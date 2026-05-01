@@ -54,6 +54,13 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.5 &mdash; 2026-05-01
+
+- Pulled <em>El Fr&iacute;o Silencio</em> from the short bio paragraph
+  &mdash; it&rsquo;s a 2027 feature that hasn&rsquo;t released, so leading
+  the bio with it overstates the moment. Still listed in the Film
+  credits section below where the year is shown explicitly.
+
 ### v0.4.4 &mdash; 2026-05-01
 
 - Dropped the &ldquo;Frank Rizzo&rdquo; tagline under the hero logo &mdash;
