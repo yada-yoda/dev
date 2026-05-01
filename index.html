@@ -410,6 +410,10 @@ table.credits tr:last-child td{border-bottom:none}
 table.credits td.title{color:#fff;font-weight:600}
 table.credits td.role{color:var(--accent)}
 table.credits td.dir{color:var(--muted);font-size:13px}
+table.credits td.dir .venue-sub{
+  display:block;color:var(--dim);font-size:11px;
+  margin-top:2px;letter-spacing:.02em;font-style:italic;
+}
 @media (max-width:640px){
   table.credits th:nth-child(3),table.credits td:nth-child(3){display:none}
 }
@@ -503,25 +507,17 @@ footer .ver{color:var(--dim);margin-left:10px}
   a{color:#000;text-decoration:none}
 
   .rs-head{
-    display:grid;grid-template-columns:1fr auto;gap:18px;align-items:start;
+    display:grid;grid-template-columns:1fr auto;gap:18px;align-items:end;
     padding-bottom:10px;
     border-bottom:2px solid #2c2e3d;
     margin-bottom:14px;
   }
-  .rs-head .rs-logo{
-    height:0.55in;width:auto;display:block;margin-bottom:6px;
-  }
   .rs-head h1{
-    font-family:'Montserrat',sans-serif;font-weight:700;
-    font-size:14pt;letter-spacing:.18em;line-height:1;color:#2c2e3d;
-    margin:0 0 4px 0;text-transform:uppercase;
+    font-family:'Montserrat',sans-serif;font-weight:900;
+    font-size:38pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
+    margin:0 0 10px 0;text-transform:uppercase;
   }
-  .rs-head .rs-sub{
-    font-family:'Montserrat',sans-serif;font-weight:600;font-size:9pt;
-    letter-spacing:.32em;text-transform:uppercase;color:#00bcd4;
-    margin-bottom:8px;
-  }
-  .rs-head .rs-contact{font-size:9.5pt;color:#333;line-height:1.5}
+  .rs-head .rs-contact{font-size:10pt;color:#333;line-height:1.5}
   .rs-head .rs-contact span{margin-right:10px}
   .rs-head .rs-contact strong{color:#2c2e3d;font-weight:700;margin-right:4px}
   .rs-head .rs-headshot{
@@ -560,6 +556,10 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-table td.t{font-weight:700;color:#000;width:42%}
   .rs-table td.r{color:#00697a;width:28%}
   .rs-table td.d{color:#555;font-style:italic;width:30%;font-size:8.5pt}
+  .rs-table td.d .rs-venue-sub{
+    display:block;color:#999;font-size:7pt;font-style:italic;
+    margin-top:1px;line-height:1.2;
+  }
   .rs-table td.span3{font-style:italic;color:#555}
 
   .rs-training-list,.rs-skills-list{font-size:9.5pt;line-height:1.5}
@@ -601,8 +601,6 @@ footer .ver{color:var(--dim);margin-left:10px}
   </a>
   <nav class="nav">
     <a href="#about">About</a>
-    <a href="#bio">Bio</a>
-    <a href="#profile">Profile</a>
     <a href="#resume">Resume</a>
     <a href="#credits">Credits</a>
     <a href="#contact">Contact</a>
@@ -622,7 +620,7 @@ footer .ver{color:var(--dim);margin-left:10px}
       <img src="assets/rizzo_logo_white.png" alt="RIZZO">
       <span class="tld">.cc</span>
     </h1>
-    <p class="hero-tag">Frank Rizzo &mdash; Actor</p>
+    <p class="hero-tag">Frank Rizzo</p>
 
     <div class="hero-quotes" aria-hidden="true">
       <span>&ldquo;Separation is in the preparation.&rdquo;</span>
@@ -668,18 +666,14 @@ footer .ver{color:var(--dim);margin-left:10px}
 <!-- ============ Bio ============ -->
 <section id="bio">
   <div class="wrap">
-    <div class="section-head">
-      <span class="kicker">02 &mdash; Bio</span>
-      <h2>Short Version</h2>
-      <span class="rule"></span>
-    </div>
     <div class="bio-prose">
       <p>
-        Frank Rizzo is a Chicago-based actor with formal training out of <strong>The Second City</strong>
-        and <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University and a working
-        background spanning music management and finance bring authentic professional-world texture to
-        his character roles. Selected credits include <em>El Fr&iacute;o Silencio</em> (feature,
-        dir. Zach Cortino), <em>Waiter Boys</em>, and <em>Deadly Domicile</em>.
+        Chicago-based. Formal training out of <strong>The Second City</strong> and
+        <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University
+        and a working background spanning music management and finance bring authentic
+        professional-world texture to character work on screen. Selected credits include
+        <em>El Fr&iacute;o Silencio</em> (feature, dir. Zach Cortino), <em>Waiter Boys</em>,
+        and <em>Deadly Domicile</em>.
       </p>
     </div>
   </div>
@@ -688,18 +682,12 @@ footer .ver{color:var(--dim);margin-left:10px}
 <!-- ============ Profile + Socials ============ -->
 <section id="profile">
   <div class="wrap">
-    <div class="section-head">
-      <span class="kicker">03 &mdash; Profile</span>
-      <h2>The Actor</h2>
-      <span class="rule"></span>
-    </div>
-
     <div class="profile">
       <div class="headshot" aria-label="Frank Rizzo headshot"></div>
 
       <div class="profile-meta">
-        <div class="role">Actor &middot; Chicago</div>
         <h3>Frank Rizzo</h3>
+        <div class="role">Chicago</div>
         <p style="margin-top:10px;color:var(--muted);max-width:560px">
           Stage, screen, and on-camera training out of The Second City and Acting Studio Chicago.
           Selected credits below. Always reading.
@@ -732,7 +720,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <section id="resume">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker">04 &mdash; Resume</span>
+      <span class="kicker">02 &mdash; Resume</span>
       <h2>Stats &amp; Training</h2>
       <span class="rule"></span>
     </div>
@@ -839,7 +827,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <section id="credits">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker">05 &mdash; Credits</span>
+      <span class="kicker">03 &mdash; Credits</span>
       <h2>Filmography</h2>
       <span class="rule"></span>
     </div>
@@ -872,19 +860,16 @@ footer .ver{color:var(--dim);margin-left:10px}
     </div>
 
     <div class="tab-panel" id="theater">
-      <p style="color:var(--muted);font-size:13px;letter-spacing:.04em;margin:0 0 14px">
-        All shows below performed at <strong style="color:#fff;font-weight:600">The Second City Training Center, Chicago</strong>.
-      </p>
       <table class="credits">
         <thead><tr><th>Production</th><th>Role / Sketches</th><th>Stage</th></tr></thead>
         <tbody>
-          <tr><td class="title">Grad Revue I Show</td><td class="role">Ensemble</td><td class="dir">Donny&rsquo;s Skybox</td></tr>
-          <tr><td class="title">Conservatory III Show</td><td class="role">Ensemble</td><td class="dir">New Judy&rsquo;s Beat Lounge</td></tr>
-          <tr><td class="title">Conservatory II Show</td><td class="role">Ensemble</td><td class="dir">New Judy&rsquo;s Beat Lounge</td></tr>
-          <tr><td class="title">Conservatory I Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</span></td><td class="dir">New Judy&rsquo;s Beat Lounge</td></tr>
-          <tr><td class="title">Improv V Show</td><td class="role">Ensemble</td><td class="dir">Donny&rsquo;s Skybox</td></tr>
-          <tr><td class="title">Acting III Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</span></td><td class="dir">Judy&rsquo;s Beat Lounge</td></tr>
-          <tr><td class="title">Improv IV Show</td><td class="role">Ensemble</td><td class="dir">De Maat Studio</td></tr>
+          <tr><td class="title">Grad Revue I Show</td><td class="role">Ensemble</td><td class="dir">Donny&rsquo;s Skybox<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Conservatory III Show</td><td class="role">Ensemble</td><td class="dir">New Judy&rsquo;s Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Conservatory II Show</td><td class="role">Ensemble</td><td class="dir">New Judy&rsquo;s Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Conservatory I Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</span></td><td class="dir">New Judy&rsquo;s Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Improv V Show</td><td class="role">Ensemble</td><td class="dir">Donny&rsquo;s Skybox<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Acting III Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</span></td><td class="dir">Judy&rsquo;s Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Improv IV Show</td><td class="role">Ensemble</td><td class="dir">De Maat Studio<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
         </tbody>
       </table>
     </div>
@@ -917,7 +902,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <!-- ============ Contact ============ -->
 <section class="contact" id="contact">
   <div class="wrap">
-    <span class="kicker" style="font-family:'Montserrat',sans-serif;font-size:11px;color:var(--accent);letter-spacing:.3em;text-transform:uppercase">06 &mdash; Contact</span>
+    <span class="kicker" style="font-family:'Montserrat',sans-serif;font-size:11px;color:var(--accent);letter-spacing:.3em;text-transform:uppercase">04 &mdash; Contact</span>
     <h2 style="margin-top:8px">Let&rsquo;s Work</h2>
     <p style="color:var(--muted);max-width:520px;margin:14px auto 0">
       For bookings, sides, or just to say hi.
@@ -940,15 +925,10 @@ footer .ver{color:var(--dim);margin-left:10px}
 <div class="resume-sheet" aria-hidden="true">
   <div class="rs-head">
     <div>
-      <img src="assets/rizzo_logo_dark.png" alt="RIZZO" class="rs-logo">
       <h1>Frank Rizzo</h1>
-      <div class="rs-sub">Actor</div>
       <div class="rs-contact">
         <span><strong>Email:</strong>frank@rizzo.cc</span>
         <span><strong>Web:</strong>rizzo.cc</span>
-        <span><strong>IMDb:</strong>nm16283183</span><br>
-        <span><strong>IG:</strong>@heyfrank</span>
-        <span><strong>Letterboxd:</strong>heyfrank</span>
         <span><strong>Local Hire:</strong>Chicago</span>
       </div>
     </div>
@@ -982,15 +962,14 @@ footer .ver{color:var(--dim);margin-left:10px}
 
   <div class="rs-section">
     <h2>Theater &middot; Sketch / Improv</h2>
-    <div style="font-size:8.5pt;color:#666;font-style:italic;margin-bottom:5px">All shows performed at The Second City Training Center, Chicago.</div>
     <table class="rs-table rs-theater">
-      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny&rsquo;s Skybox</td></tr>
-      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy&rsquo;s Beat Lounge</td></tr>
-      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy&rsquo;s Beat Lounge</td></tr>
-      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy&rsquo;s Beat Lounge</td></tr>
-      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny&rsquo;s Skybox</td></tr>
-      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy&rsquo;s Beat Lounge</td></tr>
-      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio</td></tr>
+      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny&rsquo;s Skybox<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy&rsquo;s Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy&rsquo;s Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy&rsquo;s Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny&rsquo;s Skybox<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy&rsquo;s Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
     </table>
   </div>
 
@@ -1053,7 +1032,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.1</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.2</span>
 </footer>
 
 <script>

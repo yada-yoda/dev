@@ -54,6 +54,26 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.2 &mdash; 2026-05-01
+
+- **Show, don&rsquo;t tell** pass on labels.
+  &ldquo;Short Version&rdquo; (Bio) and &ldquo;The Actor&rdquo; (Profile) section
+  headings removed &mdash; the prose and the headshot speak for themselves.
+  Hero tagline trimmed from &ldquo;Frank Rizzo &mdash; Actor&rdquo; to just
+  &ldquo;Frank Rizzo.&rdquo; Profile role tag dropped from
+  &ldquo;Actor &middot; Chicago&rdquo; to &ldquo;Chicago.&rdquo; Bio paragraph
+  reworded to drop the explicit &ldquo;actor&rdquo; opener.
+- **Print resume header rebuilt.** Dropped the RIZZO logo image (it
+  was duplicating the name). &ldquo;FRANK RIZZO&rdquo; now displays as a single
+  large 38pt headline, both names same weight. &ldquo;Actor&rdquo; subtitle
+  removed. Contact line stripped to just **Email / Web / Local Hire**
+  &mdash; IG, Letterboxd, and IMDb code dropped from the printed PDF
+  (they remain on the website for visitors who want them).
+- **Theater venue restructured.** Dropped the &ldquo;All shows performed
+  at...&rdquo; intro line on both screen and print; the venue text now
+  tucks under each stage name in a smaller, faded italic style.
+- Top nav dropped the now-unlabeled Bio / Profile links.
+
 ### v0.4.1 &mdash; 2026-05-01
 
 - **Theater section** filled in with seven real Second City Training
