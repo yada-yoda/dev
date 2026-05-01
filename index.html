@@ -479,11 +479,11 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 @media print{
   /* Use letter portrait, tight margins */
-  @page{size:letter portrait;margin:0.4in}
+  @page{size:letter portrait;margin:0.35in}
 
   /* Reset everything visual on the page */
   html,body{background:#fff!important;color:#000!important}
-  body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:10pt;line-height:1.35}
+  body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:9.5pt;line-height:1.3}
 
   /* Hide everything except the resume sheet */
   body > *{display:none!important}
@@ -500,22 +500,22 @@ footer .ver{color:var(--dim);margin-left:10px}
   a{color:#000;text-decoration:none}
 
   .rs-head{
-    display:grid;grid-template-columns:1fr auto;gap:18px;align-items:end;
-    padding-bottom:10px;
+    display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;
+    padding-bottom:6px;
     border-bottom:2px solid #2c2e3d;
-    margin-bottom:14px;
+    margin-bottom:9px;
   }
   .rs-head h1{
     font-family:'Montserrat',sans-serif;font-weight:900;
-    font-size:38pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
+    font-size:34pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
     margin:0;text-transform:uppercase;
   }
   .rs-head .rs-sub{
-    font-family:'Montserrat',sans-serif;font-weight:600;font-size:10pt;
+    font-family:'Montserrat',sans-serif;font-weight:600;font-size:9pt;
     letter-spacing:.4em;text-transform:uppercase;color:#00bcd4;
-    margin:4px 0 10px 0;
+    margin:3px 0 7px 0;
   }
-  .rs-head .rs-contact{font-size:10pt;color:#333;line-height:1.5}
+  .rs-head .rs-contact{font-size:9.5pt;color:#333;line-height:1.45}
   .rs-head .rs-contact span{margin-right:10px}
   .rs-head .rs-contact strong{color:#2c2e3d;font-weight:700;margin-right:4px}
   .rs-head .rs-headshot{
@@ -526,30 +526,30 @@ footer .ver{color:var(--dim);margin-left:10px}
   }
 
   .rs-stats{
-    display:grid;grid-template-columns:repeat(6,1fr);gap:6px 14px;
-    padding:8px 0 12px;
+    display:grid;grid-template-columns:repeat(6,1fr);gap:3px 12px;
+    padding:5px 0 6px;
     border-bottom:1px solid #ccc;
-    margin-bottom:14px;
-    font-size:9pt;
+    margin-bottom:9px;
+    font-size:8.5pt;
   }
   .rs-stats div strong{
     display:block;font-family:'Montserrat',sans-serif;font-weight:700;
-    font-size:7.5pt;letter-spacing:.18em;text-transform:uppercase;color:#00bcd4;
-    margin-bottom:1px;
+    font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#00bcd4;
+    margin-bottom:0;
   }
 
-  .rs-section{margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
+  .rs-section{margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}
   .rs-section h2{
     font-family:'Montserrat',sans-serif;font-weight:700;
-    font-size:10pt;letter-spacing:.28em;text-transform:uppercase;
-    color:#2c2e3d;margin:0 0 6px 0;
-    padding-bottom:3px;border-bottom:1.5px solid #00bcd4;
+    font-size:9.5pt;letter-spacing:.26em;text-transform:uppercase;
+    color:#2c2e3d;margin:0 0 4px 0;
+    padding-bottom:2px;border-bottom:1.5px solid #00bcd4;
   }
   .rs-table{width:100%;border-collapse:collapse}
   .rs-table td{
-    padding:3px 6px 3px 0;
+    padding:2px 6px 2px 0;
     vertical-align:top;
-    font-size:9.5pt;
+    font-size:9pt;
   }
   .rs-table td.t{font-weight:700;color:#000;width:42%}
   .rs-table td.r{color:#00697a;width:28%}
@@ -560,32 +560,48 @@ footer .ver{color:var(--dim);margin-left:10px}
   }
   .rs-table td.span3{font-style:italic;color:#555}
 
-  .rs-training-list,.rs-skills-list{font-size:9.5pt;line-height:1.5}
-  .rs-training-list div{margin-bottom:3px}
-  .rs-training-list strong{color:#2c2e3d}
-  .rs-training-list em{color:#666;font-style:normal;font-size:8.5pt;margin-left:6px}
+  /* Theater table has shorter production names + longer sketch lists,
+     so it needs different column proportions than Film/TV. */
+  .rs-table.rs-theater td.t{width:28%}
+  .rs-table.rs-theater td.r{width:42%}
+  .rs-table.rs-theater td.d{width:30%}
+
+  .rs-skills-list{font-size:9pt;line-height:1.4}
+  .rs-training-list{
+    column-count:2;
+    column-gap:24px;
+    -webkit-column-count:2;
+    font-size:9pt;line-height:1.35;
+  }
+  .rs-training-list div{
+    margin-bottom:3px;
+    break-inside:avoid;
+    page-break-inside:avoid;
+  }
+  .rs-training-list strong{color:#2c2e3d;display:block}
+  .rs-training-list em{color:#666;font-style:normal;font-size:8pt;display:block;margin-left:0}
 
   .rs-foot{
-    margin-top:14px;padding-top:10px;
+    margin-top:8px;padding-top:6px;
     border-top:1px solid #ccc;
     display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
   }
   .rs-foot .rs-foot-text{
-    font-family:'Montserrat',sans-serif;font-size:8.5pt;
+    font-family:'Montserrat',sans-serif;font-size:8pt;
     letter-spacing:.22em;text-transform:uppercase;color:#666;
-    line-height:1.5;
+    line-height:1.45;
   }
   .rs-foot .rs-foot-text strong{
-    color:#2c2e3d;font-size:10pt;letter-spacing:.18em;display:block;
-    margin-bottom:2px;
+    color:#2c2e3d;font-size:9.5pt;letter-spacing:.18em;display:block;
+    margin-bottom:1px;
   }
   .rs-foot .rs-qr{
-    width:0.95in;height:0.95in;display:block;
+    width:0.8in;height:0.8in;display:block;
   }
   .rs-foot .rs-qr-label{
     text-align:center;font-family:'Montserrat',sans-serif;
-    font-size:6.5pt;letter-spacing:.2em;text-transform:uppercase;
-    color:#888;margin-top:2px;
+    font-size:6pt;letter-spacing:.2em;text-transform:uppercase;
+    color:#888;margin-top:1px;
   }
 }
 </style>
@@ -1018,8 +1034,7 @@ footer .ver{color:var(--dim);margin-left:10px}
   <div class="rs-foot">
     <div class="rs-foot-text">
       <strong>rizzo.cc</strong>
-      Reel, headshots &amp; full credits<br>
-      frank@rizzo.cc &middot; @heyfrank
+      frank@rizzo.cc
     </div>
     <div>
       <img src="assets/qr-rizzo-cc.svg" alt="QR code linking to rizzo.cc" class="rs-qr">
@@ -1029,7 +1044,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.5</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.6</span>
 </footer>
 
 <script>

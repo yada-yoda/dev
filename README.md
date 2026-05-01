@@ -54,6 +54,24 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.6 &mdash; 2026-05-01
+
+- **One-page PDF pass.** Tightened the printed resume across the board so
+  it fits on a single letter page in standard cases:
+  - **Theater table** column widths redistributed (28/42/30 instead of
+    inheriting Film&rsquo;s 42/28/30) so production names don&rsquo;t hog space
+    and sketch lists fit with less wrapping.
+  - **Training section** now lays out in **2 columns** (`column-count:2`)
+    with strong/em entries stacked vertically &mdash; cuts the section&rsquo;s
+    vertical footprint roughly in half.
+  - **Body type** trimmed to 9.5pt (was 10pt), section margins to 8px
+    (was 12px), h2 margins/padding tightened, table row padding reduced
+    from 3px to 2px, page margins from 0.4in to 0.35in.
+  - **Header h1** dropped from 38pt to 34pt (still dominant), stats grid
+    rows tightened, footer trimmed from 3 lines to 2 (the &ldquo;Reel,
+    headshots &amp; full credits&rdquo; line was redundant with the QR caption).
+  - **QR code** shrunk slightly from 0.95in to 0.8in.
+
 ### v0.4.5 &mdash; 2026-05-01
 
 - Pulled <em>El Fr&iacute;o Silencio</em> from the short bio paragraph
