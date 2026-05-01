@@ -13,8 +13,9 @@
 <meta property="og:title" content="Rizzo.cc | Frank Rizzo">
 <meta property="og:description" content="Actor. Selected credits, training, contact.">
 <meta property="og:url" content="https://rizzo.franktrades.com/">
-<meta property="og:image" content="https://rizzo.franktrades.com/wp-content/uploads/2024/01/rizzocc_OG_logo.png">
+<meta property="og:image" content="assets/rizzo_og.png">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="assets/rizzo_og.png">
 
 <!-- JSON-LD Person schema -->
 <script type="application/ld+json">
@@ -33,8 +34,8 @@
 </script>
 
 <!-- Favicon -->
-<link rel="icon" href="https://rizzo.franktrades.com/wp-content/uploads/2023/12/android-chrome-192x1921-1.png">
-<link rel="apple-touch-icon" href="https://rizzo.franktrades.com/wp-content/uploads/2023/12/android-chrome-192x1921-1.png">
+<link rel="icon" href="assets/favicon-192.png">
+<link rel="apple-touch-icon" href="assets/favicon-192.png">
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -89,11 +90,14 @@ ul{list-style:none}
 }
 .topbar.scrolled{background:rgba(37,39,58,.92);box-shadow:0 1px 0 var(--line)}
 .brand{
+  display:inline-flex;align-items:baseline;gap:6px;
   font-family:'Montserrat',sans-serif;font-weight:900;
   letter-spacing:.18em;font-size:18px;color:#fff;
   text-transform:uppercase;
+  text-decoration:none;
 }
-.brand span{color:var(--accent)}
+.brand img{height:22px;width:auto;display:block;align-self:center}
+.brand .tld{color:var(--accent);font-size:14px;letter-spacing:.12em}
 .nav{display:flex;gap:28px}
 .nav a{
   font-family:'Montserrat',sans-serif;font-weight:600;
@@ -137,14 +141,21 @@ ul{list-style:none}
   max-width:900px;padding:120px 24px 80px;
 }
 .hero-logo{
-  font-family:'Montserrat',sans-serif;font-weight:900;
-  font-size:clamp(48px,9vw,120px);
-  letter-spacing:.04em;line-height:.95;
-  text-transform:uppercase;
-  color:#fff;
-  text-shadow:0 4px 30px rgba(0,0,0,.55);
+  display:inline-flex;align-items:baseline;justify-content:center;gap:14px;
+  filter:drop-shadow(0 6px 30px rgba(0,0,0,.55));
 }
-.hero-logo .dot{color:var(--accent)}
+.hero-logo img{
+  width:clamp(280px,50vw,640px);
+  height:auto;display:block;
+  align-self:center;
+}
+.hero-logo .tld{
+  font-family:'Montserrat',sans-serif;font-weight:900;
+  font-size:clamp(28px,5vw,56px);
+  color:var(--accent);
+  letter-spacing:.04em;
+  line-height:1;
+}
 .hero-tag{
   margin-top:18px;
   font-family:'Source Sans 3',sans-serif;font-weight:300;
@@ -263,7 +274,7 @@ section + section{border-top:1px solid var(--line)}
 .headshot{
   width:280px;aspect-ratio:1/1;
   background:#1a1b25 center/cover no-repeat;
-  background-image:url('https://rizzo.franktrades.com/wp-content/uploads/2024/04/Frank-Rizzo-Front-Face-scaled-thegem-person.jpeg');
+  background-image:url('assets/headshot.jpg');
   border-radius:var(--radius);
   border:1px solid var(--line-2);
   box-shadow:var(--shadow);
@@ -483,10 +494,13 @@ footer .ver{color:var(--dim);margin-left:10px}
     border-bottom:2px solid #2c2e3d;
     margin-bottom:14px;
   }
+  .rs-head .rs-logo{
+    height:0.55in;width:auto;display:block;margin-bottom:6px;
+  }
   .rs-head h1{
-    font-family:'Montserrat',sans-serif;font-weight:900;
-    font-size:30pt;letter-spacing:.04em;line-height:1;color:#2c2e3d;
-    margin:0 0 4px 0;
+    font-family:'Montserrat',sans-serif;font-weight:700;
+    font-size:14pt;letter-spacing:.18em;line-height:1;color:#2c2e3d;
+    margin:0 0 4px 0;text-transform:uppercase;
   }
   .rs-head .rs-sub{
     font-family:'Montserrat',sans-serif;font-weight:600;font-size:9pt;
@@ -499,7 +513,7 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-head .rs-headshot{
     width:1.2in;height:1.5in;
     background:#eee center/cover no-repeat;
-    background-image:url('https://rizzo.franktrades.com/wp-content/uploads/2024/04/Frank-Rizzo-Front-Face-scaled-thegem-person.jpeg');
+    background-image:url('assets/headshot.jpg');
     border:1px solid #2c2e3d;
   }
 
@@ -552,7 +566,10 @@ footer .ver{color:var(--dim);margin-left:10px}
 <body>
 
 <header class="topbar" id="topbar">
-  <div class="brand">RIZZO<span>.</span>CC</div>
+  <a class="brand" href="#page" aria-label="Rizzo.cc home">
+    <img src="assets/rizzo_logo_white.png" alt="RIZZO">
+    <span class="tld">.cc</span>
+  </a>
   <nav class="nav">
     <a href="#about">About</a>
     <a href="#profile">Profile</a>
@@ -571,7 +588,10 @@ footer .ver{color:var(--dim);margin-left:10px}
   </video>
 
   <div class="hero-inner">
-    <h1 class="hero-logo">Rizzo<span class="dot">.</span>cc</h1>
+    <h1 class="hero-logo">
+      <img src="assets/rizzo_logo_white.png" alt="RIZZO">
+      <span class="tld">.cc</span>
+    </h1>
     <p class="hero-tag">Frank Rizzo &mdash; Actor</p>
 
     <div class="hero-quotes" aria-hidden="true">
@@ -850,8 +870,9 @@ footer .ver{color:var(--dim);margin-left:10px}
 <div class="resume-sheet" aria-hidden="true">
   <div class="rs-head">
     <div>
-      <h1>FRANK RIZZO</h1>
-      <div class="rs-sub">Actor &middot; Non-Union</div>
+      <img src="assets/rizzo_logo_dark.png" alt="RIZZO" class="rs-logo">
+      <h1>Frank Rizzo</h1>
+      <div class="rs-sub">Actor</div>
       <div class="rs-contact">
         <span><strong>Email:</strong>frank@rizzo.cc</span>
         <span><strong>Web:</strong>rizzo.cc</span>
@@ -932,7 +953,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.2.0</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.3.0</span>
 </footer>
 
 <script>

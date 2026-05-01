@@ -40,6 +40,19 @@ resume info into clean panels at the bottom.
 
 ## Changelog
 
+### v0.3.0 &mdash; 2026-05-01
+
+- Carried over the existing **RIZZO wordmark logo** from rizzo.cc.
+  Three local copies in `assets/`: white (for dark UI), dark gray (for
+  print), and a wider OG variant.
+- Topbar and hero now display the logo image instead of a Montserrat
+  text wordmark, with the cyan `.cc` accent kept as a separate text
+  element.
+- Print resume header now shows the dark logo above the actor name.
+- Headshot, favicon, and OG image all served from local `assets/`
+  &mdash; the redesign is now fully self-contained, no hot-links to the
+  WordPress install.
+
 ### v0.2.0 &mdash; 2026-05-01
 
 - Added **Save Resume PDF** floating button (bottom-right). Triggers the
