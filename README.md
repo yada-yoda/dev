@@ -40,6 +40,17 @@ resume info into clean panels at the bottom.
 
 ## Changelog
 
+### v0.2.0 &mdash; 2026-05-01
+
+- Added **Save Resume PDF** floating button (bottom-right). Triggers the
+  browser print dialog &mdash; pick &ldquo;Save as PDF&rdquo; as the destination.
+- Added a print-only `.resume-sheet` styled as a standard actor&rsquo;s
+  headshot resume: name + headshot top, physical-stats row, Film / TV /
+  Commercial credit tables, training, languages, special skills.
+- Letter portrait, 0.4&Prime; margins, single-page target. Brand carry-over
+  is restrained for print: navy section rules, cyan accent on labels,
+  black body text on white paper.
+
 ### v0.1.0 &mdash; 2026-05-01
 
 - Initial scaffold. Single-file `index.html`, no external JS deps.

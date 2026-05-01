@@ -429,6 +429,124 @@ footer .ver{color:var(--dim);margin-left:10px}
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+/* ============ Print / PDF resume ============ */
+.print-btn{
+  position:fixed;right:24px;bottom:24px;z-index:60;
+  display:inline-flex;align-items:center;gap:10px;
+  padding:14px 22px;border-radius:999px;border:none;cursor:pointer;
+  background:var(--accent);color:#0d2226;
+  font-family:'Montserrat',sans-serif;font-weight:700;font-size:12px;
+  letter-spacing:.22em;text-transform:uppercase;
+  box-shadow:0 8px 24px rgba(0,188,212,.35), 0 4px 12px rgba(0,0,0,.35);
+  transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+}
+.print-btn:hover{
+  transform:translateY(-2px);
+  background:var(--accent-2);
+  box-shadow:0 12px 30px rgba(0,188,212,.45), 0 6px 14px rgba(0,0,0,.4);
+}
+.print-btn svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:2}
+@media (max-width:560px){
+  .print-btn{right:14px;bottom:14px;padding:12px 18px;font-size:11px}
+  .print-btn span.lbl{display:none}
+}
+
+/* The resume sheet is hidden on screen, revealed only when printing */
+.resume-sheet{display:none}
+
+@media print{
+  /* Use letter portrait, tight margins */
+  @page{size:letter portrait;margin:0.4in}
+
+  /* Reset everything visual on the page */
+  html,body{background:#fff!important;color:#000!important}
+  body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:10pt;line-height:1.35}
+
+  /* Hide everything except the resume sheet */
+  body > *{display:none!important}
+  body > .resume-sheet{display:block!important}
+
+  /* Show the sheet */
+  .resume-sheet{
+    display:block;
+    width:100%;color:#000;background:#fff;
+    -webkit-print-color-adjust:exact;
+    print-color-adjust:exact;
+  }
+
+  a{color:#000;text-decoration:none}
+
+  .rs-head{
+    display:grid;grid-template-columns:1fr auto;gap:18px;align-items:start;
+    padding-bottom:10px;
+    border-bottom:2px solid #2c2e3d;
+    margin-bottom:14px;
+  }
+  .rs-head h1{
+    font-family:'Montserrat',sans-serif;font-weight:900;
+    font-size:30pt;letter-spacing:.04em;line-height:1;color:#2c2e3d;
+    margin:0 0 4px 0;
+  }
+  .rs-head .rs-sub{
+    font-family:'Montserrat',sans-serif;font-weight:600;font-size:9pt;
+    letter-spacing:.32em;text-transform:uppercase;color:#00bcd4;
+    margin-bottom:8px;
+  }
+  .rs-head .rs-contact{font-size:9.5pt;color:#333;line-height:1.5}
+  .rs-head .rs-contact span{margin-right:10px}
+  .rs-head .rs-contact strong{color:#2c2e3d;font-weight:700;margin-right:4px}
+  .rs-head .rs-headshot{
+    width:1.2in;height:1.5in;
+    background:#eee center/cover no-repeat;
+    background-image:url('https://rizzo.franktrades.com/wp-content/uploads/2024/04/Frank-Rizzo-Front-Face-scaled-thegem-person.jpeg');
+    border:1px solid #2c2e3d;
+  }
+
+  .rs-stats{
+    display:grid;grid-template-columns:repeat(6,1fr);gap:6px 14px;
+    padding:8px 0 12px;
+    border-bottom:1px solid #ccc;
+    margin-bottom:14px;
+    font-size:9pt;
+  }
+  .rs-stats div strong{
+    display:block;font-family:'Montserrat',sans-serif;font-weight:700;
+    font-size:7.5pt;letter-spacing:.18em;text-transform:uppercase;color:#00bcd4;
+    margin-bottom:1px;
+  }
+
+  .rs-section{margin-bottom:12px;break-inside:avoid;page-break-inside:avoid}
+  .rs-section h2{
+    font-family:'Montserrat',sans-serif;font-weight:700;
+    font-size:10pt;letter-spacing:.28em;text-transform:uppercase;
+    color:#2c2e3d;margin:0 0 6px 0;
+    padding-bottom:3px;border-bottom:1.5px solid #00bcd4;
+  }
+  .rs-table{width:100%;border-collapse:collapse}
+  .rs-table td{
+    padding:3px 6px 3px 0;
+    vertical-align:top;
+    font-size:9.5pt;
+  }
+  .rs-table td.t{font-weight:700;color:#000;width:42%}
+  .rs-table td.r{color:#00697a;width:28%}
+  .rs-table td.d{color:#555;font-style:italic;width:30%;font-size:8.5pt}
+  .rs-table td.span3{font-style:italic;color:#555}
+
+  .rs-training-list,.rs-skills-list{font-size:9.5pt;line-height:1.5}
+  .rs-training-list div{margin-bottom:3px}
+  .rs-training-list strong{color:#2c2e3d}
+  .rs-training-list em{color:#666;font-style:normal;font-size:8.5pt;margin-left:6px}
+
+  .rs-foot{
+    margin-top:14px;padding-top:8px;
+    border-top:1px solid #ccc;
+    text-align:center;
+    font-family:'Montserrat',sans-serif;font-size:8pt;
+    letter-spacing:.3em;text-transform:uppercase;color:#999;
+  }
+}
 </style>
 </head>
 <body>
@@ -718,8 +836,103 @@ footer .ver{color:var(--dim);margin-left:10px}
   </div>
 </section>
 
+<!-- Floating Save-as-PDF button (hidden when printing) -->
+<button class="print-btn" id="printBtn" aria-label="Save resume as PDF">
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>
+    <path d="M14 2v6h6"/>
+    <path d="M9 13h6M9 17h6M9 9h2"/>
+  </svg>
+  <span class="lbl">Save Resume PDF</span>
+</button>
+
+<!-- Print-only resume sheet (revealed by @media print) -->
+<div class="resume-sheet" aria-hidden="true">
+  <div class="rs-head">
+    <div>
+      <h1>FRANK RIZZO</h1>
+      <div class="rs-sub">Actor &middot; Non-Union</div>
+      <div class="rs-contact">
+        <span><strong>Email:</strong>frank@rizzo.cc</span>
+        <span><strong>Web:</strong>rizzo.cc</span>
+        <span><strong>IMDb:</strong>nm16283183</span><br>
+        <span><strong>IG:</strong>@heyfrank</span>
+        <span><strong>Letterboxd:</strong>heyfrank</span>
+        <span><strong>Based:</strong>Chicago, IL</span>
+      </div>
+    </div>
+    <div class="rs-headshot" aria-label="Frank Rizzo headshot"></div>
+  </div>
+
+  <div class="rs-stats">
+    <div><strong>Height</strong>6&prime;0&Prime;</div>
+    <div><strong>Eyes</strong>Blue</div>
+    <div><strong>Hair</strong>Bald / Buzz / Brown</div>
+    <div><strong>Age Range</strong>34&ndash;47</div>
+    <div><strong>Shoe</strong>12.5&ndash;13 US</div>
+    <div><strong>Suit</strong>44R / L / 17.5&Prime;</div>
+  </div>
+
+  <div class="rs-section">
+    <h2>Film</h2>
+    <table class="rs-table">
+      <tr><td class="t">Deadly Domicile <em style="color:#888;font-style:normal">(Short, 2024)</em></td><td class="r">Mike</td><td class="d">dir. Skylar Kendall</td></tr>
+      <tr><td class="t">El Fr&iacute;o Silencio <em style="color:#888;font-style:normal">(Feature, 2027)</em></td><td class="r">Homeowner</td><td class="d">dir. Zach Cortino</td></tr>
+      <tr><td class="t">Waiter Boys <em style="color:#888;font-style:normal">(Short, 2025)</em></td><td class="r">Randy</td><td class="d">dir. Skylar Kendall</td></tr>
+    </table>
+  </div>
+
+  <div class="rs-section">
+    <h2>Television</h2>
+    <table class="rs-table">
+      <tr><td class="t">Deli Boys <em style="color:#888;font-style:normal">(S01)</em></td><td class="r">Background / Stand-in</td><td class="d">Hulu</td></tr>
+    </table>
+  </div>
+
+  <div class="rs-section">
+    <h2>Commercial</h2>
+    <table class="rs-table">
+      <tr><td class="span3" colspan="3">Conflicts &amp; reel available upon request.</td></tr>
+    </table>
+  </div>
+
+  <div class="rs-section">
+    <h2>Training</h2>
+    <div class="rs-training-list">
+      <div><strong>On Camera I</strong><em>Sarah Charipar &middot; Acting Studio Chicago</em></div>
+      <div><strong>Conservatory I&ndash;III</strong><em>Bradberry, Ryan, Super &middot; The Second City, Chicago</em></div>
+      <div><strong>Improv I&ndash;V</strong><em>Phillips-Spotts, DeOleo, Haughton, Rayzian, Czokse &middot; The Second City, Chicago</em></div>
+      <div><strong>Acting I&ndash;III</strong><em>Pieper, Anderson, Ryan &middot; The Second City, Chicago</em></div>
+      <div><strong>Vocal Coaching</strong><em>Amanda Murphy, Chicago, IL</em></div>
+      <div><strong>B.B.A.</strong><em>Saint Xavier University, Chicago, IL</em></div>
+    </div>
+  </div>
+
+  <div class="rs-section">
+    <h2>Languages</h2>
+    <div class="rs-skills-list">
+      English (Native) &middot; Spanish (2 yrs HS / 1 yr University) &middot; Italian (Novice) &middot; Swedish (Novice)
+    </div>
+  </div>
+
+  <div class="rs-section">
+    <h2>Special Skills</h2>
+    <div class="rs-skills-list">
+      Bike Riding &middot; Chess &middot; Finance &middot; Frisbee Golf &middot; Gaming (Video / Computer)
+      &middot; Guitar (General) &middot; IT / Computer Science &middot; Marketing &middot; Music Industry
+      &middot; Music Management &middot; Photographic Memory &middot; Poker &middot; Road Driving
+      &middot; Football &middot; Ice Skating &middot; Roller Skating &middot; Running &middot; Soccer
+      &middot; Track and Field (Discus / Shotput) &middot; Weight Lifting &middot; Yoga
+      &middot; Stock Market &middot; Swimming &middot; Tour Management
+      &middot; Valid Driver&rsquo;s License &middot; Valid Passport
+    </div>
+  </div>
+
+  <div class="rs-foot">rizzo.cc &middot; frank@rizzo.cc</div>
+</div>
+
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.1.0</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.2.0</span>
 </footer>
 
 <script>
@@ -740,6 +953,11 @@ footer .ver{color:var(--dim);margin-left:10px}
 
   // Year
   document.getElementById('yr').textContent = new Date().getFullYear();
+
+  // Save Resume PDF — opens browser print dialog; user picks "Save as PDF"
+  document.getElementById('printBtn').addEventListener('click', () => {
+    window.print();
+  });
 </script>
 </body>
 </html>
