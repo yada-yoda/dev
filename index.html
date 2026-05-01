@@ -13,9 +13,11 @@
 <meta property="og:title" content="Rizzo.cc | Frank Rizzo">
 <meta property="og:description" content="Actor. Selected credits, training, contact.">
 <meta property="og:url" content="https://rizzo.franktrades.com/">
-<meta property="og:image" content="assets/rizzo_og.png">
+<meta property="og:image" content="assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="assets/rizzo_og.png">
+<meta name="twitter:image" content="assets/og-image.png">
 
 <!-- JSON-LD Person schema -->
 <script type="application/ld+json">
@@ -223,6 +225,18 @@ section + section{border-top:1px solid var(--line)}
   font-family:'Montserrat',sans-serif;font-size:11px;
   color:var(--accent);letter-spacing:.3em;text-transform:uppercase;
 }
+
+/* ------- Bio ------- */
+.bio-prose{
+  max-width:760px;margin:0 auto;
+  font-family:'Source Sans 3',sans-serif;
+  font-size:clamp(17px,1.6vw,21px);
+  line-height:1.65;
+  color:#dde0e8;
+  text-align:center;
+}
+.bio-prose strong{color:#fff;font-weight:600}
+.bio-prose em{color:var(--accent);font-style:italic;font-weight:500}
 
 /* ------- About / RIZZO definition ------- */
 .about{
@@ -554,11 +568,26 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-training-list em{color:#666;font-style:normal;font-size:8.5pt;margin-left:6px}
 
   .rs-foot{
-    margin-top:14px;padding-top:8px;
+    margin-top:14px;padding-top:10px;
     border-top:1px solid #ccc;
-    text-align:center;
-    font-family:'Montserrat',sans-serif;font-size:8pt;
-    letter-spacing:.3em;text-transform:uppercase;color:#999;
+    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+  }
+  .rs-foot .rs-foot-text{
+    font-family:'Montserrat',sans-serif;font-size:8.5pt;
+    letter-spacing:.22em;text-transform:uppercase;color:#666;
+    line-height:1.5;
+  }
+  .rs-foot .rs-foot-text strong{
+    color:#2c2e3d;font-size:10pt;letter-spacing:.18em;display:block;
+    margin-bottom:2px;
+  }
+  .rs-foot .rs-qr{
+    width:0.95in;height:0.95in;display:block;
+  }
+  .rs-foot .rs-qr-label{
+    text-align:center;font-family:'Montserrat',sans-serif;
+    font-size:6.5pt;letter-spacing:.2em;text-transform:uppercase;
+    color:#888;margin-top:2px;
   }
 }
 </style>
@@ -572,6 +601,7 @@ footer .ver{color:var(--dim);margin-left:10px}
   </a>
   <nav class="nav">
     <a href="#about">About</a>
+    <a href="#bio">Bio</a>
     <a href="#profile">Profile</a>
     <a href="#resume">Resume</a>
     <a href="#credits">Credits</a>
@@ -635,11 +665,31 @@ footer .ver{color:var(--dim);margin-left:10px}
   </div>
 </section>
 
+<!-- ============ Bio ============ -->
+<section id="bio">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="kicker">02 &mdash; Bio</span>
+      <h2>Short Version</h2>
+      <span class="rule"></span>
+    </div>
+    <div class="bio-prose">
+      <p>
+        Frank Rizzo is a Chicago-based actor with formal training out of <strong>The Second City</strong>
+        and <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University and a working
+        background spanning music management and finance bring authentic professional-world texture to
+        his character roles. Selected credits include <em>El Fr&iacute;o Silencio</em> (feature,
+        dir. Zach Cortino), <em>Waiter Boys</em>, and <em>Deadly Domicile</em>.
+      </p>
+    </div>
+  </div>
+</section>
+
 <!-- ============ Profile + Socials ============ -->
 <section id="profile">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker">02 &mdash; Profile</span>
+      <span class="kicker">03 &mdash; Profile</span>
       <h2>The Actor</h2>
       <span class="rule"></span>
     </div>
@@ -682,7 +732,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <section id="resume">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker">03 &mdash; Resume</span>
+      <span class="kicker">04 &mdash; Resume</span>
       <h2>Stats &amp; Training</h2>
       <span class="rule"></span>
     </div>
@@ -788,7 +838,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <section id="credits">
   <div class="wrap">
     <div class="section-head">
-      <span class="kicker">04 &mdash; Credits</span>
+      <span class="kicker">05 &mdash; Credits</span>
       <h2>Filmography</h2>
       <span class="rule"></span>
     </div>
@@ -796,6 +846,7 @@ footer .ver{color:var(--dim);margin-left:10px}
     <div class="tabs" role="tablist">
       <button class="tab active" data-tab="film" role="tab">Film</button>
       <button class="tab" data-tab="tv" role="tab">TV</button>
+      <button class="tab" data-tab="theater" role="tab">Theater</button>
       <button class="tab" data-tab="commercial" role="tab">Commercial</button>
     </div>
 
@@ -815,6 +866,17 @@ footer .ver{color:var(--dim);margin-left:10px}
         <thead><tr><th>Title</th><th>Role</th><th>Network</th></tr></thead>
         <tbody>
           <tr><td class="title">Deli Boys <span class="sub" style="color:var(--dim)">(S01)</span></td><td class="role">Background / Stand-in</td><td class="dir">Hulu</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="tab-panel" id="theater">
+      <table class="credits">
+        <thead><tr><th>Production</th><th>Role</th><th>Venue / Director</th></tr></thead>
+        <tbody>
+          <tr><td class="title" colspan="3" style="text-align:center;color:var(--muted);padding:24px">
+            Selected showcase &amp; sketch work from The Second City Conservatory and Acting Studio Chicago. Full list available on request.
+          </td></tr>
         </tbody>
       </table>
     </div>
@@ -847,7 +909,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 <!-- ============ Contact ============ -->
 <section class="contact" id="contact">
   <div class="wrap">
-    <span class="kicker" style="font-family:'Montserrat',sans-serif;font-size:11px;color:var(--accent);letter-spacing:.3em;text-transform:uppercase">05 &mdash; Contact</span>
+    <span class="kicker" style="font-family:'Montserrat',sans-serif;font-size:11px;color:var(--accent);letter-spacing:.3em;text-transform:uppercase">06 &mdash; Contact</span>
     <h2 style="margin-top:8px">Let&rsquo;s Work</h2>
     <p style="color:var(--muted);max-width:520px;margin:14px auto 0">
       For bookings, sides, or just to say hi.
@@ -911,6 +973,13 @@ footer .ver{color:var(--dim);margin-left:10px}
   </div>
 
   <div class="rs-section">
+    <h2>Theater</h2>
+    <table class="rs-table">
+      <tr><td class="span3" colspan="3">Selected showcase &amp; sketch work from The Second City Conservatory and Acting Studio Chicago. Full list available on request.</td></tr>
+    </table>
+  </div>
+
+  <div class="rs-section">
     <h2>Commercial</h2>
     <table class="rs-table">
       <tr><td class="span3" colspan="3">Conflicts &amp; reel available upon request.</td></tr>
@@ -949,11 +1018,21 @@ footer .ver{color:var(--dim);margin-left:10px}
     </div>
   </div>
 
-  <div class="rs-foot">rizzo.cc &middot; frank@rizzo.cc</div>
+  <div class="rs-foot">
+    <div class="rs-foot-text">
+      <strong>rizzo.cc</strong>
+      Reel, headshots &amp; full credits<br>
+      frank@rizzo.cc &middot; @heyfrank
+    </div>
+    <div>
+      <img src="assets/qr-rizzo-cc.svg" alt="QR code linking to rizzo.cc" class="rs-qr">
+      <div class="rs-qr-label">Scan / rizzo.cc</div>
+    </div>
+  </div>
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.3.0</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.0</span>
 </footer>
 
 <script>
@@ -976,8 +1055,24 @@ footer .ver{color:var(--dim);margin-left:10px}
   document.getElementById('yr').textContent = new Date().getFullYear();
 
   // Save Resume PDF — opens browser print dialog; user picks "Save as PDF"
+  // Most browsers use document.title as the default filename. Swap it to a
+  // resume-style filename right before printing, restore it after.
+  const RESUME_LAST_UPDATED = 2026; // bump when resume content changes
+  const RESUME_FIRST = 'Frank';
+  const RESUME_LAST  = 'Rizzo';
+
   document.getElementById('printBtn').addEventListener('click', () => {
+    const original = document.title;
+    document.title = `${RESUME_FIRST}-${RESUME_LAST}-Acting-Resume-${RESUME_LAST_UPDATED}`;
     window.print();
+    // Restore after the print dialog closes (most browsers fire afterprint)
+    const restore = () => {
+      document.title = original;
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+    // Safari/iOS fallback — afterprint can be flaky
+    setTimeout(() => { document.title = original; }, 2000);
   });
 </script>
 </body>
