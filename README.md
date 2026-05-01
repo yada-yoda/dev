@@ -54,6 +54,21 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.1 &mdash; 2026-05-01
+
+- **Theater section** filled in with seven real Second City Training
+  Center credits (Grad Revue I, Conservatory I&ndash;III, Improv IV&ndash;V,
+  Acting III) on both the screen tab and the printed resume. Venue
+  lifted to a single subhead since every show was at SCTC; specific
+  stages (Donny&rsquo;s Skybox, New Judy&rsquo;s Beat Lounge, etc.)
+  remain in the venue column.
+- **Licensing &amp; Hire** panel updated: added **TSA PreCheck**, renamed
+  &ldquo;Documents&rdquo; to &ldquo;Licensing &amp; Hire&rdquo;, swapped &ldquo;Based: Chicago, IL&rdquo;
+  for the industry-standard **Local Hire: Chicago**.
+- Print resume picks up the same Local Hire / TSA PreCheck info; added
+  a dedicated &ldquo;Licensing&rdquo; section under Special Skills so it
+  doesn&rsquo;t bury in the skills list.
+
 ### v0.4.0 &mdash; 2026-05-01
 
 - **Bio section** added between About and Profile. Short third-person
