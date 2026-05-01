@@ -1,0 +1,15 @@
+# Keep source mirror local but out of git
+source/
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Build artifacts (none yet)
+node_modules/
+dist/
