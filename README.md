@@ -54,6 +54,13 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.4 &mdash; 2026-05-01
+
+- Dropped the &ldquo;Frank Rizzo&rdquo; tagline under the hero logo &mdash;
+  the RIZZO wordmark already carries the name. Removed the now-unused
+  `.hero-tag` style. Quote rotator gets a touch more headroom to fill
+  the space.
+
 ### v0.4.3 &mdash; 2026-05-01
 
 - Restored the **&ldquo;Actor&rdquo; subtitle** under the name on the
