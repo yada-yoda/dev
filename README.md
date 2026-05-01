@@ -54,6 +54,14 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.4.3 &mdash; 2026-05-01
+
+- Restored the **&ldquo;Actor&rdquo; subtitle** under the name on the
+  printed resume. The PDF is a standalone document so the role context
+  the website has from the URL, navigation, and surrounding sections
+  isn&rsquo;t there &mdash; the subtitle earns its keep on print. Set in
+  cyan small caps with wide letter-spacing under the 38pt name.
+
 ### v0.4.2 &mdash; 2026-05-01
 
 - **Show, don&rsquo;t tell** pass on labels.
