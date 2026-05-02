@@ -35,11 +35,18 @@ resume info into clean panels at the bottom.
 - Drop a real header video at `assets/header.mp4`
   (recommend 1920&times;1080, 10&ndash;20s loop, h.264 faststart, no audio).
 - Wire up the reel `<iframe>` (Vimeo or YouTube embed).
-- Fill in real Theater credits in two places: the screen tab
-  (`<div class="tab-panel" id="theater">` in `index.html`) and the
-  print resume (`<div class="rs-section">` Theater block).
 - Tighten the Special Skills list (current draft has all 25; recommended
   cut down to 8&ndash;12 high-impact entries).
+
+## Next-session PDF tweaks (deferred)
+
+- **Remove Commercial section from the printed resume.** It currently
+  just shows &ldquo;Conflicts &amp; reel available upon request&rdquo; &mdash; cutting
+  it should help everything fit on one page comfortably. Keep it on the
+  website tab for completeness.
+- **Compact the resume header.** Put **Email / Web / Local Hire** on
+  the same line as the &ldquo;ACTOR&rdquo; subtitle under the name &mdash; one
+  unified contact strip instead of stacking subtitle then contact.
 
 ## Build assets
 
