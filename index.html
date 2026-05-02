@@ -510,12 +510,17 @@ footer .ver{color:var(--dim);margin-left:10px}
     font-size:34pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
     margin:0;text-transform:uppercase;
   }
-  .rs-head .rs-sub{
-    font-family:'Montserrat',sans-serif;font-weight:600;font-size:9pt;
-    letter-spacing:.4em;text-transform:uppercase;color:#00bcd4;
-    margin:3px 0 7px 0;
+  .rs-head .rs-meta{
+    margin:5px 0 0 0;
+    font-size:9.5pt;color:#333;line-height:1.45;
+    display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;
   }
-  .rs-head .rs-contact{font-size:9.5pt;color:#333;line-height:1.45}
+  .rs-head .rs-meta .rs-sub{
+    font-family:'Montserrat',sans-serif;font-weight:700;font-size:9pt;
+    letter-spacing:.4em;text-transform:uppercase;color:#00bcd4;
+    padding-right:10px;border-right:1px solid #ccc;
+  }
+  .rs-head .rs-meta strong{color:#2c2e3d;font-weight:700;margin-right:3px}
   .rs-head .rs-contact span{margin-right:10px}
   .rs-head .rs-contact strong{color:#2c2e3d;font-weight:700;margin-right:4px}
   .rs-head .rs-headshot{
@@ -938,8 +943,8 @@ footer .ver{color:var(--dim);margin-left:10px}
   <div class="rs-head">
     <div>
       <h1>Frank Rizzo</h1>
-      <div class="rs-sub">Actor</div>
-      <div class="rs-contact">
+      <div class="rs-meta">
+        <span class="rs-sub">Actor</span>
         <span><strong>Email:</strong>frank@rizzo.cc</span>
         <span><strong>Web:</strong>rizzo.cc</span>
         <span><strong>Local Hire:</strong>Chicago</span>
@@ -986,12 +991,6 @@ footer .ver{color:var(--dim);margin-left:10px}
     </table>
   </div>
 
-  <div class="rs-section">
-    <h2>Commercial</h2>
-    <table class="rs-table">
-      <tr><td class="span3" colspan="3">Conflicts &amp; reel available upon request.</td></tr>
-    </table>
-  </div>
 
   <div class="rs-section">
     <h2>Training</h2>
@@ -1044,7 +1043,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.6</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.7</span>
 </footer>
 
 <script>

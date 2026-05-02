@@ -38,15 +38,6 @@ resume info into clean panels at the bottom.
 - Tighten the Special Skills list (current draft has all 25; recommended
   cut down to 8&ndash;12 high-impact entries).
 
-## Next-session PDF tweaks (deferred)
-
-- **Remove Commercial section from the printed resume.** It currently
-  just shows &ldquo;Conflicts &amp; reel available upon request&rdquo; &mdash; cutting
-  it should help everything fit on one page comfortably. Keep it on the
-  website tab for completeness.
-- **Compact the resume header.** Put **Email / Web / Local Hire** on
-  the same line as the &ldquo;ACTOR&rdquo; subtitle under the name &mdash; one
-  unified contact strip instead of stacking subtitle then contact.
 
 ## Build assets
 
@@ -60,6 +51,17 @@ Requires `qrcode` and `Pillow`. Re-run after changing the destination
 URL or the OG layout.
 
 ## Changelog
+
+### v0.4.7 &mdash; 2026-05-01
+
+- **Removed Commercial section from the printed resume.** It was just
+  a placeholder line; cutting it freed roughly 4 lines of vertical
+  space, making one-page fit comfortable in normal cases. Still
+  present on the website tab for completeness.
+- **Compacted the resume header into a single contact strip.** The
+  &ldquo;ACTOR&rdquo; subtitle and the Email / Web / Local Hire info now
+  sit on one row under the name, separated by a thin divider after
+  &ldquo;ACTOR&rdquo;. Saves a line and reads cleaner.
 
 ### v0.4.6 &mdash; 2026-05-01
 
