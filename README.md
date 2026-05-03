@@ -52,6 +52,21 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.2 &mdash; 2026-05-01
+
+- **Headshot semantic upgrade.** Converted from a CSS `background-image`
+  on a `<div>` to a real `<img>` tag. Previously Google Image Search
+  and most LLM crawlers would have skipped the headshot entirely
+  because CSS backgrounds aren&rsquo;t indexable. Now it shows up.
+- Rich descriptive alt text:
+  &ldquo;Frank Rizzo, Chicago-based actor &mdash; front-facing color headshot&rdquo;
+  &mdash; hits name, location, role, and image type for image search.
+- Explicit `width` / `height` attrs prevent layout shift (CLS metric).
+- `fetchpriority="high"` so the headshot loads ahead of below-fold images.
+- Print resume `.rs-headshot` left as a CSS background &mdash; only the
+  screen version is what crawlers see, and the print version uses
+  `print-color-adjust:exact` to render correctly when the user prints.
+
 ### v0.5.1 &mdash; 2026-05-01
 
 - **Crawler files at the root.** Standard set, matching the

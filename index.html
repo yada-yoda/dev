@@ -370,12 +370,13 @@ section + section{border-top:1px solid var(--line)}
 }
 @media (max-width:760px){.profile{grid-template-columns:1fr;text-align:center}}
 .headshot{
-  width:280px;aspect-ratio:1/1;
-  background:#1a1b25 center/cover no-repeat;
-  background-image:url('assets/headshot.jpg');
+  width:280px;height:280px;
+  object-fit:cover;
+  background:#1a1b25;
   border-radius:var(--radius);
   border:1px solid var(--line-2);
   box-shadow:var(--shadow);
+  display:block;
 }
 @media (max-width:760px){.headshot{margin:0 auto}}
 .profile-meta h3{font-size:32px;letter-spacing:.04em;color:#fff}
@@ -791,7 +792,12 @@ footer .ver{color:var(--dim);margin-left:10px}
 <section id="profile">
   <div class="wrap">
     <div class="profile">
-      <div class="headshot" aria-label="Frank Rizzo headshot"></div>
+      <img class="headshot"
+           src="assets/headshot.jpg"
+           alt="Frank Rizzo, Chicago-based actor — front-facing color headshot"
+           width="280" height="280"
+           fetchpriority="high"
+           decoding="async">
 
       <div class="profile-meta">
         <h3>Frank Rizzo</h3>
@@ -1134,7 +1140,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.5.1</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.5.2</span>
 </footer>
 
 <script>
