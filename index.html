@@ -3,34 +3,114 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rizzo.cc | Frank Rizzo</title>
-<meta name="description" content="RIZZO (proper noun) — actor. Selected film, TV, and commercial credits, training, and contact.">
+<title>Frank Rizzo &mdash; Actor (Chicago) | Rizzo.cc</title>
+<meta name="description" content="Frank Rizzo &mdash; Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact, downloadable resume.">
+<meta name="author" content="Frank Rizzo">
 <meta name="theme-color" content="#2c2e3d">
-<link rel="canonical" href="https://rizzo.franktrades.com/">
+<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
+<link rel="canonical" href="https://rizzo.cc/">
 
 <!-- Open Graph -->
-<meta property="og:type" content="website">
-<meta property="og:title" content="Rizzo.cc | Frank Rizzo">
-<meta property="og:description" content="Actor. Selected credits, training, contact.">
-<meta property="og:url" content="https://rizzo.franktrades.com/">
-<meta property="og:image" content="assets/og-image.png">
+<meta property="og:type" content="profile">
+<meta property="og:site_name" content="Rizzo.cc">
+<meta property="og:title" content="Frank Rizzo &mdash; Actor (Chicago)">
+<meta property="og:description" content="Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact.">
+<meta property="og:url" content="https://rizzo.cc/">
+<meta property="og:image" content="https://rizzo.cc/assets/og-image.png">
+<meta property="og:image:secure_url" content="https://rizzo.cc/assets/og-image.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="assets/og-image.png">
+<meta property="og:image:alt" content="Rizzo.cc &mdash; Frank Rizzo, Chicago-based actor">
+<meta property="og:locale" content="en_US">
+<meta property="profile:first_name" content="Frank">
+<meta property="profile:last_name" content="Rizzo">
+<meta property="profile:gender" content="male">
 
-<!-- JSON-LD Person schema -->
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Frank Rizzo &mdash; Actor (Chicago)">
+<meta name="twitter:description" content="Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact.">
+<meta name="twitter:image" content="https://rizzo.cc/assets/og-image.png">
+<meta name="twitter:image:alt" content="Rizzo.cc &mdash; Frank Rizzo, Chicago-based actor">
+
+<!-- Verification placeholders (paste real values once site is live and verified) -->
+<!-- <meta name="google-site-verification" content="PASTE_VALUE_HERE"> -->
+<!-- <meta name="msvalidate.01" content="PASTE_VALUE_HERE"> -->
+
+<!-- Structured data: Person + WebSite + Film credits in a single @graph -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
-  "@type": "Person",
-  "name": "Frank Rizzo",
-  "url": "https://rizzo.franktrades.com",
-  "jobTitle": "Actor",
-  "sameAs": [
-    "https://www.instagram.com/heyfrank/",
-    "https://letterboxd.com/heyfrank/",
-    "https://www.imdb.com/name/nm16283183/"
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://rizzo.cc/#website",
+      "url": "https://rizzo.cc/",
+      "name": "Rizzo.cc",
+      "description": "Frank Rizzo &mdash; Chicago-based actor. Selected credits, training, headshot, contact.",
+      "inLanguage": "en-US",
+      "publisher": {"@id": "https://rizzo.cc/#frank"}
+    },
+    {
+      "@type": "Person",
+      "@id": "https://rizzo.cc/#frank",
+      "name": "Frank Rizzo",
+      "alternateName": "Rizzo",
+      "url": "https://rizzo.cc/",
+      "image": "https://rizzo.cc/assets/headshot.jpg",
+      "jobTitle": "Actor",
+      "description": "Chicago-based actor. Formal training at The Second City and Acting Studio Chicago. A B.B.A. from Saint Xavier University and a working background spanning music management and finance bring authentic professional-world texture to character work on screen.",
+      "gender": "Male",
+      "nationality": {"@type": "Country", "name": "United States"},
+      "address": {
+        "@type": "PostalAddress",
+        "addressLocality": "Chicago",
+        "addressRegion": "IL",
+        "addressCountry": "US"
+      },
+      "workLocation": {"@type": "Place", "name": "Chicago, IL"},
+      "alumniOf": [
+        {"@type": "EducationalOrganization", "name": "The Second City Training Center", "url": "https://www.secondcity.com/"},
+        {"@type": "EducationalOrganization", "name": "Acting Studio Chicago", "url": "https://actingstudiochicago.com/"},
+        {"@type": "CollegeOrUniversity", "name": "Saint Xavier University", "url": "https://www.sxu.edu/"}
+      ],
+      "knowsLanguage": ["English", "Spanish", "Italian", "Swedish"],
+      "email": "mailto:frank@rizzo.cc",
+      "sameAs": [
+        "https://www.instagram.com/heyfrank/",
+        "https://letterboxd.com/heyfrank/",
+        "https://www.imdb.com/name/nm16283183/"
+      ],
+      "performerIn": [
+        {"@id": "https://rizzo.cc/#movie-deadly-domicile"},
+        {"@id": "https://rizzo.cc/#movie-el-frio-silencio"},
+        {"@id": "https://rizzo.cc/#movie-waiter-boys"}
+      ]
+    },
+    {
+      "@type": "Movie",
+      "@id": "https://rizzo.cc/#movie-deadly-domicile",
+      "name": "Deadly Domicile",
+      "datePublished": "2024",
+      "director": {"@type": "Person", "name": "Skylar Kendall"},
+      "actor": [{"@type": "Person", "name": "Frank Rizzo", "@id": "https://rizzo.cc/#frank", "characterName": "Mike"}]
+    },
+    {
+      "@type": "Movie",
+      "@id": "https://rizzo.cc/#movie-el-frio-silencio",
+      "name": "El Frío Silencio",
+      "datePublished": "2027",
+      "director": {"@type": "Person", "name": "Zach Cortino"},
+      "actor": [{"@type": "Person", "name": "Frank Rizzo", "@id": "https://rizzo.cc/#frank", "characterName": "Homeowner"}]
+    },
+    {
+      "@type": "Movie",
+      "@id": "https://rizzo.cc/#movie-waiter-boys",
+      "name": "Waiter Boys",
+      "datePublished": "2025",
+      "director": {"@type": "Person", "name": "Skylar Kendall"},
+      "actor": [{"@type": "Person", "name": "Frank Rizzo", "@id": "https://rizzo.cc/#frank", "characterName": "Randy"}]
+    }
   ]
 }
 </script>
@@ -43,6 +123,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;900&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+<!-- Google Analytics 4 (shared property G-DYME377V2S, also used on book/greenline) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-DYME377V2S"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-DYME377V2S', { 'anonymize_ip': true });
+</script>
 
 <style>
 :root{
@@ -1043,7 +1132,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.4.7</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.5.0</span>
 </footer>
 
 <script>

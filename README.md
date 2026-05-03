@@ -52,6 +52,37 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.0 &mdash; 2026-05-01
+
+- **SEO &amp; LLM-discoverability pass, part 1.** Meta tags, structured
+  data, and analytics plumbing.
+- **Canonical URL** swapped to `https://rizzo.cc/` (was franktrades).
+  Brand domain is now the single canonical home so authority isn&rsquo;t
+  split across two domains.
+- **OG / Twitter** image URLs now absolute (`https://rizzo.cc/assets/&hellip;`)
+  so social previews actually render in Slack, iMessage, Discord, X, etc.
+  Added `og:site_name`, `og:image:alt`, `og:locale`, `profile:*` tags;
+  added explicit `twitter:title / description / image:alt`.
+- **Title** strengthened to `Frank Rizzo &mdash; Actor (Chicago) | Rizzo.cc`
+  &mdash; hits the actual queries (name, role, city, brand) without keyword stuffing.
+- **Meta description** rewritten to a 150-char industry-keyword summary
+  (Second City + Acting Studio Chicago + downloadable resume).
+- **JSON-LD enriched.** Replaced the thin Person schema with a full
+  `@graph` containing: WebSite, Person (with image, description, address,
+  alumniOf for Second City + Acting Studio Chicago + Saint Xavier,
+  knowsLanguage, performerIn references), and three Movie nodes for
+  the Film credits with director + characterName. This is what gives
+  LLMs and search engines a structured map of who Frank is + what he&rsquo;s
+  done.
+- **Robots meta** explicit: index, follow, large image preview, full
+  snippet, full video preview.
+- **Verification placeholders** for Google Search Console + Bing
+  Webmaster left as commented-out tags &mdash; paste real values once
+  the site is live and verified.
+- **GA4 wired in** using existing `G-DYME377V2S` property (shared with
+  book / greenline). Anonymize-IP enabled. Will start receiving data
+  once deployed.
+
 ### v0.4.7 &mdash; 2026-05-01
 
 - **Removed Commercial section from the printed resume.** It was just
