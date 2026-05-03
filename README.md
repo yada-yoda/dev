@@ -52,6 +52,17 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.6 &mdash; 2026-05-03
+
+- **Headshot recropped with proper headroom.** The previous file was
+  WordPress&rsquo;s 400&times;400 `-thegem-person` thumbnail variant which had
+  cropped the top of the crown tight to the edge. Pulled the
+  full-resolution original (1738&times;2578) from the WP install, cropped
+  to a 1:1 square (top-aligned to preserve crown breathing room),
+  downscaled to **800&times;800** for retina-safe display on the 280px
+  profile element. Same path on disk &mdash; `assets/headshot.jpg` &mdash;
+  so no other code changes needed.
+
 ### v0.5.5 &mdash; 2026-05-03
 
 - Swapped Actors Access placeholder URL for the real profile link
