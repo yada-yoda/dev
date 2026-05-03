@@ -52,6 +52,13 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.5 &mdash; 2026-05-03
+
+- Swapped Actors Access placeholder URL for the real profile link
+  (`https://resumes.actorsaccess.com/frankrizzo`) in all three places:
+  the social pill `href`, the JSON-LD `Person.sameAs` array, and the
+  Links section of `llms.txt`. TODO comment removed.
+
 ### v0.5.4 &mdash; 2026-05-03
 
 - Added **Actors Access** social pill to the profile block, between
