@@ -52,6 +52,27 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.1 &mdash; 2026-05-01
+
+- **Crawler files at the root.** Standard set, matching the
+  greenline pattern.
+- **`robots.txt`** &mdash; allows all bots; explicitly allows AI crawlers
+  (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, Applebot-Extended,
+  Bytespider, CCBot, etc.). For an actor wanting LLM discoverability
+  this is the right default. Sitemap declared.
+- **`sitemap.xml`** &mdash; single URL with image annotations for the
+  headshot and OG card so they get into Google Image Search.
+- **`llms.txt`** &mdash; LLM-friendly Markdown summary with the
+  disambiguation block, key facts, training, full credits (Film, TV,
+  Theater), and links. This is what tools like ChatGPT / Claude /
+  Perplexity will pick up first when they crawl the site, so it&rsquo;s
+  worth keeping accurate as credits grow.
+- **`humans.txt`** &mdash; on-brand cheeky version with the &ldquo;coffee,
+  character work, and a B.B.A.&rdquo; sign-off.
+- Added `<link rel="alternate" href="/llms.txt">` and
+  `<link rel="author" href="/humans.txt">` to the document head so
+  bots and humans can both discover them.
+
 ### v0.5.0 &mdash; 2026-05-01
 
 - **SEO &amp; LLM-discoverability pass, part 1.** Meta tags, structured
