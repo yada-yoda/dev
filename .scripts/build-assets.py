@@ -1,6 +1,10 @@
 """
-Generate QR code (assets/qr-rizzo-cc.svg) and Open Graph card
-(assets/og-image.png, 1200x630) for rizzo.cc.
+Generate static assets for rizzo.cc:
+  - QR code (assets/qr-rizzo-cc.svg)
+  - Open Graph card (assets/og-image.png, 1200x630)
+  - Favicon set (assets/favicon-{16,32}.png, favicon.ico,
+    apple-touch-icon.png, icon-{192,512}.png, maskable-icon-512.png)
+  - Web app manifest (site.webmanifest)
 
 Run from project root:
     python .scripts/build-assets.py
@@ -113,8 +117,74 @@ def build_og():
     print(f"  wrote {out.relative_to(ROOT)} ({W}x{H})")
 
 
+# ---------- 3. Favicon set + web manifest ----------
+def build_favicons():
+    src_path = ASSETS / "favicon-192.png"
+    if not src_path.exists():
+        print(f"  SKIP favicons: source {src_path.relative_to(ROOT)} not found")
+        return
+
+    src = Image.open(src_path).convert("RGBA")
+
+    # PNG variants (square)
+    png_sizes = {
+        "favicon-16.png":          16,
+        "favicon-32.png":          32,
+        "apple-touch-icon.png":    180,
+        "icon-192.png":            192,
+        "icon-512.png":            512,
+    }
+    for name, size in png_sizes.items():
+        img = src.resize((size, size), Image.LANCZOS)
+        out = ASSETS / name
+        img.save(str(out), "PNG", optimize=True)
+        print(f"  wrote {out.relative_to(ROOT)} ({size}x{size})")
+
+    # Maskable icon: needs safe area (icon content within central 80%)
+    mask_size = 512
+    pad = int(mask_size * 0.1)
+    bg = Image.new("RGBA", (mask_size, mask_size), (44, 46, 61, 255))  # navy bg
+    inner = src.resize((mask_size - 2 * pad, mask_size - 2 * pad), Image.LANCZOS)
+    bg.paste(inner, (pad, pad), inner)
+    out = ASSETS / "maskable-icon-512.png"
+    bg.save(str(out), "PNG", optimize=True)
+    print(f"  wrote {out.relative_to(ROOT)} ({mask_size}x{mask_size}, maskable)")
+
+    # Multi-res .ico (16, 32, 48)
+    ico_sizes = [(16, 16), (32, 32), (48, 48)]
+    out = ASSETS / "favicon.ico"
+    src.save(str(out), format="ICO", sizes=ico_sizes)
+    print(f"  wrote {out.relative_to(ROOT)} (multi-res 16/32/48)")
+
+
+def build_manifest():
+    manifest = """{
+  "name": "Rizzo.cc — Frank Rizzo, Actor",
+  "short_name": "Rizzo.cc",
+  "description": "Frank Rizzo — Chicago-based actor. Selected credits, training, headshot, contact, downloadable resume.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#2c2e3d",
+  "theme_color": "#2c2e3d",
+  "lang": "en-US",
+  "icons": [
+    { "src": "/assets/icon-192.png",          "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/icon-512.png",          "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/maskable-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
+"""
+    out = ROOT / "site.webmanifest"
+    out.write_text(manifest, encoding="utf-8")
+    print(f"  wrote {out.relative_to(ROOT)}")
+
+
 if __name__ == "__main__":
     print("Building rizzo.cc assets:")
     build_qr()
     build_og()
+    build_favicons()
+    build_manifest()
     print("Done.")
