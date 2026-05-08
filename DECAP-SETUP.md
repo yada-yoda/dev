@@ -52,7 +52,7 @@ starting**, then execute the &ldquo;Your steps&rdquo; sections in order.
 | Decision | Choice | Why |
 |---|---|---|
 | **GitHub host account** | `yada-yoda` | You chose this. Pairs with Waiter Boys repo. |
-| **Repo name** | `rizzo` | Cleaner than `acting` for direct GitHub visits |
+| **Repo name** | `acting` | Neutral name &mdash; keeps the yada-yoda GitHub account loosely decoupled from the Rizzo identity. The repo URL will be `github.com/yada-yoda/acting`. |
 | **OAuth proxy** | Cloudflare Worker | You already use CF Workers (stocks-worker, usage-worker). Free tier, no leak surface. |
 | **Build approach** | GitHub Action regenerates `index.html` | Keeps SEO-friendly static HTML. JS-rendered content is a real SEO regression we just spent v0.5.0 fixing. |
 | **Content fields managed by Decap** | Bio, Film/TV/Theater credits, Training | The most-frequently-changed items. Hero quotes, socials, skills stay in Option B (HTML markers) since they rarely change. |
@@ -162,14 +162,14 @@ runtime. They never appear in the repo.
    ```
 2. Create the repo and push:
    ```
-   gh repo create yada-yoda/rizzo --public \
+   gh repo create yada-yoda/acting --public \
      --description "Rizzo.cc - Frank Rizzo, actor portfolio" \
      --source=. --push
    ```
 
 ### Step E: Enable GitHub Pages with custom domain
 
-1. Browse to `https://github.com/yada-yoda/rizzo/settings/pages`
+1. Browse to `https://github.com/yada-yoda/acting/settings/pages`
 2. **Source**: Deploy from a branch &rarr; `main` &rarr; `/ (root)`
 3. **Custom domain**: `rizzo.cc` (it will auto-fill if the `CNAME`
    file is in the repo). I&rsquo;ll add `CNAME` containing `rizzo.cc` as
@@ -209,7 +209,7 @@ Delete any old `A`/`CNAME` records pointing at the franktrades WP host.
    Credits, Training
 6. Open Bio, change a word, hit Publish
 7. Watch the GitHub Action run (~30 sec) at
-   `https://github.com/yada-yoda/rizzo/actions`
+   `https://github.com/yada-yoda/acting/actions`
 8. Reload `https://rizzo.cc/` &mdash; the change is live
 
 If anything misbehaves at this stage, message me and I&rsquo;ll debug.
@@ -225,6 +225,12 @@ will use ~10 requests per editing session. You&rsquo;ll never exceed it.
 **What if I lose my OAuth Client Secret?**
 GitHub OAuth Apps &rarr; your app &rarr; Generate a new client secret.
 Then redo Step C with the new value.
+
+**Why isn&rsquo;t the repo just named `rizzo` to match the brand?**
+Repo names are public on GitHub. Naming it `acting` keeps a small
+amount of friction between the yada-yoda GitHub account and your
+Rizzo identity for anyone Googling either one independently. The
+public site at rizzo.cc still presents the brand normally.
 
 **What if Decap stops working / I&rsquo;m locked out?**
 You can always edit content directly in GitHub web UI using the
