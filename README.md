@@ -52,6 +52,22 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.5.7 &mdash; 2026-05-03
+
+- **Editability pass (option B).** Added `<!-- EDIT: name -->` /
+  `<!-- /EDIT: name -->` comment markers around every editable block
+  in `index.html`. Searching the file for `EDIT: ` is now the way to
+  find any content area in two seconds.
+- New top-level **`EDITING.md`** cheatsheet with: a marker reference
+  table, copy-paste recipes for the common edits (add a film/TV/theater
+  credit, update bio, add a training entry, change a social link, swap
+  the headshot, bump the resume year), things to avoid, and the
+  GitHub web editor workflow. Designed so non-Claude content updates
+  are a low-risk, no-tooling exercise.
+- 26 marker pairs total. Mirror notes on every print-resume marker
+  point at the matching website marker (and vice versa) so updates
+  stay consistent across the two views.
+
 ### v0.5.6 &mdash; 2026-05-03
 
 - **Headshot recropped with proper headroom.** The previous file was
