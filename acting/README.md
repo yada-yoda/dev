@@ -52,6 +52,15 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.5 &mdash; 2026-05-11
+
+- **Deli Boys TV credit** role updated from &ldquo;Background / Stand-in&rdquo;
+  to **&ldquo;Stand-in for Shahjehan Khan&rdquo;** &mdash; more specific
+  attribution. Mirrored in both screen tab and printed resume.
+- **About section h2** trimmed from &ldquo;Rizzo, Defined&rdquo; to just
+  **&ldquo;Defined&rdquo;** &mdash; the &ldquo;RIZZO&rdquo; dictionary entry
+  appears immediately below the heading so the surname was redundant.
+
 ### v0.6.4 &mdash; 2026-05-11
 
 - **Fixed broken hero slideshow.** Root cause: slides were at z-index
