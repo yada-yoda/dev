@@ -99,10 +99,12 @@ website and the PDF stay in sync.
 
 1. Search for `EDIT: training`
 2. Pattern: `<li><span class="label">Course Name</span><span class="sub">Teacher &middot; School</span></li>`
-3. Mirror in `EDIT: print-training`. The print version uses a slightly
-   different markup:
+3. **Insert the new entry at the TOP of the list.** Convention: newest
+   classes go first.
+4. Mirror in `EDIT: print-training`. Same newest-at-top order; the
+   markup is slightly different:
    `<div><strong>Course Name</strong><em>Teacher &middot; School, City</em></div>`
-4. Bump the resume year.
+5. Bump the resume year.
 
 ### Change a social link
 

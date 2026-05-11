@@ -52,6 +52,24 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.3 &mdash; 2026-05-11
+
+- **Topbar reveals full FRANK [filmstrip] RIZZO lockup on scroll.**
+  At the top of the page, the topbar shows just the existing RIZZO.cc
+  lockup. Once you scroll past ~40px, &ldquo;FRANK&rdquo; (Montserrat 900) and
+  the film-strip favicon slide in from the left, and the cyan `.cc`
+  fades out. Smooth max-width + opacity transition. Built from
+  existing assets &mdash; no new logo image needed.
+- Added new class entry: **Grad Revue II &mdash; Jeffrey Bouthiette
+  &middot; The Second City**. Slotted at the top of the Training list per
+  the &ldquo;newest classes at top&rdquo; convention.
+- **Reordered all Training entries** by recency: Grad Revue II,
+  Grad Revue I, Intimacy Tools, On Camera I, Conservatory I&ndash;III,
+  Improv I&ndash;V, Acting I&ndash;III, Vocal Coaching, B.B.A. Mirrored in
+  both screen panel and printed PDF resume.
+- Documented the &ldquo;newest at top&rdquo; convention in `EDITING.md` so
+  future edits stay consistent.
+
 ### v0.6.2 &mdash; 2026-05-11
 
 - Renamed the **&ldquo;Film Inspirations&rdquo;** panel heading to just

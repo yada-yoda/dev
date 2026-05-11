@@ -203,12 +203,40 @@ ul{list-style:none}
   text-decoration:none;
   line-height:1;
 }
-.brand img{height:22px;width:auto;display:block}
+.brand .rizzo-mark{height:22px;width:auto;display:block}
 .brand .tld{
   color:var(--accent);font-size:13px;letter-spacing:.08em;
   line-height:1;display:block;
-  /* trim ascender space so .cc sits on baseline with logo bottom */
   margin-bottom:-1px;
+  transition:opacity .15s ease, max-width .2s ease;
+  overflow:hidden;
+}
+/* Hidden by default; reveal when scrolled */
+.brand .frank{
+  font-family:'Montserrat',sans-serif;font-weight:900;
+  color:#fff;letter-spacing:.04em;font-size:22px;line-height:1;
+  display:inline-block;
+  margin-bottom:-2px;
+  max-width:0;opacity:0;overflow:hidden;
+  white-space:nowrap;
+  transition:max-width .25s ease, opacity .2s ease, margin-right .2s ease;
+  margin-right:0;
+}
+.brand .filmstrip{
+  height:28px;width:auto;display:block;
+  max-width:0;opacity:0;overflow:hidden;
+  transition:max-width .25s ease .05s, opacity .2s ease, margin .2s ease;
+  margin:0;
+  align-self:center;
+}
+.topbar.scrolled .brand .frank{
+  max-width:120px;opacity:1;margin-right:6px;
+}
+.topbar.scrolled .brand .filmstrip{
+  max-width:36px;opacity:1;margin-right:6px;
+}
+.topbar.scrolled .brand .tld{
+  max-width:0;opacity:0;
 }
 .nav{display:flex;gap:28px}
 .nav a{
@@ -735,9 +763,11 @@ footer .ver{color:var(--dim);margin-left:10px}
 <body>
 
 <header class="topbar" id="topbar">
-  <a class="brand" href="#page" aria-label="Rizzo.cc home">
-    <img src="assets/rizzo_logo_white.png" alt="RIZZO">
-    <span class="tld">.cc</span>
+  <a class="brand" href="#page" aria-label="Frank Rizzo home">
+    <span class="frank" aria-hidden="true">FRANK</span>
+    <img class="filmstrip" src="assets/favicon-192.png" alt="">
+    <img class="rizzo-mark" src="assets/rizzo_logo_white.png" alt="RIZZO">
+    <span class="tld" aria-hidden="true">.cc</span>
   </a>
   <nav class="nav">
     <a href="#about">About</a>
@@ -947,14 +977,16 @@ footer .ver{color:var(--dim);margin-left:10px}
       </div>
       <!-- /EDIT: licensing -->
 
-      <!-- EDIT: training — each <li> is one entry. Pattern: <span class="label">Course Name</span><span class="sub">Teacher · School</span> -->
+      <!-- EDIT: training — each <li> is one entry. Pattern: <span class="label">Course Name</span><span class="sub">Teacher · School</span>
+           CONVENTION: newest classes go at the TOP of the list. Mirror order in /EDIT: print-training below. -->
       <div class="panel col-6">
         <h4>Education / Training</h4>
         <ul>
-          <li><span class="label">On Camera I</span><span class="sub">Sarah Charipar &middot; Acting Studio Chicago</span></li>
-          <li><span class="label">Intimacy Tools For Actors</span><span class="sub">Sydney Rene Cox &middot; Acting Studio Chicago</span></li>
-          <li><span class="label">Conservatory I&ndash;III</span><span class="sub">Corey Bradberry, Dee Ryan, Sam Super &middot; The Second City</span></li>
+          <li><span class="label">Grad Revue II</span><span class="sub">Jeffrey Bouthiette &middot; The Second City</span></li>
           <li><span class="label">Grad Revue I</span><span class="sub">Brian Morrow &middot; The Second City</span></li>
+          <li><span class="label">Intimacy Tools For Actors</span><span class="sub">Sydney Rene Cox &middot; Acting Studio Chicago</span></li>
+          <li><span class="label">On Camera I</span><span class="sub">Sarah Charipar &middot; Acting Studio Chicago</span></li>
+          <li><span class="label">Conservatory I&ndash;III</span><span class="sub">Corey Bradberry, Dee Ryan, Sam Super &middot; The Second City</span></li>
           <li><span class="label">Improv I&ndash;V</span><span class="sub">Phillips-Spotts, DeOleo, Haughton, Rayzian, Czokse &middot; The Second City</span></li>
           <li><span class="label">Acting I&ndash;III</span><span class="sub">Michael Pieper, Emily Anderson, Dee Ryan &middot; The Second City</span></li>
           <li><span class="label">Vocal Coaching</span><span class="sub">Amanda Murphy, Chicago, IL</span></li>
@@ -1177,14 +1209,16 @@ footer .ver{color:var(--dim);margin-left:10px}
   </div>
   <!-- /EDIT: print-theater-credits -->
 
-  <!-- EDIT: print-training — printed PDF Training section (2-column on the page). Mirror /EDIT: training above. -->
+  <!-- EDIT: print-training — printed PDF Training section (2-column on the page).
+       Mirror /EDIT: training above. Newest classes at the TOP. -->
   <div class="rs-section">
     <h2>Training</h2>
     <div class="rs-training-list">
-      <div><strong>On Camera I</strong><em>Sarah Charipar &middot; Acting Studio Chicago</em></div>
-      <div><strong>Intimacy Tools For Actors</strong><em>Sydney Rene Cox &middot; Acting Studio Chicago</em></div>
-      <div><strong>Conservatory I&ndash;III</strong><em>Bradberry, Ryan, Super &middot; The Second City, Chicago</em></div>
+      <div><strong>Grad Revue II</strong><em>Jeffrey Bouthiette &middot; The Second City, Chicago</em></div>
       <div><strong>Grad Revue I</strong><em>Brian Morrow &middot; The Second City, Chicago</em></div>
+      <div><strong>Intimacy Tools For Actors</strong><em>Sydney Rene Cox &middot; Acting Studio Chicago</em></div>
+      <div><strong>On Camera I</strong><em>Sarah Charipar &middot; Acting Studio Chicago</em></div>
+      <div><strong>Conservatory I&ndash;III</strong><em>Bradberry, Ryan, Super &middot; The Second City, Chicago</em></div>
       <div><strong>Improv I&ndash;V</strong><em>Phillips-Spotts, DeOleo, Haughton, Rayzian, Czokse &middot; The Second City, Chicago</em></div>
       <div><strong>Acting I&ndash;III</strong><em>Pieper, Anderson, Ryan &middot; The Second City, Chicago</em></div>
       <div><strong>Vocal Coaching</strong><em>Amanda Murphy, Chicago, IL</em></div>
@@ -1238,7 +1272,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.2</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.3</span>
 </footer>
 
 <script>
