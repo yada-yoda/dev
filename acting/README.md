@@ -52,6 +52,25 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.6 &mdash; 2026-05-11
+
+- **Slideshow rotation moved from CSS to JavaScript.** Root cause of
+  the broken cycling: the global `@media (prefers-reduced-motion: reduce)`
+  rule disables all CSS animations with `* { animation: none !important }`.
+  Users with system-level &ldquo;reduce motion&rdquo; (Windows, macOS,
+  some browsers default it) saw only slide 1 because the cycling
+  animation was killed. Now a small JS rotates `.active` class on
+  slides + quotes every 8s. CSS transitions still handle the crossfade
+  for users who want motion; reduced-motion users see hard cuts but
+  still see all slides &amp; all quotes. Quote 1 now also visible at
+  page load (paired with slide 1).
+- **Topbar lockup rebuilt.** Dropped the favicon film-strip from the
+  middle entirely. When scrolled, the RIZZO mark now sits inside a
+  white pill chip with the wordmark inverted to dark (via CSS
+  `filter: invert(1)` on the existing white logo &mdash; no new asset
+  needed). FRANK stays as white text on the navy topbar. The cyan
+  `.cc` still tucks away on scroll.
+
 ### v0.6.5 &mdash; 2026-05-11
 
 - **Deli Boys TV credit** role updated from &ldquo;Background / Stand-in&rdquo;

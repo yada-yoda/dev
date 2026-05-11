@@ -203,15 +203,26 @@ ul{list-style:none}
   text-decoration:none;
   line-height:1;
 }
-.brand .rizzo-mark{height:22px;width:auto;display:block}
+.brand .rizzo-wrap{
+  display:inline-flex;align-items:center;
+  background:transparent;
+  padding:2px 6px;
+  border-radius:3px;
+  transition:background .2s ease;
+}
+.brand .rizzo-mark{
+  height:22px;width:auto;display:block;
+  transition:filter .2s ease;
+}
 .brand .tld{
   color:var(--accent);font-size:13px;letter-spacing:.08em;
   line-height:1;display:block;
   margin-bottom:-1px;
+  margin-left:2px;
   transition:opacity .15s ease, max-width .2s ease;
   overflow:hidden;
 }
-/* Hidden by default; reveal when scrolled */
+/* FRANK text hidden by default; reveals when scrolled */
 .brand .frank{
   font-family:'Montserrat',sans-serif;font-weight:900;
   color:#fff;letter-spacing:.04em;font-size:22px;line-height:1;
@@ -222,21 +233,18 @@ ul{list-style:none}
   transition:max-width .25s ease, opacity .2s ease, margin-right .2s ease;
   margin-right:0;
 }
-.brand .filmstrip{
-  height:28px;width:auto;display:block;
-  max-width:0;opacity:0;overflow:hidden;
-  transition:max-width .25s ease .05s, opacity .2s ease, margin .2s ease;
-  margin:0;
-  align-self:center;
-}
 .topbar.scrolled .brand .frank{
   max-width:120px;opacity:1;margin-right:6px;
 }
-.topbar.scrolled .brand .filmstrip{
-  max-width:36px;opacity:1;margin-right:6px;
+/* Scrolled state: invert the RIZZO mark to a white chip with dark text */
+.topbar.scrolled .brand .rizzo-wrap{
+  background:#fff;
+}
+.topbar.scrolled .brand .rizzo-mark{
+  filter:invert(1);
 }
 .topbar.scrolled .brand .tld{
-  max-width:0;opacity:0;
+  max-width:0;opacity:0;margin-left:0;
 }
 .nav{display:flex;gap:28px}
 .nav a{
@@ -264,7 +272,7 @@ ul{list-style:none}
   object-fit:cover;
   z-index:1;
 }
-/* Slideshow layer */
+/* Slideshow layer — JS toggles .active to rotate; CSS only handles the crossfade. */
 .hero-slides{
   position:absolute;inset:0;z-index:1;overflow:hidden;
 }
@@ -272,21 +280,10 @@ ul{list-style:none}
   position:absolute;inset:0;
   background-size:cover;background-position:center;
   opacity:0;
-  animation:heroSlide 32s infinite;
-  will-change:opacity,transform;
+  transition:opacity 1s ease;
 }
-/* 4 slides x 8s each = 32s loop, 1s cross-fade. Slide 1 starts at -1s so it's
-   already faded in on page load (no blank moment at t=0). */
-.hero-slide:nth-child(1){animation-delay:-1s;opacity:1}
-.hero-slide:nth-child(2){animation-delay:7s}
-.hero-slide:nth-child(3){animation-delay:15s}
-.hero-slide:nth-child(4){animation-delay:23s}
-@keyframes heroSlide{
-  0%{opacity:0;transform:scale(1.05)}
-  3%{opacity:1}
-  25%{opacity:1;transform:scale(1.0)}
-  28%{opacity:0}
-  100%{opacity:0}
+.hero-slide.active{
+  opacity:1;
 }
 /* Dark gradient over slideshow so logo + quotes stay readable */
 .hero::after{
@@ -318,18 +315,12 @@ ul{list-style:none}
 .hero-quotes span{
   position:absolute;left:0;right:0;
   opacity:0;
-  animation:quoteFade 32s infinite;
+  transform:translateY(6px);
+  transition:opacity .8s ease, transform .8s ease;
 }
-.hero-quotes span:nth-child(1){animation-delay:0s}
-.hero-quotes span:nth-child(2){animation-delay:8s}
-.hero-quotes span:nth-child(3){animation-delay:16s}
-.hero-quotes span:nth-child(4){animation-delay:24s}
-@keyframes quoteFade{
-  0%{opacity:0;transform:translateY(6px)}
-  3%{opacity:1;transform:translateY(0)}
-  25%{opacity:1;transform:translateY(0)}
-  28%{opacity:0;transform:translateY(-6px)}
-  100%{opacity:0}
+.hero-quotes span.active{
+  opacity:1;
+  transform:translateY(0);
 }
 .scrolldown{
   position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
@@ -774,8 +765,9 @@ footer .ver{color:var(--dim);margin-left:10px}
 <header class="topbar" id="topbar">
   <a class="brand" href="#page" aria-label="Frank Rizzo home">
     <span class="frank" aria-hidden="true">FRANK</span>
-    <img class="filmstrip" src="assets/favicon-192.png" alt="">
-    <img class="rizzo-mark" src="assets/rizzo_logo_white.png" alt="RIZZO">
+    <span class="rizzo-wrap">
+      <img class="rizzo-mark" src="assets/rizzo_logo_white.png" alt="RIZZO">
+    </span>
     <span class="tld" aria-hidden="true">.cc</span>
   </a>
   <nav class="nav">
@@ -1262,7 +1254,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.5</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.6</span>
 </footer>
 
 <script>
@@ -1280,6 +1272,25 @@ footer .ver{color:var(--dim);margin-left:10px}
       document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === target));
     });
   });
+
+  // Hero slideshow + paired quote rotation (JS-driven so it works regardless
+  // of prefers-reduced-motion - reduced-motion users still see all slides,
+  // just snapping rather than crossfading since CSS transition is disabled.)
+  (function heroRotate(){
+    const slides = document.querySelectorAll('.hero-slide');
+    const quotes = document.querySelectorAll('.hero-quotes span');
+    if (!slides.length) return;
+    slides[0].classList.add('active');
+    if (quotes[0]) quotes[0].classList.add('active');
+    let i = 0;
+    setInterval(() => {
+      slides[i].classList.remove('active');
+      if (quotes[i]) quotes[i].classList.remove('active');
+      i = (i + 1) % slides.length;
+      slides[i].classList.add('active');
+      if (quotes[i]) quotes[i].classList.add('active');
+    }, 8000);
+  })();
 
   // Year
   document.getElementById('yr').textContent = new Date().getFullYear();
