@@ -52,6 +52,28 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.4 &mdash; 2026-05-11
+
+- **Fixed broken hero slideshow.** Root cause: slides were at z-index
+  `-2` inside a stacking context (`isolation: isolate`) which prevented
+  them from rendering at all in private/incognito windows and some
+  browsers. Restructured to use positive z-indices throughout (slides
+  at 1, gradient overlay at 2 via `::after`, content at 3). Dropped
+  `isolation: isolate` so the stacking is straightforward.
+- **Slide 1 visible at page load.** Added `animation-delay: -1s` and
+  base `opacity: 1` on the first slide so the hero shows a real photo
+  immediately on first paint instead of fading in from blank.
+- **Bio moved into the profile block.** Dropped the standalone bio
+  section. The bio paragraph now sits under &ldquo;Chicago&rdquo; next to
+  the headshot, filling the empty vertical space. Reworded to fit
+  the position next to the photo (no longer prefixed with
+  &ldquo;Chicago-based.&rdquo; since the &ldquo;Chicago&rdquo; role tag is
+  right above it).
+- **Social links** stripped to **icon-only** circular buttons (42px
+  diameter). Instagram / Letterboxd / IMDb / Actors Access / Email
+  pills lost their text labels; `aria-label` and `title` added on each
+  for accessibility + hover tooltips.
+
 ### v0.6.3 &mdash; 2026-05-11
 
 - **Topbar reveals full FRANK [filmstrip] RIZZO lockup on scroll.**

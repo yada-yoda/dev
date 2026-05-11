@@ -257,16 +257,16 @@ ul{list-style:none}
   display:flex;align-items:center;justify-content:center;
   text-align:center;
   overflow:hidden;
-  isolation:isolate;
+  background:#2c2e3d;
 }
 .hero-video{
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;
-  z-index:-1;
+  z-index:1;
 }
-/* Slideshow layer behind everything */
+/* Slideshow layer */
 .hero-slides{
-  position:absolute;inset:0;z-index:-2;overflow:hidden;
+  position:absolute;inset:0;z-index:1;overflow:hidden;
 }
 .hero-slide{
   position:absolute;inset:0;
@@ -275,11 +275,12 @@ ul{list-style:none}
   animation:heroSlide 32s infinite;
   will-change:opacity,transform;
 }
-/* 4 slides x 8s each = 32s loop, 1s cross-fade */
-.hero-slide:nth-child(1){animation-delay:0s}
-.hero-slide:nth-child(2){animation-delay:8s}
-.hero-slide:nth-child(3){animation-delay:16s}
-.hero-slide:nth-child(4){animation-delay:24s}
+/* 4 slides x 8s each = 32s loop, 1s cross-fade. Slide 1 starts at -1s so it's
+   already faded in on page load (no blank moment at t=0). */
+.hero-slide:nth-child(1){animation-delay:-1s;opacity:1}
+.hero-slide:nth-child(2){animation-delay:7s}
+.hero-slide:nth-child(3){animation-delay:15s}
+.hero-slide:nth-child(4){animation-delay:23s}
 @keyframes heroSlide{
   0%{opacity:0;transform:scale(1.05)}
   3%{opacity:1}
@@ -288,13 +289,13 @@ ul{list-style:none}
   100%{opacity:0}
 }
 /* Dark gradient over slideshow so logo + quotes stay readable */
-.hero::before{
-  content:"";position:absolute;inset:0;z-index:-1;
+.hero::after{
+  content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
   background:linear-gradient(180deg, rgba(20,21,30,.55) 0%, rgba(20,21,30,.40) 40%, rgba(44,46,61,.95) 100%);
 }
 .hero-inner{
   max-width:900px;padding:120px 24px 80px;
-  position:relative;z-index:1;
+  position:relative;z-index:3;
 }
 .hero-logo{
   display:inline-flex;align-items:center;justify-content:center;
@@ -332,6 +333,7 @@ ul{list-style:none}
 }
 .scrolldown{
   position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
+  z-index:3;
   font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.3em;
   color:#cfd3dd;text-transform:uppercase;
   display:flex;flex-direction:column;align-items:center;gap:10px;
@@ -441,23 +443,30 @@ section + section{border-top:1px solid var(--line)}
   font-family:'Montserrat',sans-serif;font-size:12px;
   letter-spacing:.32em;text-transform:uppercase;color:var(--accent);
 }
+.profile-bio{
+  margin-top:14px;
+  color:var(--muted);
+  font-size:15.5px;line-height:1.65;
+  max-width:600px;
+}
+.profile-bio strong{color:#fff;font-weight:600}
+.profile-bio em{color:var(--accent);font-style:italic;font-weight:500}
 .socials{
-  display:flex;gap:12px;margin-top:18px;flex-wrap:wrap;
+  display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;
 }
 @media (max-width:760px){.socials{justify-content:center}}
 .socials a{
-  display:inline-flex;align-items:center;gap:8px;
-  padding:10px 16px;
+  display:inline-flex;align-items:center;justify-content:center;
+  width:42px;height:42px;
   border:1px solid var(--line-2);border-radius:999px;
-  font-family:'Montserrat',sans-serif;font-size:11px;
-  letter-spacing:.2em;text-transform:uppercase;
   color:var(--text);
+  transition:border-color .15s, color .15s, background .15s;
 }
 .socials a:hover{
   border-color:var(--accent);color:var(--accent);
   background:rgba(0,188,212,.06);
 }
-.socials svg{width:14px;height:14px;fill:currentColor}
+.socials svg{width:18px;height:18px;fill:currentColor}
 
 /* ------- Resume panel grid ------- */
 .panels{
@@ -846,23 +855,6 @@ footer .ver{color:var(--dim);margin-left:10px}
   </div>
 </section>
 
-<!-- ============ Bio ============ -->
-<section id="bio">
-  <div class="wrap">
-    <!-- EDIT: bio — the centered short bio paragraph between About and Profile -->
-    <div class="bio-prose">
-      <p>
-        Chicago-based. Formal training out of <strong>The Second City</strong> and
-        <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University
-        and a working background spanning music management and finance bring authentic
-        professional-world texture to character work on screen. Selected credits include
-        <em>Waiter Boys</em> and <em>Deadly Domicile</em>.
-      </p>
-    </div>
-    <!-- /EDIT: bio -->
-  </div>
-</section>
-
 <!-- ============ Profile + Socials ============ -->
 <section id="profile">
   <div class="wrap">
@@ -877,34 +869,32 @@ footer .ver{color:var(--dim);margin-left:10px}
       <div class="profile-meta">
         <h3>Frank Rizzo</h3>
         <div class="role">Chicago</div>
-        <!-- EDIT: profile-intro — the short paragraph next to the headshot on the website -->
-        <p style="margin-top:10px;color:var(--muted);max-width:560px">
-          Stage, screen, and on-camera training out of The Second City and Acting Studio Chicago.
-          Selected credits below. Always reading.
+        <!-- EDIT: bio — short third-person paragraph next to the headshot -->
+        <p class="profile-bio">
+          Formal training out of <strong>The Second City</strong> and
+          <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University
+          and a working background spanning music management and finance bring authentic
+          professional-world texture to character work on screen. Selected credits include
+          <em>Waiter Boys</em> and <em>Deadly Domicile</em>.
         </p>
-        <!-- /EDIT: profile-intro -->
+        <!-- /EDIT: bio -->
 
-        <!-- EDIT: socials — change the href= URLs to update where each pill links to. Order in this list = order on screen. -->
+        <!-- EDIT: socials — icon-only social links. Change the href= URLs to update where each links to. Order in this list = order on screen. -->
         <div class="socials">
-          <a href="https://www.instagram.com/heyfrank/" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.2.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.2.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 2c-3.1 0-3.5 0-4.7.1-1.1.1-1.6.2-1.9.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.3-.3.8-.3 1.9-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.6.3 1.9.2.5.4.8.7 1.1.3.3.6.5 1.1.7.3.1.8.3 1.9.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.6-.2 1.9-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.3.3-.8.3-1.9.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.6-.3-1.9-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.3-.1-.8-.3-1.9-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.2a4.6 4.6 0 1 1 0 9.2 4.6 4.6 0 0 1 0-9.2zm0 1.9a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zm5.9-2.2a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z"/></svg>
-            Instagram
+          <a href="https://www.instagram.com/heyfrank/" target="_blank" rel="noopener" aria-label="Instagram" title="Instagram">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.2.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.2.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 2c-3.1 0-3.5 0-4.7.1-1.1.1-1.6.2-1.9.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.3-.3.8-.3 1.9-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.6.3 1.9.2.5.4.8.7 1.1.3.3.6.5 1.1.7.3.1.8.3 1.9.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.6-.2 1.9-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.3.3-.8.3-1.9.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.6-.3-1.9-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.3-.1-.8-.3-1.9-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.2a4.6 4.6 0 1 1 0 9.2 4.6 4.6 0 0 1 0-9.2zm0 1.9a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zm5.9-2.2a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z"/></svg>
           </a>
-          <a href="https://letterboxd.com/heyfrank/" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="3.2"/><circle cx="12" cy="12" r="3.2" opacity=".6"/><circle cx="18" cy="12" r="3.2"/></svg>
-            Letterboxd
+          <a href="https://letterboxd.com/heyfrank/" target="_blank" rel="noopener" aria-label="Letterboxd" title="Letterboxd">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="3.2"/><circle cx="12" cy="12" r="3.2" opacity=".6"/><circle cx="18" cy="12" r="3.2"/></svg>
           </a>
-          <a href="https://www.imdb.com/name/nm16283183/" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="7" font-weight="900" fill="currentColor" font-family="Montserrat">IMDb</text></svg>
-            IMDb
+          <a href="https://www.imdb.com/name/nm16283183/" target="_blank" rel="noopener" aria-label="IMDb" title="IMDb">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="7" font-weight="900" fill="currentColor" font-family="Montserrat">IMDb</text></svg>
           </a>
-          <a href="https://resumes.actorsaccess.com/frankrizzo" target="_blank" rel="noopener">
-            <svg viewBox="0 0 24 24"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="8" font-weight="900" fill="currentColor" font-family="Montserrat">AA</text></svg>
-            Actors Access
+          <a href="https://resumes.actorsaccess.com/frankrizzo" target="_blank" rel="noopener" aria-label="Actors Access" title="Actors Access">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="8" font-weight="900" fill="currentColor" font-family="Montserrat">AA</text></svg>
           </a>
-          <a href="mailto:frank@rizzo.cc">
-            <svg viewBox="0 0 24 24"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
-            Email
+          <a href="mailto:frank@rizzo.cc" aria-label="Email" title="Email">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
           </a>
         </div>
         <!-- /EDIT: socials -->
@@ -1272,7 +1262,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.3</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.4</span>
 </footer>
 
 <script>
