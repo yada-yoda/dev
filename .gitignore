@@ -1,5 +1,5 @@
-# Keep source mirror local but out of git
-source/
+# Per-project ignores live in this single file
+acting/source/
 
 # OS / editor cruft
 .DS_Store
@@ -10,6 +10,6 @@ desktop.ini
 .vscode/
 .idea/
 
-# Build artifacts (none yet)
+# Build artifacts
 node_modules/
 dist/
