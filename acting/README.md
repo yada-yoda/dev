@@ -52,6 +52,16 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.2 &mdash; 2026-05-11
+
+- Renamed the **&ldquo;Film Inspirations&rdquo;** panel heading to just
+  **&ldquo;Inspirations&rdquo;** &mdash; the list is directors / creators /
+  actors, not films, so the previous label was misleading.
+- Dropped the `&rarr; Acting` link from the dev.rizzo.cc 404 page.
+  404 is now purely a not-found message; visitors aren&rsquo;t routed
+  anywhere from the dev apex. (Cleaned up the now-unused `.links` CSS
+  along with it.)
+
 ### v0.6.1 &mdash; 2026-05-11
 
 - **Hero rebuilt with image slideshow.** Four cross-fading background
