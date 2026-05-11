@@ -52,6 +52,25 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.7 &mdash; 2026-05-11
+
+- **Topbar FRANK + RIZZO** vertically centered. Switched
+  `align-items` from `flex-end` to `center` and removed the negative
+  `margin-bottom` hacks on `.frank` and `.tld`.
+- **Hero quotes restyled to match the original WP site closely.**
+  Pulled the actual Slider Revolution layer config from
+  `source/current.html`: Poppins 500, ~60px at desktop (scales down on
+  mobile), all caps, line-height 1.16, tight letter-spacing. White
+  text with a deeper drop-shadow. Loaded Poppins (weights 400/500/600)
+  from Google Fonts.
+- **Motion** added back: each quote now slides up from below
+  (`translateY(36px)` &rarr; `0`) while fading in over ~1s with a
+  cubic-bezier easing close to power2.inOut from the original site.
+  Reduced-motion users still see the snap.
+- Smart-quote characters dropped from the quote text &mdash; the
+  original WP site didn&rsquo;t use them, the dramatic typography carries
+  the line break instead.
+
 ### v0.6.6 &mdash; 2026-05-11
 
 - **Slideshow rotation moved from CSS to JavaScript.** Root cause of

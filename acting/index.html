@@ -136,7 +136,7 @@
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;900&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;900&family=Poppins:wght@400;500;600&family=Source+Sans+3:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 
 <!-- EDIT: ga4 — Google Analytics tracking ID. Currently shared with book/greenline (G-DYME377V2S). Swap to a different ID to track this site separately. -->
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-DYME377V2S"></script>
@@ -196,7 +196,7 @@ ul{list-style:none}
 }
 .topbar.scrolled{background:rgba(37,39,58,.92);box-shadow:0 1px 0 var(--line)}
 .brand{
-  display:inline-flex;align-items:flex-end;gap:4px;
+  display:inline-flex;align-items:center;gap:4px;
   font-family:'Montserrat',sans-serif;font-weight:900;
   letter-spacing:.18em;font-size:18px;color:#fff;
   text-transform:uppercase;
@@ -217,7 +217,6 @@ ul{list-style:none}
 .brand .tld{
   color:var(--accent);font-size:13px;letter-spacing:.08em;
   line-height:1;display:block;
-  margin-bottom:-1px;
   margin-left:2px;
   transition:opacity .15s ease, max-width .2s ease;
   overflow:hidden;
@@ -227,7 +226,6 @@ ul{list-style:none}
   font-family:'Montserrat',sans-serif;font-weight:900;
   color:#fff;letter-spacing:.04em;font-size:22px;line-height:1;
   display:inline-block;
-  margin-bottom:-2px;
   max-width:0;opacity:0;overflow:hidden;
   white-space:nowrap;
   transition:max-width .25s ease, opacity .2s ease, margin-right .2s ease;
@@ -304,19 +302,23 @@ ul{list-style:none}
 }
 .hero-quotes{
   position:relative;
-  margin-top:48px;
-  min-height:60px;
-  font-family:'Montserrat',sans-serif;font-weight:300;
-  font-style:italic;
-  font-size:clamp(15px,1.7vw,19px);
-  color:#e7e9ef;letter-spacing:.04em;
-  text-shadow:0 2px 16px rgba(0,0,0,.6);
+  margin-top:42px;
+  min-height:clamp(90px,14vw,160px);
+  font-family:'Poppins','Montserrat',sans-serif;
+  font-weight:500;
+  font-size:clamp(28px,5vw,60px);
+  line-height:1.16;
+  color:#fff;
+  text-transform:uppercase;
+  letter-spacing:-0.01em;
+  text-shadow:0 2px 28px rgba(0,0,0,.65);
+  padding:0 12px;
 }
 .hero-quotes span{
   position:absolute;left:0;right:0;
   opacity:0;
-  transform:translateY(6px);
-  transition:opacity .8s ease, transform .8s ease;
+  transform:translateY(36px);
+  transition:opacity .9s ease, transform 1s cubic-bezier(.22,.61,.36,1);
 }
 .hero-quotes span.active{
   opacity:1;
@@ -802,10 +804,10 @@ footer .ver{color:var(--dim);margin-left:10px}
 
     <!-- EDIT: hero-quotes — rotating slogans, paired 1:1 with hero-slides above. Keep total at 4 to match slide count, or update both. -->
     <div class="hero-quotes" aria-hidden="true">
-      <span>&ldquo;Separation is in the preparation.&rdquo;</span>
-      <span>&ldquo;Don&rsquo;t be afraid of rejection or failure.&rdquo;</span>
-      <span>&ldquo;Stop trying to feel. Start trying to do.&rdquo;</span>
-      <span>&ldquo;Prepare to be unprepared. Passion is the fuel.&rdquo;</span>
+      <span>Separation is in<br>the preparation.</span>
+      <span>Don&rsquo;t be afraid<br>of rejection or failure.</span>
+      <span>Stop trying to feel.<br>Start trying to do.</span>
+      <span>Prepare to be unprepared.<br>Passion is the fuel.</span>
     </div>
     <!-- /EDIT: hero-quotes -->
   </div>
@@ -1254,7 +1256,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.6</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.7</span>
 </footer>
 
 <script>
