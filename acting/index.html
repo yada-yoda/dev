@@ -599,8 +599,16 @@ footer{
 footer .ver{color:var(--dim);margin-left:10px}
 
 /* ------- Reduced motion ------- */
+/* Honor reduced-motion preference globally, BUT keep the hero slideshow +
+   quote motion alive since they're brand identity (not decorative parallax).
+   The override below is a noticeably gentle slide-up + fade and won't induce
+   motion sickness; it stays even when reduced-motion is on. */
 @media (prefers-reduced-motion:reduce){
   *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .hero-slide{transition:opacity 1s ease!important}
+  .hero-quotes span{
+    transition:opacity .9s ease, transform 1s cubic-bezier(.22,.61,.36,1)!important;
+  }
 }
 
 /* ============ Print / PDF resume ============ */
@@ -1256,7 +1264,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.7</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.8</span>
 </footer>
 
 <script>
@@ -1275,15 +1283,19 @@ footer .ver{color:var(--dim);margin-left:10px}
     });
   });
 
-  // Hero slideshow + paired quote rotation (JS-driven so it works regardless
-  // of prefers-reduced-motion - reduced-motion users still see all slides,
-  // just snapping rather than crossfading since CSS transition is disabled.)
+  // Hero slideshow + paired quote rotation (JS-driven; works regardless of
+  // CSS animation state). The first .active class is applied via
+  // requestAnimationFrame so the browser paints the initial (opacity:0,
+  // translateY 36px) state first, then transitions to active - otherwise
+  // the entrance animation snaps and the first quote appears flat.
   (function heroRotate(){
     const slides = document.querySelectorAll('.hero-slide');
     const quotes = document.querySelectorAll('.hero-quotes span');
     if (!slides.length) return;
-    slides[0].classList.add('active');
-    if (quotes[0]) quotes[0].classList.add('active');
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      slides[0].classList.add('active');
+      if (quotes[0]) quotes[0].classList.add('active');
+    }));
     let i = 0;
     setInterval(() => {
       slides[i].classList.remove('active');

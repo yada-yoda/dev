@@ -52,6 +52,24 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.8 &mdash; 2026-05-11
+
+- **Hero motion now actually plays.** Same prefers-reduced-motion
+  culprit as the slideshow rotation bug: the global
+  `* { transition: none !important }` rule was disabling the CSS
+  transition that produces the slide-up + fade, so even though
+  JavaScript was toggling `.active`, the spans snapped instead of
+  animating. Override now reinstates the transition specifically on
+  `.hero-slide` and `.hero-quotes span` inside the reduced-motion
+  block. The slide-up is gentle enough that keeping it on for
+  reduced-motion users won&rsquo;t induce motion sickness.
+- **Initial entrance fixed.** Added double `requestAnimationFrame`
+  before applying the first `.active` class. This ensures the browser
+  paints the base state (opacity 0, `translateY(36px)`) once before
+  the class swap, which is what actually triggers the transition.
+  Without the rAF, the browser sometimes collapses the &ldquo;before&rdquo;
+  and &ldquo;after&rdquo; into a single paint and the entrance snaps.
+
 ### v0.6.7 &mdash; 2026-05-11
 
 - **Topbar FRANK + RIZZO** vertically centered. Switched
