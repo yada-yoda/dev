@@ -52,6 +52,18 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.9 &mdash; 2026-05-11
+
+- **Mobile credits tabs fix.** Two problems on narrow viewports: the
+  Commercial tab was overflowing right and causing horizontal scroll,
+  and the entire tabs strip was left-aligned instead of centered.
+  Now: `flex-wrap: wrap` so Commercial stacks beneath when there&rsquo;s
+  no room, `margin: 0 auto` to center the strip, `border-radius` reduced
+  from `999px` to `30px` so the pill looks fine across multiple rows.
+  Tab labels nowrap individually to stay one-line per tab. Sub-560px
+  breakpoint also tightens padding/font/letter-spacing for a snugger
+  fit.
+
 ### v0.6.8 &mdash; 2026-05-11
 
 - **Hero motion now actually plays.** Same prefers-reduced-motion

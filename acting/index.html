@@ -517,8 +517,12 @@ section + section{border-top:1px solid var(--line)}
 /* ------- Filmography tabs ------- */
 .tabs{
   display:flex;gap:4px;background:var(--card-2);
-  padding:6px;border-radius:999px;width:max-content;margin-bottom:20px;
+  padding:6px;border-radius:30px;
+  width:max-content;max-width:100%;
+  margin:0 auto 20px;
   border:1px solid var(--line);
+  flex-wrap:wrap;
+  justify-content:center;
 }
 .tab{
   font-family:'Montserrat',sans-serif;font-size:12px;
@@ -527,6 +531,11 @@ section + section{border-top:1px solid var(--line)}
   cursor:pointer;color:var(--muted);
   border:none;background:transparent;
   transition:all .15s ease;
+  white-space:nowrap;
+}
+@media (max-width:560px){
+  .tabs{padding:4px;gap:2px;width:auto}
+  .tab{padding:8px 14px;font-size:11px;letter-spacing:.16em}
 }
 .tab:hover{color:#fff}
 .tab.active{background:var(--accent);color:#0d2226;font-weight:700}
@@ -1264,7 +1273,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.8</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.9</span>
 </footer>
 
 <script>
