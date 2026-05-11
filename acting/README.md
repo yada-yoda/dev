@@ -52,6 +52,30 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.1 &mdash; 2026-05-11
+
+- **Hero rebuilt with image slideshow.** Four cross-fading background
+  images (Stage, NYC, Chicago, recent headshot) cycle on 32s loop with
+  paired quote overlays. Same four motivational quotes from the
+  original WP site, now synchronized 1:1 with the slides.
+- Dropped the `.cc` from the hero logo &mdash; just RIZZO wordmark + the
+  paired quote.
+- Video tag still scaffolded but commented out; drop a clip at
+  `assets/header.mp4` and uncomment the `<video>` block to swap the
+  slideshow for video playback.
+- **Topbar `.cc`** now bottom-aligned with the RIZZO logo image instead
+  of baseline-aligned text. Sits cleanly under the wordmark.
+- **Favicon paths** switched from absolute (`/assets/...`) to relative
+  (`assets/...`) so they resolve correctly both at `/acting/` subpath
+  and at eventual apex. Same fix in `site.webmanifest` icon entries.
+- **Page title** trimmed: `Frank Rizzo &mdash; Actor | Rizzo.cc`
+  (was `Frank Rizzo &mdash; Actor (Chicago) | Rizzo.cc`). Matching change in
+  OG and Twitter titles.
+- **Two new training entries** added in both screen panel and printed
+  resume sections:
+  - Intimacy Tools For Actors &mdash; Sydney Rene Cox &middot; Acting Studio Chicago
+  - Grad Revue I &mdash; Brian Morrow &middot; The Second City
+
 ### v0.6.0 &mdash; 2026-05-03
 
 - **Repo restructure for multi-project hosting.** The single-project

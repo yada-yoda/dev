@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!-- EDIT: site-meta — page title and description shown in Google results & social previews -->
-<title>Frank Rizzo &mdash; Actor (Chicago) | Rizzo.cc</title>
+<title>Frank Rizzo &mdash; Actor | Rizzo.cc</title>
 <meta name="description" content="Frank Rizzo &mdash; Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact, downloadable resume.">
 <!-- /EDIT: site-meta -->
 <meta name="author" content="Frank Rizzo">
@@ -16,7 +16,7 @@
 <!-- EDIT: og-tags — what Slack / iMessage / Discord / Twitter show when the link is shared -->
 <meta property="og:type" content="profile">
 <meta property="og:site_name" content="Rizzo.cc">
-<meta property="og:title" content="Frank Rizzo &mdash; Actor (Chicago)">
+<meta property="og:title" content="Frank Rizzo &mdash; Actor">
 <meta property="og:description" content="Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact.">
 <meta property="og:url" content="https://rizzo.cc/">
 <meta property="og:image" content="https://rizzo.cc/assets/og-image.png">
@@ -31,7 +31,7 @@
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Frank Rizzo &mdash; Actor (Chicago)">
+<meta name="twitter:title" content="Frank Rizzo &mdash; Actor">
 <meta name="twitter:description" content="Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film &amp; TV credits, headshot, training, contact.">
 <meta name="twitter:image" content="https://rizzo.cc/assets/og-image.png">
 <meta name="twitter:image:alt" content="Rizzo.cc &mdash; Frank Rizzo, Chicago-based actor">
@@ -124,14 +124,14 @@
 </script>
 <!-- /EDIT: json-ld -->
 
-<!-- Favicons & PWA manifest -->
-<link rel="icon" href="/assets/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" sizes="16x16" href="/assets/favicon-16.png">
-<link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
-<link rel="apple-touch-icon" sizes="180x180" href="/assets/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="192x192" href="/assets/icon-192.png">
-<link rel="icon" type="image/png" sizes="512x512" href="/assets/icon-512.png">
-<link rel="manifest" href="/site.webmanifest">
+<!-- Favicons & PWA manifest (relative paths so they work at /acting/ subpath AND eventual apex) -->
+<link rel="icon" href="assets/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="16x16" href="assets/favicon-16.png">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="assets/icon-512.png">
+<link rel="manifest" href="site.webmanifest">
 
 <!-- Fonts -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -196,14 +196,20 @@ ul{list-style:none}
 }
 .topbar.scrolled{background:rgba(37,39,58,.92);box-shadow:0 1px 0 var(--line)}
 .brand{
-  display:inline-flex;align-items:baseline;gap:6px;
+  display:inline-flex;align-items:flex-end;gap:4px;
   font-family:'Montserrat',sans-serif;font-weight:900;
   letter-spacing:.18em;font-size:18px;color:#fff;
   text-transform:uppercase;
   text-decoration:none;
+  line-height:1;
 }
-.brand img{height:22px;width:auto;display:block;align-self:center}
-.brand .tld{color:var(--accent);font-size:14px;letter-spacing:.12em}
+.brand img{height:22px;width:auto;display:block}
+.brand .tld{
+  color:var(--accent);font-size:13px;letter-spacing:.08em;
+  line-height:1;display:block;
+  /* trim ascender space so .cc sits on baseline with logo bottom */
+  margin-bottom:-1px;
+}
 .nav{display:flex;gap:28px}
 .nav a{
   font-family:'Montserrat',sans-serif;font-weight:600;
@@ -225,67 +231,77 @@ ul{list-style:none}
   overflow:hidden;
   isolation:isolate;
 }
-.hero-video,.hero-poster{
+.hero-video{
   position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;
-  z-index:-2;
-}
-/* Fallback gradient if no video */
-.hero::before{
-  content:"";position:absolute;inset:0;
-  background:
-    radial-gradient(1200px 600px at 70% 20%, rgba(0,188,212,.18), transparent 60%),
-    linear-gradient(180deg, #1a1c2a 0%, #2c2e3d 60%, #2c2e3d 100%);
-  z-index:-2;
-}
-.hero::after{
-  content:"";position:absolute;inset:0;
-  background:linear-gradient(180deg, rgba(20,21,30,.55) 0%, rgba(20,21,30,.35) 40%, rgba(44,46,61,.95) 100%);
   z-index:-1;
+}
+/* Slideshow layer behind everything */
+.hero-slides{
+  position:absolute;inset:0;z-index:-2;overflow:hidden;
+}
+.hero-slide{
+  position:absolute;inset:0;
+  background-size:cover;background-position:center;
+  opacity:0;
+  animation:heroSlide 32s infinite;
+  will-change:opacity,transform;
+}
+/* 4 slides x 8s each = 32s loop, 1s cross-fade */
+.hero-slide:nth-child(1){animation-delay:0s}
+.hero-slide:nth-child(2){animation-delay:8s}
+.hero-slide:nth-child(3){animation-delay:16s}
+.hero-slide:nth-child(4){animation-delay:24s}
+@keyframes heroSlide{
+  0%{opacity:0;transform:scale(1.05)}
+  3%{opacity:1}
+  25%{opacity:1;transform:scale(1.0)}
+  28%{opacity:0}
+  100%{opacity:0}
+}
+/* Dark gradient over slideshow so logo + quotes stay readable */
+.hero::before{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:linear-gradient(180deg, rgba(20,21,30,.55) 0%, rgba(20,21,30,.40) 40%, rgba(44,46,61,.95) 100%);
 }
 .hero-inner{
   max-width:900px;padding:120px 24px 80px;
+  position:relative;z-index:1;
 }
 .hero-logo{
-  display:inline-flex;align-items:baseline;justify-content:center;gap:14px;
+  display:inline-flex;align-items:center;justify-content:center;
   filter:drop-shadow(0 6px 30px rgba(0,0,0,.55));
 }
 .hero-logo img{
   width:clamp(280px,50vw,640px);
   height:auto;display:block;
-  align-self:center;
-}
-.hero-logo .tld{
-  font-family:'Montserrat',sans-serif;font-weight:900;
-  font-size:clamp(28px,5vw,56px);
-  color:var(--accent);
-  letter-spacing:.04em;
-  line-height:1;
 }
 .hero-quotes{
+  position:relative;
   margin-top:48px;
-  min-height:48px;
+  min-height:60px;
   font-family:'Montserrat',sans-serif;font-weight:300;
   font-style:italic;
-  font-size:clamp(14px,1.6vw,18px);
-  color:#cfd3dd;letter-spacing:.04em;
+  font-size:clamp(15px,1.7vw,19px);
+  color:#e7e9ef;letter-spacing:.04em;
+  text-shadow:0 2px 16px rgba(0,0,0,.6);
 }
 .hero-quotes span{
-  display:block;
+  position:absolute;left:0;right:0;
   opacity:0;
-  animation:fade 16s infinite;
+  animation:quoteFade 32s infinite;
 }
 .hero-quotes span:nth-child(1){animation-delay:0s}
-.hero-quotes span:nth-child(2){animation-delay:4s}
-.hero-quotes span:nth-child(3){animation-delay:8s}
-.hero-quotes span:nth-child(4){animation-delay:12s}
-@keyframes fade{
+.hero-quotes span:nth-child(2){animation-delay:8s}
+.hero-quotes span:nth-child(3){animation-delay:16s}
+.hero-quotes span:nth-child(4){animation-delay:24s}
+@keyframes quoteFade{
   0%{opacity:0;transform:translateY(6px)}
-  6%,22%{opacity:1;transform:translateY(0)}
-  28%,100%{opacity:0;transform:translateY(-6px)}
+  3%{opacity:1;transform:translateY(0)}
+  25%{opacity:1;transform:translateY(0)}
+  28%{opacity:0;transform:translateY(-6px)}
+  100%{opacity:0}
 }
-.hero-quotes{position:relative}
-.hero-quotes span{position:absolute;left:0;right:0}
 .scrolldown{
   position:absolute;bottom:32px;left:50%;transform:translateX(-50%);
   font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.3em;
@@ -731,21 +747,29 @@ footer .ver{color:var(--dim);margin-left:10px}
   </nav>
 </header>
 
-<!-- ============ HERO with video ============ -->
+<!-- ============ HERO with slideshow ============ -->
 <section class="hero" id="page">
-  <video class="hero-video" autoplay muted loop playsinline preload="metadata"
-         poster="https://rizzo.franktrades.com/wp-content/uploads/2023/12/rizzo_slider1.png">
-    <!-- Drop your reel-cut MP4 here. Recommend 1920x1080, ~10-20s loop, h.264, faststart, no audio. -->
+  <!-- EDIT: hero-slides — the rotating background images. Order matters; quote timing pairs 1:1 with hero-quotes below (slide 1 with quote 1, etc). -->
+  <div class="hero-slides" aria-hidden="true">
+    <div class="hero-slide" style="background-image:url('assets/hero/hero-stage.jpg')"></div>
+    <div class="hero-slide" style="background-image:url('assets/hero/hero-nyc.jpg')"></div>
+    <div class="hero-slide" style="background-image:url('assets/hero/hero-chicago.jpg')"></div>
+    <div class="hero-slide" style="background-image:url('assets/hero/hero-recent.jpg')"></div>
+  </div>
+  <!-- /EDIT: hero-slides -->
+
+  <!-- Video tag stays disabled. When ready, drop assets/header.mp4 in and uncomment.
+  <video class="hero-video" autoplay muted loop playsinline preload="metadata">
     <source src="assets/header.mp4" type="video/mp4">
   </video>
+  -->
 
   <div class="hero-inner">
     <h1 class="hero-logo">
       <img src="assets/rizzo_logo_white.png" alt="RIZZO">
-      <span class="tld">.cc</span>
     </h1>
 
-    <!-- EDIT: hero-quotes — the rotating slogans on the home page. Add/remove <span> rows. Keep total to 3-5 for the timing to feel right. -->
+    <!-- EDIT: hero-quotes — rotating slogans, paired 1:1 with hero-slides above. Keep total at 4 to match slide count, or update both. -->
     <div class="hero-quotes" aria-hidden="true">
       <span>&ldquo;Separation is in the preparation.&rdquo;</span>
       <span>&ldquo;Don&rsquo;t be afraid of rejection or failure.&rdquo;</span>
@@ -928,7 +952,9 @@ footer .ver{color:var(--dim);margin-left:10px}
         <h4>Education / Training</h4>
         <ul>
           <li><span class="label">On Camera I</span><span class="sub">Sarah Charipar &middot; Acting Studio Chicago</span></li>
+          <li><span class="label">Intimacy Tools For Actors</span><span class="sub">Sydney Rene Cox &middot; Acting Studio Chicago</span></li>
           <li><span class="label">Conservatory I&ndash;III</span><span class="sub">Corey Bradberry, Dee Ryan, Sam Super &middot; The Second City</span></li>
+          <li><span class="label">Grad Revue I</span><span class="sub">Brian Morrow &middot; The Second City</span></li>
           <li><span class="label">Improv I&ndash;V</span><span class="sub">Phillips-Spotts, DeOleo, Haughton, Rayzian, Czokse &middot; The Second City</span></li>
           <li><span class="label">Acting I&ndash;III</span><span class="sub">Michael Pieper, Emily Anderson, Dee Ryan &middot; The Second City</span></li>
           <li><span class="label">Vocal Coaching</span><span class="sub">Amanda Murphy, Chicago, IL</span></li>
@@ -1156,7 +1182,9 @@ footer .ver{color:var(--dim);margin-left:10px}
     <h2>Training</h2>
     <div class="rs-training-list">
       <div><strong>On Camera I</strong><em>Sarah Charipar &middot; Acting Studio Chicago</em></div>
+      <div><strong>Intimacy Tools For Actors</strong><em>Sydney Rene Cox &middot; Acting Studio Chicago</em></div>
       <div><strong>Conservatory I&ndash;III</strong><em>Bradberry, Ryan, Super &middot; The Second City, Chicago</em></div>
+      <div><strong>Grad Revue I</strong><em>Brian Morrow &middot; The Second City, Chicago</em></div>
       <div><strong>Improv I&ndash;V</strong><em>Phillips-Spotts, DeOleo, Haughton, Rayzian, Czokse &middot; The Second City, Chicago</em></div>
       <div><strong>Acting I&ndash;III</strong><em>Pieper, Anderson, Ryan &middot; The Second City, Chicago</em></div>
       <div><strong>Vocal Coaching</strong><em>Amanda Murphy, Chicago, IL</em></div>
@@ -1210,7 +1238,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.0</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.1</span>
 </footer>
 
 <script>
