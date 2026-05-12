@@ -303,16 +303,19 @@ ul{list-style:none}
 .hero-quotes{
   position:relative;
   margin-top:42px;
-  min-height:clamp(90px,14vw,160px);
+  min-height:clamp(80px,14vw,160px);
   font-family:'Poppins','Montserrat',sans-serif;
   font-weight:500;
-  font-size:clamp(28px,5vw,60px);
+  font-size:clamp(22px,5.2vw,60px);
   line-height:1.16;
   color:#fff;
   text-transform:uppercase;
   letter-spacing:-0.01em;
   text-shadow:0 2px 28px rgba(0,0,0,.65);
   padding:0 12px;
+}
+@media (max-width:560px){
+  .hero-quotes{padding:0 4px}
 }
 .hero-quotes span{
   position:absolute;left:0;right:0;
@@ -824,7 +827,7 @@ footer .ver{color:var(--dim);margin-left:10px}
       <span>Separation is in<br>the preparation.</span>
       <span>Don&rsquo;t be afraid<br>of rejection or failure.</span>
       <span>Stop trying to feel.<br>Start trying to do.</span>
-      <span>Prepare to be unprepared.<br>Passion is the fuel.</span>
+      <span>Prepare to be<br>unprepared.</span>
     </div>
     <!-- /EDIT: hero-quotes -->
   </div>
@@ -883,10 +886,9 @@ footer .ver{color:var(--dim);margin-left:10px}
         <!-- EDIT: bio — short third-person paragraph next to the headshot -->
         <p class="profile-bio">
           Formal training out of <strong>The Second City</strong> and
-          <strong>Acting Studio Chicago</strong>. A B.B.A. from Saint Xavier University
-          and a working background spanning music management and finance bring authentic
-          professional-world texture to character work on screen. Selected credits include
-          <em>Waiter Boys</em> and <em>Deadly Domicile</em>.
+          <strong>Acting Studio Chicago</strong>. A working background in music management
+          and finance brings authentic professional-world texture to character work on
+          screen. Selected credits include <em>Waiter Boys</em> and <em>Deadly Domicile</em>.
         </p>
         <!-- /EDIT: bio -->
 
@@ -1273,7 +1275,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.11</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.12</span>
 </footer>
 
 <script>

@@ -52,6 +52,24 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.12 &mdash; 2026-05-12
+
+- **Bio reworded.** Dropped the &ldquo;B.B.A. from Saint Xavier University&rdquo;
+  reference. Restructured the awkward &ldquo;and finance bring authentic&hellip;&rdquo;
+  sentence so the subject (&ldquo;A working background&rdquo;) reads cleanly.
+  Now: &ldquo;A working background in music management and finance brings
+  authentic professional-world texture&hellip;&rdquo;
+- **Slide 4 quote** trimmed to just **&ldquo;Prepare to be unprepared.&rdquo;** &mdash;
+  the &ldquo;Passion is the fuel&rdquo; tail was carried over by mistake from
+  a different quote.
+- **Mobile slideshow wrap fix.** Quote 3 (&ldquo;Stop trying to feel.
+  / Start trying to do.&rdquo;) was wrapping mid-line at the 28px font
+  floor on small phones. Floor dropped from 28px to 22px and the
+  responsive ramp tightened (`clamp(22px,5.2vw,60px)`). Sub-560px
+  also gets `padding:0 4px` on `.hero-quotes` so the lines have more
+  horizontal room. All four quotes now break cleanly at the intended
+  spot on mobile.
+
 ### v0.6.11 &mdash; 2026-05-12
 
 - **`acting/404.html`** added &mdash; brand-themed 404 page matching the
