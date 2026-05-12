@@ -5,6 +5,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>404 &mdash; Not Found</title>
 <meta name="robots" content="noindex, nofollow">
+<!-- GH Pages always serves THIS file for any not-found URL across the
+     whole dev.rizzo.cc domain. Inline JS below detects the requested path
+     and bounces to the project-specific 404 page when appropriate, so each
+     project gets its own branded not-found experience. -->
+<script>
+  (function(){
+    var p = window.location.pathname;
+    if (p.indexOf('/404') !== -1) return;       // already on a 404 page; don't loop
+    if (p.indexOf('/acting/') === 0) { window.location.replace('/acting/404.html'); return; }
+    if (p.indexOf('/usage/')  === 0) { window.location.replace('/usage/404.html');  return; }
+  })();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;700;900&display=swap" rel="stylesheet">

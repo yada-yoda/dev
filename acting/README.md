@@ -52,6 +52,20 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.11 &mdash; 2026-05-12
+
+- **`acting/404.html`** added &mdash; brand-themed 404 page matching the
+  site&rsquo;s dark navy + cyan palette. Big &ldquo;404&rdquo;, the line
+  &ldquo;The reel doesn&rsquo;t roll on that path,&rdquo; and one
+  link back to `/acting/`.
+- **Root `dev/404.html` made path-aware.** GitHub Pages only serves the
+  repo-root 404 for any not-found URL across the whole domain, so the
+  per-project 404 files (`acting/404.html`, `usage/404.html`) wouldn&rsquo;t
+  be auto-triggered on their own. Inline JS at the top of `dev/404.html`
+  now reads `window.location.pathname` and bounces visitors to the
+  matching project&rsquo;s 404 when the path is under `/acting/` or
+  `/usage/`. Guard against infinite loops on already-`/404` paths.
+
 ### v0.6.10 &mdash; 2026-05-11
 
 - **Improv I&ndash;V** entry expanded to full first + last names for all
