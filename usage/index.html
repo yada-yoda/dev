@@ -3,12 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="version" content="0.18.1">
+  <meta name="version" content="0.18.2">
   <!-- v0.17.7: hint that the app is light-themed so browsers don't
        transiently apply dark-mode form-control styling on load. -->
   <meta name="color-scheme" content="light">
   <title>Usage Tracker</title>
   <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
+  <!-- v0.18.2: canonical URL points at dev.rizzo.cc so search engines and
+       social-media crawlers treat that as the source-of-truth even when
+       the page is reached via the secondary rizzo.cc deployment. -->
+  <link rel="canonical" href="https://dev.rizzo.cc/usage/">
   <!-- v0.17.7: preconnect to origins we know will be hit during initial
        JS module imports (Firebase from gstatic, Chart.js from jsdelivr).
        Saves ~100-200ms of DNS+TLS handshake per origin on cold loads.
@@ -66,7 +70,7 @@
       <img src="favicon.svg" alt="" class="logo" width="36" height="36" fetchpriority="high" decoding="async">
       <div class="brand-text">
         <h1>Usage Tracker</h1>
-        <span class="version" id="version">v0.18.1</span>
+        <span class="version" id="version">v0.18.2</span>
       </div>
     </div>
     <nav class="toolbar" id="toolbar" hidden>
@@ -676,6 +680,16 @@
         </ul>
 
         <p class="settings-status" id="settings-status" aria-live="polite"></p>
+      </section>
+
+      <!-- v0.18.2: one-shot tool to backfill brand + product-image data on
+           older products that were added before the UPC lookup auto-captured
+           those fields. Hidden on dialog open if nothing needs backfilling. -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">Product data backfill</h3>
+        <p class="settings-section-lead">Some older products may be missing a brand or product image. This looks each one up in the UPC database and fills in what's missing — without changing anything you've already set.</p>
+        <button type="button" class="btn" id="settings-backfill-btn">Backfill brand &amp; images</button>
+        <p class="settings-status" id="settings-backfill-status" aria-live="polite"></p>
       </section>
     </div>
     <footer class="dialog-footer">
