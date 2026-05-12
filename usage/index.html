@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="version" content="0.18.0">
+  <!-- v0.17.7: hint that the app is light-themed so browsers don't
+       transiently apply dark-mode form-control styling on load. -->
+  <meta name="color-scheme" content="light">
+  <title>Usage Tracker</title>
+  <meta name="description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
+  <!-- v0.17.7: preconnect to origins we know will be hit during initial
+       JS module imports (Firebase from gstatic, Chart.js from jsdelivr).
+       Saves ~100-200ms of DNS+TLS handshake per origin on cold loads.
+       crossorigin=anonymous is required for ES module preconnects. -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+  <!-- v0.17.7: dns-prefetch for origins hit after first render (logo.dev
+       only when a product has a brand set; Identity Toolkit only during
+       sign-in). Lighter weight than preconnect — just resolves DNS. -->
+  <link rel="dns-prefetch" href="https://img.logo.dev">
+  <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+  <!-- v0.14.4: full favicon coverage. SVG is preferred by modern browsers
+       (scales perfectly); PNG fallbacks for everything else. apple-touch
+       drives iOS home-screen icon. manifest enables Android Add-to-Home.
+       theme-color tints the browser chrome on mobile. -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="favicon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#2b5fd9">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Usage Tracker">
+  <!-- Open Graph + Twitter Cards. Renders branded previews in Slack, Discord,
+       iMessage, Twitter/X, Facebook, LinkedIn, etc. when the URL is shared.
+       v0.14.4: PNG promoted to primary og:image (Twitter/X, Facebook, LinkedIn
+       reject SVG); SVG kept as secondary for platforms that prefer it. -->
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Usage Tracker">
+  <meta property="og:title" content="Usage Tracker">
+  <meta property="og:description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
+  <meta property="og:url" content="https://dev.rizzo.cc/usage/">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:image" content="https://dev.rizzo.cc/usage/og-image.png">
+  <meta property="og:image:type" content="image/png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Usage Tracker — personal product usage tracker">
+  <meta property="og:image" content="https://dev.rizzo.cc/usage/og-image.svg">
+  <meta property="og:image:type" content="image/svg+xml">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Usage Tracker">
+  <meta name="twitter:description" content="Personal product usage tracker — log everyday products, see per-day cost, track lifespans.">
+  <meta name="twitter:image" content="https://dev.rizzo.cc/usage/og-image.png">
+  <meta name="twitter:image:alt" content="Usage Tracker — personal product usage tracker">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="brand">
+      <!-- v0.17.7: header logo is the LCP candidate on the auth-gate
+           landing. fetchpriority=high asks the browser to prioritize this
+           image over deferred resources; decoding=async lets the main
+           thread keep parsing while the SVG decodes. -->
+      <img src="favicon.svg" alt="" class="logo" width="36" height="36" fetchpriority="high" decoding="async">
+      <div class="brand-text">
+        <h1>Usage Tracker</h1>
+        <span class="version" id="version">v0.18.0</span>
+      </div>
+    </div>
+    <nav class="toolbar" id="toolbar" hidden>
+      <button type="button" id="btn-add" class="btn btn-primary">+ Add product</button>
+      <div class="dropdown">
+        <button type="button" id="btn-import" class="btn">Import &#9662;</button>
+        <div class="dropdown-menu" id="import-menu">
+          <button type="button" data-import="file">Import from file…</button>
+          <button type="button" data-import="template-csv">Download CSV template</button>
+          <button type="button" data-import="template-json">Download JSON template</button>
+        </div>
+      </div>
+      <div class="dropdown">
+        <button type="button" id="btn-export" class="btn">Export &#9662;</button>
+        <div class="dropdown-menu" id="export-menu">
+          <button type="button" data-export="json">Export JSON</button>
+          <button type="button" data-export="csv">Export CSV</button>
+        </div>
+      </div>
+      <input type="file" id="file-import" accept=".json,application/json,.csv,text/csv" hidden>
+      <div class="user-chip" id="user-chip" hidden>
+        <img id="user-avatar" alt="" referrerpolicy="no-referrer">
+        <span id="user-name"></span>
+        <!-- v0.16.0: Settings dialog houses email-reminder opt-in for the
+             usage-worker daily digest. Kept in the user chip so it sits
+             alongside Sign out (account-level prefs cluster). -->
+        <button type="button" id="btn-settings" class="btn btn-ghost" title="Settings">Settings</button>
+        <button type="button" id="btn-signout" class="btn btn-ghost" title="Sign out">Sign out</button>
+      </div>
+    </nav>
+  </header>
+
+  <section class="auth-gate" id="auth-gate" hidden>
+    <div class="auth-card">
+      <img src="favicon.svg" alt="" width="56" height="56" fetchpriority="high" decoding="async">
+      <h2>Sign in to Usage Tracker</h2>
+      <p>Your products are stored privately in your Google account. Sign in to start tracking — or to resume from another device.</p>
+      <button type="button" id="btn-signin" class="btn btn-primary btn-google">
+        <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+          <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 8 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z"/>
+          <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.1 8 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/>
+          <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2c-2 1.4-4.5 2.2-7.2 2.2-5.3 0-9.7-3.4-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/>
+          <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.1 5.6l6.2 5.2C41.1 35.9 44 30.4 44 24c0-1.2-.1-2.4-.4-3.5z"/>
+        </svg>
+        Sign in with Google
+      </button>
+      <p class="auth-note">By signing in you accept that product data is stored in Firebase Firestore under your account only.</p>
+    </div>
+  </section>
+
+  <main id="main-wrap" hidden>
+    <section class="trends-panel" id="trends-panel" aria-live="polite" hidden></section>
+
+    <!-- v0.12.0: Reorder reminders. For each currently-active product whose
+         duration is approaching or past the average lifespan of its same-type
+         finished siblings, surface a small alert. Hidden when none apply. -->
+    <section class="reminders-panel" id="reminders-panel" aria-label="Reorder reminders" hidden></section>
+
+    <div class="display-controls" aria-label="Display controls">
+      <!-- v0.12.0: currency selector -->
+      <label class="currency-selector" title="Display all costs in this currency">
+        <span class="currency-selector-label">Currency</span>
+        <select id="currency-select"></select>
+      </label>
+      <label class="pretax-toggle" title="Show all costs with or without tax">
+        <input type="checkbox" id="pretax-toggle">
+        <span class="pretax-track" aria-hidden="true"><span class="pretax-thumb"></span></span>
+        <span class="pretax-label">Show pre-tax prices</span>
+      </label>
+      <!-- v0.17.0: density + column visibility controls. Persist per
+           browser via localStorage. Affect the desktop table only — the
+           mobile card layout has its own column subset already. -->
+      <label class="density-toggle" title="Switch table row spacing">
+        <span>Density</span>
+        <select id="density-select" aria-label="Table density">
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+        </select>
+      </label>
+      <div class="columns-dropdown">
+        <button type="button" id="btn-columns" class="columns-trigger" aria-haspopup="true" aria-expanded="false" title="Show or hide table columns">Columns &#9662;</button>
+        <div class="columns-menu" id="columns-menu" role="menu">
+          <div class="columns-menu-title">Show columns</div>
+          <div id="columns-menu-rows"></div>
+          <div class="columns-menu-actions">
+            <button type="button" class="columns-menu-action" id="columns-show-all">Show all</button>
+            <button type="button" class="columns-menu-action" id="columns-reset">Reset</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="stats-bar" id="stats-bar" aria-label="Summary">
+      <div class="stat"><span class="stat-label">Tracked products</span><span class="stat-value" id="stat-count">0</span></div>
+      <div class="stat" title="Items you've started using and not yet finished"><span class="stat-label">Active</span><span class="stat-value" id="stat-active">0</span></div>
+      <div class="stat" title="Items purchased but not yet started — sitting in inventory"><span class="stat-label">Inventory</span><span class="stat-value" id="stat-inventory">0</span></div>
+      <div class="stat"><span class="stat-label">Finished</span><span class="stat-value" id="stat-finished">0</span></div>
+      <div class="stat" title="Sum of allocated cost for products you've started using. Inventory items (no start date) are excluded until you begin using them."><span class="stat-label">Total spend</span><span class="stat-value" id="stat-total">$0.00</span></div>
+      <div class="stat" title="Sum of allocated cost for products purchased AND started using in the current calendar year. Inventory items are excluded."><span class="stat-label">YTD spend</span><span class="stat-value" id="stat-ytd-spend">$0.00</span></div>
+      <div class="stat" title="Total cost of product usage in the last 30 days. Each product contributes its per-day rate × days of overlap with the 30-day window — so two $5 products used sequentially over 30 days correctly totals $10, not $20. Updates daily as the window rolls forward."><span class="stat-label">Last 30 days</span><span class="stat-value" id="stat-rolling30">$0.00</span></div>
+      <div class="stat" title="Combined daily burn rate across all product categories active this year. For each category, rate = total spend on that category divided by the date span its products covered (so two $5 underarms used over 30 days = $0.33/day, not $0.67/day). Categories sum because they're used in parallel."><span class="stat-label">YTD daily cost</span><span class="stat-value" id="stat-ytd-perday">$0.00</span></div>
+    </section>
+
+    <nav class="view-tabs" id="view-tabs" role="tablist" aria-label="View">
+      <button type="button" class="view-tab is-active" data-view="table" role="tab" aria-selected="true">Table</button>
+      <button type="button" class="view-tab" data-view="dashboard" role="tab" aria-selected="false">Dashboard</button>
+      <button type="button" class="view-tab" data-view="activity" role="tab" aria-selected="false">Activity</button>
+      <button type="button" class="view-tab" data-view="favorites" role="tab" aria-selected="false">Favorites</button>
+    </nav>
+
+    <section class="view" id="view-table" role="tabpanel">
+      <!-- v0.14.4: live search across product fields. AND-combines with the
+           row-filter tabs below + any active chip filters above. -->
+      <div class="row-search-wrap">
+        <span class="row-search-icon" aria-hidden="true">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        </span>
+        <input type="search" id="row-search" class="row-search-input" placeholder="Search products by name, type, store, UPC…" aria-label="Search products" autocomplete="off" role="combobox" aria-controls="row-search-suggestions" aria-expanded="false" aria-autocomplete="list">
+        <div class="row-search-suggestions" id="row-search-suggestions" role="listbox" hidden></div>
+      </div>
+      <nav class="row-filter-tabs" role="tablist" aria-label="Row filter">
+        <button type="button" class="row-filter-tab is-active" data-filter="all" role="tab" aria-selected="true" title="Show every product">All</button>
+        <button type="button" class="row-filter-tab" data-filter="active" role="tab" aria-selected="false" title="Only products you've started using and not yet finished">Active</button>
+        <button type="button" class="row-filter-tab" data-filter="inventory" role="tab" aria-selected="false" title="Only products purchased but not yet started">Inventory</button>
+        <!-- v0.17.6: Finished tab — products you've already used up. Useful
+             for sorting through history (e.g. find the longest-lasting toothpaste). -->
+        <button type="button" class="row-filter-tab" data-filter="finished" role="tab" aria-selected="false" title="Only products you've finished using">Finished</button>
+        <button type="button" id="btn-reset-filters" class="btn btn-ghost" title="Clear filters and show all rows">Reset</button>
+      </nav>
+      <div class="active-filter-bar" id="active-filter-bar" hidden></div>
+      <label class="mobile-sort-wrap" for="mobile-sort">
+        <span class="mobile-sort-label">Sort:</span>
+        <select id="mobile-sort" class="mobile-sort">
+          <option value="purchaseDate.desc">Newest first</option>
+          <option value="purchaseDate.asc">Oldest first</option>
+          <option value="productName.asc">Name (A → Z)</option>
+          <option value="costPerDay.desc">Highest $/day</option>
+          <option value="cost.desc">Highest cost</option>
+        </select>
+      </label>
+      <div class="table-wrap">
+        <table class="products" id="products-table">
+          <thead>
+            <tr>
+              <th data-sort="productType">Type</th>
+              <th data-sort="productName">Name</th>
+              <th data-sort="size">Size</th>
+              <th data-sort="startDate">Start</th>
+              <th data-sort="endDate">End</th>
+              <th data-sort="duration">Duration</th>
+              <th data-sort="cost">Cost</th>
+              <th data-sort="costWithTax">w/ Tax</th>
+              <th data-sort="costPerUnit">$/unit</th>
+              <th data-sort="costPerDay">$/day</th>
+              <th data-sort="bundleStatus">Bundle</th>
+              <!-- v0.17.0: STORE + BUYER + CARD consolidated into one BOUGHT BY column. -->
+              <th data-sort="boughtBy">Bought by</th>
+              <th data-sort="purchaseDate">Purchased</th>
+              <th data-sort="upc">UPC</th>
+              <th data-sort="notes">Notes</th>
+              <th class="actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="products-body"></tbody>
+        </table>
+        <p class="loading-state" id="loading-state" hidden>Loading your products…</p>
+        <p class="empty-state" id="empty-state" hidden>No products tracked yet. Click <strong>+ Add product</strong> to get started.</p>
+      </div>
+    </section>
+
+    <section class="view" id="view-dashboard" role="tabpanel" hidden>
+      <div class="dash-export-bar">
+        <button type="button" id="btn-export-dashboard" class="btn" title="Export the stats and charts as a 4:3 PNG">Export dashboard PNG</button>
+        <button type="button" id="btn-export-overview" class="btn" title="Export a 5:7 portrait overview combining stats and charts">Export overview PNG</button>
+      </div>
+      <div class="dash-cards">
+        <div class="stat"><span class="stat-label">Avg $/day (active)</span><span class="stat-value" id="dash-avg-per-day">$0.00</span></div>
+        <div class="stat"><span class="stat-label">Avg lifespan (finished)</span><span class="stat-value" id="dash-avg-lifespan">—</span></div>
+        <div class="stat"><span class="stat-label">Top category by spend</span><span class="stat-value" id="dash-top-category">—</span></div>
+        <div class="stat"><span class="stat-label">Top store by spend</span><span class="stat-value" id="dash-top-store">—</span></div>
+      </div>
+
+      <div class="dash-charts">
+        <div class="chart-card">
+          <h3>Allocated spend by product type</h3>
+          <div class="chart-box"><canvas id="chart-by-type"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Allocated spend by store</h3>
+          <div class="chart-box"><canvas id="chart-by-store"></canvas></div>
+        </div>
+        <div class="chart-card chart-card-wide">
+          <h3>Products finished per month <span class="chart-sub">(last 12 months)</span></h3>
+          <div class="chart-box"><canvas id="chart-finished-per-month"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>$/day by product type <span class="chart-sub">(burn rate)</span></h3>
+          <div class="chart-box"><canvas id="chart-perday-by-type"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <h3>Purchases by product type <span class="chart-sub">(how often)</span></h3>
+          <div class="chart-box"><canvas id="chart-count-by-type"></canvas></div>
+        </div>
+        <div class="chart-card chart-card-wide">
+          <h3>Longest-running products <span class="chart-sub">(active + past, top 10)</span></h3>
+          <div class="chart-box"><canvas id="chart-longest-running"></canvas></div>
+        </div>
+      </div>
+
+      <p class="empty-state" id="dash-empty" hidden>Add some products to see your dashboard.</p>
+    </section>
+
+    <!-- v0.15.0: Favorites — catalog of products you remember/liked but
+         haven't necessarily tracked. Cross-references with tracked products
+         by UPC for "last used / times used" stats. Doesn't affect any
+         stats, charts, reminders, or trends. -->
+    <section class="view" id="view-favorites" role="tabpanel" hidden>
+      <div class="favorites-controls">
+        <h2 class="favorites-title">Favorites</h2>
+        <span class="favorites-count" id="favorites-count"></span>
+        <button type="button" id="btn-add-favorite" class="btn btn-primary">+ Add favorite</button>
+      </div>
+      <div class="favorites-grid" id="favorites-grid"></div>
+      <p class="empty-state" id="favorites-empty" hidden>No favorites yet. Tap <strong>+ Add favorite</strong> to remember a product you liked but aren't actively tracking.</p>
+    </section>
+
+    <section class="view" id="view-activity" role="tabpanel" hidden>
+      <div class="activity-controls">
+        <h2 class="activity-title">Activity log</h2>
+        <label class="activity-pagesize-wrap">
+          <span>Show</span>
+          <select id="activity-pagesize">
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+            <option value="150">150</option>
+          </select>
+          <span>most-recent entries</span>
+        </label>
+        <button type="button" id="btn-clear-activity" class="btn btn-ghost" title="Clear all activity entries from this browser">Clear</button>
+      </div>
+      <div class="activity-list" id="activity-list"></div>
+      <p class="empty-state" id="activity-empty" hidden>No activity recorded yet. Add, edit, duplicate, or delete a product and it'll show up here.</p>
+    </section>
+  </main>
+
+  <dialog id="product-dialog" class="product-dialog">
+    <!-- v0.15.5: novalidate so submit always fires and JS handles validation.
+         HTML5 required validation can fail silently on mobile (the "Please
+         fill out this field" tooltip is sometimes invisible in scrolled
+         dialogs) — JS validation lets us toast the specific issue. -->
+    <form id="product-form" method="dialog" novalidate>
+      <header class="dialog-header">
+        <h2 id="dialog-title">Add product</h2>
+        <button type="button" class="icon-btn" id="dialog-close" aria-label="Close">&times;</button>
+      </header>
+
+      <section id="continue-bundle-wrap" class="form-banner" data-tracked-only>
+        <label class="field">
+          <span>Continue existing bundle</span>
+          <select id="continue-bundle">
+            <option value="">— New product (not continuing a bundle) —</option>
+          </select>
+        </label>
+        <p class="form-banner-hint">Continue a previous bundle to auto-fill product name, cost, UPC, and bundle size.</p>
+      </section>
+
+      <div class="form-grid">
+        <label class="field field-wide upc-field">
+          <span>UPC <em>*</em></span>
+          <div class="input-with-btn">
+            <input name="upc" type="text" inputmode="numeric" required maxlength="20" placeholder="Scan or type — we'll look it up automatically">
+            <!-- v0.15.5: explicit Look up button. Forces a fresh fetch
+                 bypassing both L1 and L2 caches. Useful when a previous
+                 lookup failed (rate limit / network blip) and got cached
+                 as a miss; this button gives a one-tap retry without
+                 needing to clear any state. Also helps mobile where blur
+                 events sometimes don't fire reliably between fields. -->
+            <button type="button" id="btn-lookup-upc" class="btn btn-scan" title="Look up this UPC fresh, bypassing any cached miss">
+              Look up
+            </button>
+            <button type="button" id="btn-scan-upc" class="btn btn-scan" title="Scan a barcode with your camera">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M23 19V5a2 2 0 0 0-2-2H3a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2z"/>
+                <path d="M7 7v10M11 7v10M15 7v10M19 7v10"/>
+              </svg>
+              Scan
+            </button>
+          </div>
+          <span class="upc-status" id="upc-status" aria-live="polite"></span>
+          <!-- v0.15.5/v0.15.5: brand logo + product image preview shown
+               next to each other inside the dialog. Wrapper hides when
+               neither is set; either child can fail load and self-hide
+               via its onerror handler. -->
+          <div class="upc-image-preview" id="upc-image-preview" hidden>
+            <img id="upc-brand-logo" src="" alt="" loading="lazy" hidden>
+            <img id="upc-image-preview-img" src="" alt="" loading="lazy">
+            <span class="upc-image-preview-label">Product</span>
+          </div>
+          <!-- v0.12.0: Amazon search link, only shown when UPC has 8+ digits.
+               Opens amazon.com/s?k={upc} in a new tab so the user can check
+               the current market price for this item. -->
+          <a id="upc-check-amazon" class="upc-check-link" href="#" target="_blank" rel="noopener" hidden>Check current price on Amazon &#x2197;</a>
+        </label>
+
+        <label class="field">
+          <span>Product type <em>*</em></span>
+          <select name="productType" required></select>
+        </label>
+
+        <label class="field">
+          <span>Product name <em>*</em></span>
+          <input name="productName" type="text" required maxlength="120">
+        </label>
+
+        <label class="field">
+          <span>Brand <em class="muted">(for company logo)</em></span>
+          <input name="brand" type="text" maxlength="80" placeholder="Auto-filled from UPC lookup">
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Size <em>*</em></span>
+          <input name="size" type="number" step="any" min="0" required>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Unit <em>*</em></span>
+          <select name="unit" required>
+            <option value="">Select...</option>
+            <option>count</option>
+            <option>oz</option>
+            <option>fl oz</option>
+            <option>lb</option>
+            <option>g</option>
+            <option>kg</option>
+            <option>mL</option>
+            <option>L</option>
+            <option>gal</option>
+            <option>ft</option>
+            <option>m</option>
+            <option>pack</option>
+            <option>roll</option>
+            <option>sheet</option>
+            <option>load</option>
+            <option>serving</option>
+          </select>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Start date <em class="muted">(leave blank for inventory)</em></span>
+          <input name="startDate" type="date">
+          <small class="field-hint">If you've purchased this but haven't started using it yet, leave this blank — it'll be tracked as inventory and won't affect daily-cost stats until you set a start date.</small>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>End date</span>
+          <input name="endDate" type="date">
+        </label>
+
+        <label class="field" data-tracked-only>
+          <!-- v0.17.4: cost label dynamically rebrands when bundleStatus is
+               checked. The id is so syncBundleCostUI() can swap it. -->
+          <span id="cost-label">Cost (pre-tax) <em>*</em></span>
+          <div class="currency-wrap">
+            <span class="currency-prefix" data-currency-symbol>$</span>
+            <input name="cost" type="number" step="0.01" min="0" required placeholder="0.00">
+          </div>
+          <!-- v0.17.4: bundle-only helper text. Hidden when bundleStatus is
+               off; populated live with the per-item derivation when on. -->
+          <small class="field-hint cost-bundle-hint" id="cost-bundle-hint" hidden></small>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span id="cost-with-tax-label">Cost with tax</span>
+          <div class="currency-wrap">
+            <span class="currency-prefix" data-currency-symbol>$</span>
+            <input name="costWithTax" type="number" step="0.01" min="0" placeholder="0.00">
+          </div>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Store</span>
+          <select name="store"></select>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Buyer</span>
+          <select name="buyer"></select>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Card (last 4)</span>
+          <select name="cardLast4"></select>
+        </label>
+
+        <label class="field" data-tracked-only>
+          <span>Purchase date</span>
+          <input name="purchaseDate" type="date">
+        </label>
+
+        <label class="field checkbox-field" data-tracked-only>
+          <input name="bundleStatus" type="checkbox">
+          <span>Part of a bundle purchase</span>
+        </label>
+
+        <label class="field" id="bundle-size-wrap" data-tracked-only hidden>
+          <span>How many in the bundle? <em>*</em></span>
+          <input name="bundleSize" type="number" min="1" step="1" placeholder="e.g. 3">
+        </label>
+
+        <label class="field" id="bundle-position-wrap" data-tracked-only hidden>
+          <span>Which number of the bundle is this? <em>*</em></span>
+          <input name="bundlePosition" type="number" min="1" step="1" placeholder="e.g. 2 (meaning this is #2 of the bundle)">
+        </label>
+
+        <!-- v0.12.0: hidden bundleId — set by openEditDialog / handleContinueBundle / openDuplicateDialog
+             when continuing or editing an existing bundle. handleSubmit reads it; if the user checked
+             bundleStatus on a brand-new row with no bundleId set, a fresh one is generated at save time. -->
+        <input name="bundleId" type="hidden">
+        <!-- v0.12.0: imageUrl populated by UPCitemdb lookup (first HTTPS image from the response).
+             Rendered as a small thumbnail next to the product name in the table and mobile cards. -->
+        <input name="imageUrl" type="hidden">
+
+
+        <label class="field field-wide">
+          <span>Notes</span>
+          <textarea name="notes" rows="2" maxlength="500"></textarea>
+        </label>
+
+        <!-- v0.15.0: favorite-only fields. Visible only when the dialog is in
+             favorite mode (the openAddFavoriteDialog flow). The hidden
+             `favorite` input carries the catalog flag through the FIELDS
+             loop in handleSubmit. Rating is 1–5 stars; "why" is free-form. -->
+        <input name="favorite" type="hidden">
+        <label class="field field-wide" data-favorite-only>
+          <span>Rating</span>
+          <div class="rating-input" id="rating-input" role="radiogroup" aria-label="Rating">
+            <button type="button" class="rating-star" data-value="1" aria-label="1 star">★</button>
+            <button type="button" class="rating-star" data-value="2" aria-label="2 stars">★</button>
+            <button type="button" class="rating-star" data-value="3" aria-label="3 stars">★</button>
+            <button type="button" class="rating-star" data-value="4" aria-label="4 stars">★</button>
+            <button type="button" class="rating-star" data-value="5" aria-label="5 stars">★</button>
+            <button type="button" class="rating-clear" id="rating-clear" title="Clear rating">Clear</button>
+          </div>
+          <input name="favoriteRating" type="hidden">
+        </label>
+        <label class="field field-wide" data-favorite-only>
+          <span>Why I like it</span>
+          <textarea name="favoriteWhy" rows="2" maxlength="500" placeholder="What stood out about this product? (optional)"></textarea>
+        </label>
+      </div>
+
+      <footer class="dialog-footer">
+        <button type="button" class="btn" id="dialog-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="dialog-save">Save</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog id="confirm-dialog" class="confirm-dialog">
+    <p id="confirm-message">Are you sure?</p>
+    <div class="confirm-actions">
+      <button type="button" class="btn" id="confirm-no">Cancel</button>
+      <button type="button" class="btn btn-danger" id="confirm-yes">Delete</button>
+    </div>
+  </dialog>
+
+  <!-- v0.12.0: Share dialog. Read-only share-link generator. Encodes a
+       curated subset of the product into a base64 URL hash that points at
+       share.html. Self-contained recipient page; no auth required to view. -->
+  <!-- v0.14.4: Finish dialog — quick "end active product" path that prompts
+       for the end date with today pre-filled. Avoids the full Edit dialog
+       just to mark something done. -->
+  <dialog id="finish-dialog" class="finish-dialog">
+    <header class="dialog-header">
+      <h2>Finish product</h2>
+      <button type="button" class="icon-btn" id="finish-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="finish-body">
+      <p class="finish-lead" id="finish-lead">When did you finish this?</p>
+      <label class="field">
+        <span>End date</span>
+        <input type="date" id="finish-date" required>
+      </label>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="finish-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="finish-confirm">Mark finished</button>
+    </footer>
+  </dialog>
+
+  <dialog id="share-dialog" class="share-dialog">
+    <header class="dialog-header">
+      <h2>Share product</h2>
+      <button type="button" class="icon-btn" id="share-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="share-body">
+      <p class="share-lead">Anyone with this link can see this product as a read-only card. They can't edit it, and your other products stay private.</p>
+      <label class="share-url-wrap">
+        <span class="share-url-label">Share link</span>
+        <input type="text" id="share-url-input" readonly>
+      </label>
+      <p class="share-hint" id="share-hint" aria-live="polite"></p>
+    </div>
+    <footer class="dialog-footer">
+      <!-- v0.15.5: PNG export folded into the Share dialog so the user has
+           one Share button on each row instead of two. -->
+      <button type="button" class="btn" id="share-png" title="Download a 4:3 PNG card of this product">Export PNG</button>
+      <button type="button" class="btn" id="share-open">Open link</button>
+      <button type="button" class="btn btn-primary" id="share-copy">Copy link</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.12.0: Price history per UPC. Shows a line chart of cost over time
+       for products sharing the same UPC, plus a small entry table beneath. -->
+  <dialog id="price-history-dialog" class="price-history-dialog">
+    <header class="dialog-header">
+      <h2 id="price-history-title">Price history</h2>
+      <button type="button" class="icon-btn" id="price-history-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="price-history-body">
+      <div class="price-history-meta" id="price-history-meta"></div>
+      <div class="price-history-chart"><canvas id="price-history-canvas"></canvas></div>
+      <div class="price-history-table-wrap">
+        <table class="price-history-table" id="price-history-table">
+          <thead>
+            <tr>
+              <th>Purchased</th>
+              <th class="num">Cost</th>
+              <th class="num">vs first</th>
+              <th>Store</th>
+              <th>Buyer</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn btn-primary" id="price-history-done">Close</button>
+    </footer>
+  </dialog>
+
+  <dialog id="upc-match-dialog" class="upc-match-dialog">
+    <header class="dialog-header">
+      <h2>Match found</h2>
+      <button type="button" class="icon-btn" id="upc-match-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="upc-match-body">
+      <p class="upc-match-lead">We found this product for UPC <code id="upc-match-code"></code>. Use it to pre-fill the form?</p>
+      <dl class="upc-match-grid" id="upc-match-grid"></dl>
+      <p class="upc-match-hint">Fields you've already filled in won't be overwritten.</p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="upc-match-no">No, I'll enter it</button>
+      <button type="button" class="btn btn-primary" id="upc-match-yes">Yes, use this</button>
+    </footer>
+  </dialog>
+
+  <dialog id="scanner-dialog" class="scanner-dialog">
+    <header class="dialog-header">
+      <h2>Scan barcode</h2>
+      <button type="button" class="icon-btn" id="scanner-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="scanner-body">
+      <div class="scanner-video-wrap">
+        <video id="scanner-video" playsinline muted autoplay></video>
+        <div class="scanner-reticle" aria-hidden="true"></div>
+      </div>
+      <p class="scanner-hint" id="scanner-hint">Starting camera…</p>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="scanner-cancel">Cancel</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.16.0: Settings dialog. Currently houses email-reminder prefs only.
+       Writes to /users/{uid}/meta/emailPrefs which is read by the
+       usage-worker daily cron. Master switch + optional email override
+       (defaults to the signed-in Google account email). -->
+  <dialog id="settings-dialog" class="settings-dialog">
+    <header class="dialog-header">
+      <h2>Settings</h2>
+      <button type="button" class="icon-btn" id="settings-close" aria-label="Close">&times;</button>
+    </header>
+    <div class="settings-body">
+      <section class="settings-section">
+        <h3 class="settings-section-title">Email reorder reminders</h3>
+        <p class="settings-section-lead">Get a daily digest email when active products are approaching their average lifespan, so you can reorder before they run out.</p>
+
+        <label class="settings-toggle-row">
+          <input type="checkbox" id="settings-email-enabled">
+          <span class="settings-toggle-track" aria-hidden="true"><span class="settings-toggle-thumb"></span></span>
+          <span class="settings-toggle-label">Email me when products are running low</span>
+        </label>
+
+        <label class="settings-field">
+          <span>Email address</span>
+          <input type="email" id="settings-email-address" autocomplete="email" placeholder="you@example.com">
+          <small class="settings-field-hint" id="settings-email-default-hint">Leave blank to use the email on your Google account.</small>
+        </label>
+
+        <ul class="settings-cadence-list">
+          <li>Runs daily at 8am US Eastern (13:00 UTC).</li>
+          <li>One digest per email — at most one email per week so reminders don't repeat.</li>
+          <li>Skipped if nothing's due. You can turn this off any time.</li>
+        </ul>
+
+        <p class="settings-status" id="settings-status" aria-live="polite"></p>
+      </section>
+    </div>
+    <footer class="dialog-footer">
+      <button type="button" class="btn" id="settings-cancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="settings-save">Save</button>
+    </footer>
+  </dialog>
+
+  <!-- v0.15.5: <dialog> instead of <div> so toasts render in the browser's
+       top layer — visible on top of modal dialogs (Add/Edit, Finish, Share,
+       etc.). show() is non-modal so it doesn't block interaction. -->
+  <dialog id="toast" class="toast" role="status" aria-live="polite"></dialog>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,2965 @@
+:root {
+  --bg: #f5f7fb;
+  --surface: #ffffff;
+  --surface-alt: #f9fafc;
+  --border: #e3e7ef;
+  --text: #1a2238;
+  --text-muted: #6b7390;
+  --primary: #2b5fd9;
+  --primary-hover: #1f4ec2;
+  --danger: #c23b3b;
+  --danger-hover: #9e2c2c;
+  --success: #2d8a5f;
+  --shadow-sm: 0 1px 2px rgba(20, 30, 60, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 30, 60, 0.12);
+  --radius: 8px;
+}
+
+* { box-sizing: border-box; }
+
+/* Make the HTML `hidden` attribute reliably hide any element, even ones
+ * with an explicit `display:` rule further down. Without this, `<label
+ * class="field" hidden>` still renders because `.field { display: flex; }`
+ * wins on specificity. This is the global safety net — individual
+ * `[hidden]` overrides below can stay as belt-and-braces. */
+[hidden] { display: none !important; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Header */
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.logo {
+  display: block;
+  border-radius: 8px;
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.brand-text h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.version {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.05s;
+}
+
+.btn:hover { background: var(--surface-alt); border-color: #c9d0de; }
+.btn:active { transform: translateY(1px); }
+
+.btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.btn-primary:hover { background: var(--primary-hover); border-color: var(--primary-hover); }
+
+.btn-danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+.btn-danger:hover { background: var(--danger-hover); border-color: var(--danger-hover); }
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 6px;
+}
+.icon-btn:hover { background: var(--surface-alt); color: var(--text); }
+
+/* Dropdown */
+.dropdown { position: relative; }
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  min-width: 160px;
+  padding: 4px;
+  display: none;
+  z-index: 10;
+}
+.dropdown-menu.open { display: block; }
+.dropdown-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 12px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+.dropdown-menu button:hover { background: var(--surface-alt); }
+
+/* Main */
+main {
+  padding: 20px 24px 40px;
+  max-width: 100%;
+}
+
+/* v0.10.0 — Reorder reminders panel. Sits below the trends panel and above
+ * the display-controls. Each reminder is a clickable button (opens the
+ * product's Edit dialog). Pill-status indicates how close to / past the
+ * average lifespan the user is. */
+.reminders-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #fff8e6 0%, #fffaf0 100%);
+  border: 1px solid #f4d990;
+  border-radius: var(--radius);
+}
+.reminders-panel[hidden] { display: none; }
+.reminders-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.reminders-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #d98f2b;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.reminders-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.reminders-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.reminder-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid #ecd9a9;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 0.12s, background 0.12s;
+}
+.reminder-item:hover {
+  border-color: #d98f2b;
+  background: #fffdf6;
+}
+.reminder-name {
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reminder-progress {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.reminder-status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fff3d6;
+  color: #8a5a00;
+  white-space: nowrap;
+}
+.reminder-status-past {
+  background: #fbeaea;
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  .reminder-item {
+    grid-template-columns: 1fr auto;
+    gap: 6px;
+  }
+  .reminder-progress {
+    grid-column: 1 / -1;
+    margin-top: 2px;
+  }
+}
+
+/* v0.15.0 — Favorites view. Card grid (one per favorite) with cross-ref
+ * usage stats inline. Distinct visual treatment from the main table cards
+ * to signal "this is the catalog, not your tracked rotation." */
+.favorites-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.favorites-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.favorites-count {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+#btn-add-favorite { margin-left: auto; }
+
+.favorites-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+.fav-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.fav-card:hover {
+  border-color: #c9d0de;
+  box-shadow: 0 4px 16px rgba(20, 30, 60, 0.08);
+}
+.fav-thumb,
+.fav-thumb-fallback {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+  border-bottom: 1px solid var(--border);
+  display: block;
+}
+.fav-body {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+.fav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.fav-type {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+.fav-rating {
+  font-size: 14px;
+  letter-spacing: 1px;
+  color: #d98f2b;
+  white-space: nowrap;
+}
+.fav-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+.fav-why {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+.fav-usage {
+  font-size: 12px;
+  color: var(--success);
+  font-weight: 500;
+}
+.fav-usage-none { color: var(--text-muted); font-weight: 400; }
+.fav-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.fav-actions button {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+}
+.fav-actions button:hover { background: var(--surface-alt); }
+.fav-promote-btn { color: var(--primary); border-color: var(--primary); font-weight: 500; }
+.fav-promote-btn:hover { background: #eef3ff; }
+.fav-delete-btn:hover {
+  background: #fbeaea;
+  color: var(--danger);
+  border-color: #f4c7c7;
+}
+
+/* Dialog mode toggling: favorite mode hides tracked-only fields and
+ * reveals favorite-only fields. Default state hides favorite-only fields. */
+.product-dialog [data-favorite-only] { display: none; }
+.product-dialog.is-favorite-mode [data-tracked-only] { display: none !important; }
+.product-dialog.is-favorite-mode [data-favorite-only] { display: flex; }
+
+/* Rating input — five clickable stars + clear button. */
+.rating-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.rating-star {
+  background: transparent;
+  border: none;
+  padding: 4px 6px;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  color: #d4d8e4;
+  transition: color 0.12s, transform 0.05s;
+  font-family: inherit;
+}
+.rating-star:hover { color: #f0c060; }
+.rating-star.is-active { color: #d98f2b; }
+.rating-star:active { transform: scale(0.92); }
+.rating-clear {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-left: 8px;
+  font-family: inherit;
+}
+.rating-clear:hover { background: var(--surface-alt); color: var(--text); }
+
+@media (max-width: 720px) {
+  .favorites-grid { grid-template-columns: 1fr; }
+  #btn-add-favorite { margin-left: 0; }
+}
+
+/* v0.7.12 trends panel — sits above everything in the main view. Shows one
+ * "insight" or "did you know" line. Hidden when there are no products and
+ * when no real insight or cold-start fact applies. Computed once per page
+ * load; survives Firestore snapshot re-renders. */
+.trends-panel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+  border: 1px solid #d8def5;
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+.trends-panel[hidden] { display: none; }
+
+.trends-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.trends-tag-cold {
+  background: #7a4ad9;
+}
+
+.trends-text {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .trends-panel {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+
+/* Display controls — small bar above the stats with a pre-tax toggle.
+ * Sits flush with the stats bar above; on mobile it hugs the left edge. */
+.display-controls {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+/* v0.12.0 currency selector. Sits next to the pre-tax toggle. */
+.currency-selector {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.currency-selector-label {
+  font-weight: 500;
+}
+#currency-select {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  min-height: 30px;
+  max-width: 220px;
+}
+#currency-select:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+
+@media (max-width: 720px) {
+  .display-controls { justify-content: flex-start; }
+  #currency-select { max-width: 180px; }
+}
+
+.pretax-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  font-size: 13px;
+  color: var(--text);
+}
+.pretax-toggle input[type="checkbox"] {
+  /* Hidden — the visible UI is the .pretax-track + .pretax-thumb pair.
+   * Keep the input focusable for keyboard a11y. */
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+.pretax-track {
+  display: inline-block;
+  position: relative;
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 999px;
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.pretax-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s;
+}
+.pretax-toggle input:checked + .pretax-track {
+  background: var(--primary);
+}
+.pretax-toggle input:checked + .pretax-track .pretax-thumb {
+  transform: translateX(16px);
+}
+.pretax-toggle input:focus-visible + .pretax-track {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+.pretax-label { font-weight: 500; color: var(--text-muted); }
+.pretax-toggle input:checked ~ .pretax-label { color: var(--primary); }
+
+/* Hide the "w/ Tax" column entirely when pre-tax mode is on (per user
+ * preference — don't show "—" placeholders, just remove the column). The
+ * <th> already has data-sort="costWithTax" which we can target directly;
+ * matching <td>s carry .cell-with-tax. */
+body.pretax-mode .products thead th[data-sort="costWithTax"],
+body.pretax-mode .products tbody td.cell-with-tax {
+  display: none;
+}
+
+/* v0.17.0: BOUGHT BY column (STORE + BUYER + CARD merged). Pieces sit in
+ * a single flex row with thin dot separators; missing pieces render
+ * nothing (the join-fold in renderRow skips them). */
+.bought-by {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.bb-store {
+  color: var(--text);
+  font-weight: 500;
+}
+.bb-sep {
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+.bb-chip {
+  /* Inherit the .cell-chip look but tighten padding so 3 pieces fit nicely
+   * in one cell without forcing the column to grow. */
+  padding: 1px 8px;
+}
+
+/* v0.17.0: column visibility chooser. Each toggleable column has both a
+ * data-sort attribute on the <th> and a .col-<key> class on the <td>.
+ * When the user unchecks a column in the Columns dropdown, body gets a
+ * .cols-hide-<key> class and both pieces disappear together. The mobile
+ * card layout doesn't use these classes (it picks its own subset), so
+ * this only affects the desktop table. */
+body.cols-hide-productType .products thead th[data-sort="productType"],
+body.cols-hide-productType .products tbody td.col-productType { display: none; }
+body.cols-hide-size .products thead th[data-sort="size"],
+body.cols-hide-size .products tbody td.col-size { display: none; }
+body.cols-hide-startDate .products thead th[data-sort="startDate"],
+body.cols-hide-startDate .products tbody td.col-startDate { display: none; }
+body.cols-hide-endDate .products thead th[data-sort="endDate"],
+body.cols-hide-endDate .products tbody td.col-endDate { display: none; }
+body.cols-hide-duration .products thead th[data-sort="duration"],
+body.cols-hide-duration .products tbody td.col-duration { display: none; }
+body.cols-hide-cost .products thead th[data-sort="cost"],
+body.cols-hide-cost .products tbody td.col-cost { display: none; }
+body.cols-hide-costWithTax .products thead th[data-sort="costWithTax"],
+body.cols-hide-costWithTax .products tbody td.col-costWithTax { display: none; }
+body.cols-hide-costPerUnit .products thead th[data-sort="costPerUnit"],
+body.cols-hide-costPerUnit .products tbody td.col-costPerUnit { display: none; }
+body.cols-hide-costPerDay .products thead th[data-sort="costPerDay"],
+body.cols-hide-costPerDay .products tbody td.col-costPerDay { display: none; }
+body.cols-hide-bundleStatus .products thead th[data-sort="bundleStatus"],
+body.cols-hide-bundleStatus .products tbody td.col-bundleStatus { display: none; }
+body.cols-hide-boughtBy .products thead th[data-sort="boughtBy"],
+body.cols-hide-boughtBy .products tbody td.col-boughtBy { display: none; }
+body.cols-hide-purchaseDate .products thead th[data-sort="purchaseDate"],
+body.cols-hide-purchaseDate .products tbody td.col-purchaseDate { display: none; }
+body.cols-hide-upc .products thead th[data-sort="upc"],
+body.cols-hide-upc .products tbody td.col-upc { display: none; }
+body.cols-hide-notes .products thead th[data-sort="notes"],
+body.cols-hide-notes .products tbody td.col-notes { display: none; }
+
+/* v0.17.0: auto-hide NOTES column when no currently-rendered row has any
+ * note text. The .no-notes-data class is toggled by renderTable based on
+ * what's actually in the body. Hides regardless of the user's column
+ * preference — if there's nothing to show, the column shouldn't take up
+ * space. The user's manual preference (cols-hide-notes) is preserved
+ * separately and re-applies when notes do exist. */
+.products.no-notes-data thead th[data-sort="notes"],
+.products.no-notes-data tbody td.col-notes { display: none; }
+
+/* v0.17.0: density toggle. Compact mode trims row padding and shrinks
+ * the table font so more rows fit on screen. Affects desktop table only;
+ * mobile cards use their own layout. */
+.density-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.density-toggle select {
+  padding: 4px 6px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+body.density-compact .products {
+  font-size: 12px;
+}
+body.density-compact .products thead th {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+body.density-compact .products tbody td {
+  padding: 4px 8px;
+}
+body.density-compact .products .cell-chip,
+body.density-compact .products .badge {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+body.density-compact .products .name-thumb,
+body.density-compact .products .name-thumb-logo {
+  width: 20px;
+  height: 20px;
+}
+body.density-compact .products .actions-cell {
+  gap: 4px;
+}
+body.density-compact .products .actions-cell button {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+body.density-compact .bought-by {
+  font-size: 12px;
+  gap: 3px 5px;
+}
+
+/* v0.17.0: Columns dropdown — sits in the display-controls bar next to
+ * the density toggle and currency selector. Uses the same dropdown
+ * pattern as Import/Export menus. */
+.columns-dropdown {
+  position: relative;
+  display: inline-block;
+}
+.columns-dropdown .columns-trigger {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+.columns-dropdown .columns-trigger:hover {
+  background: var(--surface-alt);
+  border-color: var(--primary);
+}
+.columns-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 200px;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0,0,0,0.1));
+  padding: 6px;
+  display: none;
+  z-index: 50;
+}
+.columns-menu.open { display: block; }
+.columns-menu .columns-menu-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 6px 8px 4px;
+}
+.columns-menu .columns-menu-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 4px;
+  user-select: none;
+}
+.columns-menu .columns-menu-row:hover { background: var(--surface-alt); }
+.columns-menu .columns-menu-row input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
+}
+.columns-menu .columns-menu-actions {
+  display: flex;
+  gap: 6px;
+  padding: 6px 4px 2px;
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.columns-menu .columns-menu-action {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 11px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+  color: var(--text-muted);
+}
+.columns-menu .columns-menu-action:hover {
+  background: var(--surface-alt);
+  color: var(--text);
+}
+
+/* Stats bar */
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Table */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: auto;
+  box-shadow: var(--shadow-sm);
+}
+
+.products {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  min-width: 1400px;
+}
+
+.products thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface-alt);
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.products thead th[data-sort] {
+  cursor: pointer;
+  user-select: none;
+  padding-right: 22px;
+}
+.products thead th[data-sort]::after {
+  content: '';
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 9px;
+  color: var(--primary);
+  width: 8px;
+}
+.products thead th[data-sort]:hover { color: var(--text); }
+.products thead th.sort-asc::after { content: '▲'; }
+.products thead th.sort-desc::after { content: '▼'; }
+.products thead th.sort-asc,
+.products thead th.sort-desc { color: var(--text); }
+
+.products tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+/* v0.17.1: Allow long product names to wrap onto multiple lines instead
+ * of forcing the column wider (Old Spice's full SKU title is ~70 chars
+ * and was making the column ~600px on its own). Cap the cell width so
+ * a very long name doesn't dominate the table — at the cap, the text
+ * wraps to additional lines in the same row. v0.17.2: scoped to desktop
+ * only via min-width media so the mobile @media block's
+ * `.products tbody td { display: none }` rule still wins (otherwise the
+ * desktop name cell renders alongside the mobile card on phones). */
+@media (min-width: 721px) {
+  .products tbody td.name-cell {
+    white-space: normal;
+    max-width: 280px;
+  }
+  .products tbody td.name-cell .name-link {
+    display: inline;
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.35;
+  }
+
+  /* v0.17.1: Stack the row-actions buttons across two rows when the cell
+   * is narrow. The row is already two visual lines tall whenever a name
+   * wraps, so stacking doesn't add overall height — it just lets the
+   * buttons share the existing vertical space and reclaims horizontal
+   * width for the data columns. */
+  .products tbody td.actions-cell {
+    white-space: normal;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px;
+  }
+  .products tbody td.actions-cell button {
+    margin-left: 0; /* gap handles spacing now that the cell is flex */
+  }
+}
+
+.products tbody tr:hover { background: var(--surface-alt); }
+.products tbody tr:last-child td { border-bottom: none; }
+
+.products td.notes-cell {
+  max-width: 240px;
+  white-space: normal;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* v0.14.1 Finish dialog. Compact — just a date input and confirm. */
+.finish-dialog { max-width: 420px; }
+.finish-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.finish-lead {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.finish-body .field { gap: 4px; }
+
+/* v0.14.1: Finish button visually prioritized on mobile (primary green to
+ * suggest "complete this") so the most-common action stands out from
+ * the row of secondary actions. Desktop keeps neutral default style. */
+@media (max-width: 720px) {
+  .mc-actions .finish-btn-primary {
+    background: var(--success);
+    color: #fff;
+    border-color: var(--success);
+    font-weight: 600;
+  }
+  .mc-actions .finish-btn-primary:hover {
+    background: #246e4d;
+    border-color: #246e4d;
+  }
+}
+
+/* Notes chip — replaces the raw note text in the desktop table cell when
+ * notes are longer than the preview length. Click to expand inline. The
+ * .is-expanded variant shows the full text and grows the cell vertically
+ * (the row grows with it). Short notes still render as plain .notes-text. */
+.notes-chip {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.notes-chip:hover {
+  background: #eef3ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.notes-chip.is-expanded {
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  color: var(--text);
+  white-space: normal;
+  border-radius: 6px;
+  padding: 4px 10px;
+  text-align: left;
+  display: block;
+  width: 100%;
+  cursor: pointer;
+}
+.notes-chip.is-expanded:hover { background: var(--surface-alt); }
+.notes-text { display: inline; }
+
+/* v0.7.16 PNG export templates — these styles render inside a .png-export-stage
+ * div positioned off-screen at exact target dimensions. html2canvas captures
+ * the rendered pixels. Fonts use system defaults (already set on body) so
+ * they render consistently. All dimensions are absolute (px) since the stage
+ * has fixed width/height.
+ *
+ * Per-product card: 1200x900 (4:3). Hero header with thumbnail + name +
+ * status, 2-column grid of stats, branded footer.
+ */
+.png-export-stage {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: #1a2238;
+  -webkit-font-smoothing: antialiased;
+}
+.exp-card {
+  width: 100%;
+  height: 100%;
+  padding: 60px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+}
+.exp-card-head {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding-bottom: 24px;
+  border-bottom: 2px solid #e3e7ef;
+  margin-bottom: 32px;
+}
+.exp-card-thumb,
+.exp-card-thumb-fallback {
+  width: 140px;
+  height: 140px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  flex-shrink: 0;
+}
+.exp-card-thumb-fallback {
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+}
+.exp-card-head-text { flex: 1; min-width: 0; }
+.exp-card-type {
+  font-size: 18px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7390;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+.exp-card-name {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: #1a2238;
+  letter-spacing: -0.01em;
+  margin-bottom: 6px;
+}
+.exp-card-bundle {
+  font-size: 16px;
+  color: #2b5fd9;
+  font-weight: 500;
+}
+.exp-card-status {
+  padding: 8px 18px;
+  border-radius: 999px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.exp-card-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px 32px;
+  align-content: center;
+}
+.exp-card-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.exp-label {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7390;
+  font-weight: 500;
+}
+.exp-val {
+  font-size: 28px;
+  font-weight: 600;
+  color: #1a2238;
+  font-variant-numeric: tabular-nums;
+}
+.exp-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 1px solid #e3e7ef;
+  font-size: 14px;
+  color: #6b7390;
+}
+.exp-card-foot-version { font-variant-numeric: tabular-nums; }
+
+/* Dashboard export — landscape 1600x1200 (4:3) and portrait 1000x1400 (5:7).
+ * Same building blocks (.exp-stat tiles, .exp-chart-block per chart).
+ * Portrait stacks the chart grid in 1 column; landscape uses 2 columns. */
+.exp-dash {
+  width: 100%;
+  height: 100%;
+  padding: 50px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f7fb 100%);
+}
+.exp-dash-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 18px;
+  border-bottom: 2px solid #e3e7ef;
+  margin-bottom: 24px;
+}
+.exp-dash-title {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.exp-dash-sub {
+  font-size: 16px;
+  color: #6b7390;
+}
+.exp-dash-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.exp-dash-portrait .exp-dash-stats {
+  grid-template-columns: repeat(3, 1fr);
+}
+.exp-stat {
+  background: #ffffff;
+  border: 1px solid #e3e7ef;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.exp-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7390;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.exp-stat-val {
+  font-size: 22px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.exp-dash-charts {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+  min-height: 0;
+}
+.exp-dash-portrait .exp-dash-charts {
+  grid-template-columns: 1fr;
+}
+.exp-chart-block {
+  background: #ffffff;
+  border: 1px solid #e3e7ef;
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+}
+.exp-chart-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1a2238;
+  margin-bottom: 8px;
+}
+.exp-chart-img {
+  width: 100%;
+  flex: 1;
+  object-fit: contain;
+  min-height: 0;
+}
+.exp-dash-foot {
+  text-align: right;
+  margin-top: 16px;
+  font-size: 12px;
+  color: #6b7390;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dashboard export bar — sits above the dashboard cards. Right-aligned. */
+.dash-export-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* v0.7.17 — Activity log view. New top-level tab with a page-size selector
+ * and a clear button. Entries render as compact rows with a timestamp,
+ * action chip, and product link. */
+.activity-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.activity-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.activity-pagesize-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.activity-pagesize-wrap select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font-family: inherit;
+  font-size: 13px;
+}
+#btn-clear-activity { margin-left: auto; }
+
+.activity-summary {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+
+.activity-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.activity-row {
+  display: grid;
+  grid-template-columns: 180px 100px 1fr;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.activity-row:last-child { border-bottom: none; }
+
+.activity-when {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.activity-action {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  width: max-content;
+}
+.activity-action-add { background: #e3f5ec; color: var(--success); }
+.activity-action-edit { background: #eef3ff; color: var(--primary); }
+.activity-action-duplicate { background: #fff3d6; color: #8a5a00; }
+.activity-action-delete { background: #fbeaea; color: var(--danger); }
+
+.activity-product { min-width: 0; }
+.activity-name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+}
+.activity-name-link:hover { text-decoration: underline; }
+.activity-name-gone {
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+.activity-type {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  .activity-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+    padding: 10px 0;
+  }
+  .activity-when { font-size: 12px; }
+  #btn-clear-activity { margin-left: 0; }
+}
+
+/* v0.7.10 — clickable cell chips for Type / Buyer / Card. Hover/focus
+ * suggests they're interactive; click filters the table to that value. */
+.cell-chip {
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.cell-chip:hover {
+  background: #eef3ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+/* v0.15.3: type chips have inline color from colorForType — preserve on
+ * hover by overriding the generic .cell-chip:hover above. */
+.cell-chip-type:hover {
+  filter: brightness(1.08);
+  background: inherit !important;
+  color: inherit !important;
+  border-color: transparent !important;
+}
+
+/* Active-filter bar — sits between the row-filter tabs and the table. Each
+ * chip is dismissible; "Clear all" appears when 2+ filters are active. */
+.active-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+}
+.active-filter-bar[hidden] { display: none; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--surface);
+  border: 1px solid var(--primary);
+  border-radius: 999px;
+  padding: 3px 4px 3px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+}
+.filter-chip:hover { background: var(--surface-alt); }
+.filter-chip-key { color: var(--text-muted); font-size: 11px; font-weight: 500; }
+.filter-chip-val { color: var(--primary); font-weight: 600; }
+.filter-chip-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 16px;
+  line-height: 1;
+  margin-left: 2px;
+}
+.filter-chip:hover .filter-chip-x {
+  background: var(--primary);
+  color: #fff;
+}
+#filter-chip-clear-all { font-size: 12px; }
+
+/* Mobile-card cell: rendered into every <tr> alongside the 18 desktop cells.
+ * Hidden by default; shown (and the desktop cells hidden) at <=720px. The
+ * card markup itself lives inside `.mc`, so no extra DOM is created. */
+.products td.mobile-card-cell { display: none; }
+
+.products .num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.actions-col, .actions-cell { text-align: right; }
+.actions-cell button {
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+.actions-cell button:hover { background: var(--surface-alt); }
+.actions-cell .delete-btn:hover { background: #fbeaea; color: var(--danger); border-color: #f4c7c7; }
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 500;
+  background: #e8efff;
+  color: var(--primary);
+}
+.badge-active { background: #e3f5ec; color: var(--success); }
+.badge-inventory { background: #fff3d6; color: #8a5a00; }
+.badge-finished { background: #efe9fb; color: #5b3ba8; }
+
+/* Bundle chips — originator ("bundle × N") is the row that first introduced
+ * the bundle purchase; members ("2 of 3") are sibling rows recorded later.
+ * A slightly deeper primary tone for the originator so you can tell the
+ * canonical row from its siblings at a glance. */
+.badge-bundle-origin { background: #d4e0fb; color: var(--primary-hover); font-weight: 600; }
+.badge-bundle-member { background: #eef2fc; color: #4a5a85; }
+
+/* v0.7.13: clickable bundle chip — same look as the .badge-bundle-* spans
+ * but with a button reset and a hover lift. Reuses .badge for base styling. */
+.bundle-chip {
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11px;
+  padding: 2px 8px;
+  transition: filter 0.12s, box-shadow 0.12s;
+}
+.bundle-chip:hover {
+  filter: brightness(0.95);
+  box-shadow: 0 1px 4px rgba(43, 95, 217, 0.18);
+}
+.bundle-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Slide-out sibling panel row — full-width row inserted below the clicked
+ * row in the products table. The TD has colspan="19" so it spans every
+ * column. The visual panel sits inside .bundle-siblings with rounded corners
+ * and a tinted background so it reads as detail, not as another row. */
+.bundle-siblings-row td.bundle-siblings-cell {
+  padding: 0 12px 12px;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--border);
+}
+.bundle-siblings {
+  background: linear-gradient(180deg, #eef3ff 0%, #f5f7ff 100%);
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.bundle-siblings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.bundle-siblings-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+}
+.bundle-siblings-label strong {
+  color: var(--primary);
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  margin-left: 4px;
+}
+.bundle-siblings-close {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 20px;
+  line-height: 1;
+  padding: 2px 8px;
+  cursor: pointer;
+  border-radius: 50%;
+}
+.bundle-siblings-close:hover { background: rgba(0,0,0,0.06); color: var(--text); }
+
+.bundle-siblings-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bundle-sibling {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text);
+  transition: border-color 0.12s, background 0.12s;
+}
+.bundle-sibling:hover {
+  border-color: var(--primary);
+  background: #fff;
+}
+.bundle-sibling.is-current {
+  border-color: var(--primary);
+  background: #eef3ff;
+}
+.bundle-sibling-pos {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--primary);
+  font-size: 12px;
+  min-width: 24px;
+  text-align: center;
+}
+.bundle-sibling-name {
+  font-weight: 500;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bundle-siblings-remaining {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.bundle-siblings-remaining em {
+  color: var(--primary);
+  font-style: normal;
+  font-weight: 500;
+}
+
+/* On mobile the slide-out row is hidden by the existing rule that hides all
+ * non-mobile-card-cell tds. Inject the same content inside the mobile card
+ * itself when expanded — see app.js renderMobileCard for that logic.
+ * The .bundle-siblings styling stays identical inside the card. */
+@media (max-width: 720px) {
+  .bundle-siblings-row { display: none; }
+  .mc .bundle-siblings {
+    margin-top: 10px;
+    margin-bottom: 4px;
+  }
+}
+
+/* "in use" indicator — smaller, on its own line under the duration number */
+.in-use-suffix {
+  display: block;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  margin: 0;
+}
+
+/* Dialog */
+dialog {
+  border: none;
+  border-radius: 12px;
+  padding: 0;
+  box-shadow: 0 12px 40px rgba(20, 30, 60, 0.2);
+  max-width: 720px;
+  width: 90vw;
+}
+
+dialog::backdrop { background: rgba(20, 30, 60, 0.45); }
+
+.dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.dialog-header h2 { margin: 0; font-size: 18px; font-weight: 600; }
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px 16px;
+  padding: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.field-wide { grid-column: 1 / -1; }
+
+.field > span {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.field em {
+  font-style: normal;
+  color: var(--danger);
+  margin-left: 2px;
+}
+
+.field input, .field select, .field textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.field input:focus, .field select:focus, .field textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.checkbox-field > span {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.checkbox-field input[type="checkbox"] { width: 16px; height: 16px; }
+
+/* Input + trailing button (UPC field with Scan) */
+.input-with-btn {
+  display: flex;
+  gap: 6px;
+  align-items: stretch;
+}
+.input-with-btn input {
+  flex: 1;
+  min-width: 0;
+}
+.btn-scan {
+  flex-shrink: 0;
+  padding: 6px 12px;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--primary);
+  border-color: var(--primary);
+  background: #fff;
+}
+
+/* v0.17.3: On mobile, the UPC field's input + Look up + Scan trio
+ * couldn't all fit on one line at narrow widths — Scan was pushed
+ * past the right edge, forcing a horizontal scroll inside the
+ * dialog. Wrap the row so buttons fall onto a second line below the
+ * input, each taking equal share of the row's width. */
+@media (max-width: 720px) {
+  .input-with-btn {
+    flex-wrap: wrap;
+  }
+  .input-with-btn input {
+    flex: 1 1 100%;
+  }
+  .input-with-btn .btn-scan {
+    flex: 1 1 0;
+    justify-content: center;
+  }
+}
+.btn-scan:hover {
+  background: #eef3ff;
+  border-color: var(--primary-hover);
+  color: var(--primary-hover);
+}
+.btn-scan svg { flex-shrink: 0; }
+
+/* UPC field at the top of the form — slightly emphasized */
+.upc-field {
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.upc-field > span:first-child {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.upc-status {
+  font-size: 13px;
+  color: var(--text-muted);
+  min-height: 18px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+/* v0.7.20: error and busy states get a tinted pill so they catch the eye —
+ * previous 12px muted-grey was easy to miss when the UPC lookup failed,
+ * and "I haven't had success" is the wrong reaction we want. */
+.upc-status.is-error {
+  background: #fbeaea;
+  border: 1px solid #f4c7c7;
+  color: var(--danger);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 6px;
+}
+.upc-status.is-busy {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* v0.15.1: small product-image preview inside the Edit/Add dialog. Shown
+ * after a successful UPC lookup OR when editing an existing product that
+ * already has an imageUrl. Sits below the UPC status pill. */
+.upc-image-preview {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 6px 10px 6px 6px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.upc-image-preview[hidden] { display: none; }
+.upc-image-preview img {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--border);
+}
+.upc-image-preview img[hidden] { display: none; }
+/* v0.15.2: brand logo gets the circular treatment in the preview too */
+#upc-brand-logo {
+  border-radius: 50% !important;
+  object-fit: contain !important;
+  padding: 2px;
+}
+.upc-image-preview-label {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+/* v0.7.23: small inline spinner so the user knows a lookup is in flight.
+ * Pure CSS — no DOM changes needed in setUpcStatus. */
+.upc-status.is-busy::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: upc-spin 0.7s linear infinite;
+}
+@keyframes upc-spin {
+  to { transform: rotate(360deg); }
+}
+.upc-status.is-ok {
+  background: #e3f5ec;
+  color: var(--success);
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  margin-top: 6px;
+}
+/* v0.11.0 — Share dialog. Compact; just an explanation, the URL, and
+ * copy / open buttons. */
+.share-dialog { max-width: 480px; }
+.share-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.share-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.share-url-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.share-url-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+#share-url-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--surface-alt);
+  color: var(--text);
+}
+#share-url-input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  border-color: var(--primary);
+}
+.share-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--success);
+  min-height: 18px;
+}
+
+/* v0.8.0 — Price history dialog. Wider than the others to fit the chart
+ * + entry table comfortably. The chart canvas has a fixed height so the
+ * Chart.js render target measures consistently. */
+.price-history-dialog { max-width: 720px; }
+.price-history-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.price-history-meta {
+  font-size: 13px;
+}
+.ph-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+.ph-meta-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ph-meta-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.ph-meta-grid strong { font-weight: 600; font-size: 15px; }
+.ph-meta-grid code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 2px 6px;
+  border-radius: 4px;
+  width: fit-content;
+}
+.ph-meta-sub {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.ph-meta-change.ph-change-up strong { color: var(--danger); }
+.ph-meta-change.ph-change-down strong { color: var(--success); }
+.ph-meta-change.ph-change-flat strong { color: var(--text-muted); }
+.ph-meta-note {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.price-history-chart {
+  position: relative;
+  width: 100%;
+  height: 240px;
+}
+
+.price-history-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.price-history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.price-history-table thead th {
+  background: var(--surface-alt);
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+}
+.price-history-table tbody td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.price-history-table tbody tr:last-child td { border-bottom: none; }
+.price-history-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.price-history-table .ph-diff { font-weight: 500; }
+.price-history-table .ph-row-up .ph-diff { color: var(--danger); }
+.price-history-table .ph-row-down .ph-diff { color: var(--success); }
+
+@media (max-width: 720px) {
+  .price-history-dialog { max-width: 95vw; }
+  .price-history-chart { height: 200px; }
+  .price-history-table { font-size: 12px; }
+  .price-history-table thead th,
+  .price-history-table tbody td { padding: 6px 8px; }
+}
+
+/* v0.9.0 — Amazon check link below the UPC status. Inline-block so it
+ * sits as a small chip-like link rather than a full-width row. The arrow
+ * suggests it opens in a new tab. */
+.upc-check-link {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--primary);
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  border-radius: 999px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.upc-check-link:hover {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.upc-check-link[hidden] { display: none; }
+
+/* UPC match confirmation dialog */
+.upc-match-dialog { max-width: 460px; }
+.upc-match-body { padding: 16px 20px 12px; }
+.upc-match-lead {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.upc-match-lead code {
+  background: var(--surface-alt);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.upc-match-grid {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 6px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 13px;
+}
+.upc-match-grid dt {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+.upc-match-grid dd { margin: 0; color: var(--text); }
+.upc-match-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* v0.7.15 — small product thumbnail to the left of the name in the desktop
+ * table cell. Square, rounded, contained on a neutral background so any
+ * aspect ratio looks tidy. Lazy-loaded; the inline `onerror` handler removes
+ * the img if the host fails so the row never shows a broken-image icon. */
+.name-thumb {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  vertical-align: middle;
+  margin-right: 6px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+/* v0.15.2: brand logos from logo.dev render with a slightly different
+ * treatment — circular, white background, contained (not cropped) — to
+ * signal "this is a brand identifier" vs the boxy product photos. */
+.name-thumb-logo {
+  border-radius: 50%;
+  background: #fff;
+  object-fit: contain;
+  padding: 1px;
+}
+
+/* Mobile-card head thumbnail — slightly larger since it's the only visual
+ * anchor for the card and there's more horizontal room. */
+.mc-thumb {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+/* v0.15.2: brand-logo variant for mobile cards */
+.mc-thumb-logo {
+  border-radius: 50%;
+  background: #fff;
+  object-fit: contain;
+  padding: 2px;
+}
+
+/* Clickable product name in the table */
+.products tbody td.name-cell .name-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--primary);
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  font-weight: 600;
+}
+.products tbody td.name-cell .name-link:hover { text-decoration: underline; }
+
+/* Scanner dialog */
+.scanner-dialog { max-width: 480px; }
+.scanner-body {
+  padding: 16px 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scanner-video-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: #000;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+#scanner-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scanner-reticle {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 72%;
+  height: 32%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.scanner-hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+  min-height: 1.5em;
+}
+.scanner-hint.is-error { color: var(--danger); }
+
+/* Currency input with $ prefix */
+.currency-wrap {
+  position: relative;
+  display: block;
+}
+.currency-prefix {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+.currency-wrap input {
+  width: 100%;
+  padding-left: 22px;
+}
+
+/* Continue-bundle banner inside dialog */
+.form-banner {
+  background: #eef3ff;
+  border: 1px solid #d4e0ff;
+  padding: 12px 16px;
+  margin: 16px 20px 0;
+  border-radius: var(--radius);
+}
+.form-banner[hidden] { display: none; }
+.form-banner .field > span {
+  color: var(--primary);
+  font-weight: 600;
+}
+.form-banner-hint {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+  background: var(--surface-alt);
+  border-radius: 0 0 12px 12px;
+}
+
+/* Confirm dialog */
+.confirm-dialog { max-width: 380px; }
+.confirm-dialog p { margin: 0; padding: 24px 24px 12px; font-size: 15px; }
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 20px;
+}
+
+/* Toast — v0.15.3 is now a <dialog> element so it renders in the browser
+ * top layer (above any modal). Reset all the default <dialog> chrome
+ * (border, padding, etc.) and position it at the top center. */
+.toast {
+  position: fixed;
+  top: 24px;
+  bottom: auto;
+  left: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+  background: #1a2238;
+  color: #fff;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 999px;
+  font-size: 13px;
+  box-shadow: var(--shadow-md);
+  z-index: 100;
+  animation: toast-in 0.2s ease-out;
+  /* <dialog> default styles override */
+  max-width: min(90vw, 480px);
+}
+.toast:not([open]) { display: none; }
+.toast::backdrop { display: none; background: transparent; }
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, -8px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Auth gate (full-page sign-in card) */
+.auth-gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 70px);
+  padding: 24px;
+}
+.auth-gate[hidden] { display: none; }
+
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  padding: 32px 28px;
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+}
+
+.auth-card img { display: block; margin: 0 auto 12px; border-radius: 12px; }
+.auth-card h2 { margin: 0 0 8px; font-size: 20px; font-weight: 600; }
+.auth-card p {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.btn-google {
+  width: 100%;
+  justify-content: center;
+  padding: 10px 16px;
+  font-size: 15px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+.btn-google:hover { background: var(--surface-alt); border-color: #c9d0de; }
+.btn-google svg { flex-shrink: 0; }
+
+.auth-note {
+  margin-top: 16px !important;
+  font-size: 12px !important;
+  color: var(--text-muted);
+}
+
+/* User chip in header (avatar + name + signout) */
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 8px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  margin-left: 8px;
+}
+.user-chip[hidden] { display: none; }
+
+.user-chip img {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--border);
+}
+
+.user-chip span {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-ghost {
+  padding: 4px 10px;
+  font-size: 12px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+}
+.btn-ghost:hover { background: var(--surface); color: var(--text); border-color: var(--border); }
+
+/* Loading state */
+.loading-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 40px 20px;
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Row-filter tabs (All / Active / Inventory) — sit above the products table.
+ * Visually subtler than the top-level view tabs since they're a secondary
+ * filter, not a navigation. Uses a pill background instead of a solid primary
+ * fill for the active state. */
+.row-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.row-filter-tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.row-filter-tab:hover {
+  color: var(--text);
+  border-color: #c9d0de;
+}
+
+.row-filter-tab.is-active {
+  background: #eef3ff;
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+#btn-reset-filters { margin-left: auto; }
+
+/* v0.14.0: row search input. Lives above the row-filter-tabs nav. Pill-
+ * shaped to match the rest of the table chrome; magnifier icon inside the
+ * input via an absolutely-positioned span. */
+.row-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.row-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-muted);
+  pointer-events: none;
+  display: inline-flex;
+  align-items: center;
+}
+.row-search-input {
+  width: 100%;
+  padding: 8px 12px 8px 36px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 38px;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+.row-search-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43, 95, 217, 0.12);
+}
+.row-search-input::placeholder { color: var(--text-muted); }
+/* Hide native search-clear button — UX is cleaner with our existing Reset */
+.row-search-input::-webkit-search-cancel-button { display: none; }
+
+/* v0.14.0 search suggestions dropdown. Floats below the search input.
+ * Each suggestion is a button; the active one (keyboard nav) gets a
+ * primary background. Empty state explains no matches found. */
+.row-search-suggestions {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+}
+.row-search-suggestions[hidden] { display: none; }
+.row-search-suggestion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  font-size: 13px;
+  color: var(--text);
+}
+.row-search-suggestion:hover,
+.row-search-suggestion.is-active {
+  background: #eef3ff;
+}
+.row-search-thumb,
+.row-search-thumb-fallback {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.row-search-thumb-fallback {
+  background: linear-gradient(135deg, #eef3ff 0%, #f5f0ff 100%);
+}
+.row-search-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.row-search-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.row-search-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+.row-search-type {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+.row-search-empty {
+  padding: 12px 14px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* Mobile-only sort dropdown — desktop has clickable column headers, so we
+ * hide this above 720px. See @media block below for the visible state. */
+.mobile-sort-wrap { display: none; }
+
+/* Inline hint under a date input — explains optional fields. */
+.field-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+/* v0.17.4: bundle-aware cost hint. Same .field-hint base, but slightly
+ * tinted toward primary so the live per-item derivation reads as a
+ * computed value (vs. the static gray hints used elsewhere). */
+.cost-bundle-hint {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+/* The `<em class="muted">` variant in field labels — used for "(leave blank
+ * for inventory)" hint next to "Start date". Overrides the default em color
+ * (red, used for required-field asterisks) since this is informational. */
+.field em.muted {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* View tabs (Table / Dashboard) */
+.view-tabs {
+  display: inline-flex;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.view-tab {
+  background: transparent;
+  border: none;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-muted);
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.view-tab:hover { color: var(--text); }
+
+.view-tab.is-active {
+  background: var(--primary);
+  color: #fff;
+}
+
+.view[hidden] { display: none; }
+
+/* Dashboard */
+.dash-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dash-charts {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px 18px 18px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.chart-card-wide { grid-column: 1 / -1; }
+
+.chart-card h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.01em;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.chart-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--text-muted);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.chart-box {
+  position: relative;
+  width: 100%;
+  height: 260px;
+  min-width: 0;
+}
+
+.chart-card-wide .chart-box { height: 300px; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .dash-charts { grid-template-columns: 1fr; }
+  .chart-card-wide { grid-column: auto; }
+}
+
+/* Mobile table → card layout. The desktop table is 1400px min-width with
+ * horizontal scroll, which is unusable on a phone. At <=720px we abandon
+ * table layout entirely (display: block on table/thead/tbody/tr/td), hide
+ * the 18 desktop cells, and let the .mobile-card-cell render as a stacked
+ * card per product. Same DOM, same event handlers — just a different shape. */
+@media (max-width: 720px) {
+  .table-wrap {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    overflow: visible;
+  }
+  .products {
+    display: block;
+    min-width: 0;
+    border-collapse: collapse;
+  }
+  .products thead { display: none; }
+  .products tbody { display: block; }
+  .products tbody tr {
+    display: block;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .products tbody tr:hover { background: var(--surface); }
+  .products tbody tr:last-child { margin-bottom: 0; border-bottom: 1px solid var(--border); }
+  /* Hide every desktop cell on mobile; show only the mobile-card cell. */
+  .products tbody td { display: none; }
+  .products tbody td.mobile-card-cell {
+    display: block;
+    border: none;
+    padding: 0;
+    white-space: normal;
+  }
+
+  /* Card content */
+  .mc { padding: 14px 16px; }
+  .mc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .mc-type {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .mc-name {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--primary);
+    text-align: left;
+    cursor: pointer;
+    margin: 0 0 12px;
+    line-height: 1.3;
+    width: 100%;
+    display: block;
+  }
+  .mc-name:hover { text-decoration: underline; }
+  .mc-grid {
+    margin: 0 0 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .mc-row {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    gap: 10px;
+    margin: 0;
+    align-items: baseline;
+  }
+  .mc-row dt {
+    color: var(--text-muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0;
+    font-weight: 500;
+  }
+  .mc-row dd {
+    margin: 0;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    word-break: break-word;
+  }
+
+  /* v0.7.22 / v0.14.0: clickable filter chips inside mobile cards. Type
+   * chip is color-coded per productType (deterministic hash) so categories
+   * are visually scannable. Bigger + bolder than other chips since type
+   * is the primary scanning axis on mobile. */
+  .mc-type-chip {
+    font-size: 13px;
+    padding: 5px 12px;
+    font-weight: 600;
+    min-height: 28px;
+    /* inline style overrides background/color/border-color per-type */
+  }
+  .mc-type-chip:hover { filter: brightness(1.08); }
+  .mc-meta-chip {
+    font-size: 12px;
+    padding: 1px 8px;
+    vertical-align: baseline;
+  }
+  .mc-meta-text {
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+  }
+  .mc-meta-sep {
+    color: var(--text-muted);
+    margin: 0 2px;
+  }
+  .mc-row-notes dd { color: var(--text-muted); font-size: 12px; }
+  .mc-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+    /* v0.15.5: allow wrapping. With 5+ buttons (Edit / Duplicate / Share /
+     * History / Delete, plus optional Finish for active rows), the row was
+     * overflowing at typical mobile widths. min-width 64px + the longest
+     * label "Duplicate" was forcing text to wrap inside each button,
+     * breaking text centering and stretching height. Wrapping the row
+     * itself keeps each button at its natural width. */
+    flex-wrap: wrap;
+  }
+  .mc-actions button {
+    padding: 7px 12px;
+    font-size: 13px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: transparent;
+    cursor: pointer;
+    min-height: 36px;
+    /* v0.15.5: drop min-width and force single-line text so each button
+     * sizes to its label, centered cleanly. */
+    white-space: nowrap;
+    line-height: 1.2;
+  }
+  .mc-actions button:hover { background: var(--surface-alt); }
+  .mc-actions .delete-btn:hover {
+    background: #fbeaea;
+    color: var(--danger);
+    border-color: #f4c7c7;
+  }
+
+  /* Stats bar squeezes into 2 columns on phones */
+  .stats-bar { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  .stat { padding: 10px 12px; }
+  .stat-value { font-size: 17px; }
+
+  /* Row-filter tabs already wrap; tighten the gap a touch */
+  .row-filter-tabs { gap: 6px; }
+
+  /* Mobile sort dropdown — visible on phones in place of the desktop column
+   * headers. Sits between the row-filter tabs and the first card. */
+  .mobile-sort-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .mobile-sort-label { font-weight: 500; }
+  .mobile-sort {
+    flex: 1;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    min-height: 38px;
+  }
+  .mobile-sort:focus {
+    outline: 2px solid var(--primary);
+    outline-offset: -1px;
+    border-color: var(--primary);
+  }
+
+  /* Show-more / Show-less expander on each card. The Where + Notes rows are
+   * hidden by default (.mc-row-extra) and revealed when the user taps the
+   * button (parent gets .mc-expanded). The button itself stays compact and
+   * left-aligned, hugging the bottom of the visible card content. */
+  .mc-more-btn {
+    background: none;
+    border: none;
+    padding: 4px 0 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--primary);
+    cursor: pointer;
+    text-align: left;
+    font-family: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .mc-more-btn:hover { color: var(--primary-hover); }
+  .mc .mc-row-extra { display: none; }
+  .mc.mc-expanded .mc-row-extra { display: grid; }
+}
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .site-header { padding: 12px 16px; }
+  main { padding: 16px; }
+  .user-chip span { max-width: 80px; }
+  .auth-card { padding: 24px 20px; }
+  .chart-box { height: 220px; }
+}
+
+/* v0.16.0 Settings dialog. Email-reminder opt-in lives here; future
+ * account-level prefs would slot in as additional .settings-section blocks. */
+.settings-dialog { max-width: 480px; }
+.settings-body {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-section-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.settings-section-lead {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+.settings-toggle-row input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.settings-toggle-track {
+  width: 36px;
+  height: 20px;
+  background: var(--border);
+  border-radius: 999px;
+  position: relative;
+  transition: background 0.15s ease;
+  flex-shrink: 0;
+}
+.settings-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+}
+.settings-toggle-row input:checked ~ .settings-toggle-track {
+  background: var(--primary);
+}
+.settings-toggle-row input:checked ~ .settings-toggle-track .settings-toggle-thumb {
+  transform: translateX(16px);
+}
+.settings-toggle-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.settings-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.settings-field input[type="email"] {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+.settings-field input[type="email"]:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(43, 95, 217, 0.15);
+}
+.settings-field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.settings-cadence-list {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+.settings-cadence-list li { margin-bottom: 2px; }
+.settings-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+.settings-status.is-error { color: var(--danger, #b03434); }
+.settings-status.is-success { color: var(--success, #2f7d54); }
+
+@media (max-width: 640px) {
+  .settings-dialog { max-width: 92vw; }
+}
+
+/* v0.17.5: Density + Columns controls only affect the desktop table.
+ * Mobile uses the stacked card layout (the <= 720px breakpoint flips
+ * .products to display:block + hides every desktop td except the
+ * mobile-card-cell). Hide these two controls on mobile so the
+ * display-controls bar isn't cluttered with toggles that do nothing.
+ * Currency + Pre-tax stay visible because they affect cost numbers
+ * shown in the cards too. */
+@media (max-width: 720px) {
+  .density-toggle,
+  .columns-dropdown { display: none; }
+}
