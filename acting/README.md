@@ -52,6 +52,14 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.10 &mdash; 2026-05-11
+
+- **Improv I&ndash;V** entry expanded to full first + last names for all
+  five instructors: Mo Phillips-Spotts, Mari DeOleo, Maya Haughton,
+  Aram Rayzian, Mark Czokse. Mirrored in both screen panel and
+  printed resume training sections. Previously only last names were
+  listed.
+
 ### v0.6.9 &mdash; 2026-05-11
 
 - **Mobile credits tabs fix.** Two problems on narrow viewports: the
