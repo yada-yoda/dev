@@ -1,0 +1,978 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Ledger — Collectibles Inventory</title>
+<meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
+<link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
+<meta name="theme-color" content="#0a0d11" />
+
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://dev.rizzo.cc/inventory/" />
+<meta property="og:title" content="The Ledger — Collectibles Inventory" />
+<meta property="og:description" content="Self-hosted inventory for Beanie Babies and resale collectibles. Listing-ready for Poshmark and eBay, multi-device sync, photo backup." />
+<meta property="og:image" content="https://dev.rizzo.cc/inventory/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="The Ledger — collectibles inventory tool, dark mode with teal plush-bear logo" />
+<meta property="og:site_name" content="The Ledger" />
+
+<!-- Twitter / X -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="The Ledger — Collectibles Inventory" />
+<meta name="twitter:description" content="Self-hosted inventory for Beanie Babies and resale collectibles. Listing-ready for Poshmark and eBay, multi-device sync, photo backup." />
+<meta name="twitter:image" content="https://dev.rizzo.cc/inventory/og-image.png" />
+<meta name="twitter:image:alt" content="The Ledger — collectibles inventory tool, dark mode with teal plush-bear logo" />
+
+<!-- Icons -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- Font CSS loaded async via the media=print swap trick so it stops
+     blocking first paint. Trimmed weights to only what styles.css uses
+     (Geist 400/500/600/700 + Geist Mono 400/500). -->
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
+<link rel="stylesheet" href="styles.css?v=0.9.0" />
+</head>
+<body>
+
+<!-- ============ DEMO BANNER ============ -->
+<div class="demo-banner" id="demoBanner" hidden>
+  <div class="demo-banner-inner">
+    <span class="demo-banner-icon" aria-hidden="true">&#x1F3AC;</span>
+    <span class="demo-banner-text"><strong>Demo mode</strong> &middot; sample data only, nothing is being saved</span>
+    <button type="button" class="btn-link" id="exitDemoBtn">Exit demo</button>
+  </div>
+</div>
+
+<!-- ============ AUTH BAR ============ -->
+<div class="auth-bar">
+  <div class="auth-bar-inner">
+    <div class="auth-status" id="authStatus">
+      <span class="auth-dot" aria-hidden="true"></span>
+      <span class="auth-status-text">Guest mode &middot; data stored locally on this device</span>
+    </div>
+    <div class="auth-actions">
+      <button type="button" class="btn-link" id="signInBtn">
+        <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M12 11v2.4h5.7c-.3 1.4-1.7 4-5.7 4-3.4 0-6.2-2.8-6.2-6.4S8.6 4.6 12 4.6c2 0 3.3.8 4 1.6l2.7-2.6C17 2 14.7 1 12 1 5.9 1 1 6 1 12s4.9 11 11 11c6.3 0 10.5-4.4 10.5-10.7 0-.7-.1-1.3-.2-1.9H12z"/></svg>
+        Sign in with Google to sync
+      </button>
+      <div class="auth-pill" id="signedInPill" hidden>
+        <span class="auth-pill-name" id="userName"></span>
+        <button type="button" class="btn-link" id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HEADER ============ -->
+<header class="header">
+  <div class="header-inner">
+    <div class="brand">
+      <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
+        <circle cx="20" cy="22" r="7" fill="currentColor"/>
+        <circle cx="44" cy="22" r="7" fill="currentColor"/>
+        <circle cx="20" cy="22" r="3" fill="var(--bg-0)"/>
+        <circle cx="44" cy="22" r="3" fill="var(--bg-0)"/>
+        <circle cx="32" cy="34" r="16" fill="currentColor"/>
+        <circle cx="26" cy="32" r="2.2" fill="var(--bg-0)"/>
+        <circle cx="38" cy="32" r="2.2" fill="var(--bg-0)"/>
+        <ellipse cx="32" cy="38" rx="2.5" ry="1.8" fill="var(--bg-0)"/>
+        <path d="M 28 41 Q 32 43.5 36 41" stroke="var(--bg-0)" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+        <path d="M 47 42 q -2 -3 -4 -1 q -2 -2 -4 1 q 0 3 4 6 q 4 -3 4 -6 z" fill="#ef4444"/>
+      </svg>
+      <div class="brand-text">
+        <h1>The Ledger</h1>
+        <p class="tagline">Collectibles inventory · Poshmark &amp; eBay ready</p>
+      </div>
+    </div>
+    <div class="stats" id="statsBar">
+      <div class="stat"><span class="stat-value" id="statTotal">0</span><span class="stat-label">Items</span></div>
+      <div class="stat"><span class="stat-value" id="statActive">0</span><span class="stat-label">Active</span></div>
+      <div class="stat"><span class="stat-value" id="statSold">0</span><span class="stat-label">Sold</span></div>
+      <div class="stat"><span class="stat-value" id="statValue">$0</span><span class="stat-label">Est. Value</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ============ TOOLBAR ============ -->
+<section class="toolbar">
+  <div class="toolbar-inner">
+    <div class="search-wrap">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="searchInput" placeholder="Search by name, SKU, tag, UPC, location…" autocomplete="off" />
+    </div>
+    <div class="filter-group">
+      <select id="filterCategory">
+        <option value="">All Categories</option>
+      </select>
+      <select id="filterStatus">
+        <option value="">All Statuses</option>
+        <option value="Draft">Draft</option>
+        <option value="Ready to List">Ready to List</option>
+        <option value="Listed - Poshmark">Listed — Poshmark</option>
+        <option value="Listed - eBay">Listed — eBay</option>
+        <option value="Listed - Both">Listed — Both</option>
+        <option value="Sold">Sold</option>
+        <option value="Shipped">Shipped</option>
+        <option value="Archived">Archived</option>
+      </select>
+      <select id="sortBy">
+        <option value="created_desc">Newest first</option>
+        <option value="created_asc">Oldest first</option>
+        <option value="name_asc">Name A→Z</option>
+        <option value="name_desc">Name Z→A</option>
+        <option value="price_desc">Price High→Low</option>
+        <option value="price_asc">Price Low→High</option>
+        <option value="sku_asc">SKU ↑</option>
+      </select>
+    </div>
+    <div class="actions">
+      <button class="btn btn-ghost" id="importBtn" title="Import JSON or CSV">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
+        Import
+      </button>
+      <div class="dropdown">
+        <button class="btn btn-ghost" id="exportBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V9m0 0-4 4m4-4 4 4M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/></svg>
+          Export
+        </button>
+        <div class="dropdown-menu" id="exportMenu">
+          <button data-format="json"><strong>Full Backup</strong><small>JSON — re-importable</small></button>
+          <button data-format="csv"><strong>Spreadsheet</strong><small>CSV — Excel / Sheets</small></button>
+          <button data-format="poshmark"><strong>Poshmark Listings</strong><small>TXT — ready to copy</small></button>
+          <button data-format="ebay"><strong>eBay File Exchange</strong><small>CSV — direct upload</small></button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="addBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>
+        New Item
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ MAIN ============ -->
+<main id="mainContent">
+  <div class="view-toggle">
+    <button class="view-btn active" data-view="grid" title="Grid View">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    </button>
+    <button class="view-btn" data-view="table" title="Table View">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <span class="result-count" id="resultCount"></span>
+  </div>
+
+  <div id="itemGrid" class="item-grid"></div>
+  <div id="itemTable" class="item-table" style="display:none;"></div>
+
+  <div id="emptyState" class="empty-state">
+    <svg class="empty-icon" viewBox="0 0 64 64" aria-hidden="true">
+      <circle cx="20" cy="22" r="7" fill="currentColor" opacity=".3"/>
+      <circle cx="44" cy="22" r="7" fill="currentColor" opacity=".3"/>
+      <circle cx="32" cy="34" r="16" fill="currentColor" opacity=".3"/>
+      <circle cx="26" cy="32" r="2" fill="currentColor"/>
+      <circle cx="38" cy="32" r="2" fill="currentColor"/>
+      <path d="M 28 41 Q 32 43.5 36 41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+    </svg>
+    <h2>No items yet</h2>
+    <p>Start cataloguing your collection — or import a backup to restore existing data.</p>
+    <div class="empty-actions">
+      <button class="btn btn-primary" onclick="document.getElementById('addBtn').click()">Add First Item</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('importBtn').click()">Import Backup</button>
+      <button class="btn btn-ghost" id="tryDemoBtn">See it with sample data</button>
+    </div>
+  </div>
+</main>
+
+<!-- ============ EDITOR MODAL ============ -->
+<div class="modal" id="itemModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card">
+    <header class="modal-header">
+      <div>
+        <p class="modal-eyebrow" id="modalEyebrow">New Entry</p>
+        <h2 id="modalTitle">Catalogue Item</h2>
+      </div>
+      <button class="icon-btn" id="modalClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <nav class="modal-tabs">
+      <button class="tab-btn active" data-tab="basics">Basics</button>
+      <button class="tab-btn" data-tab="beanie" id="beanieTab">Beanie Details</button>
+      <button class="tab-btn" data-tab="condition">Condition</button>
+      <button class="tab-btn" data-tab="listing">Listing &amp; Pricing</button>
+      <button class="tab-btn" data-tab="research">Research</button>
+      <button class="tab-btn" data-tab="shipping">Shipping</button>
+      <button class="tab-btn" data-tab="fees">Fees &amp; Profit</button>
+      <button class="tab-btn" data-tab="photos">Photos &amp; Notes</button>
+    </nav>
+
+    <form class="modal-form" id="itemForm">
+
+      <!-- TAB: BASICS -->
+      <section class="tab-panel active" data-panel="basics">
+        <!-- UPC Lookup Banner -->
+        <div class="lookup-card">
+          <div class="lookup-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7v10M7 7v10M11 7v10M15 7v10M19 7v10"/></svg>
+            <div>
+              <h4>UPC / Barcode Lookup</h4>
+              <p>Enter a UPC or scan a barcode to auto-fill details from product databases.</p>
+            </div>
+          </div>
+          <div class="lookup-row">
+            <input type="text" name="upc" id="upcInput" placeholder="UPC / EAN / ISBN (e.g. 008421040100)" />
+            <button type="button" class="btn btn-accent" id="upcLookup">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+              Lookup
+            </button>
+            <button type="button" class="btn btn-ghost" id="upcScan" title="Scan with camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2M7 8h10v8H7z"/></svg>
+            </button>
+          </div>
+          <div class="lookup-status" id="upcStatus"></div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field field-span-2">
+            <label>Item Name <span class="req">*</span></label>
+            <div class="input-with-suggest">
+              <input type="text" name="name" id="nameInput" required placeholder='e.g. "Princess" the Bear' autocomplete="off" />
+              <div class="suggest-dropdown" id="beanieSuggest"></div>
+            </div>
+            <small id="nameHint" class="field-hint"></small>
+          </div>
+          <div class="field">
+            <label>Category <span class="req">*</span></label>
+            <select name="category" id="categorySelect" required>
+              <option value="Beanie Baby">Beanie Baby</option>
+              <option value="Plush / Stuffed Animal">Plush / Stuffed Animal</option>
+              <option value="Clothing">Clothing</option>
+              <option value="Shoes">Shoes</option>
+              <option value="Accessories">Accessories</option>
+              <option value="Jewelry">Jewelry</option>
+              <option value="Electronics">Electronics</option>
+              <option value="Home &amp; Decor">Home &amp; Decor</option>
+              <option value="Books / Media">Books / Media</option>
+              <option value="Toys &amp; Collectibles">Toys &amp; Collectibles</option>
+              <option value="Trading Cards">Trading Cards</option>
+              <option value="Vintage">Vintage</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>SKU / Inventory № <span class="req">*</span></label>
+            <div class="input-with-btn">
+              <input type="text" name="sku" required placeholder="BB-0001" />
+              <button type="button" class="btn-mini" id="autoSku">Auto</button>
+            </div>
+            <small>Physically mark this on the package.</small>
+          </div>
+          <div class="field">
+            <label>Brand / Maker</label>
+            <input type="text" name="brand" placeholder="Ty Inc., Nike, …" />
+          </div>
+          <div class="field">
+            <label>Model / Style</label>
+            <input type="text" name="model" />
+          </div>
+          <div class="field">
+            <label>Size</label>
+            <input type="text" name="size" placeholder="M, 10.5, 8 inch" />
+          </div>
+          <div class="field">
+            <label>Color(s)</label>
+            <input type="text" name="color" placeholder="Purple w/ white accents" />
+          </div>
+          <div class="field">
+            <label>Material</label>
+            <input type="text" name="material" placeholder="Plush, PVC pellets" />
+          </div>
+          <div class="field">
+            <label>Country of Manufacture</label>
+            <input type="text" name="country" placeholder="China, Indonesia, …" />
+          </div>
+          <div class="field">
+            <label>Storage Location</label>
+            <input type="text" name="location" placeholder="Bin A-3, Shelf 2" />
+          </div>
+          <div class="field">
+            <label>Quantity</label>
+            <input type="number" name="quantity" value="1" min="1" />
+          </div>
+          <div class="field field-span-2">
+            <label class="checkbox-label">
+              <input type="checkbox" name="has_variations" id="hasVariationsToggle" />
+              <span>Each one is unique &mdash; colors / patterns vary (tye-dye, hand-painted, etc.)</span>
+            </label>
+          </div>
+          <div class="field field-span-2" id="variationDescField" style="display:none;">
+            <label>Variation Notes <small>&mdash; what differs between examples</small></label>
+            <input type="text" name="variation_description" placeholder='e.g. "purple/blue tye-dye, swirl pattern unique to each"' />
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: BEANIE DETAILS -->
+      <section class="tab-panel" data-panel="beanie">
+        <div class="panel-intro">
+          <h3>Beanie Baby Specific Details</h3>
+          <p>Tag information dramatically affects value. Use the auto-fill from the name search in Basics to populate most of these instantly.</p>
+        </div>
+
+        <div class="lookup-card lookup-card-inline">
+          <div class="lookup-header">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+            <div>
+              <h4>Fill from Reference Database</h4>
+              <p>Search our database of 60+ popular Beanies, or add your own entries for reuse.</p>
+            </div>
+          </div>
+          <div class="lookup-row">
+            <input type="text" id="beanieLookupInput" placeholder="Search: Princess, Patti, Peanut…" />
+            <button type="button" class="btn btn-ghost" id="saveBeanieBtn" title="Save current info as a reusable reference entry">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+              Save to DB
+            </button>
+          </div>
+          <div class="beanie-results" id="beanieLookupResults"></div>
+        </div>
+
+        <div class="field-grid">
+          <div class="field">
+            <label>Year Released</label>
+            <input type="number" name="bb_year" min="1993" max="2099" placeholder="1997" />
+          </div>
+          <div class="field">
+            <label>Date of Birth (on tag)</label>
+            <input type="text" name="bb_birthday" placeholder='e.g. "October 17, 1997"' />
+          </div>
+          <div class="field field-span-2">
+            <label>Tag Poem / Text</label>
+            <textarea name="bb_poem" rows="4" placeholder="Transcribe the poem from the heart tag…"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Swing (Heart) Tag Generation</label>
+            <select name="bb_swing_gen">
+              <option value="">Unknown</option>
+              <option>1st Gen (1993-94)</option>
+              <option>2nd Gen (1994)</option>
+              <option>3rd Gen (1995)</option>
+              <option>4th Gen (1996-98)</option>
+              <option>5th Gen (1998-99)</option>
+              <option>6th Gen (1999-2000)</option>
+              <option>7th Gen (2000-01)</option>
+              <option>8th Gen (2001-02)</option>
+              <option>9th-18th Gen (2002+)</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tush Tag Generation</label>
+            <select name="bb_tush_gen">
+              <option value="">Unknown</option>
+              <option>1st Gen Tush (black &amp; white)</option>
+              <option>2nd Gen Tush (1994)</option>
+              <option>3rd Gen Tush (1995)</option>
+              <option>4th Gen Tush (1996)</option>
+              <option>5th Gen Tush (1997)</option>
+              <option>6th Gen Tush (1998)</option>
+              <option>7th Gen Tush (1999+)</option>
+              <option>Later Gen</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Heart Tag Condition</label>
+            <select name="bb_swing_cond">
+              <option>Mint (no creases/bends)</option>
+              <option>Near Mint (minor wear)</option>
+              <option>Good (visible creases)</option>
+              <option>Fair (heavy wear)</option>
+              <option>Damaged / Folded</option>
+              <option>Missing</option>
+              <option>Tag Protector Applied</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tush Tag Condition</label>
+            <select name="bb_tush_cond">
+              <option>Mint</option>
+              <option>Near Mint</option>
+              <option>Good</option>
+              <option>Fair</option>
+              <option>Damaged</option>
+              <option>Missing</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Style / PE Number</label>
+            <input type="text" name="bb_style_num" placeholder="4300" />
+          </div>
+          <div class="field">
+            <label>PVC or PE Pellets</label>
+            <select name="bb_pellets">
+              <option value="">Unknown</option>
+              <option>PVC Pellets</option>
+              <option>PE Pellets</option>
+              <option>Mixed</option>
+            </select>
+          </div>
+
+          <div class="field field-span-2">
+            <label>Known Errors / Variations <small>(these can multiply value)</small></label>
+            <textarea name="bb_errors" rows="2" placeholder='e.g. misspelled word, missing embroidery, color variation, Canadian tush tag…'></textarea>
+          </div>
+          <div class="field field-span-2">
+            <label>Retirement / Rarity Notes</label>
+            <textarea name="bb_rarity" rows="2" placeholder="Retirement date, 1st edition, hologram tag, limited release details…"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CONDITION -->
+      <section class="tab-panel" data-panel="condition">
+        <div class="field-grid">
+          <div class="field field-span-2">
+            <label>Overall Condition</label>
+            <select name="condition">
+              <option>New With Tags (NWT)</option>
+              <option>New Without Tags (NWOT)</option>
+              <option>New With Defects</option>
+              <option>Like New / Excellent Used</option>
+              <option>Very Good</option>
+              <option>Good</option>
+              <option>Fair</option>
+              <option>Poor / For Parts</option>
+            </select>
+          </div>
+          <div class="field field-span-2">
+            <label>Condition Notes / Flaws</label>
+            <textarea name="condition_notes" rows="4" placeholder="List every flaw honestly — pilling, stains, missing tags, discoloration, loose thread at left paw…"></textarea>
+          </div>
+          <div class="field">
+            <label>Has Original Packaging?</label>
+            <select name="has_packaging">
+              <option>No</option>
+              <option>Yes — Original Box</option>
+              <option>Yes — Original Bag</option>
+              <option>Partial</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Smoke / Pet Free?</label>
+            <select name="environment">
+              <option>Smoke-free &amp; Pet-free home</option>
+              <option>Smoke-free home</option>
+              <option>Pet-free home</option>
+              <option>Home with pets</option>
+              <option>Home with smokers</option>
+            </select>
+          </div>
+          <div class="field field-span-2">
+            <label>Authentication / Verification</label>
+            <input type="text" name="authentication" placeholder='e.g. "True Blue Beans authenticated", photo-matched, …' />
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: LISTING / PRICING -->
+      <section class="tab-panel" data-panel="listing">
+        <div class="field-grid">
+          <div class="field field-span-2">
+            <label>Listing Title <small>— what buyers see (Poshmark 50 char / eBay 80 char)</small></label>
+            <input type="text" name="listing_title" maxlength="80" placeholder='e.g. "VTG 1997 Ty Princess Diana Beanie Baby PVC Pellets Mint"' />
+            <small class="char-count" id="titleCount">0 / 80</small>
+          </div>
+          <div class="field field-span-2">
+            <label>Shared Listing Description <small>&mdash; default used when a platform-specific description is empty</small></label>
+            <textarea name="listing_desc" rows="5" placeholder="Default description used for both platforms. Include all details, condition, measurements, shipping info."></textarea>
+          </div>
+          <div class="field field-span-2">
+            <label>eBay Description <small>&mdash; overrides shared when present</small></label>
+            <textarea name="listing_desc_ebay" rows="4" placeholder='Optional. eBay-specific copy &mdash; e.g. more detail-heavy, condition-focused.'></textarea>
+          </div>
+          <div class="field field-span-2">
+            <label>Poshmark Description <small>&mdash; overrides shared when present</small></label>
+            <textarea name="listing_desc_poshmark" rows="4" placeholder='Optional. Poshmark-specific copy &mdash; e.g. more conversational, hashtag-friendly.'></textarea>
+          </div>
+          <div class="field field-span-2">
+            <label>Tags / Keywords <small>— comma separated</small></label>
+            <input type="text" name="tags" placeholder="vintage, 90s, beanie, ty, princess, rare, collectible" />
+          </div>
+          <div class="field">
+            <label>Cost of Goods <span class="info-tip" data-tip="What you paid to acquire the item, before tax and supplies.">?</span></label>
+            <input type="number" step="0.01" name="cost" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Item Tax <span class="info-tip" data-tip="Sales tax you paid when buying the item. Adds to your cost basis.">?</span></label>
+            <input type="number" step="0.01" name="item_tax" placeholder="0.00" />
+          </div>
+          <div class="field field-span-2">
+            <label>Other Expenses <small>&mdash; supplies, gas, etc.</small> <span class="info-tip" data-tip="Variable costs tied to this listing: bubble wrap, tape, labels, gas to ship, authentication fees. Adds to cost basis.">?</span></label>
+            <div class="input-with-btn">
+              <input type="number" step="0.01" name="other_expenses" placeholder="0.00" style="flex:0 0 120px" />
+              <input type="text" name="other_expenses_notes" placeholder="Notes (e.g. bubble wrap + label)" />
+            </div>
+          </div>
+          <div class="field">
+            <label>Listing Price</label>
+            <input type="number" step="0.01" name="price" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Minimum Accept</label>
+            <input type="number" step="0.01" name="min_price" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Sold Price <span class="info-tip" data-tip="What the buyer actually paid, before fees and shipping.">?</span></label>
+            <input type="number" step="0.01" name="sold_price" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Status</label>
+            <select name="status">
+              <option>Draft</option>
+              <option>Ready to List</option>
+              <option>Listed - Poshmark</option>
+              <option>Listed - eBay</option>
+              <option>Listed - Both</option>
+              <option>Sold</option>
+              <option>Shipped</option>
+              <option>Archived</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Platform Sold On</label>
+            <select name="sold_platform">
+              <option value="">—</option>
+              <option>Poshmark</option>
+              <option>eBay</option>
+              <option>Mercari</option>
+              <option>Facebook Marketplace</option>
+              <option>Local / Cash</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Date Listed</label>
+            <input type="date" name="date_listed" />
+          </div>
+          <div class="field">
+            <label>Date Sold</label>
+            <input type="date" name="date_sold" />
+          </div>
+          <div class="field">
+            <label>Poshmark Listing URL</label>
+            <input type="url" name="url_poshmark" placeholder="https://poshmark.com/listing/…" />
+          </div>
+          <div class="field">
+            <label>eBay Listing URL</label>
+            <input type="url" name="url_ebay" placeholder="https://ebay.com/itm/…" />
+          </div>
+          <div class="field">
+            <label>eBay Item Number</label>
+            <input type="text" name="ebay_item_number" placeholder="e.g. 285123456789" />
+          </div>
+          <div class="field">
+            <label>Poshmark Order Number</label>
+            <input type="text" name="poshmark_order_number" placeholder="e.g. 65a1f23..." />
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PRICING RESEARCH -->
+      <section class="tab-panel" data-panel="research">
+        <div class="panel-intro">
+          <h3>Pricing Research</h3>
+          <p>Record what comparable items have actually sold for, with the date and source. The suggested price below averages whatever you fill in, and the margin estimate accounts for typical platform fees.</p>
+        </div>
+
+        <div class="research-grid">
+          <div class="research-card">
+            <header class="research-card-header">
+              <h4>eBay sold avg</h4>
+              <span class="research-stale" data-stale-for="ebay" hidden>stale</span>
+            </header>
+            <div class="research-fields">
+              <div class="field">
+                <label>Sold price</label>
+                <input type="number" step="0.01" name="research_ebay_avg" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Date checked</label>
+                <input type="date" name="research_ebay_date" />
+              </div>
+              <div class="field field-span-2">
+                <label>Source / Notes</label>
+                <input type="text" name="research_ebay_notes" placeholder="URL or any notes (e.g. last 5 sold avg)" />
+              </div>
+            </div>
+          </div>
+
+          <div class="research-card">
+            <header class="research-card-header">
+              <h4>Poshmark sold avg</h4>
+              <span class="research-stale" data-stale-for="poshmark" hidden>stale</span>
+            </header>
+            <div class="research-fields">
+              <div class="field">
+                <label>Sold price</label>
+                <input type="number" step="0.01" name="research_poshmark_avg" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Date checked</label>
+                <input type="date" name="research_poshmark_date" />
+              </div>
+              <div class="field field-span-2">
+                <label>Source / Notes</label>
+                <input type="text" name="research_poshmark_notes" placeholder="URL or any notes" />
+              </div>
+            </div>
+          </div>
+
+          <div class="research-card">
+            <header class="research-card-header">
+              <h4>Price guide</h4>
+              <span class="research-stale" data-stale-for="guide" hidden>stale</span>
+            </header>
+            <div class="research-fields">
+              <div class="field">
+                <label>Guide value</label>
+                <input type="number" step="0.01" name="research_guide_avg" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Date checked</label>
+                <input type="date" name="research_guide_date" />
+              </div>
+              <div class="field field-span-2">
+                <label>Source / Notes</label>
+                <input type="text" name="research_guide_notes" placeholder='e.g. "Beanie Babies Price Guide 2024"' />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="suggest-panel" id="researchSummary">
+          <div class="suggest-row">
+            <div class="suggest-block">
+              <div class="suggest-label">Suggested listing price</div>
+              <div class="suggest-value" id="suggestedPrice">—</div>
+              <div class="suggest-sub" id="suggestedSub">Fill in any platform above</div>
+            </div>
+            <button type="button" class="btn btn-ghost" id="useSuggestedPrice" disabled>Use as listing price</button>
+          </div>
+          <div class="margin-row" id="marginRow" hidden>
+            <div class="margin-block">
+              <div class="margin-label">Poshmark net (~80%)</div>
+              <div class="margin-value" id="marginPoshmark">—</div>
+              <div class="margin-sub" id="marginPoshmarkSub">&nbsp;</div>
+            </div>
+            <div class="margin-block">
+              <div class="margin-label">eBay net (~87%)</div>
+              <div class="margin-value" id="marginEbay">—</div>
+              <div class="margin-sub" id="marginEbaySub">&nbsp;</div>
+            </div>
+          </div>
+          <p class="suggest-disclaimer">Net estimates are rough &mdash; Poshmark takes 20% on sales &ge; $15 ($2.95 flat below), eBay takes ~13% plus a small payment-processing fee. Actuals vary by category.</p>
+        </div>
+      </section>
+
+      <!-- TAB: SHIPPING -->
+      <section class="tab-panel" data-panel="shipping">
+        <div class="panel-intro">
+          <h3>Packaged Dimensions &amp; Weight</h3>
+          <p>Measure the item <em>in its shipping box</em> for accurate postage.</p>
+        </div>
+        <div class="field-grid">
+          <div class="field">
+            <label>Weight Value</label>
+            <input type="number" step="0.01" name="weight_value" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Weight Unit</label>
+            <select name="weight_unit">
+              <option>oz</option><option>lb</option><option>g</option><option>kg</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Dim. Unit</label>
+            <select name="dim_unit">
+              <option>in</option><option>cm</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Box Length</label>
+            <input type="number" step="0.1" name="box_length" placeholder="0" />
+          </div>
+          <div class="field">
+            <label>Box Width</label>
+            <input type="number" step="0.1" name="box_width" placeholder="0" />
+          </div>
+          <div class="field">
+            <label>Box Height</label>
+            <input type="number" step="0.1" name="box_height" placeholder="0" />
+          </div>
+          <div class="field field-span-2">
+            <label>Package Type</label>
+            <select name="package_type">
+              <option>Poly Mailer</option>
+              <option>Padded Mailer / Bubble Mailer</option>
+              <option>Small Box</option>
+              <option>Medium Box</option>
+              <option>Large Box</option>
+              <option>USPS Flat Rate Envelope</option>
+              <option>USPS Small Flat Rate Box</option>
+              <option>USPS Medium Flat Rate Box</option>
+              <option>USPS Large Flat Rate Box</option>
+              <option>Custom</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Preferred Carrier</label>
+            <select name="carrier">
+              <option>USPS Ground Advantage</option>
+              <option>USPS Priority Mail</option>
+              <option>USPS First-Class Package</option>
+              <option>USPS Media Mail</option>
+              <option>UPS Ground</option>
+              <option>FedEx</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Postage Charged to Buyer <span class="info-tip" data-tip="What you charge the buyer for shipping (the line item on the listing). Counts as revenue.">?</span></label>
+            <input type="number" step="0.01" name="ship_cost" placeholder="0.00" />
+          </div>
+          <div class="field">
+            <label>Actual Postage Paid <span class="info-tip" data-tip="What the shipping label actually cost you. Counts against profit. Often different from what the buyer paid.">?</span></label>
+            <input type="number" step="0.01" name="postage_paid" placeholder="0.00" />
+          </div>
+          <div class="field field-span-2">
+            <label>Shipping Notes</label>
+            <textarea name="ship_notes" rows="2" placeholder="Fragile, tag protector in place, etc."></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: FEES & PROFIT -->
+      <section class="tab-panel" data-panel="fees">
+        <div class="panel-intro">
+          <h3>Fees &amp; Profit</h3>
+          <p>Once an item sells, fill in what each platform actually charged you. The summary at the bottom shows revenue minus costs minus fees, so you know what actually landed in your bank account. The <strong>Auto-fill standard fees</strong> button pre-fills the typical rates based on the sold platform and price &mdash; you can then tweak each value to match your real seller statement.</p>
+        </div>
+
+        <div class="fees-toolbar">
+          <button type="button" class="btn btn-accent" id="autoFillFeesBtn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>
+            Auto-fill standard fees
+          </button>
+          <span class="fees-toolbar-hint">Uses sold price + sold platform from Listing &amp; Pricing</span>
+        </div>
+
+        <div class="fees-grid">
+          <div class="fees-card" data-fees-platform="ebay">
+            <header class="fees-card-header">
+              <h4>eBay fees</h4>
+            </header>
+            <div class="fees-card-fields">
+              <div class="field">
+                <label>Insertion fee <span class="info-tip" data-tip="$0.35 per listing after the first 250 free per month for most categories. Often $0.">?</span></label>
+                <input type="number" step="0.01" name="fee_ebay_insertion" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Final value fee <span class="info-tip" data-tip="Typically ~13.25% of the item sale price for most categories. eBay deducts this automatically.">?</span></label>
+                <input type="number" step="0.01" name="fee_ebay_fvf" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>FVF on shipping <span class="info-tip" data-tip="Same ~13.25% rate, but applied to the postage you charged the buyer. Yes, eBay takes a cut of shipping too.">?</span></label>
+                <input type="number" step="0.01" name="fee_ebay_fvf_shipping" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Per-order fee <span class="info-tip" data-tip="Flat $0.30 fixed fee eBay adds to every paid order, regardless of price.">?</span></label>
+                <input type="number" step="0.01" name="fee_ebay_per_order" placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+
+          <div class="fees-card" data-fees-platform="poshmark">
+            <header class="fees-card-header">
+              <h4>Poshmark fee</h4>
+            </header>
+            <div class="fees-card-fields">
+              <div class="field field-span-2">
+                <label>Selling fee <span class="info-tip" data-tip="Poshmark takes 20% of the sold price on sales of $15 or more, or a flat $2.95 on sales below $15. Sales tax is collected from the buyer separately and is not your expense.">?</span></label>
+                <input type="number" step="0.01" name="fee_poshmark" placeholder="0.00" />
+              </div>
+            </div>
+          </div>
+
+          <div class="fees-card" data-fees-platform="other">
+            <header class="fees-card-header">
+              <h4>Other</h4>
+            </header>
+            <div class="fees-card-fields">
+              <div class="field">
+                <label>PayPal / processing <span class="info-tip" data-tip="2.9% + $0.30 per transaction for PayPal Goods &amp; Services. Most marketplace platforms now bundle this into their final value fee &mdash; only fill this if you accepted payment outside the marketplace's flow.">?</span></label>
+                <input type="number" step="0.01" name="fee_paypal" placeholder="0.00" />
+              </div>
+              <div class="field">
+                <label>Other fee amount <span class="info-tip" data-tip="Anything else that came out of your sale: promoted listings, authentication fees, return shipping, marketplace insurance, etc.">?</span></label>
+                <input type="number" step="0.01" name="fee_other" placeholder="0.00" />
+              </div>
+              <div class="field field-span-2">
+                <label>Other fee notes</label>
+                <input type="text" name="fee_other_notes" placeholder='e.g. "Promoted listing 2%"' />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="pnl-panel" id="pnlPanel">
+          <header class="pnl-header">
+            <h4>Profit &amp; Loss</h4>
+            <div class="pnl-status" id="pnlStatus">Not sold yet &mdash; values are projections based on listing price</div>
+          </header>
+          <div class="pnl-rows">
+            <div class="pnl-row">
+              <div class="pnl-row-label">Revenue</div>
+              <div class="pnl-row-detail" id="pnlRevenueDetail">&mdash;</div>
+              <div class="pnl-row-amount pos" id="pnlRevenue">&mdash;</div>
+            </div>
+            <div class="pnl-row">
+              <div class="pnl-row-label">Cost basis</div>
+              <div class="pnl-row-detail" id="pnlCostDetail">&mdash;</div>
+              <div class="pnl-row-amount neg" id="pnlCost">&mdash;</div>
+            </div>
+            <div class="pnl-row">
+              <div class="pnl-row-label">Platform fees</div>
+              <div class="pnl-row-detail" id="pnlFeesDetail">&mdash;</div>
+              <div class="pnl-row-amount neg" id="pnlFees">&mdash;</div>
+            </div>
+            <div class="pnl-row pnl-row-total">
+              <div class="pnl-row-label">Net profit</div>
+              <div class="pnl-row-detail" id="pnlMarginDetail">&mdash;</div>
+              <div class="pnl-row-amount" id="pnlNet">&mdash;</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="days-panel" id="daysPanel" hidden>
+          <div class="days-block">
+            <div class="days-label" id="daysActiveLabel">Days active</div>
+            <div class="days-value" id="daysActiveValue">&mdash;</div>
+            <div class="days-sub" id="daysActiveSub">&nbsp;</div>
+          </div>
+          <div class="days-block" id="daysSoldBlock" hidden>
+            <div class="days-label">Days from listed to sold</div>
+            <div class="days-value" id="daysToSoldValue">&mdash;</div>
+            <div class="days-sub" id="daysToSoldSub">&nbsp;</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: PHOTOS / NOTES -->
+      <section class="tab-panel" data-panel="photos">
+        <div class="panel-intro">
+          <h3>Photos &amp; Additional Notes</h3>
+          <p>Photos are stored locally. For large libraries, export regularly.</p>
+        </div>
+        <div class="field">
+          <label>Upload Photos</label>
+          <div class="photo-drop" id="photoDrop">
+            <input type="file" id="photoInput" multiple accept="image/*" hidden />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+            <p>Drop images or <button type="button" class="link-btn" onclick="document.getElementById('photoInput').click()">browse</button></p>
+          </div>
+          <div class="photo-preview" id="photoPreview"></div>
+        </div>
+        <div class="field">
+          <label>Private Notes <small>— for your eyes only, not exported to listings</small></label>
+          <textarea name="private_notes" rows="4" placeholder="Source, purchase date, research links, pricing history…"></textarea>
+        </div>
+      </section>
+
+      <footer class="modal-footer">
+        <button type="button" class="btn btn-danger" id="deleteBtn" style="display:none">Delete</button>
+        <div style="flex:1"></div>
+        <button type="button" class="btn btn-ghost" id="cancelBtn">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Entry</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<!-- ============ CONFIRM MODAL ============ -->
+<div class="modal mini-modal" id="confirmModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card">
+    <h3 id="confirmTitle">Confirm</h3>
+    <p id="confirmMessage"></p>
+    <footer class="modal-footer">
+      <button class="btn btn-ghost" id="confirmCancel">Cancel</button>
+      <button class="btn btn-danger" id="confirmOk">Confirm</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ IMPORT MODAL ============ -->
+<div class="modal mini-modal" id="importModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card">
+    <h3>Import Inventory</h3>
+    <p>Upload a previously-exported JSON backup or a CSV file with matching columns.</p>
+    <input type="file" id="importFile" accept=".json,.csv" />
+    <div class="import-options">
+      <label><input type="radio" name="importMode" value="merge" checked /> Merge with existing</label>
+      <label><input type="radio" name="importMode" value="replace" /> Replace all existing</label>
+    </div>
+    <footer class="modal-footer">
+      <button class="btn btn-ghost" id="importCancel">Cancel</button>
+      <button class="btn btn-primary" id="importConfirm">Import</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ SCANNER MODAL ============ -->
+<div class="modal mini-modal" id="scannerModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card">
+    <h3>Scan Barcode</h3>
+    <p id="scannerStatus">Position the barcode in front of your camera.</p>
+    <div class="scanner-wrap">
+      <video id="scannerVideo" autoplay playsinline muted></video>
+      <div class="scanner-overlay"></div>
+    </div>
+    <footer class="modal-footer">
+      <button class="btn btn-ghost" id="scannerClose">Cancel</button>
+    </footer>
+  </div>
+</div>
+
+<!-- ============ TOAST ============ -->
+<div id="toast" class="toast"></div>
+
+<footer class="site-footer">
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <span id="appVersion">v0.9.0</span></p>
+</footer>
+
+<!-- Cache-bust query string. Bump these (along with the styles.css link
+     above) whenever a release ships new JS or CSS, so users on a stale
+     browser cache get the new file. The value should match APP_VERSION
+     in app.js. -->
+<script type="module" src="firebase-config.js?v=0.9.0"></script>
+<script defer src="beanie-db.js?v=0.9.0"></script>
+<script defer src="demo-data.js?v=0.9.0"></script>
+<script defer src="app.js?v=0.9.0"></script>
+</body>
+</html>
