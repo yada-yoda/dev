@@ -3,7 +3,7 @@ Maintainer: itsavibecode
 GitHub: https://github.com/itsavibecode
 
 /* SITE */
-Last update: 2026-05-08 (v1.2.0)
+Last update: 2026-05-15 (v1.3.0)
 Standards: HTML5, CSS3, ES2022
 Components: Firebase (Auth, Firestore), Google Analytics 4
 Software: VS Code, Claude Code
