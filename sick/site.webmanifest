@@ -1,0 +1,18 @@
+{
+  "name": "Illness Tracker",
+  "short_name": "Illness",
+  "description": "A private illness and symptom tracker. Log episodes, medicines, vitals, and dose timers. Spot patterns in where, when, and how you get sick.",
+  "start_url": "/sick/",
+  "scope": "/sick/",
+  "id": "/sick/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1117",
+  "theme_color": "#0d1117",
+  "categories": ["health", "medical", "lifestyle", "productivity"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

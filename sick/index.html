@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Illness Tracker — Track · Analyze · Prevent</title>
+<meta name="description" content="A private illness and symptom tracker. Log episodes, medicines, vitals, and dose timers. Spot patterns in where, when, and how you get sick.">
+<meta name="theme-color" content="#0d1117">
+<link rel="canonical" href="https://dev.rizzo.cc/sick/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Illness Tracker">
+<meta property="og:title" content="Illness Tracker — Track · Analyze · Prevent">
+<meta property="og:description" content="A private illness and symptom tracker. Log episodes, medicines, vitals, and dose timers. Spot patterns in where, when, and how you get sick.">
+<meta property="og:url" content="https://dev.rizzo.cc/sick/">
+<meta property="og:image" content="https://dev.rizzo.cc/sick/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Illness Tracker dashboard preview with stats and upcoming dose reminders">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Illness Tracker — Track · Analyze · Prevent">
+<meta name="twitter:description" content="A private illness and symptom tracker. Log episodes, medicines, vitals, and dose timers. Spot patterns in where, when, and how you get sick.">
+<meta name="twitter:image" content="https://dev.rizzo.cc/sick/og-image.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<!-- html2canvas is lazy-loaded on first PNG export, see loadHtml2Canvas() -->
+<style>
+:root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-tertiary:#21262d;--bg-input:#0d1117;--text-primary:#e6edf3;--text-secondary:#8b949e;--accent:#58a6ff;--accent-warm:#f78166;--accent-purple:#a371f7;--border:#30363d;--danger:#f85149;--success:#3fb950;--warning:#d29922;
+--temp-normal:#3fb950;--temp-low-grade:#d29922;--temp-fever:#f78166;--temp-high-fever:#f85149}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.header{background:linear-gradient(135deg,#161b22,#0d1117);border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px}
+.logo{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#58a6ff,#a371f7);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.header h1{font-size:20px;font-weight:700;letter-spacing:-0.02em}.header .sub{font-size:12px;color:var(--text-secondary)}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap}
+.nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto}
+.nav button{flex:1;padding:14px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:80px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.nav button.active{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}.nav button .nav-icon{font-size:18px}
+.content{padding:20px;max-width:800px;margin:0 auto}
+.card{background:var(--bg-card);border-radius:16px;padding:24px;border:1px solid var(--border);margin-bottom:12px}
+.btn{padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}
+.btn:disabled{opacity:.4;cursor:default}.btn-outline{background:transparent;border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:linear-gradient(135deg,#58a6ff,#a371f7);border:none;color:#fff;font-weight:700;font-size:16px;padding:14px 28px;border-radius:12px;width:100%;cursor:pointer;font-family:inherit}
+.btn-google{background:#fff;color:#333;border:1px solid #ddd;padding:10px 20px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit}
+.btn-sm{padding:6px 14px;border-radius:8px;font-size:12px}.btn-danger{color:var(--danger)}.btn-accent{color:var(--accent)}
+.btn-gcal{background:transparent;border:1px solid #4285F4;color:#4285F4;padding:8px 16px;border-radius:10px;font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px}
+.label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:16px}
+.select{appearance:none}.textarea{resize:vertical}
+.section-title{margin:0 0 14px;font-size:15px;font-weight:600;color:var(--accent)}
+.tag-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.tag{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
+.tag.active{border-color:var(--accent);background:var(--accent);color:#fff}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{text-align:center;padding:16px}.stat-value{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace}.stat-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
+.risk-bar-track{height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}.risk-bar-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.chip{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(88,166,255,.12);color:var(--accent);display:inline-block}
+.chip-med{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(163,113,247,.12);color:var(--accent-purple);display:inline-block}
+.entry-row{padding:14px;border-radius:12px;background:var(--bg-tertiary);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.entry-row.clickable{cursor:pointer;transition:border-color .2s;border:1px solid transparent}.entry-row.clickable:hover{border-color:var(--accent)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px}
+.contact-row{display:flex;gap:8px;margin-bottom:8px}.contact-row input{flex:1}
+.vitals-entry{padding:12px;border-radius:10px;background:var(--bg-primary);border:1px solid var(--border);margin-bottom:8px}
+.vitals-entry .vitals-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.vitals-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.vitals-grid .input,.vitals-grid .select{margin-bottom:0;font-size:13px;padding:8px 10px}
+.auth-banner{padding:12px 20px;background:var(--bg-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
+.auth-banner .user-info{display:flex;align-items:center;gap:10px}.auth-banner .user-avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
+.timing-box{text-align:center;padding:16px;background:var(--bg-tertiary);border-radius:12px}
+.timing-value{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace}.timing-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
+.freq-row{margin-bottom:8px}.freq-header{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}
+.freq-track{height:4px;background:var(--bg-tertiary);border-radius:2px}.freq-fill{height:100%;border-radius:2px}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.4);animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.hidden{display:none !important}
+/* PNG export card (rendered off-screen) */
+.png-card{position:absolute;left:-9999px;top:0;width:600px;background:#161b22;color:#e6edf3;font-family:'DM Sans','Segoe UI',sans-serif;padding:28px;border-radius:16px;border:2px solid #30363d}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}.header{padding:12px 16px}.content{padding:14px}.header-actions{width:100%}.header-actions .btn,.header-actions .btn-gcal{flex:1;justify-content:center;font-size:12px;padding:8px 10px}}
+</style>
+</head>
+<body>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<!-- firebase-firestore-compat.js is lazy-loaded by ensureFirestore() on first use -->
+
+<div id="demo-banner" class="hidden" style="background:linear-gradient(90deg,#a371f7 0%,#58a6ff 100%);color:#fff;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:500;flex-wrap:wrap"><span>🎭 <strong>Demo Mode</strong> — sample data, nothing is saved</span><button onclick="exitDemo()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer">Exit Demo</button></div>
+
+<div id="auth-banner" class="auth-banner">
+  <div id="auth-signed-out"><span style="color:var(--text-secondary)">Sign in to sync data &amp; Google Calendar</span></div>
+  <div id="auth-signed-in" class="user-info hidden"><img id="user-avatar" class="user-avatar" src="" alt=""><span id="user-name" style="font-weight:600"></span></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button id="btn-signin" class="btn-google" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.87 7.34 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>
+    <button id="btn-signout" class="btn btn-sm hidden" onclick="signOut()">Sign Out</button>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="logo">🩺</div>
+    <div><h1>Illness Tracker</h1><div class="sub">Track · Analyze · Prevent <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500" id="app-version"></span></div></div>
+  </div>
+  <div class="header-actions">
+    <button class="btn-gcal" onclick="syncAllToGCal()" id="btn-gcal" disabled>📅 Google Cal</button>
+    <button class="btn" onclick="exportICS()" id="btn-export-ics" disabled>📅 .ics</button>
+    <button class="btn" onclick="exportJSON()" id="btn-export-json" disabled>💾 JSON</button>
+    <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📂 Import</button>
+    <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
+  </div>
+</div>
+
+<div class="nav" id="nav">
+  <button class="active" data-view="dashboard" onclick="switchView('dashboard')"><span class="nav-icon">◉</span> Dashboard</button>
+  <button data-view="log" onclick="switchView('log')"><span class="nav-icon">✚</span> Log Illness</button>
+  <button data-view="history" onclick="switchView('history')"><span class="nav-icon">☰</span> History</button>
+  <button data-view="analysis" onclick="switchView('analysis')"><span class="nav-icon">◈</span> Analysis</button>
+</div>
+
+<div class="content">
+  <div id="view-dashboard"></div>
+  <div id="view-log" class="hidden"></div>
+  <div id="view-history" class="hidden"></div>
+  <div id="view-analysis" class="hidden"></div>
+</div>
+<!-- Off-screen container for PNG rendering -->
+<div id="png-render-area"></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// VERSION
+// ═══════════════════════════════════════════════
+const APP_VERSION = 'v0.42';
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let entries = [];
+let currentView = 'dashboard';
+let editingId = null;
+let firebaseReady = false;
+let currentUser = null;
+let db = null;
+let gcalAccessToken = null;
+
+// Dismissed overdue dose alerts — keyed by "entryId:vitalId"
+let dismissedDoses = new Set();
+function loadDismissed() { try { const r = localStorage.getItem('illness_dismissed_doses'); if (r) dismissedDoses = new Set(JSON.parse(r)); } catch(e) {} }
+function saveDismissed() {
+  if (demoMode) return;
+  try { localStorage.setItem('illness_dismissed_doses', JSON.stringify([...dismissedDoses])); } catch(e) {}
+  // Sync to Firestore (lazy-load firestore if it hasn't been pulled yet)
+  if (firebaseReady && currentUser) {
+    ensureFirestore().then(d => {
+      try { d.collection('users').doc(currentUser.uid).set({ dismissedDoses: [...dismissedDoses] }, { merge: true }); } catch(e) {}
+    }).catch(()=>{});
+  }
+}
+function dismissDose(key) { dismissedDoses.add(key); saveDismissed(); render(); }
+function getDoseKey(entryId, vitalId) { return entryId + ':' + vitalId; }
+loadDismissed();
+
+// Custom meds
+let customMeds = [];
+function loadCustomMeds() { try { const r = localStorage.getItem('illness_custom_meds'); if (r) customMeds = JSON.parse(r); } catch(e) {} }
+function saveCustomMeds() {
+  if (demoMode) return;
+  try { localStorage.setItem('illness_custom_meds', JSON.stringify(customMeds)); } catch(e) {}
+  if (firebaseReady && currentUser) {
+    ensureFirestore().then(d => {
+      try { d.collection('users').doc(currentUser.uid).set({ customMeds }, { merge: true }); } catch(e) {}
+    }).catch(()=>{});
+  }
+}
+function getAllMeds() {
+  const all = [...COMMON_MEDS, ...customMeds.filter(m => !COMMON_MEDS.includes(m))];
+  all.sort((a, b) => a.localeCompare(b));
+  return [...all, 'Other'];
+}
+function addCustomMed(vitalId) {
+  const input = document.getElementById('custom-med-' + vitalId);
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) { showToast('⚠️ Enter a medicine name'); return; }
+  if (!customMeds.includes(name) && !COMMON_MEDS.includes(name)) { customMeds.push(name); saveCustomMeds(); }
+  updateVital(vitalId, 'medicine', name);
+  renderVitals();
+  showToast('✅ "' + name + '" added to your medicines');
+}
+loadCustomMeds();
+
+// ═══════════════════════════════════════════════
+// DEMO MODE
+// ═══════════════════════════════════════════════
+let demoMode = false;
+let demoBackup = null;
+const DEMO_CUSTOM_MEDS = ['Mucinex DM'];
+function buildDemoEntries() {
+  const pad = n => String(n).padStart(2, '0');
+  const dt = (daysAgo, hour = 10, min = 0) => {
+    const d = new Date(Date.now() - daysAgo * 86400000);
+    d.setHours(hour, min, 0, 0);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const dateOnly = daysAgo => {
+    const d = new Date(Date.now() - daysAgo * 86400000);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  };
+  const localISO = msAgo => {
+    const d = new Date(Date.now() - msAgo);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  return [
+    { id: 'demo-active', symptomStart: dt(1, 8), recoveryDate: '', symptoms: ['Cough','Sore Throat','Congestion','Headache'], severity: 'Moderate', initialTemp: '100.4', location: 'Office/Work', locationDetails: '', activity: 'Working', contacts: ['Coworker A'], diagnosis: 'Common Cold', notes: 'Started feeling tired yesterday, full symptoms by morning.', vitals: [
+      { id:'v-a1', dateTime: localISO(5*3600e3), temperature:'100.6', spo2:'97', medicine:'Tylenol (Acetaminophen)', dosage:'500mg', doseInterval:'4', notes:'' },
+      { id:'v-a2', dateTime: localISO(1*3600e3), temperature:'99.8', spo2:'98', medicine:'DayQuil', dosage:'30ml', doseInterval:'4', notes:'' },
+    ]},
+    { id: 'demo-flu', symptomStart: dt(22, 19), recoveryDate: dateOnly(15), symptoms: ['Fever','Body Aches','Headache','Chills','Fatigue','Cough'], severity: 'Severe', initialTemp: '102.8', location: 'Social Gathering', locationDetails: 'Birthday party', activity: 'Socializing', contacts: ['Friend B','Friend C'], diagnosis: 'Flu', notes: 'Knocked me out for almost a week.', vitals: [
+      { id:'v-f1', dateTime: dt(22, 20), temperature:'103.4', spo2:'96', medicine:'Advil/Motrin (Ibuprofen)', dosage:'400mg', doseInterval:'6', notes:'' },
+      { id:'v-f2', dateTime: dt(21, 8),  temperature:'102.6', spo2:'97', medicine:'Tylenol (Acetaminophen)', dosage:'500mg', doseInterval:'6', notes:'' },
+      { id:'v-f3', dateTime: dt(20, 14), temperature:'101.4', spo2:'97', medicine:'NyQuil', dosage:'30ml', doseInterval:'8', notes:'Slept hard' },
+      { id:'v-f4', dateTime: dt(18, 10), temperature:'99.4',  spo2:'98', medicine:'', dosage:'', doseInterval:'', notes:'Fever broke overnight' },
+    ]},
+    { id: 'demo-stomach', symptomStart: dt(58, 22), recoveryDate: dateOnly(56), symptoms: ['Nausea','Vomiting','Diarrhea','Body Aches','Fatigue'], severity: 'Moderate', initialTemp: '99.6', location: 'Restaurant', locationDetails: 'Sushi place downtown', activity: 'Cooking/Eating Out', contacts: [], diagnosis: 'Food Poisoning', notes: 'Strongly suspect the sushi from the night before.', vitals: [
+      { id:'v-s1', dateTime: dt(57, 8),  temperature:'99.4', spo2:'98', medicine:'Pedialyte', dosage:'500ml', doseInterval:'', notes:'' },
+      { id:'v-s2', dateTime: dt(57, 14), temperature:'98.8', spo2:'98', medicine:'Imodium', dosage:'2mg', doseInterval:'', notes:'' },
+    ]},
+    { id: 'demo-allergies', symptomStart: dt(118, 7), recoveryDate: dateOnly(114), symptoms: ['Sneezing','Runny Nose','Eye Irritation','Congestion'], severity: 'Mild', initialTemp: '', location: 'Outdoors', locationDetails: 'Trail run', activity: 'Exercising', contacts: [], diagnosis: 'Seasonal Allergies', notes: 'High pollen count this week.', vitals: [
+      { id:'v-al1', dateTime: dt(118, 8), temperature:'', spo2:'', medicine:'Zyrtec', dosage:'10mg', doseInterval:'24', notes:'' },
+    ]},
+    { id: 'demo-cold-old', symptomStart: dt(215, 9), recoveryDate: dateOnly(210), symptoms: ['Cough','Sore Throat','Fatigue'], severity: 'Mild', initialTemp: '99.2', location: 'Office/Work', locationDetails: '', activity: 'Working', contacts: ['Coworker A'], diagnosis: 'Common Cold', notes: '', vitals: [] },
+  ];
+}
+function enterDemo() {
+  if (demoMode) return;
+  demoMode = true;
+  demoBackup = { entries: JSON.parse(JSON.stringify(entries)), customMeds: [...customMeds], dismissed: new Set(dismissedDoses) };
+  entries = buildDemoEntries();
+  customMeds = [...DEMO_CUSTOM_MEDS];
+  dismissedDoses = new Set();
+  if (history.replaceState && !location.search.includes('demo=1')) history.replaceState(null, '', '?demo=1');
+  const banner = document.getElementById('demo-banner'); if (banner) banner.classList.remove('hidden');
+  if (typeof updateAuthUI === 'function') updateAuthUI();
+  const gcal = document.getElementById('btn-gcal'); if (gcal) gcal.disabled = true;
+  switchView('dashboard');
+  showToast('🎭 Demo mode — sample data only');
+}
+function exitDemo() {
+  if (!demoMode) return;
+  demoMode = false;
+  if (demoBackup) {
+    entries = demoBackup.entries; customMeds = demoBackup.customMeds; dismissedDoses = demoBackup.dismissed;
+    demoBackup = null;
+  } else {
+    entries = []; customMeds = []; dismissedDoses = new Set();
+    loadLocal(); loadCustomMeds(); loadDismissed();
+  }
+  if (history.replaceState) history.replaceState(null, '', location.pathname);
+  const banner = document.getElementById('demo-banner'); if (banner) banner.classList.add('hidden');
+  if (typeof updateAuthUI === 'function') updateAuthUI();
+  if (currentUser && firebaseReady) loadFromFirestore();
+  else switchView('dashboard');
+}
+
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const SYMPTOMS = ["Fever","Chills","Cough","Sore Throat","Runny Nose","Congestion","Sneezing","Headache","Body Aches","Fatigue","Nausea","Vomiting","Diarrhea","Loss of Taste/Smell","Shortness of Breath","Dizziness","Ear Pain","Eye Irritation","Rash","Swollen Glands"];
+const SEVERITY = ["Mild","Moderate","Severe"];
+const LOCATIONS = ["Home","Office/Work","School","Gym","Restaurant","Public Transit","Grocery Store","Hospital/Clinic","Airport/Travel","Social Gathering","Outdoors","Other"];
+const ACTIVITIES = ["Working","Exercising","Traveling","Socializing","Cooking/Eating Out","Shopping","Commuting","Childcare","Attending Event","Other"];
+const COMMON_MEDS = ["Tylenol (Acetaminophen)","Advil/Motrin (Ibuprofen)","Aspirin","DayQuil","NyQuil","Mucinex","Robitussin","Sudafed","Benadryl","Zyrtec","Claritin","Flonase","Tamiflu","Amoxicillin","Azithromycin (Z-Pack)","Paxlovid","Pedialyte","Pepto-Bismol","Imodium","Tums","Throat Lozenges","Vitamin C","Zinc"];
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+const genId = () => Math.random().toString(36).slice(2, 11);
+const daysBetween = (a, b) => Math.round(Math.abs(new Date(a) - new Date(b)) / 86400000);
+const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '—';
+const esc = (s) => { if (typeof s !== 'string') return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+// Temperature color coding (°F)
+function tempColor(f) {
+  const n = parseFloat(f);
+  if (isNaN(n)) return 'var(--text-secondary)';
+  if (n < 97.0) return 'var(--accent)';         // below normal — cool blue
+  if (n < 99.5) return 'var(--temp-normal)';     // normal — green
+  if (n < 100.4) return 'var(--temp-low-grade)'; // low-grade — yellow
+  if (n < 103.0) return 'var(--temp-fever)';     // fever — orange
+  return 'var(--temp-high-fever)';               // high fever — red
+}
+function tempHTML(f) {
+  if (!f) return '';
+  return '<span style="color:'+tempColor(f)+';font-weight:600">'+esc(f)+'°F</span>';
+}
+
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.remove('hidden');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+function updateExportButtons() {
+  const has = entries.length > 0;
+  document.getElementById('btn-export-ics').disabled = !has;
+  document.getElementById('btn-export-json').disabled = !has;
+  document.getElementById('btn-gcal').disabled = !has || !gcalAccessToken;
+}
+
+// ═══════════════════════════════════════════════
+// DOSE TIMER HELPERS
+// ═══════════════════════════════════════════════
+function calcNextDose(dateTime, intervalHours) {
+  if (!dateTime || !intervalHours) return null;
+  const taken = new Date(dateTime);
+  if (isNaN(taken)) return null;
+  return new Date(taken.getTime() + parseFloat(intervalHours) * 3600000);
+}
+function calcDoseTimerHTML(v, entryId) {
+  const next = calcNextDose(v.dateTime, v.doseInterval);
+  if (!next) return '';
+  const now = new Date(), diff = next - now, isPast = diff <= 0, absDiff = Math.abs(diff);
+  // If overdue and dismissed, show nothing
+  if (isPast && entryId) {
+    const doseKey = getDoseKey(entryId, v.id);
+    if (dismissedDoses.has(doseKey)) return '';
+  }
+  const hrs = Math.floor(absDiff / 3600000), mins = Math.floor((absDiff % 3600000) / 60000);
+  const timeStr = next.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  const isToday = next.toDateString() === now.toDateString();
+  const isTomorrow = next.toDateString() === new Date(now.getTime() + 86400000).toDateString();
+  const dayLabel = isToday ? 'today' : isTomorrow ? 'tomorrow' : next.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  const timeText = (hrs > 0 ? hrs + 'h ' : '') + mins + 'm';
+  if (isPast) {
+    return '<div style="font-size:12px;padding:8px 12px;border-radius:8px;background:rgba(248,81,73,.1);border:1px solid rgba(248,81,73,.2);display:flex;align-items:center;gap:8px"><span style="font-size:16px">⏰</span><div><span style="color:var(--danger);font-weight:600">Next dose was due '+timeText+' ago</span><span style="color:var(--text-secondary);margin-left:8px">('+timeStr+' '+dayLabel+')</span></div></div>';
+  }
+  const urgent = diff < 3600000;
+  const bg = urgent ? 'rgba(210,153,34,.1)' : 'rgba(63,185,80,.1)';
+  const bd = urgent ? 'rgba(210,153,34,.2)' : 'rgba(63,185,80,.2)';
+  const cl = urgent ? 'var(--warning)' : 'var(--success)';
+  return '<div style="font-size:12px;padding:8px 12px;border-radius:8px;background:'+bg+';border:1px solid '+bd+';display:flex;align-items:center;gap:8px"><span style="font-size:16px">💊</span><div><span style="color:'+cl+';font-weight:600">Next dose in '+timeText+'</span><span style="color:var(--text-secondary);margin-left:8px">('+timeStr+' '+dayLabel+')</span></div></div>';
+}
+function renderDoseTimer(vitalId) {
+  const v = formVitals.find(x => x.id === vitalId);
+  const el = document.getElementById('dose-timer-' + vitalId);
+  if (v && el) el.innerHTML = calcDoseTimerHTML(v, editingId);
+}
+// Auto-refresh timers
+setInterval(() => {
+  formVitals.forEach(v => { if (v.dateTime && v.doseInterval) renderDoseTimer(v.id); });
+  if (currentView === 'dashboard' || currentView === 'history') {
+    const a = analyze();
+    if (currentView === 'dashboard') document.getElementById('view-dashboard').innerHTML = renderDashboard(a);
+    else document.getElementById('view-history').innerHTML = renderHistory();
+  }
+}, 30000);
+
+// ═══════════════════════════════════════════════
+// FIREBASE
+// ═══════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCR7AHHq8nIu_k7usHiItQCJIu_6Lo-p6A",authDomain:"illnesstracker-8d888.firebaseapp.com",
+  projectId:"illnesstracker-8d888",storageBucket:"illnesstracker-8d888.firebasestorage.app",
+  messagingSenderId:"660525580864",appId:"1:660525580864:web:ba78d04b13147a2b34d5a5",measurementId:"G-RNQ6FDPBH4"
+};
+const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events';
+
+// Lazy-load firebase-firestore-compat the first time we need Firestore.
+let _firestoreLoading = null;
+function ensureFirestore() {
+  if (db) return Promise.resolve(db);
+  if (_firestoreLoading) return _firestoreLoading;
+  _firestoreLoading = new Promise((resolve, reject) => {
+    if (typeof firebase === 'undefined') { _firestoreLoading = null; return reject(new Error('firebase not loaded')); }
+    const init = () => { try { db = firebase.firestore(); resolve(db); } catch(e) { _firestoreLoading = null; reject(e); } };
+    if (firebase.firestore) return init();
+    const s = document.createElement('script');
+    s.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
+    s.onload = init;
+    s.onerror = () => { _firestoreLoading = null; reject(new Error('firestore-compat load failed')); };
+    document.head.appendChild(s);
+  });
+  return _firestoreLoading;
+}
+function initFirebase() {
+  try {
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseReady = true;
+    // Don't init firestore here — wait until the user is signed in, then lazy-load
+    firebase.auth().onAuthStateChanged(user => {
+      currentUser = user;
+      updateAuthUI();
+      if (user) ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e));
+    });
+  } catch(e) { console.warn('Firebase init failed:', e); }
+}
+function updateAuthUI() {
+  const cu = currentUser;
+  document.getElementById('auth-signed-out').classList.toggle('hidden', !!cu);
+  document.getElementById('auth-signed-in').classList.toggle('hidden', !cu);
+  document.getElementById('btn-signin').classList.toggle('hidden', !!cu || demoMode);
+  document.getElementById('btn-signout').classList.toggle('hidden', !cu);
+  if (cu) { document.getElementById('user-avatar').src = cu.photoURL||''; document.getElementById('user-name').textContent = cu.displayName||cu.email; }
+  else gcalAccessToken = null;
+  updateExportButtons();
+}
+function signIn() {
+  if (!firebaseReady) { showToast('⚠️ Firebase not ready'); return; }
+  const p = new firebase.auth.GoogleAuthProvider();
+  p.addScope(GCAL_SCOPES);
+  firebase.auth().signInWithPopup(p).then(r => {
+    if (r.credential) { gcalAccessToken = r.credential.accessToken; updateExportButtons(); showToast('✅ Signed in — Calendar sync enabled'); }
+  }).catch(e => showToast('⚠️ Sign-in failed: ' + e.message));
+}
+function signOut() { if (!firebaseReady) return; firebase.auth().signOut(); gcalAccessToken = null; updateExportButtons(); showToast('Signed out'); }
+
+async function loadFromFirestore() {
+  if (demoMode) return;
+  if (!firebaseReady || !currentUser) return;
+  try {
+    await ensureFirestore();
+    const doc = await db.collection('users').doc(currentUser.uid).get();
+    if (doc.exists) {
+      const d = doc.data();
+      if (d.entries) {
+        const remote = d.entries, remoteIds = new Set(remote.map(e => e.id));
+        const localOnly = entries.filter(e => !remoteIds.has(e.id));
+        entries = [...remote, ...localOnly];
+        if (localOnly.length > 0) saveToFirestore();
+        saveLocal(); render();
+        showToast('✅ Data synced from cloud');
+      } else if (entries.length > 0) saveToFirestore();
+      // Sync custom meds
+      if (d.customMeds) { customMeds = [...new Set([...customMeds, ...d.customMeds])]; saveCustomMeds(); }
+      // Sync dismissed doses
+      if (d.dismissedDoses) {
+        const remoteDismissed = new Set(d.dismissedDoses);
+        const merged = new Set([...dismissedDoses, ...remoteDismissed]);
+        dismissedDoses = merged;
+        saveDismissed();
+        render();
+      }
+    }
+  } catch(e) { console.error('Firestore load error:', e); }
+}
+async function saveToFirestore() {
+  if (demoMode) return;
+  if (!firebaseReady || !currentUser) return;
+  try {
+    await ensureFirestore();
+    await db.collection('users').doc(currentUser.uid).set({
+      entries, customMeds, dismissedDoses: [...dismissedDoses],
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(e) { console.error('Firestore save error:', e); }
+}
+
+// ═══════════════════════════════════════════════
+// GOOGLE CALENDAR SYNC
+// ═══════════════════════════════════════════════
+async function syncToGCal(entry) {
+  if (!gcalAccessToken) { showToast('⚠️ Sign in first'); return; }
+  const startDT = entry.symptomStart.includes('T') ? entry.symptomStart : entry.symptomStart+'T08:00:00';
+  const endDT = entry.recoveryDate ? entry.recoveryDate+'T23:59:00' : startDT;
+  const vitalsLog = (entry.vitals||[]).map(v => {
+    let p = [];
+    if (v.temperature) p.push('Temp: '+v.temperature+'°F');
+    if (v.spo2) p.push('SpO2: '+v.spo2+'%');
+    if (v.medicine) p.push('Med: '+v.medicine+(v.dosage?' ('+v.dosage+')':'')+(v.doseInterval?' every '+v.doseInterval+'h':''));
+    return fmtDateTime(v.dateTime)+': '+p.join(', ');
+  }).join('\n');
+  const body = {
+    summary:'🤒 '+(entry.diagnosis||'Illness'),
+    description:'Symptoms: '+(entry.symptoms||[]).join(', ')+'\nSeverity: '+entry.severity+(entry.temperature?'\nTemp: '+entry.temperature+'°F':'')+'\nLocation: '+(entry.location||'')+(entry.locationDetail?' — '+entry.locationDetail:'')+(entry.notes?'\nNotes: '+entry.notes:'')+(vitalsLog?'\n\nVitals/Medicine Log:\n'+vitalsLog:''),
+    location:entry.locationDetail||entry.location||'',
+    start:{dateTime:new Date(startDT).toISOString(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone},
+    end:{dateTime:new Date(endDT).toISOString(),timeZone:Intl.DateTimeFormat().resolvedOptions().timeZone}
+  };
+  try {
+    const r = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events',{method:'POST',headers:{'Authorization':'Bearer '+gcalAccessToken,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if (r.ok) showToast('✅ Synced to Google Calendar');
+    else if (r.status===401){gcalAccessToken=null;updateExportButtons();showToast('⚠️ Session expired — sign in again');}
+    else{const e=await r.json();showToast('⚠️ '+(e.error?.message||r.status));}
+  } catch(e){showToast('⚠️ Sync failed: '+e.message);}
+}
+async function syncAllToGCal(){if(!gcalAccessToken){showToast('⚠️ Sign in first');return;}showToast('⏳ Syncing...');let ok=0;for(const e of entries){try{await syncToGCal(e);ok++;}catch{}await new Promise(r=>setTimeout(r,300));}showToast('✅ Synced '+ok+' events');}
+
+// ═══════════════════════════════════════════════
+// LOCAL STORAGE & EXPORT/IMPORT
+// ═══════════════════════════════════════════════
+function saveLocal(){if(demoMode)return;try{localStorage.setItem('illness_entries',JSON.stringify(entries));}catch(e){}}
+function loadLocal(){try{const r=localStorage.getItem('illness_entries');if(r)entries=JSON.parse(r);}catch(e){}}
+function persist(){saveLocal();saveToFirestore();updateExportButtons();}
+
+function createICSEvent(e){
+  const start=e.symptomStart.replace(/[-:]/g,'').split('T').join('T')+'00';
+  const end=e.recoveryDate?e.recoveryDate.replace(/-/g,'')+'T235959':start;
+  const meds=(e.vitals||[]).filter(v=>v.medicine).map(v=>v.medicine+(v.dosage?' ('+v.dosage+')':'')+(v.doseInterval?' every '+v.doseInterval+'h':'')).join(', ');
+  return 'BEGIN:VEVENT\r\nDTSTART:'+start+'\r\nDTEND:'+end+'\r\nSUMMARY:🤒 '+(e.diagnosis||'Illness')+'\r\nDESCRIPTION:Symptoms: '+(e.symptoms||[]).join(', ')+(meds?'\\nMedicine: '+meds:'')+'\\nSeverity: '+e.severity+'\r\nLOCATION:'+(e.locationDetail||e.location)+'\r\nUID:'+e.id+'@illnesstracker\r\nEND:VEVENT';
+}
+function exportICS(){dl(new Blob(['BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//IllnessTracker//EN\r\nCALSCALE:GREGORIAN\r\n'+entries.map(createICSEvent).join('\r\n')+'\r\nEND:VCALENDAR'],{type:'text/calendar'}),'illness-log-'+APP_VERSION+'.ics');}
+function exportJSON(){dl(new Blob([JSON.stringify(entries,null,2)],{type:'application/json'}),'illness-data-'+APP_VERSION+'.json');}
+function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
+function importJSON(evt){
+  const f=evt.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=(e)=>{try{const d=JSON.parse(e.target.result);if(Array.isArray(d)){entries=[...d.filter(x=>!new Set(entries.map(e=>e.id)).has(x.id)),...entries];persist();render();showToast('✅ Imported');}}catch{showToast('⚠️ Invalid JSON');}};
+  r.readAsText(f);evt.target.value='';
+}
+
+// ═══════════════════════════════════════════════
+// PNG EXPORT PER ILLNESS
+// ═══════════════════════════════════════════════
+// Lazy-load html2canvas the first time PNG export is invoked
+let _h2cLoading = null;
+function loadHtml2Canvas() {
+  if (typeof html2canvas === 'function') return Promise.resolve();
+  if (_h2cLoading) return _h2cLoading;
+  _h2cLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload = resolve;
+    s.onerror = () => { _h2cLoading = null; reject(new Error('html2canvas load failed')); };
+    document.head.appendChild(s);
+  });
+  return _h2cLoading;
+}
+async function exportPNG(entryId) {
+  const e = entries.find(x => x.id === entryId);
+  if (!e) return;
+  showToast('⏳ Generating PNG...');
+  try { await loadHtml2Canvas(); } catch(err) { showToast('⚠️ PNG export failed to load'); return; }
+  const area = document.getElementById('png-render-area');
+  const vitalsRows = (e.vitals||[]).map(v => {
+    let parts = [];
+    if (v.temperature) parts.push('🌡 '+tempHTML(v.temperature));
+    if (v.spo2) parts.push('💨 SpO2: '+v.spo2+'%');
+    if (v.medicine) parts.push('<span class="chip-med">'+esc(v.medicine)+(v.dosage?' · '+esc(v.dosage):'')+(v.doseInterval?' · every '+esc(v.doseInterval)+'h':'')+'</span>');
+    return '<div style="font-size:13px;margin-bottom:6px;display:flex;flex-wrap:wrap;align-items:center;gap:8px"><span style="color:#8b949e;font-family:JetBrains Mono,monospace;font-size:11px;min-width:130px">'+fmtDateTime(v.dateTime)+'</span>'+parts.join('')+'</div>';
+  }).join('');
+  area.innerHTML = '<div class="png-card" id="png-target">'
+    + '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><div style="width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,#58a6ff,#a371f7);display:flex;align-items:center;justify-content:center;font-size:16px">🩺</div><div><div style="font-size:18px;font-weight:700">'+esc(e.diagnosis||'Undiagnosed Illness')+'</div><div style="font-size:12px;color:#8b949e">'+fmtDate(e.symptomStart)+(e.recoveryDate?' → '+fmtDate(e.recoveryDate)+' ('+daysBetween(e.symptomStart,e.recoveryDate)+'d)':'')+'</div></div></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">'+(e.symptoms||[]).map(s=>'<span style="padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(88,166,255,.12);color:#58a6ff">'+esc(s)+'</span>').join('')+'</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:13px;margin-bottom:12px">'
+    + '<div><span style="color:#8b949e">Severity:</span> '+esc(e.severity)+(e.temperature?' · '+tempHTML(e.temperature):'')+'</div>'
+    + '<div><span style="color:#8b949e">Location:</span> '+esc(e.location)+(e.locationDetail?' — '+esc(e.locationDetail):'')+'</div>'
+    + (e.activity?'<div><span style="color:#8b949e">Activity:</span> '+esc(e.activity)+'</div>':'')
+    + (e.contacts&&e.contacts.length?'<div><span style="color:#8b949e">Contacts:</span> '+esc(e.contacts.join(', '))+'</div>':'')
+    + '</div>'
+    + (e.notes?'<div style="font-size:12px;color:#8b949e;font-style:italic;margin-bottom:12px">"'+esc(e.notes)+'"</div>':'')
+    + (vitalsRows?'<div style="border-top:1px solid #30363d;padding-top:10px;margin-top:4px"><div style="font-size:12px;font-weight:600;color:#a371f7;margin-bottom:8px">💊 Medicine & Vitals</div>'+vitalsRows+'</div>':'')
+    + '<div style="margin-top:12px;font-size:10px;color:#484f58;text-align:right">Illness Tracker '+APP_VERSION+'</div>'
+    + '</div>';
+  await new Promise(r => setTimeout(r, 100));
+  try {
+    const canvas = await html2canvas(document.getElementById('png-target'), { backgroundColor: '#161b22', scale: 2 });
+    canvas.toBlob(blob => {
+      const name = (e.diagnosis||'illness').replace(/[^a-zA-Z0-9]/g,'-').toLowerCase();
+      dl(blob, name+'-'+fmtDate(e.symptomStart).replace(/[^a-zA-Z0-9]/g,'-')+'-'+APP_VERSION+'.png');
+      area.innerHTML = '';
+      showToast('✅ PNG saved');
+    });
+  } catch(err) { showToast('⚠️ PNG export failed'); area.innerHTML = ''; }
+}
+
+// ═══════════════════════════════════════════════
+// ANALYSIS ENGINE
+// ═══════════════════════════════════════════════
+function analyze(){
+  if(entries.length<1)return null;
+  const sf={},lf={},cf={},af={},mf={},df={},medf={},gaps=[];
+  const sorted=[...entries].sort((a,b)=>new Date(a.symptomStart)-new Date(b.symptomStart));
+  sorted.forEach((e,i)=>{
+    (e.symptoms||[]).forEach(s=>sf[s]=(sf[s]||0)+1);
+    if(e.location)lf[e.location]=(lf[e.location]||0)+1;
+    if(e.activity)af[e.activity]=(af[e.activity]||0)+1;
+    const mo=new Date(e.symptomStart).toLocaleString('en-US',{month:'long'});mf[mo]=(mf[mo]||0)+1;
+    const dow=new Date(e.symptomStart).toLocaleString('en-US',{weekday:'long'});df[dow]=(df[dow]||0)+1;
+    (e.contacts||[]).forEach(c=>{const n=c.toLowerCase().trim();if(n)cf[n]=(cf[n]||0)+1;});
+    (e.vitals||[]).forEach(v=>{if(v.medicine)medf[v.medicine]=(medf[v.medicine]||0)+1;});
+    if(i>0)gaps.push(daysBetween(e.symptomStart,sorted[i-1].symptomStart));
+  });
+  const top=(o,n)=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,n);
+  const topS=top(sf,5),topL=top(lf,3),topC=top(cf,3),topA=top(af,3),topMed=top(medf,5);
+  const peakM=top(mf,1)[0],peakD=top(df,1)[0];
+  const avgGap=gaps.length?Math.round(gaps.reduce((a,b)=>a+b,0)/gaps.length):null;
+  const withRec=sorted.filter(e=>e.recoveryDate);
+  const avgDur=withRec.length?Math.round(withRec.reduce((s,e)=>s+daysBetween(e.symptomStart,e.recoveryDate),0)/withRec.length):null;
+  const risks=[],n=entries.length;
+  if(topL.length&&topL[0][1]>=2)risks.push({factor:'Recurring location: '+topL[0][0],score:Math.min(topL[0][1]/n,1),detail:topL[0][1]+' of '+n+' illnesses at "'+topL[0][0]+'"'});
+  if(topC.length&&topC[0][1]>=2)risks.push({factor:'Recurring contact: '+topC[0][0],score:Math.min(topC[0][1]/n,1),detail:'"'+topC[0][0]+'" near you during '+topC[0][1]+' events'});
+  if(peakM&&peakM[1]>=2)risks.push({factor:'Seasonal: '+peakM[0],score:Math.min(peakM[1]/n,1),detail:peakM[1]+' illnesses in '+peakM[0]});
+  if(topA.length&&topA[0][1]>=2)risks.push({factor:'Activity: '+topA[0][0],score:Math.min(topA[0][1]/n,1),detail:'"'+topA[0][0]+'" before '+topA[0][1]+' events'});
+  if(avgGap!==null&&avgGap<30)risks.push({factor:'Frequent illness cycle',score:Math.min(1,30/(avgGap||1)*.3),detail:'Avg gap only '+avgGap+' days'});
+  risks.sort((a,b)=>b.score-a.score);
+  return{total:n,topS,topL,topC,topA,topMed,peakM,peakD,avgGap,avgDur,risks};
+}
+
+// ═══════════════════════════════════════════════
+// VIEW SWITCHING
+// ═══════════════════════════════════════════════
+function switchView(v){
+  currentView=v;
+  ['dashboard','log','history','analysis'].forEach(id=>document.getElementById('view-'+id).classList.toggle('hidden',id!==v));
+  document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===v));
+  if(v!=='log')editingId=null;
+  render();
+}
+// Navigate to history and scroll to a specific entry
+function goToEntry(entryId){
+  switchView('history');
+  setTimeout(()=>{const el=document.getElementById('entry-'+entryId);if(el){el.scrollIntoView({behavior:'smooth',block:'start'});el.style.boxShadow='0 0 0 2px var(--accent)';setTimeout(()=>el.style.boxShadow='',2000);}},50);
+}
+
+// ═══════════════════════════════════════════════
+// FORM
+// ═══════════════════════════════════════════════
+let formSymptoms=[];
+let formVitals=[];
+
+function toggleSymptom(s){const i=formSymptoms.indexOf(s);if(i>=0)formSymptoms.splice(i,1);else formSymptoms.push(s);renderSymptomTags();}
+function renderSymptomTags(){const c=document.getElementById('symptom-tags');if(!c)return;c.innerHTML=SYMPTOMS.map(s=>'<button class="tag '+(formSymptoms.includes(s)?'active':'')+'" onclick="toggleSymptom(\''+s.replace(/'/g,"\\'")+'\')">'+esc(s)+'</button>').join('');}
+function addContact(){const c=document.getElementById('contacts-list');const row=document.createElement('div');row.className='contact-row';row.innerHTML='<input class="input" style="margin-bottom:0" placeholder="Contact '+(c.children.length+1)+'" data-contact><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">×</button>';c.appendChild(row);}
+
+function addVitalEntry(){formVitals.push({id:genId(),dateTime:'',temperature:'',spo2:'',medicine:'',dosage:'',doseInterval:'',notes:''});renderVitals();}
+function removeVitalEntry(id){formVitals=formVitals.filter(v=>v.id!==id);renderVitals();}
+function updateVital(id,field,value){
+  const v=formVitals.find(x=>x.id===id);
+  if(v){v[field]=value;if(field==='medicine'&&value==='Other'){v.medicine='Other';renderVitals();}}
+}
+function renderVitals(){
+  const c=document.getElementById('vitals-list');if(!c)return;
+  const meds=getAllMeds();
+  const medOpts=meds.map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join('');
+  c.innerHTML=formVitals.map((v,i)=>{
+    const isOther=v.medicine==='Other';
+    return '<div class="vitals-entry" data-vital-id="'+v.id+'"><div class="vitals-header"><span style="font-size:13px;font-weight:600;color:var(--accent-purple)">💊 Entry '+(i+1)+'</span><button class="btn btn-sm btn-danger" onclick="removeVitalEntry(\''+v.id+'\')">×</button></div>'
+    +'<div style="margin-bottom:8px"><label class="label" style="font-size:10px">Date/Time</label><input class="input" style="margin-bottom:0" type="datetime-local" value="'+esc(v.dateTime)+'" onchange="updateVital(\''+v.id+'\',\'dateTime\',this.value)"></div>'
+    +'<div class="vitals-grid"><div><label class="label" style="font-size:10px">Temp (°F)</label><input class="input" type="number" step="0.1" placeholder="101.2" value="'+esc(v.temperature)+'" onchange="updateVital(\''+v.id+'\',\'temperature\',this.value)"></div><div><label class="label" style="font-size:10px">SpO2 (%)</label><input class="input" type="number" min="0" max="100" placeholder="98" value="'+esc(v.spo2)+'" onchange="updateVital(\''+v.id+'\',\'spo2\',this.value)"></div></div>'
+    +'<div class="vitals-grid" style="margin-top:8px"><div><label class="label" style="font-size:10px">Medicine</label><select class="select" style="margin-bottom:0" onchange="updateVital(\''+v.id+'\',\'medicine\',this.value)"><option value="">Select...</option>'+medOpts+'</select></div><div><label class="label" style="font-size:10px">Dosage</label><input class="input" placeholder="e.g. 500mg" value="'+esc(v.dosage)+'" onchange="updateVital(\''+v.id+'\',\'dosage\',this.value)"></div><div><label class="label" style="font-size:10px">Every (hours)</label><input class="input" type="number" min="1" max="72" step="0.5" placeholder="e.g. 4" value="'+esc(v.doseInterval)+'" onchange="updateVital(\''+v.id+'\',\'doseInterval\',this.value);renderDoseTimer(\''+v.id+'\')"></div><div><label class="label" style="font-size:10px">Note</label><input class="input" placeholder="Optional" value="'+esc(v.notes)+'" onchange="updateVital(\''+v.id+'\',\'notes\',this.value)"></div></div>'
+    +'<div id="dose-timer-'+v.id+'" style="margin-top:6px">'+calcDoseTimerHTML(v, editingId)+'</div>'
+    +(isOther?'<div style="margin-top:8px;display:flex;gap:8px;align-items:flex-end"><div style="flex:1"><label class="label" style="font-size:10px">Custom Medicine Name</label><input class="input" style="margin-bottom:0" id="custom-med-'+v.id+'" placeholder="Enter medicine name..." onkeydown="if(event.key===\'Enter\'){event.preventDefault();addCustomMed(\''+v.id+'\')}"></div><button class="btn btn-sm btn-accent" style="height:38px;white-space:nowrap" onclick="addCustomMed(\''+v.id+'\')">+ Add</button></div>':'')
+    +'</div>';
+  }).join('');
+  formVitals.forEach(v=>{if(v.medicine){const el=c.querySelector('[data-vital-id="'+v.id+'"] select');if(el){const has=[...el.options].some(o=>o.value===v.medicine);if(has)el.value=v.medicine;}}});
+}
+
+function submitForm(){
+  const f=(id)=>document.getElementById(id)?.value||'';
+  const symptomStart=f('f-start');
+  if(!symptomStart||formSymptoms.length===0){showToast('⚠️ Add a start date and at least one symptom');return;}
+  const contacts=[...document.querySelectorAll('[data-contact]')].map(i=>i.value).filter(c=>c.trim());
+  const entry={
+    id:editingId||genId(),symptomStart,recoveryDate:f('f-recovery'),
+    symptoms:[...formSymptoms],severity:f('f-severity')||'Mild',temperature:f('f-temp'),
+    location:f('f-location'),locationDetail:f('f-location-detail'),activity:f('f-activity'),
+    contacts,diagnosis:f('f-diagnosis'),notes:f('f-notes'),
+    vitals:formVitals.filter(v=>v.dateTime||v.temperature||v.spo2||v.medicine),
+    createdAt:new Date().toISOString()
+  };
+  if(editingId){entries=entries.map(e=>e.id===editingId?entry:e);showToast('✅ Updated');}
+  else{entries.unshift(entry);showToast('✅ Illness logged');}
+  editingId=null;formSymptoms=[];formVitals=[];
+  persist();switchView('history');
+}
+
+function editEntry(id){
+  const e=entries.find(x=>x.id===id);if(!e)return;
+  editingId=id;formSymptoms=[...(e.symptoms||[])];
+  formVitals=(e.vitals||[]).map(v=>({...v,id:v.id||genId()}));
+  switchView('log');
+  setTimeout(()=>{
+    const sv=(s,v)=>{const el=document.getElementById(s);if(el)el.value=v||'';};
+    sv('f-start',e.symptomStart);sv('f-recovery',e.recoveryDate);sv('f-severity',e.severity);
+    sv('f-temp',e.temperature);sv('f-location',e.location);sv('f-location-detail',e.locationDetail);
+    sv('f-activity',e.activity);sv('f-diagnosis',e.diagnosis);sv('f-notes',e.notes);
+    renderSymptomTags();renderVitals();
+    const cl=document.getElementById('contacts-list');cl.innerHTML='';
+    (e.contacts&&e.contacts.length?e.contacts:['']).forEach((c,i)=>{
+      const row=document.createElement('div');row.className='contact-row';
+      row.innerHTML='<input class="input" style="margin-bottom:0" placeholder="Contact '+(i+1)+'" data-contact value="'+esc(c)+'">'+(i>0?'<button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">×</button>':'');
+      cl.appendChild(row);
+    });
+  },0);
+}
+function deleteEntry(id){entries=entries.filter(e=>e.id!==id);persist();render();showToast('🗑️ Deleted');}
+
+// ═══════════════════════════════════════════════
+// RENDER FUNCTIONS
+// ═══════════════════════════════════════════════
+function render(){
+  updateExportButtons();const a=analyze();
+  document.getElementById('view-dashboard').innerHTML=renderDashboard(a);
+  if(currentView==='log'){
+    document.getElementById('view-log').innerHTML=renderLogForm();
+    renderSymptomTags();renderVitals();
+    if(!editingId){const cl=document.getElementById('contacts-list');if(cl&&cl.children.length===0){const row=document.createElement('div');row.className='contact-row';row.innerHTML='<input class="input" style="margin-bottom:0" placeholder="Contact 1" data-contact>';cl.appendChild(row);}}
+  }
+  document.getElementById('view-history').innerHTML=renderHistory();
+  document.getElementById('view-analysis').innerHTML=renderAnalysis(a);
+}
+
+function riskBarHTML(score,label){const pct=Math.round(score*100);const color=pct>66?'#e74c3c':pct>33?'#f39c12':'#27ae60';return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px;color:var(--text-secondary)"><span>'+esc(label)+'</span><span style="color:'+color+';font-weight:700">'+pct+'%</span></div><div class="risk-bar-track"><div class="risk-bar-fill" style="width:'+pct+'%;background:'+color+'"></div></div></div>';}
+function freqBarHTML(name,count,total,color){return '<div class="freq-row"><div class="freq-header"><span style="color:var(--text-secondary)">'+esc(name)+'</span><span style="font-family:\'JetBrains Mono\';color:'+color+'">'+count+'</span></div><div class="freq-track"><div class="freq-fill" style="width:'+(count/total*100)+'%;background:'+color+'"></div></div></div>';}
+
+// ── Upcoming doses ──
+function getUpcomingDoses(){
+  const now=new Date(),doses=[];
+  entries.forEach(e=>{(e.vitals||[]).forEach((v,vi)=>{
+    if(!v.medicine||!v.dateTime||!v.doseInterval)return;
+    const next=calcNextDose(v.dateTime,v.doseInterval);if(!next)return;
+    const diff=next-now;if(diff>24*3600000||diff< -24*3600000)return;
+    const doseKey=getDoseKey(e.id,v.id||vi),isPast=diff<=0;
+    if(isPast&&dismissedDoses.has(doseKey))return;
+    doses.push({medicine:v.medicine,dosage:v.dosage,interval:v.doseInterval,nextDose:next,diff,isPast,diagnosis:e.diagnosis||'Illness',doseKey});
+  });});
+  doses.sort((a,b)=>{if(a.isPast&&!b.isPast)return -1;if(!a.isPast&&b.isPast)return 1;return a.nextDose-b.nextDose;});
+  return doses;
+}
+function renderUpcomingDosesCard(){
+  const doses=getUpcomingDoses();if(!doses.length)return '';
+  return '<div class="card"><h3 style="font-size:16px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px"><span style="color:var(--accent-purple)">💊</span> Upcoming Doses</h3>'
+  +doses.map(d=>{
+    const now=new Date(),absDiff=Math.abs(d.diff),hrs=Math.floor(absDiff/3600000),mins=Math.floor((absDiff%3600000)/60000);
+    const timeStr=d.nextDose.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    const isToday=d.nextDose.toDateString()===now.toDateString();
+    const isTmrw=d.nextDose.toDateString()===new Date(now.getTime()+86400000).toDateString();
+    const dayL=isToday?'today':isTmrw?'tomorrow':d.nextDose.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+    const tt=(hrs>0?hrs+'h ':'')+mins+'m';
+    let bg,bd,si,st,sc;
+    if(d.isPast){bg='rgba(248,81,73,.08)';bd='rgba(248,81,73,.2)';si='⏰';st='Overdue by '+tt;sc='var(--danger)';}
+    else if(d.diff<3600000){bg='rgba(210,153,34,.08)';bd='rgba(210,153,34,.2)';si='⚠';st='Due in '+tt;sc='var(--warning)';}
+    else{bg='rgba(63,185,80,.08)';bd='rgba(63,185,80,.2)';si='💊';st='Due in '+tt;sc='var(--success)';}
+    return '<div style="padding:12px;border-radius:10px;background:'+bg+';border:1px solid '+bd+';margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><div style="font-weight:600;font-size:14px;color:var(--accent-purple)">'+esc(d.medicine)+(d.dosage?' <span style="font-weight:400;color:var(--text-secondary)">· '+esc(d.dosage)+'</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary);margin-top:2px">Every '+esc(d.interval)+'h · for '+esc(d.diagnosis)+'</div></div><div style="text-align:right;display:flex;align-items:center;gap:8px"><div><div style="font-size:13px;font-weight:600;color:'+sc+'">'+si+' '+st+'</div><div style="font-size:11px;color:var(--text-secondary)">'+timeStr+' '+dayL+'</div></div>'+(d.isPast?'<button class="btn btn-sm" style="color:var(--text-secondary);border-color:var(--border);padding:4px 10px;font-size:11px" onclick="event.stopPropagation();dismissDose(\''+d.doseKey+'\')" title="Dismiss">✕</button>':'')+'</div></div>';
+  }).join('')+'</div>';
+}
+
+// ── Dashboard ──
+function renderDashboard(a){
+  const stats='<div class="stats-grid">'+[
+    {l:'Total Illnesses',v:entries.length,c:'var(--accent)'},
+    {l:'Avg Duration',v:a?.avgDur?a.avgDur+'d':'—',c:'var(--accent-warm)'},
+    {l:'Avg Gap',v:a?.avgGap?a.avgGap+'d':'—',c:'var(--success)'},
+    {l:'Risk Factors',v:a?.risks.length||0,c:'var(--warning)'}
+  ].map(s=>'<div class="card stat-card"><div class="stat-value" style="color:'+s.c+'">'+s.v+'</div><div class="stat-label">'+s.l+'</div></div>').join('')+'</div>';
+  if(!entries.length)return stats+'<div class="card" style="text-align:center;padding:48px"><div style="font-size:48px;margin-bottom:16px">🏥</div><h2 style="font-size:20px;font-weight:600;margin-bottom:8px">No illnesses logged yet</h2><p style="color:var(--text-secondary);margin-bottom:20px">Start tracking to uncover patterns — or take a quick tour first.</p><div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn-primary" style="min-width:240px" onclick="switchView(\'log\')">Log Your First Illness</button><button class="btn btn-outline" style="min-width:160px" onclick="enterDemo()">🎭 Try a Demo</button></div></div>';
+  const dosesHTML=renderUpcomingDosesCard();
+  let riskHTML='';
+  if(a&&a.risks.length)riskHTML='<div class="card"><h3 style="font-size:16px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:8px"><span style="color:var(--warning)">⚠</span> Top Risk Factors</h3>'+a.risks.map(r=>riskBarHTML(r.score,r.factor)+'<div style="font-size:12px;color:var(--text-secondary);margin:-6px 0 12px 4px">'+esc(r.detail)+'</div>').join('')+'</div>';
+  const recent=[...entries].sort((a,b)=>new Date(b.symptomStart)-new Date(a.symptomStart)).slice(0,3);
+  const recentHTML='<div class="card"><h3 style="font-size:16px;font-weight:600;margin-bottom:16px">Recent Illnesses</h3>'+recent.map(e=>'<div class="entry-row clickable" onclick="goToEntry(\''+e.id+'\')"><div><div style="font-weight:600;font-size:14px">'+esc(e.diagnosis||'Undiagnosed')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.symptomStart)+' · '+esc(e.severity)+(e.temperature?' · '+tempHTML(e.temperature):'')+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap">'+(e.symptoms||[]).slice(0,3).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+((e.symptoms||[]).length>3?'<span style="font-size:11px;color:var(--text-secondary);padding:3px 6px">+'+(e.symptoms.length-3)+'</span>':'')+'</div></div>').join('')+'</div>';
+  return stats+dosesHTML+riskHTML+recentHTML;
+}
+
+// ── Log Form ──
+function renderLogForm(){
+  const selOpts=(arr)=>arr.map(o=>'<option value="'+esc(o)+'">'+esc(o)+'</option>').join('');
+  return '<h2 style="font-size:20px;font-weight:700;margin-bottom:20px">'+(editingId?'Edit Illness Entry':'Log New Illness')+'</h2>'
+  +'<div class="card"><h3 class="section-title">📅 When</h3><div class="grid-2"><div><label class="label">Symptom Start *</label><input class="input" type="datetime-local" id="f-start"></div><div><label class="label">Recovery Date</label><input class="input" type="date" id="f-recovery"></div></div></div>'
+  +'<div class="card"><h3 class="section-title">🤒 Symptoms *</h3><div id="symptom-tags" class="tag-grid"></div><div class="grid-2"><div><label class="label">Severity</label><select class="select" id="f-severity"><option value="">Select...</option>'+selOpts(SEVERITY)+'</select></div><div><label class="label">Initial Temp (°F)</label><input class="input" type="number" step="0.1" placeholder="e.g. 101.2" id="f-temp"></div></div></div>'
+  +'<div class="card"><h3 class="section-title" style="color:var(--accent-purple)">💊 Medicine &amp; Vitals Log</h3><p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Track each dose of medicine, temperature, and SpO2 over time.</p><div id="vitals-list"></div><button class="btn" style="border-style:dashed;margin-top:4px" onclick="addVitalEntry()">+ Add Medicine / Vitals Entry</button></div>'
+  +'<div class="card"><h3 class="section-title">📍 Where &amp; What</h3><label class="label">General Location</label><select class="select" id="f-location"><option value="">Select...</option>'+selOpts(LOCATIONS)+'</select><label class="label">Specific Location Details</label><input class="input" placeholder="e.g. Trader Joe\'s on Clark St" id="f-location-detail"><label class="label">What were you doing?</label><select class="select" id="f-activity"><option value="">Select...</option>'+selOpts(ACTIVITIES)+'</select></div>'
+  +'<div class="card"><h3 class="section-title">👥 People Nearby</h3><p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">Anyone sick near you or in close contact before symptoms.</p><div id="contacts-list"></div><button class="btn" style="border-style:dashed;margin-top:4px" onclick="addContact()">+ Add Contact</button></div>'
+  +'<div class="card"><h3 class="section-title">📝 Details</h3><label class="label">Diagnosis (if known)</label><input class="input" placeholder="e.g. Cold, Flu, COVID, Strep" id="f-diagnosis"><label class="label">Notes</label><textarea class="input textarea" rows="3" placeholder="Stress, sleep quality, travel..." id="f-notes"></textarea></div>'
+  +'<div style="display:flex;gap:12px"><button class="btn-primary" onclick="submitForm()">'+(editingId?'Update Entry':'Save Entry')+'</button>'+(editingId?'<button class="btn" style="padding:14px 20px;font-size:14px;cursor:pointer;font-family:inherit" onclick="editingId=null;formSymptoms=[];formVitals=[];switchView(\'log\')">Cancel</button>':'')+'</div>';
+}
+
+// ── History Vitals ──
+function renderVitalsInHistory(vitals,entryId){
+  if(!vitals||!vitals.length)return '';
+  return '<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)"><div style="font-size:12px;font-weight:600;color:var(--accent-purple);margin-bottom:8px">💊 Medicine &amp; Vitals Log</div>'
+  +vitals.map((v,vi)=>{
+    let parts=[];
+    if(v.temperature)parts.push('<span>🌡 '+tempHTML(v.temperature)+'</span>');
+    if(v.spo2)parts.push('<span style="color:var(--accent)">💨 SpO2: '+esc(v.spo2)+'%</span>');
+    if(v.medicine)parts.push('<span class="chip-med">'+esc(v.medicine)+(v.dosage?' · '+esc(v.dosage):'')+(v.doseInterval?' · every '+esc(v.doseInterval)+'h':'')+'</span>');
+    if(v.notes)parts.push('<span style="color:var(--text-secondary);font-style:italic">'+esc(v.notes)+'</span>');
+    let doseLine='';
+    const next=calcNextDose(v.dateTime,v.doseInterval);
+    if(next){
+      const doseKey=getDoseKey(entryId,v.id||vi),now=new Date(),diff=next-now,isPast=diff<=0;
+      if(isPast&&dismissedDoses.has(doseKey)){/* dismissed */}
+      else{
+        const absDiff=Math.abs(diff),hrs=Math.floor(absDiff/3600000),mins=Math.floor((absDiff%3600000)/60000);
+        const timeStr=next.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+        const isToday=next.toDateString()===now.toDateString();const isTmrw=next.toDateString()===new Date(now.getTime()+86400000).toDateString();
+        const dayL=isToday?'today':isTmrw?'tomorrow':next.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+        const tt=(hrs>0?hrs+'h ':'')+mins+'m';
+        let bg,bd,ic,tx,tc;
+        if(isPast){bg='rgba(248,81,73,.08)';bd='rgba(248,81,73,.15)';ic='⏰';tx='Overdue by '+tt;tc='var(--danger)';}
+        else if(diff<3600000){bg='rgba(210,153,34,.08)';bd='rgba(210,153,34,.15)';ic='⚠';tx='Next dose in '+tt;tc='var(--warning)';}
+        else{bg='rgba(63,185,80,.08)';bd='rgba(63,185,80,.15)';ic='💊';tx='Next dose in '+tt;tc='var(--success)';}
+        doseLine='<div style="margin-top:4px;display:flex;align-items:center;gap:6px"><div style="padding:6px 10px;border-radius:8px;background:'+bg+';border:1px solid '+bd+';font-size:12px;display:inline-flex;align-items:center;gap:6px"><span>'+ic+'</span><span style="font-weight:600;color:'+tc+'">'+tx+'</span><span style="color:var(--text-secondary)">· '+timeStr+' '+dayL+'</span></div>'+(isPast?'<button class="btn btn-sm" style="color:var(--text-secondary);border-color:var(--border);padding:3px 8px;font-size:11px" onclick="event.stopPropagation();dismissDose(\''+doseKey+'\')" title="Dismiss">✕</button>':'')+'</div>';
+      }
+    }
+    return '<div style="margin-bottom:10px"><div style="font-size:12px;display:flex;flex-wrap:wrap;align-items:center;gap:8px"><span style="color:var(--text-secondary);font-family:\'JetBrains Mono\';font-size:11px;min-width:130px">'+fmtDateTime(v.dateTime)+'</span>'+parts.join('')+'</div>'+doseLine+'</div>';
+  }).join('')+'</div>';
+}
+
+// ── History ──
+function renderHistory(){
+  if(!entries.length)return '<h2 style="font-size:20px;font-weight:700;margin-bottom:20px">Illness History</h2><div class="card" style="text-align:center;padding:40px"><p style="color:var(--text-secondary)">No entries yet.</p></div>';
+  const sorted=[...entries].sort((a,b)=>new Date(b.symptomStart)-new Date(a.symptomStart));
+  return '<h2 style="font-size:20px;font-weight:700;margin-bottom:20px">Illness History</h2>'
+  +sorted.map(e=>'<div class="card" id="entry-'+e.id+'"><div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px"><div><div style="font-size:17px;font-weight:700">'+esc(e.diagnosis||'Undiagnosed Illness')+'</div><div style="font-size:13px;color:var(--text-secondary);margin-top:4px">'+fmtDate(e.symptomStart)+(e.recoveryDate?' → '+fmtDate(e.recoveryDate)+' ('+daysBetween(e.symptomStart,e.recoveryDate)+'d)':'')+'</div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+  +'<button class="btn btn-sm" style="color:var(--accent-purple)" onclick="exportPNG(\''+e.id+'\')" title="Export as PNG">📸</button>'
+  +(gcalAccessToken?'<button class="btn btn-sm" style="color:#4285F4" onclick="syncToGCal(entries.find(x=>x.id===\''+e.id+'\'))">📅</button>':'')
+  +'<button class="btn btn-sm btn-accent" onclick="editEntry(\''+e.id+'\')">Edit</button><button class="btn btn-sm btn-danger" onclick="deleteEntry(\''+e.id+'\')">Delete</button></div></div>'
+  +'<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:6px">'+(e.symptoms||[]).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div>'
+  +'<div style="margin-top:12px" class="grid-auto"><div style="font-size:12px;color:var(--text-secondary)"><strong style="color:var(--text-primary)">Severity:</strong> '+esc(e.severity)+(e.temperature?' · 🌡 '+tempHTML(e.temperature):'')+'</div><div style="font-size:12px;color:var(--text-secondary)"><strong style="color:var(--text-primary)">Location:</strong> '+esc(e.location)+(e.locationDetail?' — '+esc(e.locationDetail):'')+'</div>'+(e.activity?'<div style="font-size:12px;color:var(--text-secondary)"><strong style="color:var(--text-primary)">Activity:</strong> '+esc(e.activity)+'</div>':'')+'</div>'
+  +(e.contacts&&e.contacts.length?'<div style="margin-top:8px;font-size:12px;color:var(--text-secondary)"><strong style="color:var(--text-primary)">Contacts:</strong> '+esc(e.contacts.join(', '))+'</div>':'')
+  +(e.notes?'<div style="margin-top:8px;font-size:12px;color:var(--text-secondary);font-style:italic">"'+esc(e.notes)+'"</div>':'')
+  +renderVitalsInHistory(e.vitals,e.id)
+  +'</div>').join('');
+}
+
+// ── Analysis ──
+function renderAnalysis(a){
+  if(!a||entries.length<2)return '<h2 style="font-size:20px;font-weight:700;margin-bottom:20px">Pattern Analysis</h2><div class="card" style="text-align:center;padding:40px"><div style="font-size:40px;margin-bottom:12px">📊</div><p style="color:var(--text-secondary)">Log at least 2 illness events to see patterns.</p></div>';
+  const riskHTML='<div class="card"><h3 style="font-size:16px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px"><span style="color:var(--warning)">⚠</span> Calculated Risk Factors</h3><p style="font-size:12px;color:var(--text-secondary);margin-bottom:16px">Based on '+a.total+' logged illnesses</p>'+(a.risks.length?a.risks.map(r=>riskBarHTML(r.score,r.factor)+'<div style="font-size:12px;color:var(--text-secondary);margin:-6px 0 16px 4px">'+esc(r.detail)+'</div>').join(''):'<p style="color:var(--text-secondary);font-size:13px">No strong patterns yet.</p>')+'</div>';
+  const freqHTML='<div class="grid-2"><div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Top Symptoms</h4>'+a.topS.map(([n,c])=>freqBarHTML(n,c,a.total,'var(--accent)')).join('')+'</div><div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Top Locations</h4>'+a.topL.map(([n,c])=>freqBarHTML(n,c,a.total,'var(--accent-warm)')).join('')+'</div></div>';
+  const caHTML='<div class="grid-2"><div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Recurring Contacts</h4>'+(a.topC.length?a.topC.map(([n,c])=>'<div class="entry-row" style="margin-bottom:6px;font-size:13px"><span style="text-transform:capitalize">'+esc(n)+'</span><span style="font-family:\'JetBrains Mono\';color:var(--danger)">'+c+'×</span></div>').join(''):'<p style="font-size:12px;color:var(--text-secondary)">No recurring contacts</p>')+'</div><div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Activity Patterns</h4>'+(a.topA.length?a.topA.map(([n,c])=>'<div class="entry-row" style="margin-bottom:6px;font-size:13px"><span>'+esc(n)+'</span><span style="font-family:\'JetBrains Mono\';color:var(--success)">'+c+'×</span></div>').join(''):'<p style="font-size:12px;color:var(--text-secondary)">No patterns</p>')+'</div></div>';
+  const medHTML=a.topMed&&a.topMed.length?'<div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">💊 Most Used Medicines</h4>'+a.topMed.map(([n,c])=>freqBarHTML(n,c,a.total,'var(--accent-purple)')).join('')+'</div>':'';
+  const timingHTML='<div class="card"><h4 style="font-size:14px;font-weight:600;margin-bottom:12px">Timing Insights</h4><div class="grid-auto">'+(a.peakM?'<div class="timing-box"><div class="timing-value" style="color:var(--warning)">'+esc(a.peakM[0])+'</div><div class="timing-label">Peak month ('+a.peakM[1]+'×)</div></div>':'')+(a.peakD?'<div class="timing-box"><div class="timing-value" style="color:var(--accent)">'+esc(a.peakD[0])+'</div><div class="timing-label">Most common day ('+a.peakD[1]+'×)</div></div>':'')+(a.avgGap!==null?'<div class="timing-box"><div class="timing-value" style="color:var(--success)">'+a.avgGap+' days</div><div class="timing-label">Avg gap between illnesses</div></div>':'')+(a.avgDur!==null?'<div class="timing-box"><div class="timing-value" style="color:var(--accent-warm)">'+a.avgDur+' days</div><div class="timing-label">Avg illness duration</div></div>':'')+'</div></div>';
+  return '<h2 style="font-size:20px;font-weight:700;margin-bottom:20px">Pattern Analysis</h2>'+riskHTML+freqHTML+caHTML+medHTML+timingHTML;
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+// Render synchronously — DOM is already parsed at this point in body.
+// Don't wait for DOMContentLoaded because that would block on deferred Firebase scripts.
+document.getElementById('app-version').textContent = APP_VERSION;
+document.title = 'Illness Tracker ' + APP_VERSION + ' — Track · Analyze · Prevent';
+loadLocal();
+if (new URLSearchParams(location.search).has('demo')) enterDemo();
+else render();
+// Defer Firebase auth init until after first paint — auth iframe + getProjectConfig
+// add ~100KB of network chatter that shouldn't compete with LCP.
+function bootFirebase() {
+  if (typeof firebase === 'undefined') { setTimeout(bootFirebase, 200); return; }
+  initFirebase();
+}
+if ('requestIdleCallback' in window) requestIdleCallback(bootFirebase, { timeout: 3000 });
+else window.addEventListener('load', () => setTimeout(bootFirebase, 100));
+</script>
+</body>
+</html>
