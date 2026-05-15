@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Privacy Policy — SceneSeed</title>
+<meta name="description" content="What SceneSeed collects, what it doesn't, and what happens to it. Short and honest.">
+<meta name="robots" content="index, follow">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/privacy.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SceneSeed">
+<meta property="og:title" content="Privacy Policy — SceneSeed">
+<meta property="og:description" content="What SceneSeed collects, what it doesn't, and what happens to it.">
+<meta property="og:url" content="https://dev.rizzo.cc/sceneseed/privacy.html">
+<meta property="og:image" content="https://dev.rizzo.cc/sceneseed/og-image.png">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav">
+      <a href="/sceneseed/">Home</a>
+    </nav>
+  </div>
+</header>
+
+<main class="prose">
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: 2026-05-07</p>
+
+  <p>SceneSeed is a free tool for improv teams to collect audience suggestions during a show. This page explains what's collected, what's not, and how it's used. If anything below is unclear, treat the most user-friendly interpretation as the correct one.</p>
+
+  <h2>What's collected from audience members</h2>
+  <ul>
+    <li>The text of the suggestion you submit.</li>
+    <li>The timestamp of submission (server time, used to enforce the show's submission window).</li>
+    <li>If the host has turned on name collection for this show, the first name you choose to share — optional or required depending on the show's setting. The field is up to 50 characters of plain text. It's visible to the host on their dashboard alongside your suggestion.</li>
+    <li>No email. No IP address logging. No device fingerprint.</li>
+  </ul>
+
+  <h2>What's collected from hosts (people who sign in)</h2>
+  <ul>
+    <li>An email address (used to sign in and identify your account).</li>
+    <li>A display name, if you provide one.</li>
+    <li>The shows, groups, and suggestions you create.</li>
+  </ul>
+
+  <h2>Where it's stored</h2>
+  <p>All data is stored on Google Cloud. We do not run our own servers and we do not sell, share, rent, or trade any of this data.</p>
+
+  <h2>Analytics</h2>
+  <p>The site uses Google Analytics 4 to count page views in aggregate. GA4 may use cookies. You can disable analytics by using a browser extension like uBlock Origin or by enabling "Do Not Track."</p>
+
+  <h2>Cookies</h2>
+  <p>SceneSeed itself does not set marketing cookies. Sign-in and aggregated analytics may set cookies necessary for those features to work.</p>
+
+  <h2>Children</h2>
+  <p>SceneSeed is not directed at children under 13.</p>
+
+  <h2>Changes</h2>
+  <p>If this policy changes meaningfully, the date at the top of this page will be updated and the new version will appear at the same URL.</p>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+</body>
+</html>

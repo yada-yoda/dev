@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Perform — SceneSeed</title>
+<meta name="description" content="Full-screen performer view of incoming suggestions.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#000000">
+<meta name="robots" content="noindex">
+
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body class="perform-body">
+
+<main id="perform" hidden>
+  <div id="perform-stage" class="perform-stage" tabindex="0" role="button" aria-label="Tap to advance">
+    <div class="perform-fit-wrap">
+      <p id="perform-round" class="perform-round" hidden></p>
+      <p id="perform-name" class="perform-name" hidden></p>
+      <h1 id="perform-text" class="perform-text">…</h1>
+    </div>
+  </div>
+
+  <header id="perform-bar" class="perform-bar">
+    <div class="perform-bar-left">
+      <a href="dashboard.html" id="perform-exit" class="perform-icon-btn" aria-label="Exit performer view" title="Exit (Esc)">
+        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+          <path d="M6 6 L18 18 M18 6 L6 18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+      </a>
+      <span id="perform-counter" class="perform-counter">0 / 0</span>
+    </div>
+
+    <div class="perform-bar-right">
+      <select id="perform-filter" class="perform-select" aria-label="Filter suggestions">
+        <option value="active">Active (not used or hidden)</option>
+        <option value="all">All</option>
+        <option value="favorite">★ Favorites</option>
+        <option value="unused">Not used</option>
+      </select>
+      <button type="button" id="perform-fav" class="perform-icon-btn" aria-label="Favorite (F)" title="Favorite (F)">☆</button>
+      <button type="button" id="perform-used" class="perform-icon-btn" aria-label="Mark used (U)" title="Mark used (U)">○</button>
+    </div>
+  </header>
+
+  <div id="perform-hint" class="perform-hint">
+    <span class="perform-hint-key">←</span> back &nbsp;·&nbsp; <span class="perform-hint-key">tap</span> or <span class="perform-hint-key">→</span> next &nbsp;·&nbsp; <span class="perform-hint-key">esc</span> exit
+  </div>
+</main>
+
+<div id="perform-loading" class="perform-loading">
+  <p>Loading…</p>
+</div>
+
+<div id="perform-empty" class="perform-loading" hidden>
+  <p id="perform-empty-msg">No suggestions yet.</p>
+  <p><a href="dashboard.html" class="perform-back-link">← Back to dashboard</a></p>
+</div>
+
+<script type="module">
+import { onAuth } from './auth.js';
+import { getShow } from './shows.js';
+import { listSuggestions, setSuggestionFlag } from './host-suggestions.js';
+
+const code = new URLSearchParams(window.location.search).get('code');
+
+const perform        = document.getElementById('perform');
+const loading        = document.getElementById('perform-loading');
+const empty          = document.getElementById('perform-empty');
+const emptyMsg       = document.getElementById('perform-empty-msg');
+const stage          = document.getElementById('perform-stage');
+const fitWrap        = stage.querySelector('.perform-fit-wrap');
+const textEl         = document.getElementById('perform-text');
+const nameEl         = document.getElementById('perform-name');
+const roundEl        = document.getElementById('perform-round');
+const counterEl      = document.getElementById('perform-counter');
+const filterSel      = document.getElementById('perform-filter');
+const favBtn         = document.getElementById('perform-fav');
+const usedBtn        = document.getElementById('perform-used');
+const bar            = document.getElementById('perform-bar');
+const hint           = document.getElementById('perform-hint');
+const exitLink       = document.getElementById('perform-exit');
+
+let allSuggestions = [];
+let filtered = [];
+let index = 0;
+let unsub = null;
+let show = null;
+
+// Compute the back-link target: prefer the show page if we have a code.
+const backHref = code ? `show.html?code=${encodeURIComponent(code)}` : 'dashboard.html';
+exitLink.href = backHref;
+empty.querySelector('.perform-back-link').href = backHref;
+
+function bail(msg) {
+  loading.hidden = true;
+  perform.hidden = true;
+  empty.hidden = false;
+  emptyMsg.textContent = msg;
+}
+
+function applyFilter() {
+  const mode = filterSel.value;
+  filtered = allSuggestions.filter((s) => {
+    if (mode === 'all') return true;
+    if (mode === 'favorite') return !!s.isFavorite;
+    if (mode === 'unused') return !s.isUsed;
+    // default: active = not hidden, not used
+    return !s.isHidden && !s.isUsed;
+  });
+  // Sort oldest-first so the host walks through chronologically.
+  filtered.sort((a, b) => {
+    const aT = a.createdAt?.toMillis?.() ?? 0;
+    const bT = b.createdAt?.toMillis?.() ?? 0;
+    return aT - bT;
+  });
+  // Keep the same suggestion in view if it's still in the filter; otherwise clamp.
+  const currentId = filtered[index]?.id;
+  if (filtered.length === 0) {
+    index = 0;
+  } else if (currentId === undefined || !filtered.some((s, i) => i === index && s.id === currentId)) {
+    index = Math.min(index, filtered.length - 1);
+  }
+  paint();
+}
+
+function fitText() {
+  // Binary-search the largest font size that fits both width and height.
+  if (filtered.length === 0) return;
+  const cw = stage.clientWidth - 48;   // padding cushion
+  const ch = stage.clientHeight - 48;
+  if (cw <= 0 || ch <= 0) return;
+  let lo = 16, hi = 720, best = 16;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    fitWrap.style.fontSize = mid + 'px';
+    if (fitWrap.scrollWidth <= cw && fitWrap.scrollHeight <= ch) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  fitWrap.style.fontSize = best + 'px';
+}
+
+function roundLabelFor(roundId) {
+  if (!roundId || !show) return '';
+  const r = (show.rounds || []).find((rr) => rr.id === roundId);
+  return r ? r.label : roundId;
+}
+
+function paint() {
+  if (filtered.length === 0) {
+    counterEl.textContent = '0 / 0';
+    textEl.textContent = 'No suggestions in this filter yet.';
+    nameEl.hidden = true;
+    roundEl.hidden = true;
+    favBtn.disabled = true;
+    usedBtn.disabled = true;
+    favBtn.textContent = '☆';
+    usedBtn.textContent = '○';
+    fitText();
+    return;
+  }
+  index = Math.max(0, Math.min(index, filtered.length - 1));
+  const s = filtered[index];
+  textEl.textContent = s.text || '';
+  const rLabel = (show?.rounds?.length && s.roundId) ? roundLabelFor(s.roundId) : '';
+  if (rLabel) {
+    roundEl.textContent = rLabel;
+    roundEl.hidden = false;
+  } else {
+    roundEl.hidden = true;
+  }
+  if (s.submitterName) {
+    nameEl.textContent = s.submitterName;
+    nameEl.hidden = false;
+  } else {
+    nameEl.hidden = true;
+  }
+  counterEl.textContent = `${index + 1} / ${filtered.length}`;
+  favBtn.textContent = s.isFavorite ? '★' : '☆';
+  favBtn.classList.toggle('is-on', !!s.isFavorite);
+  usedBtn.textContent = s.isUsed ? '✓' : '○';
+  usedBtn.classList.toggle('is-on', !!s.isUsed);
+  favBtn.disabled = false;
+  usedBtn.disabled = false;
+  fitText();
+}
+
+function next() {
+  if (filtered.length === 0) return;
+  index = (index + 1) % filtered.length;
+  paint();
+}
+function prev() {
+  if (filtered.length === 0) return;
+  index = (index - 1 + filtered.length) % filtered.length;
+  paint();
+}
+
+stage.addEventListener('click', (e) => {
+  // Don't advance if a click bubbled from a button up in the DOM
+  if (e.target.closest('.perform-bar') || e.target.closest('.perform-icon-btn')) return;
+  next();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Spacebar') { e.preventDefault(); next(); }
+  else if (e.key === 'ArrowLeft') { e.preventDefault(); prev(); }
+  else if (e.key === 'Escape') { window.location.href = backHref; }
+  else if (e.key === 'f' || e.key === 'F') { favBtn.click(); }
+  else if (e.key === 'u' || e.key === 'U') { usedBtn.click(); }
+});
+
+window.addEventListener('resize', fitText);
+
+filterSel.addEventListener('change', () => {
+  index = 0;
+  applyFilter();
+});
+
+favBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const s = filtered[index];
+  if (!s) return;
+  favBtn.disabled = true;
+  try {
+    await setSuggestionFlag(code, s.id, 'isFavorite', !s.isFavorite);
+    // Local state flip for instant UX; the snapshot will catch up shortly.
+    s.isFavorite = !s.isFavorite;
+    paint();
+  } catch (err) {
+    console.error(err);
+    alert('Could not toggle favorite.');
+  } finally {
+    favBtn.disabled = false;
+  }
+});
+
+usedBtn.addEventListener('click', async (e) => {
+  e.stopPropagation();
+  const s = filtered[index];
+  if (!s) return;
+  usedBtn.disabled = true;
+  try {
+    await setSuggestionFlag(code, s.id, 'isUsed', !s.isUsed);
+    s.isUsed = !s.isUsed;
+    paint();
+  } catch (err) {
+    console.error(err);
+    alert('Could not toggle used.');
+  } finally {
+    usedBtn.disabled = false;
+  }
+});
+
+// Auto-fade the toolbar + hint after a few seconds of no interaction.
+let idleTimer = null;
+function wake() {
+  document.body.classList.remove('perform-idle');
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => document.body.classList.add('perform-idle'), 3000);
+}
+['mousemove', 'click', 'keydown', 'touchstart'].forEach((ev) =>
+  window.addEventListener(ev, wake, { passive: true })
+);
+wake();
+
+async function load() {
+  if (!code) {
+    bail('No show code in the URL.');
+    return;
+  }
+  try {
+    show = await getShow(code);
+    if (!show) {
+      bail("That show couldn't be found, or you don't have access to it.");
+      return;
+    }
+    document.title = `${show.title || 'Perform'} — SceneSeed`;
+    unsub = listSuggestions(code, (list) => {
+      allSuggestions = list;
+      applyFilter();
+      loading.hidden = true;
+      perform.hidden = false;
+      // refit on first paint (fonts and viewport may finalize after load)
+      requestAnimationFrame(fitText);
+    });
+  } catch (err) {
+    console.error(err);
+    bail('Could not load this show.');
+  }
+}
+
+onAuth((user) => {
+  if (!user) {
+    window.location.replace('signin.html');
+    return;
+  }
+  load();
+});
+</script>
+</body>
+</html>

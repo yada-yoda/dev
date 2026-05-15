@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+
+<title>Ensemble view — SceneSeed</title>
+<meta name="description" content="Read-only view of audience suggestions for a show.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav">
+      <span class="dialog-sub" style="font-size:13px">Ensemble view</span>
+    </nav>
+  </div>
+</header>
+
+<main id="view-main" class="container dash" hidden>
+  <section class="dash-hero">
+    <p id="view-label" class="aud-show-label" hidden></p>
+    <h1 id="view-title">…</h1>
+    <p id="view-prompt" class="lede" hidden></p>
+  </section>
+
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>Suggestions</h2>
+      <span id="view-summary" class="dialog-sub"></span>
+    </div>
+    <p class="dialog-sub" id="view-expires" hidden></p>
+    <div id="view-loading" class="dash-empty"><p>Loading…</p></div>
+    <div id="view-empty" class="dash-empty" hidden>
+      <p>No suggestions to show.</p>
+    </div>
+    <div id="view-list" class="sug-list" hidden></div>
+  </section>
+</main>
+
+<div id="view-locked" class="dash-loading" hidden>
+  <p id="view-locked-msg">This share link isn't active.</p>
+  <p><a href="/sceneseed/" class="perform-back-link">SceneSeed home</a></p>
+</div>
+
+<div id="view-loading-shell" class="dash-loading">
+  <p>Loading…</p>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="/sceneseed/privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { db } from '../firebase-config.js';
+import { doc, getDoc, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js';
+
+const code = new URLSearchParams(window.location.search).get('c');
+
+const main = document.getElementById('view-main');
+const loadingShell = document.getElementById('view-loading-shell');
+const locked = document.getElementById('view-locked');
+const lockedMsg = document.getElementById('view-locked-msg');
+const labelEl = document.getElementById('view-label');
+const titleEl = document.getElementById('view-title');
+const promptEl = document.getElementById('view-prompt');
+const summaryEl = document.getElementById('view-summary');
+const expiresEl = document.getElementById('view-expires');
+const listLoading = document.getElementById('view-loading');
+const listEmpty = document.getElementById('view-empty');
+const listEl = document.getElementById('view-list');
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function showLocked(msg) {
+  loadingShell.hidden = true;
+  main.hidden = true;
+  locked.hidden = false;
+  if (msg) lockedMsg.textContent = msg;
+}
+
+function fmtTime(ts) {
+  const d = ts?.toDate?.();
+  if (!d) return '';
+  return `${d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })}`;
+}
+function fmtDateTime(ts) {
+  const d = ts?.toDate?.();
+  if (!d) return '';
+  return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function roundLabelFor(roundId, rounds) {
+  if (!roundId) return '';
+  const r = (rounds || []).find((rr) => rr.id === roundId);
+  return r ? r.label : roundId;
+}
+
+function renderCard(s, rounds) {
+  const t = fmtTime(s.createdAt);
+  const submitter = s.submitterName ? `<span class="sug-submitter">${escHtml(s.submitterName)}</span>` : '';
+  const rLabel = roundLabelFor(s.roundId, rounds);
+  const roundChip = (rounds.length && s.roundId) ? `<span class="sug-round">${escHtml(rLabel)}</span>` : '';
+  const cls = ['sug-card'];
+  if (s.isFavorite) cls.push('is-favorite');
+  if (s.isUsed) cls.push('is-used');
+  // hidden suggestions are excluded entirely from the ensemble view
+  return `
+    <article class="${cls.join(' ')}">
+      <div class="sug-text">${escHtml(s.text)}</div>
+      <div class="sug-meta">
+        <span class="sug-time">${roundChip}${submitter}${escHtml(t)}</span>
+        <div class="sug-actions">
+          ${s.isFavorite ? '<span class="sug-tag">★ favorite</span>' : ''}
+          ${s.isUsed ? '<span class="sug-tag">✓ used</span>' : ''}
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+let currentEventRounds = [];
+
+function renderList(list) {
+  listLoading.hidden = true;
+  // Hide hidden suggestions; sort newest-first.
+  const visible = list
+    .filter((s) => !s.isHidden)
+    .sort((a, b) => {
+      const aT = a.createdAt?.toMillis?.() ?? 0;
+      const bT = b.createdAt?.toMillis?.() ?? 0;
+      return bT - aT;
+    });
+  if (visible.length === 0) {
+    listEmpty.hidden = false;
+    listEl.hidden = true;
+    listEl.innerHTML = '';
+    summaryEl.textContent = '';
+    return;
+  }
+  listEmpty.hidden = true;
+  listEl.hidden = false;
+  listEl.innerHTML = visible.map((s) => renderCard(s, currentEventRounds)).join('');
+  summaryEl.textContent = `${visible.length} total`;
+}
+
+async function load() {
+  if (!code) {
+    showLocked("This link is missing a show code.");
+    return;
+  }
+  try {
+    const snap = await getDoc(doc(db, 'events', code));
+    if (!snap.exists()) {
+      showLocked("That show couldn't be found.");
+      return;
+    }
+    const event = { id: snap.id, ...snap.data() };
+    currentEventRounds = Array.isArray(event.rounds) ? event.rounds : [];
+
+    if (!event.shareEnabled) {
+      showLocked("This share isn't active right now. The host can re-enable it from their dashboard.");
+      return;
+    }
+    const expires = event.shareExpiresAt?.toDate?.();
+    if (!expires || expires.getTime() <= Date.now()) {
+      showLocked(`This share expired ${expires ? fmtDateTime(event.shareExpiresAt) : 'a while ago'}.`);
+      return;
+    }
+
+    // Paint header
+    if (event.promptText) {
+      labelEl.textContent = event.title || '';
+      labelEl.hidden = !event.title;
+      titleEl.textContent = event.title || '(untitled show)';
+      promptEl.textContent = event.promptText;
+      promptEl.hidden = false;
+    } else {
+      titleEl.textContent = event.title || '(untitled show)';
+      promptEl.hidden = true;
+    }
+    document.title = `${event.title || 'View'} — SceneSeed`;
+    expiresEl.textContent = `Share ends ${fmtDateTime(event.shareExpiresAt)}.`;
+    expiresEl.hidden = false;
+
+    loadingShell.hidden = true;
+    main.hidden = false;
+
+    // Live subscription to suggestions (allowed by rules during active share window)
+    onSnapshot(
+      collection(db, 'events', code, 'suggestions'),
+      (snap) => {
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        renderList(list);
+      },
+      (err) => {
+        console.error('Failed to load suggestions:', err);
+        listLoading.hidden = true;
+        listEmpty.hidden = false;
+        listEmpty.querySelector('p').textContent = 'Could not load suggestions. Try refreshing.';
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    showLocked("Could not load this share.");
+  }
+}
+
+load();
+</script>
+</body>
+</html>

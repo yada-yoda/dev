@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Dashboard — SceneSeed</title>
+<meta name="description" content="Manage your improv groups, shows, and suggestions.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/dashboard.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav user-nav" aria-label="Account" hidden>
+      <span id="user-email" class="user-email"></span>
+      <button id="signout-btn" type="button" class="link-btn">Sign out</button>
+    </nav>
+  </div>
+</header>
+
+<main id="dash-main" class="container dash" hidden>
+  <section class="dash-hero">
+    <h1>Welcome back<span id="welcome-name"></span>.</h1>
+    <p class="lede">Your groups and shows live here. Pick up where you left off — or spin up something new.</p>
+  </section>
+
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>Your groups</h2>
+      <button type="button" id="new-group-btn" class="btn">+ New group</button>
+    </div>
+    <div id="groups-loading" class="dash-empty"><p>Loading…</p></div>
+    <div id="groups-empty" class="dash-empty" hidden>
+      <p>No groups yet. Click <strong>+ New group</strong> to create your first improv ensemble.</p>
+    </div>
+    <div id="groups-list" class="groups-list" hidden></div>
+  </section>
+
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>Past shows</h2>
+      <span id="past-summary" class="dialog-sub"></span>
+    </div>
+    <div id="past-loading" class="dash-empty"><p>Loading…</p></div>
+    <div id="past-empty" class="dash-empty" hidden>
+      <p>No past shows yet. Once a show finishes (its end time passes), it'll appear here so you can grab the suggestions as a CSV.</p>
+    </div>
+    <div id="past-list" class="past-list" hidden></div>
+  </section>
+
+  <section class="dash-section">
+    <h2>What's coming</h2>
+    <ol class="steps">
+      <li>
+        <h3>v0.7.0 · Performer view</h3>
+        <p>Full-screen big-text display of one suggestion at a time, sized for projecting on a wall.</p>
+      </li>
+      <li>
+        <h3>v0.8.0 · QR + ensemble share</h3>
+        <p>Downloadable QR code for each show + a separate read-only share link for ensemble members with auto-expiry.</p>
+      </li>
+      <li>
+        <h3>v0.9.0 · Post-show summary</h3>
+        <p>Auto-built recap with favorites and used suggestions, plus PNG export to share.</p>
+      </li>
+    </ol>
+  </section>
+</main>
+
+<dialog id="new-group-dialog" class="dialog" aria-labelledby="ng-title">
+  <form id="new-group-form" class="dialog-form" novalidate>
+    <h2 id="ng-title">New group</h2>
+    <p class="dialog-sub">Give your improv ensemble a name. You can edit it later.</p>
+    <label class="field">
+      <span>Name</span>
+      <input type="text" name="name" required maxlength="80" autocomplete="off" placeholder="The Late Bloomers">
+    </label>
+    <label class="field">
+      <span>Description <em>(optional)</em></span>
+      <textarea name="description" maxlength="500" rows="3" placeholder="Short-form improv troupe out of Chicago."></textarea>
+    </label>
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="submit" class="btn">Create</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="dash-loading" class="dash-loading">
+  <p>Checking sign-in…</p>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { onAuth, signOut } from './auth.js';
+import { listGroups, createGroup } from './groups.js';
+import { getAllShowsForUser } from './shows.js';
+import { getAllSuggestions, triggerCsvDownload } from './host-suggestions.js';
+
+const dashMain = document.getElementById('dash-main');
+const dashLoading = document.getElementById('dash-loading');
+const userNav = document.querySelector('.user-nav');
+const userEmail = document.getElementById('user-email');
+const welcomeName = document.getElementById('welcome-name');
+const signoutBtn = document.getElementById('signout-btn');
+
+const groupsList = document.getElementById('groups-list');
+const groupsEmpty = document.getElementById('groups-empty');
+const groupsLoading = document.getElementById('groups-loading');
+const newGroupBtn = document.getElementById('new-group-btn');
+const dialog = document.getElementById('new-group-dialog');
+const form = document.getElementById('new-group-form');
+
+const pastList = document.getElementById('past-list');
+const pastEmpty = document.getElementById('past-empty');
+const pastLoading = document.getElementById('past-loading');
+const pastSummary = document.getElementById('past-summary');
+
+let unsubGroups = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
+function renderGroups(groups) {
+  groupsLoading.hidden = true;
+  if (groups.length === 0) {
+    groupsEmpty.hidden = false;
+    groupsList.hidden = true;
+    groupsList.innerHTML = '';
+    return;
+  }
+  groupsEmpty.hidden = true;
+  groupsList.hidden = false;
+  groupsList.innerHTML = groups.map((g) => `
+    <a class="group-card" href="group.html?id=${encodeURIComponent(g.id)}">
+      <h3>${escapeHtml(g.name)}</h3>
+      ${g.description ? `<p>${escapeHtml(g.description)}</p>` : ''}
+    </a>
+  `).join('');
+}
+
+onAuth((user) => {
+  if (unsubGroups) { unsubGroups(); unsubGroups = null; }
+  if (!user) {
+    window.location.replace('signin.html');
+    return;
+  }
+  dashLoading.hidden = true;
+  dashMain.hidden = false;
+  userNav.hidden = false;
+  userEmail.textContent = user.email || '';
+  if (user.displayName) {
+    welcomeName.textContent = `, ${user.displayName.split(' ')[0]}`;
+  }
+  unsubGroups = listGroups(renderGroups);
+  loadPastShows();
+});
+
+// ── Past shows section ──────────────────────────────────
+async function loadPastShows() {
+  pastLoading.hidden = false;
+  pastEmpty.hidden = true;
+  pastList.hidden = true;
+  pastList.innerHTML = '';
+  try {
+    const all = await getAllShowsForUser();
+    const now = Date.now();
+    const past = all
+      .filter((s) => {
+        const end = s.showEndsAt?.toMillis?.();
+        return end && end < now;
+      })
+      .sort((a, b) => {
+        const aT = a.showStartsAt?.toMillis?.() ?? 0;
+        const bT = b.showStartsAt?.toMillis?.() ?? 0;
+        return bT - aT;
+      });
+    pastLoading.hidden = true;
+    if (past.length === 0) {
+      pastEmpty.hidden = false;
+      pastSummary.textContent = '';
+      return;
+    }
+    pastList.hidden = false;
+    pastSummary.textContent = `${past.length} past show${past.length === 1 ? '' : 's'}`;
+    pastList.innerHTML = past.map(renderPastRow).join('');
+  } catch (err) {
+    console.error('Failed to load past shows:', err);
+    pastLoading.hidden = true;
+    pastEmpty.hidden = false;
+    pastEmpty.querySelector('p').textContent = 'Could not load past shows. Try refreshing.';
+  }
+}
+
+function fmtPastDate(ts) {
+  const d = ts?.toDate?.();
+  if (!d) return '';
+  return d.toLocaleString(undefined, {
+    weekday: 'short', month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit'
+  });
+}
+
+function escAttr(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function renderPastRow(show) {
+  const date = fmtPastDate(show.showStartsAt);
+  const venue = show.venueName ? ` · ${escAttr(show.venueName)}` : '';
+  return `
+    <div class="past-row" data-code="${escAttr(show.publicCode)}">
+      <div class="past-row-info">
+        <h3>${escAttr(show.title || '(untitled show)')}</h3>
+        <p class="past-row-meta">${escAttr(date)}${venue} · <code>${escAttr(show.publicCode)}</code></p>
+      </div>
+      <div class="past-row-actions">
+        <a class="link-btn" href="show.html?code=${encodeURIComponent(show.publicCode)}">Open</a>
+        <a class="link-btn" href="summary.html?code=${encodeURIComponent(show.publicCode)}">Summary</a>
+        <button type="button" class="link-btn past-download" data-code="${escAttr(show.publicCode)}">Download CSV</button>
+      </div>
+    </div>
+  `;
+}
+
+pastList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.past-download');
+  if (!btn) return;
+  const code = btn.dataset.code;
+  if (!code) return;
+  btn.disabled = true;
+  const wasLabel = btn.textContent;
+  btn.textContent = 'Preparing…';
+  try {
+    const all = await getAllShowsForUser();
+    const show = all.find((s) => s.publicCode === code);
+    if (!show) throw new Error('Show not found');
+    const sugs = await getAllSuggestions(code);
+    triggerCsvDownload(show, sugs);
+  } catch (err) {
+    alert(`Couldn't download: ${err.message || err}`);
+    console.error(err);
+  } finally {
+    btn.textContent = wasLabel;
+    btn.disabled = false;
+  }
+});
+
+signoutBtn.addEventListener('click', async () => {
+  if (unsubGroups) { unsubGroups(); unsubGroups = null; }
+  await signOut();
+  window.location.replace('./');
+});
+
+newGroupBtn.addEventListener('click', () => {
+  form.reset();
+  dialog.showModal();
+  form.elements.name.focus();
+});
+
+dialog.querySelector('[data-close]').addEventListener('click', () => dialog.close());
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = form.elements.name.value.trim();
+  const description = form.elements.description.value.trim();
+  if (!name) return;
+  const submitBtn = form.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    await createGroup({ name, description });
+    dialog.close();
+  } catch (err) {
+    alert('Could not create group: ' + (err.message || err));
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

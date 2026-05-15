@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Group — SceneSeed</title>
+<meta name="description" content="Manage an improv group on SceneSeed.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/group.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="dashboard.html" aria-label="SceneSeed dashboard">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav user-nav" aria-label="Account" hidden>
+      <span id="user-email" class="user-email"></span>
+      <button id="signout-btn" type="button" class="link-btn">Sign out</button>
+    </nav>
+  </div>
+</header>
+
+<main id="group-main" class="container dash" hidden>
+  <p class="breadcrumb"><a href="dashboard.html">← All groups</a></p>
+
+  <section class="dash-hero">
+    <div class="group-head">
+      <div>
+        <h1 id="group-name">…</h1>
+        <p id="group-description" class="lede"></p>
+      </div>
+      <div class="group-actions">
+        <button type="button" id="edit-btn" class="btn secondary">Edit</button>
+        <button type="button" id="delete-btn" class="btn danger">Delete</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section">
+    <div class="dash-section-head">
+      <h2>Shows</h2>
+      <button type="button" id="new-show-btn" class="btn">+ New show</button>
+    </div>
+    <div id="shows-loading" class="dash-empty"><p>Loading…</p></div>
+    <div id="shows-empty" class="dash-empty" hidden>
+      <p>No shows yet. Click <strong>+ New show</strong> to schedule one.</p>
+    </div>
+    <div id="shows-list" class="shows-list" hidden></div>
+  </section>
+</main>
+
+<dialog id="show-dialog" class="dialog dialog-lg" aria-labelledby="show-dialog-title">
+  <form id="show-form" class="dialog-form" novalidate>
+    <h2 id="show-dialog-title">New show</h2>
+    <p class="dialog-sub">Set the title, venue, and the windows. You can edit any of this later.</p>
+
+    <label class="field">
+      <span>Title</span>
+      <input type="text" name="title" required maxlength="120" autocomplete="off" placeholder="Friday Night Improv">
+    </label>
+
+    <label class="field">
+      <span>Venue <em>(optional)</em></span>
+      <input type="text" name="venueName" maxlength="120" autocomplete="off" placeholder="The Annoyance Theatre">
+    </label>
+
+    <label class="field">
+      <span>Prompt template <em>(optional)</em></span>
+      <select name="promptTemplate">
+        <option value="">— Pick a template —</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Prompt <em>(optional, shown to the audience)</em></span>
+      <textarea name="promptText" maxlength="500" rows="2" placeholder="Suggest a one-word location for our next scene."></textarea>
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Show starts</span>
+        <input type="datetime-local" name="showStartsAt" required>
+      </label>
+      <label class="field">
+        <span>Show ends</span>
+        <input type="datetime-local" name="showEndsAt" required>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Submissions open</span>
+        <input type="datetime-local" name="submissionOpenAt" required>
+      </label>
+      <label class="field">
+        <span>Submissions close</span>
+        <input type="datetime-local" name="submissionCloseAt" required>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Max suggestion length</span>
+        <input type="number" name="maxSuggestionLength" min="20" max="500" value="140">
+      </label>
+      <label class="field">
+        <span>Timezone</span>
+        <input type="text" name="timezone" readonly>
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Ask audience for a first name</span>
+      <select name="nameCollection">
+        <option value="off" selected>Off — anonymous submissions only</option>
+        <option value="optional">Optional — audience can choose</option>
+        <option value="required">Required — submission needs a name</option>
+      </select>
+    </label>
+
+    <label class="field-check">
+      <input type="checkbox" name="profanityFilterEnabled" checked>
+      <span>Filter profanity & hate terms</span>
+    </label>
+    <label class="field-check">
+      <input type="checkbox" name="duplicateDetectionEnabled" checked>
+      <span>Reject duplicate suggestions</span>
+    </label>
+
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="submit" class="btn">Create show</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="group-loading" class="dash-loading">
+  <p>Loading…</p>
+</div>
+
+<div id="group-error" class="dash-loading" hidden>
+  <p id="group-error-msg">Group not found.</p>
+  <p><a href="dashboard.html">← Back to dashboard</a></p>
+</div>
+
+<dialog id="edit-dialog" class="dialog" aria-labelledby="edit-title">
+  <form id="edit-form" class="dialog-form" novalidate>
+    <h2 id="edit-title">Edit group</h2>
+    <label class="field">
+      <span>Name</span>
+      <input type="text" name="name" required maxlength="80" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Description <em>(optional)</em></span>
+      <textarea name="description" maxlength="500" rows="3"></textarea>
+    </label>
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog" class="dialog" aria-labelledby="del-title">
+  <div class="dialog-form">
+    <h2 id="del-title">Delete group?</h2>
+    <p class="dialog-sub">This will permanently delete <strong id="del-name"></strong>. This can't be undone.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="button" id="confirm-delete" class="btn danger">Delete group</button>
+    </div>
+  </div>
+</dialog>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { onAuth, signOut } from './auth.js';
+import { getGroup, updateGroup, deleteGroup } from './groups.js';
+import { listShowsByGroup, createShow, roundUpToNext15, toInputValue, windowState } from './shows.js';
+import { populatePromptTemplateSelect } from './prompts.js';
+
+const groupId = new URLSearchParams(window.location.search).get('id');
+
+const main = document.getElementById('group-main');
+const loading = document.getElementById('group-loading');
+const errorEl = document.getElementById('group-error');
+const errorMsg = document.getElementById('group-error-msg');
+const userNav = document.querySelector('.user-nav');
+const userEmail = document.getElementById('user-email');
+const signoutBtn = document.getElementById('signout-btn');
+
+const nameEl = document.getElementById('group-name');
+const descEl = document.getElementById('group-description');
+
+const editBtn = document.getElementById('edit-btn');
+const editDialog = document.getElementById('edit-dialog');
+const editForm = document.getElementById('edit-form');
+
+const deleteBtn = document.getElementById('delete-btn');
+const deleteDialog = document.getElementById('delete-dialog');
+const delName = document.getElementById('del-name');
+const confirmDeleteBtn = document.getElementById('confirm-delete');
+
+let currentGroup = null;
+let unsubShows = null;
+
+const showsList = document.getElementById('shows-list');
+const showsEmpty = document.getElementById('shows-empty');
+const showsLoading = document.getElementById('shows-loading');
+const newShowBtn = document.getElementById('new-show-btn');
+const showDialog = document.getElementById('show-dialog');
+const showForm = document.getElementById('show-form');
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fmtDateRange(show) {
+  const start = show.showStartsAt?.toDate?.();
+  const end = show.showEndsAt?.toDate?.();
+  if (!start) return '';
+  const sameDay = end && start.toDateString() === end.toDateString();
+  const dateOpts = { weekday: 'short', month: 'short', day: 'numeric' };
+  const timeOpts = { hour: 'numeric', minute: '2-digit' };
+  const dateStr = start.toLocaleDateString(undefined, dateOpts);
+  const startTime = start.toLocaleTimeString(undefined, timeOpts);
+  if (!end) return `${dateStr} · ${startTime}`;
+  const endTime = end.toLocaleTimeString(undefined, timeOpts);
+  return sameDay ? `${dateStr} · ${startTime}–${endTime}` : `${dateStr} ${startTime} → ${end.toLocaleDateString(undefined, dateOpts)} ${endTime}`;
+}
+
+function renderShows(shows) {
+  showsLoading.hidden = true;
+  if (shows.length === 0) {
+    showsEmpty.hidden = false;
+    showsList.hidden = true;
+    showsList.innerHTML = '';
+    return;
+  }
+  showsEmpty.hidden = true;
+  showsList.hidden = false;
+  showsList.innerHTML = shows.map((s) => {
+    const ws = windowState(s);
+    const stateLabel = {
+      open: 'Open now',
+      before: 'Opens soon',
+      after: 'Closed',
+      closed: 'Closed'
+    }[ws.state] || '';
+    return `
+      <a class="show-card" href="show.html?code=${encodeURIComponent(s.publicCode)}">
+        <div class="show-card-head">
+          <h3>${escHtml(s.title)}</h3>
+          <span class="show-state state-${ws.state}">${stateLabel}</span>
+        </div>
+        <p class="show-meta">${escHtml(fmtDateRange(s))}${s.venueName ? ` · ${escHtml(s.venueName)}` : ''}</p>
+        <p class="show-code"><code>${escHtml(s.publicCode)}</code></p>
+      </a>
+    `;
+  }).join('');
+}
+
+function showError(msg) {
+  loading.hidden = true;
+  main.hidden = true;
+  errorEl.hidden = false;
+  errorMsg.textContent = msg;
+}
+
+function paint(group) {
+  currentGroup = group;
+  nameEl.textContent = group.name;
+  if (group.description) {
+    descEl.textContent = group.description;
+    descEl.hidden = false;
+  } else {
+    descEl.hidden = true;
+  }
+  document.title = `${group.name} — SceneSeed`;
+}
+
+async function load() {
+  if (!groupId) {
+    showError('No group ID in the URL.');
+    return;
+  }
+  try {
+    const group = await getGroup(groupId);
+    if (!group) {
+      showError('Group not found, or you don’t have access to it.');
+      return;
+    }
+    loading.hidden = true;
+    main.hidden = false;
+    paint(group);
+    if (unsubShows) { unsubShows(); }
+    unsubShows = listShowsByGroup(group.id, renderShows);
+  } catch (err) {
+    console.error(err);
+    showError('Could not load this group.');
+  }
+}
+
+onAuth((user) => {
+  if (!user) {
+    window.location.replace('signin.html');
+    return;
+  }
+  userNav.hidden = false;
+  userEmail.textContent = user.email || '';
+  load();
+});
+
+signoutBtn.addEventListener('click', async () => {
+  if (unsubShows) { unsubShows(); unsubShows = null; }
+  await signOut();
+  window.location.replace('./');
+});
+
+// Populate the prompt-template select once at module load.
+populatePromptTemplateSelect(showForm.elements.promptTemplate);
+showForm.elements.promptTemplate.addEventListener('change', () => {
+  const v = showForm.elements.promptTemplate.value;
+  if (v) {
+    showForm.elements.promptText.value = v;
+    showForm.elements.promptTemplate.value = '';
+  }
+});
+
+// ── New show ────────────────────────────────────
+newShowBtn.addEventListener('click', () => {
+  showForm.reset();
+  // Sensible defaults: show starts 24h from now (rounded), 90-min run, window opens 30min before, closes 60min after start.
+  const start = roundUpToNext15(new Date(Date.now() + 24 * 60 * 60 * 1000));
+  const end = new Date(start.getTime() + 90 * 60 * 1000);
+  const open = new Date(start.getTime() - 30 * 60 * 1000);
+  const close = new Date(start.getTime() + 60 * 60 * 1000);
+  showForm.elements.showStartsAt.value = toInputValue(start);
+  showForm.elements.showEndsAt.value = toInputValue(end);
+  showForm.elements.submissionOpenAt.value = toInputValue(open);
+  showForm.elements.submissionCloseAt.value = toInputValue(close);
+  showForm.elements.timezone.value = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  showForm.elements.maxSuggestionLength.value = 140;
+  showForm.elements.profanityFilterEnabled.checked = true;
+  showForm.elements.duplicateDetectionEnabled.checked = true;
+  showDialog.showModal();
+  showForm.elements.title.focus();
+});
+
+showDialog.querySelector('[data-close]').addEventListener('click', () => showDialog.close());
+
+showForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentGroup) return;
+  const submitBtn = showForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    const code = await createShow(currentGroup.id, {
+      title: showForm.elements.title.value,
+      venueName: showForm.elements.venueName.value,
+      promptText: showForm.elements.promptText.value,
+      showStartsAt: showForm.elements.showStartsAt.value,
+      showEndsAt: showForm.elements.showEndsAt.value,
+      submissionOpenAt: showForm.elements.submissionOpenAt.value,
+      submissionCloseAt: showForm.elements.submissionCloseAt.value,
+      timezone: showForm.elements.timezone.value,
+      maxSuggestionLength: showForm.elements.maxSuggestionLength.value,
+      nameCollection: showForm.elements.nameCollection.value,
+      profanityFilterEnabled: showForm.elements.profanityFilterEnabled.checked,
+      duplicateDetectionEnabled: showForm.elements.duplicateDetectionEnabled.checked
+    });
+    showDialog.close();
+    window.location.href = 'show.html?code=' + encodeURIComponent(code);
+  } catch (err) {
+    alert('Could not create show: ' + (err.message || err));
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// ── Edit ────────────────────────────────────────
+editBtn.addEventListener('click', () => {
+  if (!currentGroup) return;
+  editForm.elements.name.value = currentGroup.name;
+  editForm.elements.description.value = currentGroup.description || '';
+  editDialog.showModal();
+  editForm.elements.name.focus();
+});
+editDialog.querySelector('[data-close]').addEventListener('click', () => editDialog.close());
+
+editForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = editForm.elements.name.value.trim();
+  const description = editForm.elements.description.value.trim();
+  if (!name) return;
+  const submitBtn = editForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    await updateGroup(currentGroup.id, { name, description });
+    paint({ ...currentGroup, name, description });
+    editDialog.close();
+  } catch (err) {
+    alert('Could not save: ' + (err.message || err));
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// ── Delete ──────────────────────────────────────
+deleteBtn.addEventListener('click', () => {
+  if (!currentGroup) return;
+  delName.textContent = currentGroup.name;
+  deleteDialog.showModal();
+});
+deleteDialog.querySelector('[data-close]').addEventListener('click', () => deleteDialog.close());
+
+confirmDeleteBtn.addEventListener('click', async () => {
+  if (!currentGroup) return;
+  confirmDeleteBtn.disabled = true;
+  try {
+    await deleteGroup(currentGroup.id);
+    deleteDialog.close();
+    window.location.replace('dashboard.html');
+  } catch (err) {
+    alert('Could not delete: ' + (err.message || err));
+    console.error(err);
+    confirmDeleteBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Show summary — SceneSeed</title>
+<meta name="description" content="Post-show summary with favorites, used suggestions, and top submitters.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/summary.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="dashboard.html" aria-label="SceneSeed dashboard">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav user-nav" aria-label="Account" hidden>
+      <span id="user-email" class="user-email"></span>
+      <button id="signout-btn" type="button" class="link-btn">Sign out</button>
+    </nav>
+  </div>
+</header>
+
+<main id="summary-main" class="container summary-wrap" hidden>
+  <p class="breadcrumb"><a id="back-to-show" href="dashboard.html">← Back to show</a></p>
+
+  <div class="summary-actions">
+    <button type="button" id="download-png" class="btn">Download PNG</button>
+    <button type="button" id="copy-text" class="btn secondary">Copy as text</button>
+  </div>
+
+  <article id="summary-card" class="summary-card">
+    <header class="summary-header">
+      <div class="summary-brand">
+        <svg viewBox="0 0 100 100" aria-hidden="true" class="summary-logo">
+          <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+          <circle cx="50" cy="46" r="5"/>
+          <circle cx="62" cy="44" r="5"/>
+          <circle cx="74" cy="42" r="5"/>
+          <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+        </svg>
+        <span>SceneSeed</span>
+      </div>
+      <p class="summary-meta" id="summary-meta">…</p>
+      <h1 id="summary-title" class="summary-title">…</h1>
+      <p id="summary-venue" class="summary-venue" hidden></p>
+    </header>
+
+    <section class="summary-stats">
+      <div class="summary-stat">
+        <span class="summary-stat-n" id="stat-total">0</span>
+        <span class="summary-stat-l">Suggestions</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-n" id="stat-fav">0</span>
+        <span class="summary-stat-l">Favorites</span>
+      </div>
+      <div class="summary-stat">
+        <span class="summary-stat-n" id="stat-used">0</span>
+        <span class="summary-stat-l">Made the stage</span>
+      </div>
+    </section>
+
+    <section class="summary-section" id="section-favorites" hidden>
+      <h2>★ Favorites</h2>
+      <ul id="list-favorites" class="summary-list"></ul>
+    </section>
+
+    <section class="summary-section" id="section-used" hidden>
+      <h2>✓ Made the stage</h2>
+      <ul id="list-used" class="summary-list"></ul>
+    </section>
+
+    <section class="summary-section" id="section-top" hidden>
+      <h2>Top submitters</h2>
+      <ul id="list-top" class="summary-top"></ul>
+    </section>
+
+    <section class="summary-section" id="section-also" hidden>
+      <h2>Also submitted</h2>
+      <ul id="list-also" class="summary-also"></ul>
+    </section>
+
+    <section class="summary-section" id="section-empty" hidden>
+      <p class="summary-empty">No suggestions came in for this show.</p>
+    </section>
+
+    <footer class="summary-footer">
+      <span id="summary-public-code"></span>
+      <span class="summary-footer-dot">·</span>
+      <span>dev.rizzo.cc/sceneseed</span>
+    </footer>
+  </article>
+</main>
+
+<div id="summary-loading" class="dash-loading">
+  <p>Loading…</p>
+</div>
+
+<div id="summary-error" class="dash-loading" hidden>
+  <p id="summary-error-msg">Show not found.</p>
+  <p><a href="dashboard.html">← Back to dashboard</a></p>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { onAuth, signOut } from './auth.js';
+import { getShow } from './shows.js';
+import { getAllSuggestions } from './host-suggestions.js';
+
+const code = new URLSearchParams(window.location.search).get('code');
+
+const main = document.getElementById('summary-main');
+const loading = document.getElementById('summary-loading');
+const errorEl = document.getElementById('summary-error');
+const errorMsg = document.getElementById('summary-error-msg');
+const userNav = document.querySelector('.user-nav');
+const userEmail = document.getElementById('user-email');
+const signoutBtn = document.getElementById('signout-btn');
+const backLink = document.getElementById('back-to-show');
+
+const summaryCard = document.getElementById('summary-card');
+const titleEl = document.getElementById('summary-title');
+const metaEl = document.getElementById('summary-meta');
+const venueEl = document.getElementById('summary-venue');
+const statTotal = document.getElementById('stat-total');
+const statFav = document.getElementById('stat-fav');
+const statUsed = document.getElementById('stat-used');
+const sectionFav = document.getElementById('section-favorites');
+const listFav = document.getElementById('list-favorites');
+const sectionUsed = document.getElementById('section-used');
+const listUsed = document.getElementById('list-used');
+const sectionTop = document.getElementById('section-top');
+const listTop = document.getElementById('list-top');
+const sectionAlso = document.getElementById('section-also');
+const listAlso = document.getElementById('list-also');
+const sectionEmpty = document.getElementById('section-empty');
+const codeFooterEl = document.getElementById('summary-public-code');
+
+const dlPngBtn = document.getElementById('download-png');
+const copyTextBtn = document.getElementById('copy-text');
+
+let currentShow = null;
+let currentSuggestions = [];
+
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function fmtDateRange(show) {
+  const start = show.showStartsAt?.toDate?.();
+  const end = show.showEndsAt?.toDate?.();
+  if (!start) return '';
+  const dateOpts = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' };
+  const timeOpts = { hour: 'numeric', minute: '2-digit' };
+  const dateStr = start.toLocaleDateString(undefined, dateOpts);
+  const startTime = start.toLocaleTimeString(undefined, timeOpts);
+  if (!end) return `${dateStr} · ${startTime}`;
+  const endTime = end.toLocaleTimeString(undefined, timeOpts);
+  return `${dateStr} · ${startTime}–${endTime}`;
+}
+
+function showError(msg) {
+  loading.hidden = true;
+  main.hidden = true;
+  errorEl.hidden = false;
+  errorMsg.textContent = msg;
+}
+
+function paint(show, suggestions) {
+  document.title = `${show.title || 'Show'} summary — SceneSeed`;
+  titleEl.textContent = show.title || '(untitled show)';
+  metaEl.textContent = fmtDateRange(show);
+  if (show.venueName) {
+    venueEl.textContent = show.venueName;
+    venueEl.hidden = false;
+  } else {
+    venueEl.hidden = true;
+  }
+  codeFooterEl.textContent = show.publicCode || '';
+  if (show.groupId) {
+    backLink.href = 'show.html?code=' + encodeURIComponent(show.publicCode);
+    backLink.textContent = '← Back to show';
+  }
+
+  const visible = suggestions.filter((s) => !s.isHidden);
+  const favs = visible.filter((s) => s.isFavorite);
+  const used = visible.filter((s) => s.isUsed);
+
+  statTotal.textContent = visible.length;
+  statFav.textContent = favs.length;
+  statUsed.textContent = used.length;
+
+  if (visible.length === 0) {
+    sectionEmpty.hidden = false;
+    sectionFav.hidden = true;
+    sectionUsed.hidden = true;
+    sectionTop.hidden = true;
+    sectionAlso.hidden = true;
+    return;
+  }
+  sectionEmpty.hidden = true;
+
+  const renderQuoted = (s) => {
+    const name = s.submitterName ? `<span class="summary-name">— ${escHtml(s.submitterName)}</span>` : '';
+    return `<li>"${escHtml(s.text)}"${name}</li>`;
+  };
+
+  if (favs.length) {
+    listFav.innerHTML = favs.slice(0, 8).map(renderQuoted).join('');
+    sectionFav.hidden = false;
+  } else {
+    sectionFav.hidden = true;
+  }
+
+  if (used.length) {
+    listUsed.innerHTML = used.slice(0, 12).map(renderQuoted).join('');
+    sectionUsed.hidden = false;
+  } else {
+    sectionUsed.hidden = true;
+  }
+
+  // Top submitters (only if names were collected)
+  if (show.nameCollection !== 'off') {
+    const counts = new Map();
+    for (const s of visible) {
+      const name = (s.submitterName || '').trim();
+      if (!name) continue;
+      counts.set(name, (counts.get(name) || 0) + 1);
+    }
+    const top = [...counts.entries()]
+      .filter(([, n]) => n >= 2)  // only show people who submitted 2+
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5);
+    if (top.length) {
+      listTop.innerHTML = top.map(([n, count]) =>
+        `<li><span class="summary-top-name">${escHtml(n)}</span> <span class="summary-top-count">${count} suggestions</span></li>`
+      ).join('');
+      sectionTop.hidden = false;
+    } else {
+      sectionTop.hidden = true;
+    }
+  } else {
+    sectionTop.hidden = true;
+  }
+
+  // "Also submitted" — random sample of unused, non-favorite suggestions
+  const rest = visible.filter((s) => !s.isFavorite && !s.isUsed);
+  if (rest.length > 0) {
+    // Random sample up to 10
+    const sample = [...rest].sort(() => Math.random() - 0.5).slice(0, 10);
+    listAlso.innerHTML = sample.map((s) => `<li>${escHtml(s.text)}</li>`).join('');
+    sectionAlso.hidden = false;
+  } else {
+    sectionAlso.hidden = true;
+  }
+}
+
+async function load() {
+  if (!code) {
+    showError('No show code in the URL.');
+    return;
+  }
+  try {
+    const [show, suggestions] = await Promise.all([
+      getShow(code),
+      getAllSuggestions(code)
+    ]);
+    if (!show) {
+      showError("Show not found, or you don't have access to it.");
+      return;
+    }
+    currentShow = show;
+    currentSuggestions = suggestions;
+    paint(show, suggestions);
+    loading.hidden = true;
+    main.hidden = false;
+  } catch (err) {
+    console.error(err);
+    showError('Could not load this summary.');
+  }
+}
+
+onAuth((user) => {
+  if (!user) {
+    window.location.replace('signin.html');
+    return;
+  }
+  userNav.hidden = false;
+  userEmail.textContent = user.email || '';
+  load();
+});
+
+signoutBtn.addEventListener('click', async () => {
+  await signOut();
+  window.location.replace('./');
+});
+
+// ── PNG export via html2canvas ──────────────────────────
+dlPngBtn.addEventListener('click', async () => {
+  if (!currentShow) return;
+  dlPngBtn.disabled = true;
+  const wasLabel = dlPngBtn.textContent;
+  dlPngBtn.textContent = 'Generating…';
+  try {
+    const html2canvas = (await import('https://esm.run/html2canvas@1.4.1')).default;
+    const canvas = await html2canvas(summaryCard, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      windowWidth: summaryCard.scrollWidth,
+      windowHeight: summaryCard.scrollHeight
+    });
+    const dataUrl = canvas.toDataURL('image/png');
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    const slug = (currentShow.title || currentShow.publicCode || 'show')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const date = (currentShow.showStartsAt?.toDate?.() || new Date()).toISOString().slice(0, 10);
+    a.download = `${currentShow.publicCode}-${slug}-${date}-summary.png`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => a.remove(), 0);
+  } catch (err) {
+    console.error(err);
+    alert('Could not generate PNG: ' + (err.message || err));
+  } finally {
+    dlPngBtn.textContent = wasLabel;
+    dlPngBtn.disabled = false;
+  }
+});
+
+// ── Copy as plain text ──────────────────────────────────
+function buildPlainText(show, suggestions) {
+  const visible = suggestions.filter((s) => !s.isHidden);
+  const favs = visible.filter((s) => s.isFavorite);
+  const used = visible.filter((s) => s.isUsed);
+
+  const lines = [];
+  lines.push(show.title || '(untitled show)');
+  lines.push(fmtDateRange(show));
+  if (show.venueName) lines.push(show.venueName);
+  lines.push('');
+  lines.push(`${visible.length} suggestion${visible.length === 1 ? '' : 's'}` +
+             ` · ${favs.length} favorite${favs.length === 1 ? '' : 's'}` +
+             ` · ${used.length} made the stage`);
+
+  if (favs.length) {
+    lines.push('');
+    lines.push('FAVORITES');
+    for (const s of favs.slice(0, 12)) {
+      lines.push(`- "${s.text}"${s.submitterName ? ' — ' + s.submitterName : ''}`);
+    }
+  }
+  if (used.length) {
+    lines.push('');
+    lines.push('MADE THE STAGE');
+    for (const s of used.slice(0, 20)) {
+      lines.push(`- "${s.text}"${s.submitterName ? ' — ' + s.submitterName : ''}`);
+    }
+  }
+
+  lines.push('');
+  lines.push(`${show.publicCode} · dev.rizzo.cc/sceneseed`);
+  return lines.join('\n');
+}
+
+copyTextBtn.addEventListener('click', async () => {
+  if (!currentShow) return;
+  try {
+    const text = buildPlainText(currentShow, currentSuggestions);
+    await navigator.clipboard.writeText(text);
+    const orig = copyTextBtn.textContent;
+    copyTextBtn.textContent = 'Copied!';
+    setTimeout(() => (copyTextBtn.textContent = orig), 1500);
+  } catch (err) {
+    console.error(err);
+    alert('Copy failed.');
+  }
+});
+</script>
+</body>
+</html>

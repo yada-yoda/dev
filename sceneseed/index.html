@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<!-- PWA: register the service worker so the app is installable + works offline. -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>SceneSeed — Audience Suggestions for Live Improv Shows</title>
+<meta name="description" content="A free web app for improv teams. Collect audience suggestions through a show-specific QR code with a server-locked submission window.">
+<meta name="keywords" content="improv suggestion app, audience suggestion collector, improv show QR code, live improv ensemble dashboard, suggestion box for theater, improv prompt generator, audience participation app, scene starter, improv prompt seed, QR audience suggestions">
+<meta name="author" content="itsavibecode">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="index, follow">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/">
+
+<!-- Favicons & PWA -->
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SceneSeed">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="SceneSeed — Audience Suggestions for Live Improv Shows">
+<meta property="og:description" content="A free web app for improv teams. Collect audience suggestions through a show-specific QR code with a server-locked submission window.">
+<meta property="og:url" content="https://dev.rizzo.cc/sceneseed/">
+<meta property="og:image" content="https://dev.rizzo.cc/sceneseed/og-image.png">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SceneSeed — audience suggestions for live improv shows.">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="SceneSeed — Audience Suggestions for Live Improv Shows">
+<meta name="twitter:description" content="A free web app for improv teams. Collect audience suggestions through a show-specific QR code with a server-locked submission window.">
+<meta name="twitter:image" content="https://dev.rizzo.cc/sceneseed/og-image.png">
+
+<!-- JSON-LD: Organization + WebApplication -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://dev.rizzo.cc/sceneseed/#org",
+      "name": "SceneSeed",
+      "url": "https://dev.rizzo.cc/sceneseed/",
+      "logo": "https://dev.rizzo.cc/sceneseed/favicon.svg",
+      "sameAs": [
+        "https://www.google.com/",
+        "https://www.google.com/",
+        "https://www.google.com/",
+        "https://www.google.com/"
+      ]
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://dev.rizzo.cc/sceneseed/#site",
+      "url": "https://dev.rizzo.cc/sceneseed/",
+      "name": "SceneSeed",
+      "publisher": { "@id": "https://dev.rizzo.cc/sceneseed/#org" },
+      "inLanguage": "en-US"
+    },
+    {
+      "@type": "WebApplication",
+      "name": "SceneSeed",
+      "url": "https://dev.rizzo.cc/sceneseed/",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Any",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "description": "Audience suggestion collector for improv shows. Hosts create a show, set a submission window, and share a QR code with the audience. Performers view, favorite, and mark suggestions as used from a live dashboard."
+    }
+  ]
+}
+</script>
+
+<!-- Google Analytics 4 -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav" aria-label="Primary">
+      <a href="#how">How it works</a>
+      <a href="privacy.html">Privacy</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <section class="hero">
+    <div class="container">
+      <h1>Audience suggestions, planted from the back row.</h1>
+      <p class="lede">SceneSeed gives improv teams a show-specific QR code so the audience can shout suggestions into a phone instead of into the void. Window opens when you say. Closes when you say. Performers see them live.</p>
+      <a id="cta-signin" class="btn" href="signin.html">Sign in to host a show</a>
+    </div>
+  </section>
+
+  <section id="how">
+    <div class="container">
+      <h2>How it works</h2>
+      <p class="sub">Three steps from doors-open to closing scene.</p>
+      <ol class="steps">
+        <li>
+          <h3>Spin up a show</h3>
+          <p>Create your improv group, then add a show with a title, prompt, and a submission window.</p>
+        </li>
+        <li>
+          <h3>Share the QR code</h3>
+          <p>Each show gets a memorable code like <code>coral-2042</code> and a downloadable QR. Stick it on the program. Project it. Print it on a coaster. Whatever.</p>
+        </li>
+        <li>
+          <h3>Run the room</h3>
+          <p>Suggestions stream into your dashboard. Favorite, hide, search, and flip to a full-screen performer view when you need to read one out loud.</p>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <h2>Why server-locked?</h2>
+      <p class="sub">Because frontend locks are theater — anyone with a browser console can bypass them. SceneSeed enforces the submission window in Google's datacenters via Firebase security rules. A forged request bounces off Google's clock, not ours. Your audience plays fair whether they want to or not.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

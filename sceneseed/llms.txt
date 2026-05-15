@@ -1,0 +1,32 @@
+# SceneSeed
+
+> SceneSeed is a free web app for improv teams and theaters to collect audience suggestions through a show-specific QR code. Hosts create a show, set a submission window, and share the QR with the audience. Submissions are server-time-locked to that window. Performers view, favorite, filter, and mark suggestions as used from a live dashboard.
+
+## What it does
+- Admins create improv groups and shows
+- Each show has a configurable submission window (open/close times) and a public audience URL like `/s/?c=coral-2042`
+- The window is enforced server-side via Firestore security rules — not just on the frontend
+- Audiences scan a QR code and submit short text suggestions during the window
+- Duplicate suggestions are rejected automatically (deterministic doc IDs)
+- Performers see suggestions live, can favorite, hide, mark as used, search, and filter
+- A separate ensemble share link with expiry lets other team members view suggestions read-only
+
+## Stack
+- Vanilla HTML / CSS / JavaScript (no framework, no build step)
+- Firebase Auth (email link passwordless + Google OAuth)
+- Firebase Firestore (security-rules-based time-window enforcement)
+- Hosted on GitHub Pages
+- Google Analytics 4
+
+## Pages
+- [/](/) — landing page, what SceneSeed is, sign in
+- [/privacy.html](/privacy.html) — privacy policy
+- /s/?c={publicCode} — audience submission page (no login)
+- /view/?t={shareToken} — ensemble read-only view (no login, expires after show)
+- /dashboard/ — admin dashboard (login required)
+
+## Public code format
+Show codes follow `{color}-2###` — for example `coral-2042` or `teal-2007`. The "2" prefix is a decade marker for 2026–2029. Shorter color names are used first, longer color names later in the year-tier.
+
+## License
+MIT

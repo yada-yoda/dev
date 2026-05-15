@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Sign in — SceneSeed</title>
+<meta name="description" content="Sign in to SceneSeed to host an improv show.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/signin.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav">
+      <a href="/sceneseed/">Home</a>
+    </nav>
+  </div>
+</header>
+
+<main class="auth-wrap">
+  <section class="auth-card" aria-labelledby="signin-heading">
+    <h1 id="signin-heading">Sign in</h1>
+    <p class="auth-sub">Sign in to host an improv show — create groups, run shows, and view audience suggestions.</p>
+
+    <form id="email-form" class="auth-form" novalidate>
+      <label for="email">Email</label>
+      <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com">
+      <button type="submit" class="btn">Continue with email</button>
+      <p class="auth-fineprint">We'll send a sign-in link to your inbox. No password to remember.</p>
+    </form>
+
+    <div class="auth-divider"><span>or</span></div>
+
+    <button type="button" id="google-btn" class="btn secondary auth-google">
+      <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 16.1 19 13 24 13c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.3C29.3 35 26.8 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.5 16.1 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.3-4.3 5.5l6.2 5.3C40.1 35.2 44 30 44 24c0-1.3-.1-2.4-.4-3.5z"/>
+      </svg>
+      Continue with Google
+    </button>
+
+    <p id="status" class="auth-status" hidden></p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { sendMagicLink, signInWithGoogle, completeMagicLinkSignIn, isMagicLinkReturn, onAuth } from './auth.js';
+
+const DASHBOARD = 'dashboard.html';
+
+const emailForm = document.getElementById('email-form');
+const emailInput = document.getElementById('email');
+const googleBtn = document.getElementById('google-btn');
+const status = document.getElementById('status');
+
+function showStatus(msg, kind = 'info') {
+  status.hidden = false;
+  status.textContent = msg;
+  status.dataset.kind = kind;
+}
+
+// Already signed in? Skip straight to dashboard.
+onAuth((user) => {
+  if (user && !isMagicLinkReturn()) {
+    window.location.replace(DASHBOARD);
+  }
+});
+
+// Magic-link return: complete sign-in automatically.
+(async () => {
+  if (isMagicLinkReturn()) {
+    try {
+      showStatus('Signing you in…');
+      await completeMagicLinkSignIn();
+      window.location.replace(DASHBOARD);
+    } catch (err) {
+      showStatus('Sign-in link is invalid or expired. Please request a new one.', 'error');
+      console.error(err);
+    }
+  }
+})();
+
+emailForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email = emailInput.value.trim();
+  if (!email) return;
+  try {
+    showStatus('Sending sign-in link…');
+    await sendMagicLink(email);
+    showStatus(`Check ${email} for a sign-in link. You can close this tab.`, 'success');
+    emailForm.querySelector('button').disabled = true;
+  } catch (err) {
+    showStatus(err.message || 'Could not send sign-in link.', 'error');
+    console.error(err);
+  }
+});
+
+googleBtn.addEventListener('click', async () => {
+  try {
+    showStatus('Opening Google sign-in…');
+    await signInWithGoogle();
+    window.location.replace(DASHBOARD);
+  } catch (err) {
+    if (err?.code === 'auth/popup-closed-by-user') {
+      showStatus('Sign-in cancelled.');
+    } else {
+      showStatus(err.message || 'Google sign-in failed.', 'error');
+    }
+    console.error(err);
+  }
+});
+</script>
+</body>
+</html>

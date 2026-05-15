@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+
+<title>Suggest a scene — SceneSeed</title>
+<meta name="description" content="Submit a one-line suggestion to the show.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="manifest" href="../site.webmanifest">
+
+<link rel="stylesheet" href="../styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body class="audience">
+
+<main id="aud-main" class="aud-wrap" hidden>
+  <header class="aud-brand" aria-label="SceneSeed">
+    <svg viewBox="0 0 100 100" aria-hidden="true" class="aud-logo">
+      <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+      <circle cx="50" cy="46" r="5"/>
+      <circle cx="62" cy="44" r="5"/>
+      <circle cx="74" cy="42" r="5"/>
+      <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+    </svg>
+    <span>SceneSeed</span>
+  </header>
+
+  <section class="aud-card">
+    <p id="show-label" class="aud-show-label" hidden></p>
+    <h1 id="show-headline" class="aud-headline">…</h1>
+
+    <form id="aud-form" novalidate>
+      <div id="aud-name-row" class="aud-name-row" hidden>
+        <label for="aud-name">First name <span id="aud-name-hint" class="aud-name-hint">(optional)</span></label>
+        <input id="aud-name" name="name" type="text" autocomplete="given-name" maxlength="50" placeholder="Your first name">
+      </div>
+      <label for="aud-text" class="visually-hidden">Your suggestion</label>
+      <textarea id="aud-text" name="text" rows="3" required placeholder="Type your suggestion…" autocomplete="off" autocapitalize="sentences" maxlength="140"></textarea>
+      <div class="aud-counter">
+        <span id="aud-count">0</span> / <span id="aud-max">140</span>
+      </div>
+      <button id="aud-submit" type="submit" class="btn aud-submit">Send suggestion</button>
+    </form>
+
+    <div id="aud-success" class="aud-success" hidden>
+      <div class="aud-success-icon" aria-hidden="true">
+        <svg viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r="28" fill="none" stroke-width="4"/>
+          <path d="M 20 33 L 29 42 L 45 24" fill="none" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h2>Got it!</h2>
+      <p>Thanks for the seed.</p>
+      <button id="aud-again" type="button" class="btn secondary">Send another suggestion</button>
+    </div>
+
+    <div id="aud-state" class="aud-state" hidden></div>
+    <div id="aud-countdown" class="aud-countdown" hidden></div>
+    <div id="aud-message" class="aud-message" hidden></div>
+  </section>
+
+  <footer class="aud-footer">
+    <span id="aud-code-label"></span>
+  </footer>
+</main>
+
+<div id="aud-loading" class="aud-loading">
+  <p>Loading…</p>
+</div>
+
+<div id="aud-not-found" class="aud-loading" hidden>
+  <p id="aud-not-found-msg">This link doesn't lead to a show.</p>
+</div>
+
+<script type="module">
+import { doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js';
+import { db } from '../firebase-config.js';
+import { submitSuggestion } from '../submissions.js';
+import { windowState } from '../shows.js';
+import { checkProfanity } from '../profanity.js';
+
+// Hidden grace: keep the form usable for an extra few seconds AFTER the
+// official close time so a slow audience or laggy network still goes through.
+// The countdown displays the official close (e.g. 2:30:00), but the form stays
+// active until officialClose + cushion (e.g. 2:30:03). Firestore rules apply
+// the same grace server-side so submissions inside the cushion actually save.
+// We don't surface the cushion in the UI — it's a quiet generosity.
+const CLIENT_CUSHION_MS = 3000;
+
+const code = new URLSearchParams(window.location.search).get('c');
+
+const main        = document.getElementById('aud-main');
+const loading     = document.getElementById('aud-loading');
+const notFound    = document.getElementById('aud-not-found');
+const notFoundMsg = document.getElementById('aud-not-found-msg');
+const labelEl     = document.getElementById('show-label');
+const headlineEl  = document.getElementById('show-headline');
+const codeLabel   = document.getElementById('aud-code-label');
+
+const form        = document.getElementById('aud-form');
+const textArea    = document.getElementById('aud-text');
+const counterEl   = document.getElementById('aud-count');
+const maxEl       = document.getElementById('aud-max');
+const submitBtn   = document.getElementById('aud-submit');
+const stateEl     = document.getElementById('aud-state');
+const countdownEl = document.getElementById('aud-countdown');
+const messageEl   = document.getElementById('aud-message');
+const successEl   = document.getElementById('aud-success');
+const againBtn    = document.getElementById('aud-again');
+const nameRow     = document.getElementById('aud-name-row');
+const nameInput   = document.getElementById('aud-name');
+const nameHint    = document.getElementById('aud-name-hint');
+
+let event = null;
+let tickHandle = null;
+
+function setMessage(html, kind) {
+  messageEl.hidden = false;
+  messageEl.dataset.kind = kind;
+  messageEl.innerHTML = html;
+}
+function clearMessage() {
+  messageEl.hidden = true;
+  messageEl.removeAttribute('data-kind');
+  messageEl.innerHTML = '';
+}
+
+function fmtTime(ts) {
+  const d = ts?.toDate?.();
+  if (!d) return '';
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+function fmtDateTime(ts) {
+  const d = ts?.toDate?.();
+  if (!d) return '';
+  return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function fmtCountdown(ms) {
+  if (ms <= 0) return 'Closes in 0s';
+  const totalSec = Math.floor(ms / 1000);
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  const ss = String(s).padStart(2, '0');
+  if (h >= 1) return `Closes in ${h}h ${String(m).padStart(2, '0')}m ${ss}s`;
+  if (m >= 1) return `Closes in ${m}m ${ss}s`;
+  return `Closes in ${s}s`;
+}
+
+// Effective form-lock time = official close + cushion (audience-side leniency).
+function effectiveCloseMs() {
+  const t = event?.submissionCloseAt?.toMillis?.();
+  return t ? t + CLIENT_CUSHION_MS : null;
+}
+
+// Compute current state, factoring in the cushion. Mirrors windowState() from
+// shows.js but applies the audience-only cushion for `auto` mode.
+function audienceWindowState() {
+  if (!event) return { state: 'closed' };
+  if (event.manualStatus === 'force_open') return { state: 'open' };
+  if (event.manualStatus === 'force_closed') return { state: 'closed' };
+  const open = event.submissionOpenAt?.toDate?.();
+  const close = effectiveCloseMs();
+  if (!open || !close) return { state: 'closed' };
+  const now = Date.now();
+  if (now < open.getTime()) return { state: 'before' };
+  if (now > close) return { state: 'after' };
+  return { state: 'open' };
+}
+
+function refreshState() {
+  if (!event) return false;
+  // Rounds gate: if the show has rounds but none is active, lock the form
+  // regardless of the time-based window. Server rules enforce this too.
+  const rounds = Array.isArray(event.rounds) ? event.rounds : [];
+  if (rounds.length > 0 && !event.activeRoundId) {
+    stateEl.hidden = false;
+    stateEl.dataset.kind = 'closed';
+    stateEl.textContent = 'Waiting for the next round…';
+    countdownEl.hidden = true;
+    submitBtn.disabled = true;
+    textArea.disabled = true;
+    if (nameInput) nameInput.disabled = true;
+    return false;
+  }
+  // Re-enable the name input on every state refresh in case we previously
+  // disabled it during a rounds-locked phase.
+  if (nameInput) nameInput.disabled = false;
+
+  const ws = audienceWindowState();
+  stateEl.hidden = false;
+  stateEl.dataset.kind = ws.state;
+  if (ws.state === 'open') {
+    const closeT = fmtTime(event.submissionCloseAt);
+    stateEl.textContent = event.manualStatus === 'force_open'
+      ? 'Submissions are open.'
+      : closeT ? `Submissions are open · closes ${closeT}` : 'Submissions are open.';
+    submitBtn.disabled = false;
+    textArea.disabled = false;
+
+    // Countdown displays time-to-OFFICIAL-close (not the cushioned lock time).
+    // Once the official close passes, hide the countdown silently — the form
+    // stays active for the cushion duration, but we don't draw attention to it.
+    if (event.manualStatus === 'auto') {
+      const officialClose = event.submissionCloseAt?.toMillis?.() ?? 0;
+      const remaining = officialClose - Date.now();
+      if (remaining > 0) {
+        countdownEl.hidden = false;
+        countdownEl.textContent = fmtCountdown(remaining);
+        countdownEl.classList.toggle('urgent', remaining < 60_000);
+        countdownEl.classList.toggle('critical', remaining < 10_000);
+      } else {
+        countdownEl.hidden = true;
+        countdownEl.classList.remove('urgent', 'critical');
+      }
+    } else {
+      countdownEl.hidden = true;
+    }
+    return true;
+  }
+  // closed states
+  countdownEl.hidden = true;
+  if (ws.state === 'before') {
+    stateEl.textContent = `Submissions open ${fmtDateTime(event.submissionOpenAt)}.`;
+  } else if (ws.state === 'after') {
+    stateEl.textContent = 'Submissions are closed for this show.';
+  } else {
+    stateEl.textContent = 'Submissions are closed.';
+  }
+  submitBtn.disabled = true;
+  textArea.disabled = true;
+  return false;
+}
+
+function startTicking() {
+  if (tickHandle) return;
+  tickHandle = setInterval(refreshState, 1000);
+}
+
+function showSuccess() {
+  form.hidden = true;
+  messageEl.hidden = true;
+  successEl.hidden = false;
+}
+function showFormAgain() {
+  successEl.hidden = true;
+  messageEl.hidden = true;
+  form.hidden = false;
+  textArea.value = '';
+  // Don't clear the name — let repeat submitters keep their handle.
+  updateCounter();
+  textArea.focus();
+}
+
+function showNotFound(msg) {
+  loading.hidden = true;
+  main.hidden = true;
+  notFound.hidden = false;
+  if (msg) notFoundMsg.textContent = msg;
+}
+
+// Apply event data to the visible header (label, headline, code, max length,
+// name field state). Called on first snapshot AND on every subsequent live
+// update — so when the host opens a new round, the audience's headline switches
+// without a manual refresh.
+function paintEventDisplay() {
+  document.title = `${event.title || 'Suggestion'} — SceneSeed`;
+
+    // ─── Rounds-aware prompt selection (v0.10.0+) ─────────
+    // If the show has rounds, the active round's prompt is the headline and
+    // the round label rides along with the show title above it. If rounds
+    // exist but none is active, the audience sees a "Waiting for the next
+    // round" lock (handled in refreshState below).
+    const rounds = Array.isArray(event.rounds) ? event.rounds : [];
+    const activeRound = rounds.find((r) => r.id === event.activeRoundId) || null;
+    const effectivePrompt = activeRound
+      ? activeRound.promptText
+      : (rounds.length === 0 ? event.promptText : '');
+
+    const labelBits = [event.title, activeRound ? activeRound.label : ''].filter(Boolean);
+    if (labelBits.length) {
+      labelEl.textContent = labelBits.join(' · ');
+      labelEl.hidden = false;
+    } else {
+      labelEl.hidden = true;
+    }
+
+    if (effectivePrompt) {
+      headlineEl.textContent = effectivePrompt;
+    } else if (rounds.length > 0) {
+      // Rounds defined but none active — headline reads as the show title
+      // (the lock screen will explain there's no round open right now).
+      headlineEl.textContent = event.title || '(untitled show)';
+    } else {
+      headlineEl.textContent = event.title || '(untitled show)';
+    }
+    codeLabel.textContent = event.publicCode;
+
+    const max = Number(event.maxSuggestionLength) || 140;
+    textArea.maxLength = max;
+    maxEl.textContent = String(max);
+    updateCounter();
+
+    // Name field: show when host opts into 'optional' or 'required' collection.
+    const mode = event.nameCollection || 'off';
+    if (mode === 'off') {
+      nameRow.hidden = true;
+      nameInput.required = false;
+    } else {
+      nameRow.hidden = false;
+      nameInput.required = (mode === 'required');
+      nameHint.textContent = mode === 'required' ? '(required)' : '(optional)';
+    }
+
+}
+
+let firstSnap = true;
+function load() {
+  if (!code) {
+    showNotFound("This link is missing a show code.");
+    return;
+  }
+  // Live subscription on the event doc — when the host opens a new round
+  // or changes the prompt, the audience's headline updates in place.
+  onSnapshot(
+    doc(db, 'events', code),
+    (snap) => {
+      if (!snap.exists()) {
+        showNotFound("That show couldn't be found. Double-check the link.");
+        return;
+      }
+      event = { id: snap.id, ...snap.data() };
+      paintEventDisplay();
+      refreshState();
+      if (firstSnap) {
+        firstSnap = false;
+        loading.hidden = true;
+        main.hidden = false;
+        startTicking();
+      }
+    },
+    (err) => {
+      console.error(err);
+      showNotFound("Couldn't load this show. Try refreshing the page.");
+    }
+  );
+}
+
+function updateCounter() {
+  const n = textArea.value.length;
+  counterEl.textContent = String(n);
+  counterEl.classList.toggle('over', n >= (Number(textArea.maxLength) || 140) * 0.9);
+}
+
+textArea.addEventListener('input', updateCounter);
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!event) return;
+  clearMessage();
+  if (!refreshState()) {
+    setMessage('Submissions are closed right now.', 'error');
+    return;
+  }
+  const text = textArea.value.trim();
+  if (!text) return;
+
+  // Client-side name validation when required (server rule enforces it too).
+  const name = (nameInput.value || '').trim();
+  if (event.nameCollection === 'required' && !name) {
+    setMessage('A first name is required for this show.', 'error');
+    nameInput.focus();
+    return;
+  }
+
+  // Profanity / hate-term gate. Hate terms always blocked. Profanity gate
+  // controlled by the show's profanityFilterEnabled toggle.
+  const profCheck = checkProfanity(text, {
+    allowProfanity: event.profanityFilterEnabled === false
+  });
+  if (!profCheck.ok) {
+    const msg = profCheck.reason === 'hate'
+      ? "We don't allow hateful language on the stage. Try a different suggestion."
+      : "Let's keep it stage-safe — try a cleaner version.";
+    setMessage(msg, 'warn');
+    textArea.focus();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  const wasLabel = submitBtn.textContent;
+  submitBtn.textContent = 'Sending…';
+  try {
+    await submitSuggestion(event.publicCode, text, name, event.activeRoundId || '');
+    showSuccess();
+  } catch (err) {
+    if (err.code === 'duplicate') {
+      setMessage('Someone beat you to that one. Try another.', 'warn');
+    } else if (err.code === 'empty') {
+      setMessage('That submission was empty.', 'error');
+    } else {
+      // Most likely the window closed between the page load and submit, or the
+      // text exceeds the max, or profanity/dedup at the rule layer.
+      const ws = windowState(event);
+      if (ws.state !== 'open') {
+        setMessage('Submissions are closed right now.', 'error');
+      } else {
+        setMessage("That suggestion couldn't be sent. Try a different one.", 'error');
+      }
+      console.error(err);
+    }
+  } finally {
+    submitBtn.textContent = wasLabel;
+    refreshState();
+  }
+});
+
+againBtn.addEventListener('click', () => {
+  showFormAgain();
+});
+
+// Force a clean form state whenever the page is shown. This covers the browser
+// back-forward cache (bfcache) restoring the success card from a previous visit:
+// without this, hitting "back" or reopening the same incognito tab would resume
+// on the success state even though the audience hasn't actually submitted yet.
+window.addEventListener('pageshow', () => {
+  successEl.hidden = true;
+  messageEl.hidden = true;
+  form.hidden = false;
+});
+
+load();
+</script>
+</body>
+</html>

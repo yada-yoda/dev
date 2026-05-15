@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Show — SceneSeed</title>
+<meta name="description" content="Manage an improv show on SceneSeed.">
+<meta name="version" content="1.2.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="noindex">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/show.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="manifest" href="site.webmanifest">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="dashboard.html" aria-label="SceneSeed dashboard">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav user-nav" aria-label="Account" hidden>
+      <span id="user-email" class="user-email"></span>
+      <button id="signout-btn" type="button" class="link-btn">Sign out</button>
+    </nav>
+  </div>
+</header>
+
+<main id="show-main" class="container dash" hidden>
+  <p class="breadcrumb"><a id="back-to-group" href="dashboard.html">← Back</a></p>
+
+  <section class="dash-hero">
+    <div class="group-head">
+      <div>
+        <h1 id="show-title">…</h1>
+        <p id="show-meta" class="lede"></p>
+      </div>
+      <div class="group-actions">
+        <a id="perform-link" class="btn" href="#">Perform</a>
+        <a id="summary-link" class="btn secondary" href="#">Summary</a>
+        <button type="button" id="edit-btn" class="btn secondary">Edit</button>
+        <button type="button" id="delete-btn" class="btn danger">Delete</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="dash-section rounds-section">
+    <div class="dash-section-head">
+      <h2>Rounds</h2>
+      <button type="button" id="add-round-btn" class="btn">+ Add round</button>
+    </div>
+    <p class="dialog-sub" id="rounds-help">Rounds are optional. Add one to run multiple prompts in a single show — like "Round 1: Location", "Round 2: Relationship". Without rounds, the show uses the single prompt below.</p>
+    <div id="rounds-list" class="rounds-list" hidden></div>
+  </section>
+
+  <div class="show-grid">
+    <section class="dash-section show-grid-main">
+      <div class="dash-section-head">
+        <h2>Suggestions</h2>
+        <span id="sug-summary" class="dialog-sub"></span>
+      </div>
+
+      <div class="sug-toolbar">
+        <div class="sug-tabs" role="tablist" aria-label="Filter suggestions">
+          <button type="button" class="sug-tab is-active" data-filter="all" role="tab" aria-selected="true">All <span class="sug-tab-n" data-count="all">0</span></button>
+          <button type="button" class="sug-tab" data-filter="favorite" role="tab" aria-selected="false">★ Favorites <span class="sug-tab-n" data-count="favorite">0</span></button>
+          <button type="button" class="sug-tab" data-filter="hidden" role="tab" aria-selected="false">Hidden <span class="sug-tab-n" data-count="hidden">0</span></button>
+          <button type="button" class="sug-tab" data-filter="used" role="tab" aria-selected="false">Used <span class="sug-tab-n" data-count="used">0</span></button>
+        </div>
+        <select id="sug-round-filter" class="sug-round-filter" hidden aria-label="Filter by round">
+          <option value="">All rounds</option>
+        </select>
+        <input type="search" id="sug-search" class="sug-search" placeholder="Search suggestions…" autocomplete="off" aria-label="Search suggestions">
+        <button type="button" id="sug-download" class="link-btn sug-download" title="Download all suggestions as CSV">Download CSV</button>
+      </div>
+
+      <div id="sug-loading" class="dash-empty"><p>Loading…</p></div>
+      <div id="sug-empty" class="dash-empty" hidden>
+        <p id="sug-empty-msg">No suggestions yet. Share the QR code or link with the audience to get the seeds rolling.</p>
+      </div>
+      <div id="sug-list" class="sug-list" hidden></div>
+    </section>
+
+    <aside class="dash-section show-grid-side">
+      <h2>Public code</h2>
+      <div class="code-row">
+        <code id="show-code" class="big-code">…</code>
+        <span id="show-state" class="show-state">…</span>
+      </div>
+      <div id="qr-card" class="qr-card">
+        <div id="qr-display" class="qr-display" aria-label="QR code for the audience link">
+          <span class="qr-loading">Generating QR…</span>
+        </div>
+        <button type="button" id="qr-download" class="link-btn">Download QR (PNG)</button>
+      </div>
+      <p class="public-url-line">
+        <a id="public-url" href="#" target="_blank" rel="noopener"></a>
+      </p>
+      <button type="button" id="copy-url" class="link-btn">Copy link</button>
+    </aside>
+  </div>
+
+  <section class="dash-section">
+    <h2>Prompt</h2>
+    <p id="show-prompt" class="lede"></p>
+    <p id="no-prompt" class="dialog-sub" hidden><em>No prompt set. Audience will just see the show title.</em></p>
+  </section>
+
+  <section class="dash-section">
+    <h2>Windows</h2>
+    <dl class="window-list">
+      <dt>Show runs</dt>
+      <dd id="w-show">…</dd>
+      <dt>Submissions open</dt>
+      <dd id="w-open">…</dd>
+      <dt>Submissions close</dt>
+      <dd id="w-close">…</dd>
+      <dt>Timezone</dt>
+      <dd id="w-tz">…</dd>
+      <dt>Max suggestion length</dt>
+      <dd id="w-max">…</dd>
+      <dt>Manual override</dt>
+      <dd id="w-manual">…</dd>
+    </dl>
+  </section>
+
+  <section class="dash-section">
+    <h2>Ensemble share</h2>
+    <p class="dialog-sub">Share a read-only view of the suggestion feed with ensemble members. They don't sign in — just open the link. The share auto-expires after the date you set.</p>
+
+    <label class="field-check">
+      <input type="checkbox" id="share-enabled">
+      <span>Share suggestions with anyone who has the link</span>
+    </label>
+
+    <div id="share-active" hidden>
+      <label class="field" style="margin-top:14px">
+        <span>Share expires</span>
+        <input type="datetime-local" id="share-expires">
+      </label>
+      <p class="public-url-line" style="margin-top:14px">
+        <a id="share-url" href="#" target="_blank" rel="noopener"></a>
+      </p>
+      <div style="display:inline-flex;gap:14px;margin-top:6px">
+        <button type="button" id="copy-share-url" class="link-btn">Copy share link</button>
+        <button type="button" id="save-share" class="link-btn">Save expiry</button>
+      </div>
+      <p id="share-status" class="dialog-sub" hidden style="margin-top:10px"></p>
+    </div>
+  </section>
+</main>
+
+<div id="show-loading" class="dash-loading">
+  <p>Loading…</p>
+</div>
+
+<div id="show-error" class="dash-loading" hidden>
+  <p id="show-error-msg">Show not found.</p>
+  <p><a href="dashboard.html">← Back to dashboard</a></p>
+</div>
+
+<dialog id="edit-dialog" class="dialog dialog-lg" aria-labelledby="edit-title">
+  <form id="edit-form" class="dialog-form" novalidate>
+    <h2 id="edit-title">Edit show</h2>
+
+    <label class="field">
+      <span>Title</span>
+      <input type="text" name="title" required maxlength="120" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Venue <em>(optional)</em></span>
+      <input type="text" name="venueName" maxlength="120" autocomplete="off">
+    </label>
+    <label class="field">
+      <span>Prompt template <em>(optional)</em></span>
+      <select name="promptTemplate">
+        <option value="">— Pick a template —</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Prompt <em>(optional)</em></span>
+      <textarea name="promptText" maxlength="500" rows="2"></textarea>
+    </label>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Show starts</span>
+        <input type="datetime-local" name="showStartsAt" required>
+      </label>
+      <label class="field">
+        <span>Show ends</span>
+        <input type="datetime-local" name="showEndsAt" required>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Submissions open</span>
+        <input type="datetime-local" name="submissionOpenAt" required>
+      </label>
+      <label class="field">
+        <span>Submissions close</span>
+        <input type="datetime-local" name="submissionCloseAt" required>
+      </label>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span>Max suggestion length</span>
+        <input type="number" name="maxSuggestionLength" min="20" max="500">
+      </label>
+      <label class="field">
+        <span>Manual override</span>
+        <select name="manualStatus">
+          <option value="auto">Auto (use windows above)</option>
+          <option value="force_open">Force open</option>
+          <option value="force_closed">Force closed</option>
+        </select>
+      </label>
+    </div>
+
+    <label class="field">
+      <span>Ask audience for a first name</span>
+      <select name="nameCollection">
+        <option value="off">Off — anonymous submissions only</option>
+        <option value="optional">Optional — audience can choose</option>
+        <option value="required">Required — submission needs a name</option>
+      </select>
+    </label>
+
+    <label class="field-check">
+      <input type="checkbox" name="profanityFilterEnabled">
+      <span>Filter profanity & hate terms</span>
+    </label>
+    <label class="field-check">
+      <input type="checkbox" name="duplicateDetectionEnabled">
+      <span>Reject duplicate suggestions</span>
+    </label>
+
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="round-dialog" class="dialog" aria-labelledby="round-dialog-title">
+  <form id="round-form" class="dialog-form" novalidate>
+    <h2 id="round-dialog-title">Add round</h2>
+    <p class="dialog-sub" id="round-dialog-sub">Each round is one prompt. The host opens one round at a time during the show.</p>
+    <label class="field">
+      <span>Label</span>
+      <input type="text" name="label" maxlength="60" autocomplete="off" placeholder="Round 1">
+    </label>
+    <label class="field">
+      <span>Prompt template <em>(optional)</em></span>
+      <select name="promptTemplate">
+        <option value="">— Pick a template —</option>
+      </select>
+    </label>
+    <label class="field">
+      <span>Prompt</span>
+      <textarea name="promptText" maxlength="500" rows="2" required placeholder="Give us a location."></textarea>
+    </label>
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="submit" class="btn">Save round</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="delete-dialog" class="dialog" aria-labelledby="del-title">
+  <div class="dialog-form">
+    <h2 id="del-title">Delete show?</h2>
+    <p class="dialog-sub">This permanently deletes <strong id="del-name"></strong> and any suggestions submitted to it. This can't be undone.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn secondary" data-close>Cancel</button>
+      <button type="button" id="confirm-delete" class="btn danger">Delete show</button>
+    </div>
+  </div>
+</dialog>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+    </div>
+    <div>SceneSeed v1.2.0 · MIT</div>
+  </div>
+</footer>
+
+<script type="module">
+import { onAuth, signOut } from './auth.js';
+import { getShow, updateShow, deleteShow, toInputValue, windowState,
+         addRound, updateRound, deleteRound, setActiveRound, closeAllRounds } from './shows.js';
+import { listSuggestions, setSuggestionFlag, deleteSuggestion, triggerCsvDownload } from './host-suggestions.js';
+import { generateQrSvg, generateQrPngDataUrl, downloadDataUrl } from './qr.js';
+import { populatePromptTemplateSelect } from './prompts.js';
+
+const code = new URLSearchParams(window.location.search).get('code');
+
+const main = document.getElementById('show-main');
+const loading = document.getElementById('show-loading');
+const errorEl = document.getElementById('show-error');
+const errorMsg = document.getElementById('show-error-msg');
+const userNav = document.querySelector('.user-nav');
+const userEmail = document.getElementById('user-email');
+const signoutBtn = document.getElementById('signout-btn');
+
+const titleEl = document.getElementById('show-title');
+const metaEl = document.getElementById('show-meta');
+const codeEl = document.getElementById('show-code');
+const stateEl = document.getElementById('show-state');
+const publicUrlEl = document.getElementById('public-url');
+const copyUrlBtn = document.getElementById('copy-url');
+const promptEl = document.getElementById('show-prompt');
+const noPromptEl = document.getElementById('no-prompt');
+const wShow = document.getElementById('w-show');
+const wOpen = document.getElementById('w-open');
+const wClose = document.getElementById('w-close');
+const wTz = document.getElementById('w-tz');
+const wMax = document.getElementById('w-max');
+const wManual = document.getElementById('w-manual');
+const backLink = document.getElementById('back-to-group');
+
+const performLink = document.getElementById('perform-link');
+const summaryLink = document.getElementById('summary-link');
+const qrDisplay = document.getElementById('qr-display');
+const qrDownloadBtn = document.getElementById('qr-download');
+const shareEnabledEl = document.getElementById('share-enabled');
+const shareActive = document.getElementById('share-active');
+const shareExpiresEl = document.getElementById('share-expires');
+const shareUrlEl = document.getElementById('share-url');
+const copyShareBtn = document.getElementById('copy-share-url');
+const saveShareBtn = document.getElementById('save-share');
+const shareStatus = document.getElementById('share-status');
+const editBtn = document.getElementById('edit-btn');
+const editDialog = document.getElementById('edit-dialog');
+const editForm = document.getElementById('edit-form');
+
+const deleteBtn = document.getElementById('delete-btn');
+const deleteDialog = document.getElementById('delete-dialog');
+const delName = document.getElementById('del-name');
+const confirmDeleteBtn = document.getElementById('confirm-delete');
+
+let currentShow = null;
+let unsubSuggestions = null;
+let allSuggestions = [];
+let activeFilter = 'all';
+let searchTerm = '';
+
+const sugLoading = document.getElementById('sug-loading');
+const sugEmpty = document.getElementById('sug-empty');
+const sugEmptyMsg = document.getElementById('sug-empty-msg');
+const sugList = document.getElementById('sug-list');
+const sugSearch = document.getElementById('sug-search');
+const sugSummary = document.getElementById('sug-summary');
+const sugTabs = document.querySelectorAll('.sug-tab');
+const sugDownload = document.getElementById('sug-download');
+const sugRoundFilter = document.getElementById('sug-round-filter');
+
+const roundsList = document.getElementById('rounds-list');
+const addRoundBtn = document.getElementById('add-round-btn');
+const roundDialog = document.getElementById('round-dialog');
+const roundForm = document.getElementById('round-form');
+const roundDialogTitle = document.getElementById('round-dialog-title');
+let editingRoundId = null;            // null = new round; otherwise the id being edited
+let activeRoundFilter = '';           // '' = all rounds
+
+function showError(msg) {
+  loading.hidden = true;
+  main.hidden = true;
+  errorEl.hidden = false;
+  errorMsg.textContent = msg;
+}
+
+// ── Suggestions feed ─────────────────────────────────────
+function escHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  }[c]));
+}
+
+function relTime(d) {
+  if (!d) return '';
+  const ms = Date.now() - d.getTime();
+  const sec = Math.floor(ms / 1000);
+  if (sec < 10) return 'just now';
+  if (sec < 60) return `${sec}s ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return d.toLocaleDateString();
+}
+
+function renderCard(s) {
+  const created = s.createdAt?.toDate?.();
+  const time = created
+    ? `${created.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' })} · ${relTime(created)}`
+    : '';
+  const cls = ['sug-card'];
+  if (s.isFavorite) cls.push('is-favorite');
+  if (s.isHidden) cls.push('is-hidden');
+  if (s.isUsed) cls.push('is-used');
+  const submitterChip = s.submitterName
+    ? `<span class="sug-submitter">${escHtml(s.submitterName)}</span>`
+    : '';
+  const roundChip = (currentShow?.rounds?.length && s.roundId)
+    ? `<span class="sug-round">${escHtml(roundLabelFor(s.roundId))}</span>`
+    : '';
+  return `
+    <article class="${cls.join(' ')}" data-id="${escHtml(s.id)}">
+      <div class="sug-text">${escHtml(s.text)}</div>
+      <div class="sug-meta">
+        <span class="sug-time">${roundChip}${submitterChip}${escHtml(time)}</span>
+        <div class="sug-actions">
+          <button type="button" class="sug-btn sug-fav"  data-action="favorite" title="${s.isFavorite ? 'Unfavorite' : 'Favorite'}" aria-label="${s.isFavorite ? 'Unfavorite' : 'Favorite'}" aria-pressed="${!!s.isFavorite}">${s.isFavorite ? '★' : '☆'}</button>
+          <button type="button" class="sug-btn sug-hide" data-action="hidden"   title="${s.isHidden   ? 'Unhide'     : 'Hide'}"      aria-label="${s.isHidden   ? 'Unhide'     : 'Hide'}"      aria-pressed="${!!s.isHidden}">${s.isHidden ? '↺' : '⊘'}</button>
+          <button type="button" class="sug-btn sug-used" data-action="used"     title="${s.isUsed     ? 'Mark unused' : 'Mark used'}" aria-label="${s.isUsed     ? 'Mark unused' : 'Mark used'}" aria-pressed="${!!s.isUsed}">${s.isUsed ? '✓' : '○'}</button>
+          <button type="button" class="sug-btn sug-del"  data-action="delete"   title="Delete"   aria-label="Delete">✕</button>
+        </div>
+      </div>
+    </article>
+  `;
+}
+
+function renderSuggestions() {
+  sugLoading.hidden = true;
+
+  const counts = {
+    all: allSuggestions.length,
+    favorite: allSuggestions.filter((s) => s.isFavorite).length,
+    hidden:   allSuggestions.filter((s) => s.isHidden).length,
+    used:     allSuggestions.filter((s) => s.isUsed).length
+  };
+  document.querySelectorAll('.sug-tab-n').forEach((el) => {
+    el.textContent = counts[el.dataset.count] ?? 0;
+  });
+
+  let filtered = allSuggestions;
+  if (activeFilter === 'favorite') filtered = filtered.filter((s) => s.isFavorite);
+  else if (activeFilter === 'hidden') filtered = filtered.filter((s) => s.isHidden);
+  else if (activeFilter === 'used') filtered = filtered.filter((s) => s.isUsed);
+
+  if (activeRoundFilter === '__none__') {
+    filtered = filtered.filter((s) => !s.roundId);
+  } else if (activeRoundFilter) {
+    filtered = filtered.filter((s) => s.roundId === activeRoundFilter);
+  }
+
+  if (searchTerm) {
+    const t = searchTerm.toLowerCase();
+    filtered = filtered.filter((s) => (s.text || '').toLowerCase().includes(t));
+  }
+
+  if (filtered.length === 0) {
+    sugList.hidden = true;
+    sugList.innerHTML = '';
+    sugEmpty.hidden = false;
+    if (counts.all === 0) {
+      sugEmptyMsg.textContent = 'No suggestions yet. Share the QR code or link with the audience to get the seeds rolling.';
+    } else if (searchTerm) {
+      sugEmptyMsg.textContent = `No matches for "${searchTerm}".`;
+    } else {
+      sugEmptyMsg.textContent = `No suggestions in this filter yet.`;
+    }
+  } else {
+    sugEmpty.hidden = true;
+    sugList.hidden = false;
+    sugList.innerHTML = filtered.map(renderCard).join('');
+  }
+
+  sugSummary.textContent = activeFilter === 'all' && !searchTerm
+    ? (counts.all === 0 ? '' : `${counts.all} total`)
+    : `${filtered.length} of ${counts.all}`;
+}
+
+function startSuggestions(publicCode) {
+  if (unsubSuggestions) unsubSuggestions();
+  unsubSuggestions = listSuggestions(publicCode, (list) => {
+    allSuggestions = list;
+    renderSuggestions();
+  });
+}
+
+sugTabs.forEach((tab) => {
+  tab.addEventListener('click', () => {
+    sugTabs.forEach((t) => {
+      t.classList.remove('is-active');
+      t.setAttribute('aria-selected', 'false');
+    });
+    tab.classList.add('is-active');
+    tab.setAttribute('aria-selected', 'true');
+    activeFilter = tab.dataset.filter;
+    renderSuggestions();
+  });
+});
+
+sugSearch.addEventListener('input', () => {
+  searchTerm = sugSearch.value.trim();
+  renderSuggestions();
+});
+
+// ── CSV download (helpers shared via host-suggestions.js) ─────
+sugDownload.addEventListener('click', () => {
+  if (!currentShow) return;
+  triggerCsvDownload(currentShow, allSuggestions);
+});
+
+sugList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.sug-btn');
+  if (!btn) return;
+  const card = btn.closest('.sug-card');
+  if (!card || !currentShow) return;
+  const hash = card.dataset.id;
+  const action = btn.dataset.action;
+  const s = allSuggestions.find((x) => x.id === hash);
+  if (!s) return;
+
+  btn.disabled = true;
+  try {
+    if (action === 'favorite') {
+      await setSuggestionFlag(currentShow.publicCode, hash, 'isFavorite', !s.isFavorite);
+    } else if (action === 'hidden') {
+      await setSuggestionFlag(currentShow.publicCode, hash, 'isHidden', !s.isHidden);
+    } else if (action === 'used') {
+      await setSuggestionFlag(currentShow.publicCode, hash, 'isUsed', !s.isUsed);
+    } else if (action === 'delete') {
+      await deleteSuggestion(currentShow.publicCode, hash);
+    }
+  } catch (err) {
+    alert(`Couldn't update: ${err.message || err}`);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function fmt(ts) {
+  if (!ts) return '—';
+  const d = ts.toDate?.() || new Date(ts);
+  return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+function paint(show) {
+  currentShow = show;
+  titleEl.textContent = show.title;
+  document.title = `${show.title} — SceneSeed`;
+
+  const venue = show.venueName ? ` · ${show.venueName}` : '';
+  metaEl.textContent = fmt(show.showStartsAt) + venue;
+
+  codeEl.textContent = show.publicCode;
+  const ws = windowState(show);
+  const labels = { open: 'Open now', before: 'Opens soon', after: 'Closed', closed: 'Closed' };
+  stateEl.textContent = labels[ws.state] || ws.state;
+  stateEl.className = 'show-state state-' + ws.state;
+
+  // Public URL
+  const path = window.location.pathname;
+  const dir = path.substring(0, path.lastIndexOf('/') + 1);
+  const url = window.location.origin + dir + 's/?c=' + encodeURIComponent(show.publicCode);
+  publicUrlEl.href = url;
+  publicUrlEl.textContent = url;
+
+  if (show.promptText) {
+    promptEl.textContent = show.promptText;
+    promptEl.hidden = false;
+    noPromptEl.hidden = true;
+  } else {
+    promptEl.hidden = true;
+    noPromptEl.hidden = false;
+  }
+
+  wShow.textContent = `${fmt(show.showStartsAt)} → ${fmt(show.showEndsAt)}`;
+  wOpen.textContent = fmt(show.submissionOpenAt);
+  wClose.textContent = fmt(show.submissionCloseAt);
+  wTz.textContent = show.timezone || '—';
+  wMax.textContent = `${show.maxSuggestionLength || 140} chars`;
+  wManual.textContent = show.manualStatus === 'auto' ? 'Auto (using window times)' :
+                        show.manualStatus === 'force_open' ? 'Forced OPEN' : 'Forced CLOSED';
+
+  if (show.groupId) {
+    backLink.href = 'group.html?id=' + encodeURIComponent(show.groupId);
+    backLink.textContent = '← Back to group';
+  }
+
+  performLink.href = 'perform.html?code=' + encodeURIComponent(show.publicCode);
+  summaryLink.href = 'summary.html?code=' + encodeURIComponent(show.publicCode);
+
+  paintShareUI(show);
+  paintQr(url);
+  paintRounds(show);
+}
+
+// ── Rounds panel ────────────────────────────────────────
+function roundLabelFor(roundId) {
+  if (!roundId || !currentShow) return '';
+  const r = (currentShow.rounds || []).find((rr) => rr.id === roundId);
+  return r ? r.label : roundId;
+}
+
+function paintRounds(show) {
+  const rounds = Array.isArray(show.rounds) ? show.rounds : [];
+  if (rounds.length === 0) {
+    roundsList.hidden = true;
+    roundsList.innerHTML = '';
+    sugRoundFilter.hidden = true;
+    return;
+  }
+  roundsList.hidden = false;
+  const active = show.activeRoundId || '';
+  roundsList.innerHTML = rounds.map((r, i) => {
+    const isActive = r.id === active;
+    const cls = ['round-card'];
+    if (isActive) cls.push('is-active');
+    return `
+      <div class="${cls.join(' ')}" data-id="${escHtml(r.id)}">
+        <div class="round-card-info">
+          <h3>${escHtml(r.label || `Round ${i + 1}`)}${isActive ? ' <span class="round-active-badge">Active</span>' : ''}</h3>
+          <p class="round-card-prompt">${escHtml(r.promptText)}</p>
+        </div>
+        <div class="round-card-actions">
+          ${isActive
+            ? `<button type="button" class="btn secondary" data-action="close-round">Close round</button>`
+            : `<button type="button" class="btn" data-action="open-round">Open this round</button>`}
+          <button type="button" class="link-btn" data-action="edit-round">Edit</button>
+          <button type="button" class="link-btn round-delete" data-action="delete-round">Delete</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Populate the round filter for the suggestions feed
+  sugRoundFilter.hidden = false;
+  const prev = sugRoundFilter.value;
+  while (sugRoundFilter.options.length > 1) sugRoundFilter.remove(1);
+  for (const r of rounds) {
+    const opt = document.createElement('option');
+    opt.value = r.id;
+    opt.textContent = r.label || r.id;
+    sugRoundFilter.appendChild(opt);
+  }
+  if (allSuggestions.some((s) => !s.roundId)) {
+    const opt = document.createElement('option');
+    opt.value = '__none__';
+    opt.textContent = '(no round)';
+    sugRoundFilter.appendChild(opt);
+  }
+  sugRoundFilter.value = prev;
+}
+
+roundsList.addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn || !currentShow) return;
+  const card = btn.closest('.round-card');
+  if (!card) return;
+  const roundId = card.dataset.id;
+  const action = btn.dataset.action;
+  const round = (currentShow.rounds || []).find((r) => r.id === roundId);
+  if (!round) return;
+
+  btn.disabled = true;
+  try {
+    if (action === 'open-round') {
+      await setActiveRound(currentShow.publicCode, roundId);
+      currentShow = { ...currentShow, activeRoundId: roundId };
+      paintRounds(currentShow);
+    } else if (action === 'close-round') {
+      await closeAllRounds(currentShow.publicCode);
+      currentShow = { ...currentShow, activeRoundId: '' };
+      paintRounds(currentShow);
+    } else if (action === 'edit-round') {
+      openRoundDialog(round);
+    } else if (action === 'delete-round') {
+      if (!window.confirm(`Delete "${round.label}"? Suggestions submitted under this round will stay, but lose their round label.`)) return;
+      await deleteRound(currentShow.publicCode, roundId);
+      const fresh = await getShow(currentShow.publicCode);
+      currentShow = fresh;
+      paintRounds(fresh);
+      renderSuggestions();
+    }
+  } catch (err) {
+    alert(`Round action failed: ${err.message || err}`);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function openRoundDialog(round) {
+  editingRoundId = round ? round.id : null;
+  roundDialogTitle.textContent = round ? 'Edit round' : 'Add round';
+  roundForm.elements.label.value = round?.label || `Round ${(currentShow?.rounds?.length || 0) + 1}`;
+  roundForm.elements.promptText.value = round?.promptText || '';
+  roundForm.elements.promptTemplate.value = '';
+  roundDialog.showModal();
+  roundForm.elements.label.focus();
+}
+
+addRoundBtn.addEventListener('click', () => openRoundDialog(null));
+roundDialog.querySelector('[data-close]').addEventListener('click', () => roundDialog.close());
+
+populatePromptTemplateSelect(roundForm.elements.promptTemplate);
+roundForm.elements.promptTemplate.addEventListener('change', () => {
+  const v = roundForm.elements.promptTemplate.value;
+  if (v) {
+    roundForm.elements.promptText.value = v;
+    roundForm.elements.promptTemplate.value = '';
+  }
+});
+
+roundForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentShow) return;
+  const label = roundForm.elements.label.value.trim();
+  const promptText = roundForm.elements.promptText.value.trim();
+  if (!promptText) return;
+  const submitBtn = roundForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    if (editingRoundId) {
+      await updateRound(currentShow.publicCode, editingRoundId, { label, promptText });
+    } else {
+      await addRound(currentShow.publicCode, label, promptText);
+    }
+    const fresh = await getShow(currentShow.publicCode);
+    currentShow = fresh;
+    paintRounds(fresh);
+    renderSuggestions();
+    roundDialog.close();
+  } catch (err) {
+    alert(`Couldn't save round: ${err.message || err}`);
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+sugRoundFilter.addEventListener('change', () => {
+  activeRoundFilter = sugRoundFilter.value;
+  renderSuggestions();
+});
+
+// ── QR code ─────────────────────────────────────────────
+let lastQrUrl = '';
+async function paintQr(url) {
+  if (!url || url === lastQrUrl) return;
+  lastQrUrl = url;
+  try {
+    const svg = await generateQrSvg(url, { width: 220 });
+    qrDisplay.innerHTML = svg;
+  } catch (err) {
+    console.error('QR generation failed:', err);
+    qrDisplay.innerHTML = '<span class="qr-loading">QR unavailable</span>';
+  }
+}
+
+qrDownloadBtn.addEventListener('click', async () => {
+  if (!currentShow || !lastQrUrl) return;
+  qrDownloadBtn.disabled = true;
+  const wasLabel = qrDownloadBtn.textContent;
+  qrDownloadBtn.textContent = 'Preparing…';
+  try {
+    const png = await generateQrPngDataUrl(lastQrUrl, { width: 1024 });
+    downloadDataUrl(png, `${currentShow.publicCode}-qr.png`);
+  } catch (err) {
+    alert(`Couldn't generate QR PNG: ${err.message || err}`);
+    console.error(err);
+  } finally {
+    qrDownloadBtn.textContent = wasLabel;
+    qrDownloadBtn.disabled = false;
+  }
+});
+
+// ── Ensemble share ──────────────────────────────────────
+function shareUrlFor(publicCode) {
+  const path = window.location.pathname;
+  const dir = path.substring(0, path.lastIndexOf('/') + 1);
+  return window.location.origin + dir + 'view/?c=' + encodeURIComponent(publicCode);
+}
+
+function paintShareUI(show) {
+  const enabled = !!show.shareEnabled;
+  shareEnabledEl.checked = enabled;
+  if (enabled) {
+    shareActive.hidden = false;
+    // Default expiry = showEndsAt + 24h, if none set yet
+    let expires = show.shareExpiresAt?.toDate?.();
+    if (!expires) {
+      const showEnd = show.showEndsAt?.toDate?.();
+      expires = showEnd ? new Date(showEnd.getTime() + 24 * 60 * 60 * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+    }
+    shareExpiresEl.value = toInputValue(expires);
+    const url = shareUrlFor(show.publicCode);
+    shareUrlEl.href = url;
+    shareUrlEl.textContent = url;
+  } else {
+    shareActive.hidden = true;
+  }
+}
+
+function setShareStatus(msg, kind = 'info') {
+  shareStatus.hidden = false;
+  shareStatus.textContent = msg;
+  shareStatus.dataset.kind = kind;
+  setTimeout(() => { shareStatus.hidden = true; }, 3500);
+}
+
+shareEnabledEl.addEventListener('change', async () => {
+  if (!currentShow) return;
+  shareEnabledEl.disabled = true;
+  try {
+    if (shareEnabledEl.checked) {
+      // Default expiry: showEndsAt + 24h (or now + 24h if no end time).
+      const showEnd = currentShow.showEndsAt?.toDate?.();
+      const defaultExpiry = showEnd
+        ? new Date(showEnd.getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await updateShow(currentShow.publicCode, {
+        shareEnabled: true,
+        shareExpiresAt: defaultExpiry
+      });
+      currentShow = { ...currentShow, shareEnabled: true, shareExpiresAt: { toDate: () => defaultExpiry } };
+    } else {
+      await updateShow(currentShow.publicCode, { shareEnabled: false });
+      currentShow = { ...currentShow, shareEnabled: false };
+    }
+    paintShareUI(currentShow);
+  } catch (err) {
+    alert('Could not toggle share: ' + (err.message || err));
+    console.error(err);
+    shareEnabledEl.checked = !!currentShow.shareEnabled;
+  } finally {
+    shareEnabledEl.disabled = false;
+  }
+});
+
+saveShareBtn.addEventListener('click', async () => {
+  if (!currentShow) return;
+  saveShareBtn.disabled = true;
+  try {
+    const newExpiry = new Date(shareExpiresEl.value);
+    if (isNaN(newExpiry.getTime())) throw new Error('Invalid date');
+    await updateShow(currentShow.publicCode, { shareExpiresAt: newExpiry });
+    currentShow = { ...currentShow, shareExpiresAt: { toDate: () => newExpiry } };
+    setShareStatus('Expiry saved.', 'success');
+  } catch (err) {
+    setShareStatus('Could not save: ' + (err.message || err), 'error');
+    console.error(err);
+  } finally {
+    saveShareBtn.disabled = false;
+  }
+});
+
+copyShareBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(shareUrlEl.href);
+    const orig = copyShareBtn.textContent;
+    copyShareBtn.textContent = 'Copied!';
+    setTimeout(() => (copyShareBtn.textContent = orig), 1500);
+  } catch {
+    alert('Copy failed — select the link manually.');
+  }
+});
+
+async function load() {
+  if (!code) {
+    showError('No show code in the URL.');
+    return;
+  }
+  try {
+    const show = await getShow(code);
+    if (!show) {
+      showError('Show not found, or you don’t have access to it.');
+      return;
+    }
+    loading.hidden = true;
+    main.hidden = false;
+    paint(show);
+    startSuggestions(show.publicCode);
+  } catch (err) {
+    console.error(err);
+    showError('Could not load this show.');
+  }
+}
+
+onAuth((user) => {
+  if (!user) {
+    window.location.replace('signin.html');
+    return;
+  }
+  userNav.hidden = false;
+  userEmail.textContent = user.email || '';
+  load();
+});
+
+signoutBtn.addEventListener('click', async () => {
+  if (unsubSuggestions) { unsubSuggestions(); unsubSuggestions = null; }
+  await signOut();
+  window.location.replace('./');
+});
+
+copyUrlBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(publicUrlEl.href);
+    copyUrlBtn.textContent = 'Copied!';
+    setTimeout(() => (copyUrlBtn.textContent = 'Copy link'), 1500);
+  } catch {
+    alert('Copy failed — select the link manually.');
+  }
+});
+
+// Prompt-template select inside the edit dialog: fills the prompt textarea.
+populatePromptTemplateSelect(editForm.elements.promptTemplate);
+editForm.elements.promptTemplate.addEventListener('change', () => {
+  const v = editForm.elements.promptTemplate.value;
+  if (v) {
+    editForm.elements.promptText.value = v;
+    editForm.elements.promptTemplate.value = '';
+  }
+});
+
+// ── Edit ────────────────────────────────────────
+editBtn.addEventListener('click', () => {
+  if (!currentShow) return;
+  const f = editForm.elements;
+  f.title.value = currentShow.title || '';
+  f.venueName.value = currentShow.venueName || '';
+  f.promptText.value = currentShow.promptText || '';
+  f.showStartsAt.value = toInputValue(currentShow.showStartsAt);
+  f.showEndsAt.value = toInputValue(currentShow.showEndsAt);
+  f.submissionOpenAt.value = toInputValue(currentShow.submissionOpenAt);
+  f.submissionCloseAt.value = toInputValue(currentShow.submissionCloseAt);
+  f.maxSuggestionLength.value = currentShow.maxSuggestionLength || 140;
+  f.manualStatus.value = currentShow.manualStatus || 'auto';
+  f.nameCollection.value = currentShow.nameCollection || 'off';
+  f.profanityFilterEnabled.checked = currentShow.profanityFilterEnabled !== false;
+  f.duplicateDetectionEnabled.checked = currentShow.duplicateDetectionEnabled !== false;
+  editDialog.showModal();
+  f.title.focus();
+});
+editDialog.querySelector('[data-close]').addEventListener('click', () => editDialog.close());
+
+editForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (!currentShow) return;
+  const f = editForm.elements;
+  const submitBtn = editForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  try {
+    await updateShow(currentShow.publicCode, {
+      title: f.title.value,
+      venueName: f.venueName.value,
+      promptText: f.promptText.value,
+      showStartsAt: f.showStartsAt.value,
+      showEndsAt: f.showEndsAt.value,
+      submissionOpenAt: f.submissionOpenAt.value,
+      submissionCloseAt: f.submissionCloseAt.value,
+      maxSuggestionLength: f.maxSuggestionLength.value,
+      manualStatus: f.manualStatus.value,
+      nameCollection: f.nameCollection.value,
+      profanityFilterEnabled: f.profanityFilterEnabled.checked,
+      duplicateDetectionEnabled: f.duplicateDetectionEnabled.checked
+    });
+    // Re-fetch to refresh derived fields like windowState
+    const fresh = await getShow(currentShow.publicCode);
+    paint(fresh);
+    editDialog.close();
+  } catch (err) {
+    alert('Could not save: ' + (err.message || err));
+    console.error(err);
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// ── Delete ──────────────────────────────────────
+deleteBtn.addEventListener('click', () => {
+  if (!currentShow) return;
+  delName.textContent = currentShow.title;
+  deleteDialog.showModal();
+});
+deleteDialog.querySelector('[data-close]').addEventListener('click', () => deleteDialog.close());
+
+confirmDeleteBtn.addEventListener('click', async () => {
+  if (!currentShow) return;
+  confirmDeleteBtn.disabled = true;
+  try {
+    await deleteShow(currentShow.publicCode);
+    const groupId = currentShow.groupId;
+    deleteDialog.close();
+    window.location.replace(groupId ? 'group.html?id=' + encodeURIComponent(groupId) : 'dashboard.html');
+  } catch (err) {
+    alert('Could not delete: ' + (err.message || err));
+    console.error(err);
+    confirmDeleteBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
