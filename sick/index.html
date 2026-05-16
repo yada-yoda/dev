@@ -78,7 +78,10 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .stat-detail{max-height:0;overflow:hidden;transition:max-height .4s ease-out,margin-bottom .4s ease-out;margin-bottom:0}
 .stat-detail.open{max-height:3000px;margin-bottom:24px}
 /* Panel flush against the grid above: flat top corners + matching colored top border so the active card merges into it */
-.stat-detail-inner{animation:fadeIn .35s ease;border-top-width:3px;border-top-style:solid;border-top-color:var(--border);border-top-left-radius:0;border-top-right-radius:0}
+.stat-detail-inner{border-top-width:3px;border-top-style:solid;border-top-color:var(--border);border-top-left-radius:0;border-top-right-radius:0}
+/* Slide-down + fade only on first open — kept off the base rule so 30s dashboard re-renders don't re-trigger it */
+@keyframes slideDownFade{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
+.stat-detail-inner.entering{animation:slideDownFade .35s ease}
 .stat-detail-inner.stat-detail-total{border-top-color:var(--accent)}
 .stat-detail-inner.stat-detail-duration{border-top-color:var(--accent-warm)}
 .stat-detail-inner.stat-detail-gap{border-top-color:var(--success)}
@@ -168,7 +171,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.46';
+const APP_VERSION = 'v0.47';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -788,6 +791,14 @@ function toggleStat(key) {
   openStat = key;
   panel.innerHTML = renderStatDetail(key, analyze());
   panel.classList.add('open');
+  // Trigger the slide-down + fade once on open. The class is removed after the
+  // animation completes so subsequent dashboard re-renders (30s dose timer tick)
+  // don't replay it.
+  const inner = panel.querySelector('.stat-detail-inner');
+  if (inner) {
+    inner.classList.add('entering');
+    setTimeout(() => inner.classList.remove('entering'), 400);
+  }
   const card = document.querySelector('.stat-card.tappable[data-stat="'+key+'"]');
   if (card) card.classList.add('expanded');
 }
