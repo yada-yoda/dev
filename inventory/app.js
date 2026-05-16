@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.3';
+const APP_VERSION = '0.9.4';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -220,6 +220,13 @@ function renderStats() {
   document.getElementById('statActive').textContent = active;
   document.getElementById('statSold').textContent = sold;
   document.getElementById('statValue').textContent = '$' + value.toFixed(0);
+  // Reflect current scope filter on the stat cards
+  const scope = state.filter.scope || '';
+  document.querySelectorAll('.stat[data-scope]').forEach(el => {
+    const elScope = el.dataset.scope;
+    const matches = (elScope === 'all' && !scope) || (elScope === scope);
+    el.classList.toggle('selected', matches);
+  });
 }
 
 function renderCard(item) {
@@ -284,9 +291,17 @@ function populateCategoryFilter() {
 }
 
 // ============ FILTERS ============
+// Active = items currently for sale or queued to list. Drafts are excluded
+// because the stat-card count (renderStats) also excludes them — keep
+// these two definitions in sync.
+const ACTIVE_STATUSES = ['Ready to List', 'Listed - Poshmark', 'Listed - eBay', 'Listed - Both'];
+const SOLD_STATUSES = ['Sold', 'Shipped'];
+
 function applyFilters(items) {
-  const { search, category, status, sort } = state.filter;
+  const { search, category, status, sort, scope } = state.filter;
   let result = items.filter(i => {
+    if (scope === 'active' && !ACTIVE_STATUSES.includes(i.status)) return false;
+    if (scope === 'sold' && !SOLD_STATUSES.includes(i.status)) return false;
     if (category && i.category !== category) return false;
     if (status && i.status !== status) return false;
     if (search) {
@@ -1399,7 +1414,7 @@ function enterDemoMode() {
   }
   state.demoMode = true;
   state.items = DEMO_ITEMS.map(i => ({ ...DEFAULT_FIELDS, ...i }));
-  state.filter = { search: '', category: '', status: '', sort: 'created_desc' };
+  state.filter = { search: '', category: '', status: '', sort: 'created_desc', scope: '' };
   document.getElementById('searchInput').value = '';
   document.getElementById('filterCategory').value = '';
   document.getElementById('filterStatus').value = '';
@@ -1832,6 +1847,16 @@ function init() {
   document.getElementById('filterCategory').onchange = e => { state.filter.category = e.target.value; render(); };
   document.getElementById('filterStatus').onchange = e => { state.filter.status = e.target.value; render(); };
   document.getElementById('sortBy').onchange = e => { state.filter.sort = e.target.value; render(); };
+
+  // Interactive stat cards: click to filter the grid to Items/Active/Sold.
+  // Clicking the currently-selected card clears the scope.
+  document.querySelectorAll('.stat[data-scope]').forEach(el => {
+    el.onclick = () => {
+      const target = el.dataset.scope === 'all' ? '' : el.dataset.scope;
+      state.filter.scope = (state.filter.scope === target && target !== '') ? '' : target;
+      render();
+    };
+  });
 
   // View toggle
   document.querySelectorAll('.view-btn').forEach(btn => {

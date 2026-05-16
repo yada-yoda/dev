@@ -262,8 +262,50 @@ body {
   text-align: center;
   border-right: 1px solid var(--border);
   min-width: 82px;
+  /* Reset native button defaults when .stat is a <button> */
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  position: relative;
+  transition: background 140ms, color 140ms;
 }
 .stat:last-child { border-right: none; }
+
+/* Clickable stat cards (Items / Active / Sold) — Est. Value stays static. */
+button.stat[data-scope] {
+  cursor: pointer;
+}
+button.stat[data-scope]:hover {
+  background: var(--bg-2);
+}
+button.stat[data-scope]:hover .stat-label {
+  color: var(--text-1);
+}
+button.stat[data-scope]:focus-visible {
+  background: var(--bg-2);
+  box-shadow: inset 0 0 0 2px var(--accent-line);
+}
+button.stat[data-scope].selected {
+  background: var(--accent-dim);
+}
+button.stat[data-scope].selected .stat-value {
+  color: var(--accent);
+}
+button.stat[data-scope].selected .stat-label {
+  color: var(--accent);
+}
+button.stat[data-scope].selected::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.55);
+}
 .stat-value {
   display: block;
   font-weight: 600;

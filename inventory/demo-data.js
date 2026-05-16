@@ -16,22 +16,73 @@
    fetches, no copyright concerns, ~700 bytes per item.
    ============================================================ */
 
-function _demoPhoto(label, hue, kind) {
-  const c1 = `hsl(${hue},60%,40%)`;
-  const c2 = `hsl(${(hue + 30) % 360},70%,22%)`;
-  const shirt =
-    '<path d="M 70 55 L 88 45 L 100 60 L 112 45 L 130 55 L 145 90 L 130 95 L 130 145 L 70 145 L 70 95 L 55 90 Z" '
-    + 'fill="rgba(255,255,255,.85)" stroke="rgba(0,0,0,.2)" stroke-width="1.5"/>';
-  const bear =
-    '<g transform="translate(100 90)" fill="rgba(255,255,255,.92)">'
+const _ICONS = {
+  bear:
+      '<g transform="translate(100 90)" fill="rgba(255,255,255,.92)">'
     + '<circle cx="-25" cy="-30" r="14"/><circle cx="25" cy="-30" r="14"/>'
     + '<circle cx="0" cy="5" r="32"/></g>'
     + '<circle cx="89" cy="91" r="3.5" fill="#0d1117"/>'
     + '<circle cx="111" cy="91" r="3.5" fill="#0d1117"/>'
     + '<ellipse cx="100" cy="106" rx="5" ry="3" fill="#0d1117"/>'
     + '<path d="M 91 113 Q 100 118 109 113" stroke="#0d1117" stroke-width="2" '
-    + 'fill="none" stroke-linecap="round"/>';
-  const icon = kind === 'shirt' ? shirt : bear;
+    + 'fill="none" stroke-linecap="round"/>',
+  elephant:
+      '<g fill="rgba(255,255,255,.92)">'
+    + '<ellipse cx="100" cy="100" rx="36" ry="28"/>'
+    + '<ellipse cx="68" cy="95" rx="14" ry="20"/>'
+    + '<ellipse cx="132" cy="95" rx="14" ry="20"/>'
+    + '<path d="M 95 120 Q 95 142 112 140 Q 122 132 112 122 Z"/>'
+    + '</g>'
+    + '<circle cx="88" cy="95" r="3" fill="#0d1117"/>'
+    + '<circle cx="112" cy="95" r="3" fill="#0d1117"/>',
+  dinosaur:
+      '<g fill="rgba(255,255,255,.92)">'
+    + '<path d="M 55 115 L 60 92 L 82 82 L 112 82 L 132 90 L 148 96 L 148 106 L 132 106 L 122 100 L 110 106 L 98 110 L 75 116 Z"/>'
+    + '<path d="M 55 115 L 33 108 L 28 114 L 50 122 Z"/>'
+    + '<path d="M 90 110 L 86 122 L 94 124 L 96 112 Z"/>'
+    + '</g>'
+    + '<circle cx="138" cy="96" r="2" fill="#0d1117"/>',
+  spider:
+      '<g fill="rgba(255,255,255,.92)">'
+    + '<circle cx="100" cy="98" r="18"/>'
+    + '<circle cx="100" cy="84" r="10"/>'
+    + '</g>'
+    + '<g stroke="rgba(255,255,255,.92)" stroke-width="2.5" stroke-linecap="round" fill="none">'
+    + '<path d="M 84 90 L 64 80"/><path d="M 82 98 L 60 96"/>'
+    + '<path d="M 82 106 L 60 112"/><path d="M 84 113 L 64 124"/>'
+    + '<path d="M 116 90 L 136 80"/><path d="M 118 98 L 140 96"/>'
+    + '<path d="M 118 106 L 140 112"/><path d="M 116 113 L 136 124"/>'
+    + '</g>'
+    + '<circle cx="96" cy="82" r="2" fill="#0d1117"/>'
+    + '<circle cx="104" cy="82" r="2" fill="#0d1117"/>',
+  lizard:
+      '<g fill="rgba(255,255,255,.92)">'
+    + '<path d="M 35 108 Q 60 92 90 102 Q 120 112 150 98 L 158 102 L 155 110 Q 125 122 95 112 Q 60 102 35 115 Z"/>'
+    + '<path d="M 50 92 L 53 87 L 56 92 Z"/>'
+    + '<path d="M 68 89 L 71 84 L 74 89 Z"/>'
+    + '<path d="M 86 92 L 89 87 L 92 92 Z"/>'
+    + '<path d="M 104 95 L 107 90 L 110 95 Z"/>'
+    + '<path d="M 122 97 L 125 92 L 128 97 Z"/>'
+    + '</g>'
+    + '<circle cx="148" cy="100" r="2" fill="#0d1117"/>',
+  donkey:
+      '<g fill="rgba(255,255,255,.92)">'
+    + '<ellipse cx="100" cy="108" rx="30" ry="35"/>'
+    + '<ellipse cx="86" cy="70" rx="6" ry="20" transform="rotate(-15 86 70)"/>'
+    + '<ellipse cx="114" cy="70" rx="6" ry="20" transform="rotate(15 114 70)"/>'
+    + '</g>'
+    + '<circle cx="92" cy="100" r="3" fill="#0d1117"/>'
+    + '<circle cx="108" cy="100" r="3" fill="#0d1117"/>'
+    + '<ellipse cx="100" cy="128" rx="8" ry="5" fill="#0d1117"/>',
+  shirt:
+      '<path d="M 70 55 L 88 45 L 100 60 L 112 45 L 130 55 L 145 90 L 130 95 L 130 145 L 70 145 L 70 95 L 55 90 Z" '
+    + 'fill="rgba(255,255,255,.85)" stroke="rgba(0,0,0,.2)" stroke-width="1.5"/>'
+};
+
+function _demoPhoto(label, hue, kind) {
+  const c1 = `hsl(${hue},60%,40%)`;
+  const c2 = `hsl(${(hue + 30) % 360},70%,22%)`;
+  const icon = _ICONS[kind] || _ICONS.bear;
   const safe = String(label).replace(/[<>&]/g, '');
   const svg =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">'
@@ -122,7 +173,7 @@ const DEMO_ITEMS = [
     research_ebay_avg: '1100.00', research_ebay_date: '2026-04-20',
     research_ebay_notes: 'Recent sold range $950-$1300',
     research_guide_avg: '1500.00',
-    quantity: 1, photos: [_demoPhoto('Peanut Royal Blue', 220)],
+    quantity: 1, photos: [_demoPhoto('Peanut Royal Blue', 220, 'elephant')],
     created_at: '2026-04-19T08:00:00Z', updated_at: '2026-04-20T09:45:00Z'
   },
   {
@@ -181,7 +232,7 @@ const DEMO_ITEMS = [
     date_listed: '2026-04-22',
     research_ebay_avg: '825.00', research_ebay_date: '2026-04-22',
     research_guide_avg: '900.00',
-    quantity: 1, photos: [_demoPhoto('Rex T-Rex', 15)],
+    quantity: 1, photos: [_demoPhoto('Rex T-Rex', 15, 'dinosaur')],
     created_at: '2026-04-21T11:30:00Z', updated_at: '2026-04-22T10:00:00Z'
   },
   {
@@ -200,7 +251,7 @@ const DEMO_ITEMS = [
     status: 'Listed - Poshmark',
     date_listed: '2026-04-15',
     url_poshmark: 'https://poshmark.com/listing/example-6',
-    quantity: 1, photos: [_demoPhoto('Iggy Iguana', 210)],
+    quantity: 1, photos: [_demoPhoto('Iggy Iguana', 210, 'lizard')],
     created_at: '2026-04-14T13:00:00Z', updated_at: '2026-04-15T09:00:00Z'
   },
   {
@@ -253,7 +304,7 @@ const DEMO_ITEMS = [
     cost: '4.00', price: '22.00',
     status: 'Listed - eBay',
     date_listed: '2026-04-18',
-    quantity: 1, photos: [_demoPhoto('Spinner Spider', 25)],
+    quantity: 1, photos: [_demoPhoto('Spinner Spider', 25, 'spider')],
     created_at: '2026-04-17T16:00:00Z', updated_at: '2026-04-18T11:00:00Z'
   },
   {
@@ -275,7 +326,7 @@ const DEMO_ITEMS = [
     ebay_item_number: '285567890123',
     ship_cost: '5.50', postage_paid: '4.85',
     fee_ebay_fvf: '7.95', fee_ebay_fvf_shipping: '0.73', fee_ebay_per_order: '0.30',
-    quantity: 1, photos: [_demoPhoto('Lefty Donkey', 230)],
+    quantity: 1, photos: [_demoPhoto('Lefty Donkey', 230, 'donkey')],
     created_at: '2026-03-14T09:00:00Z', updated_at: '2026-04-02T14:00:00Z'
   },
   {

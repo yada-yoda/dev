@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Ledger v0.9.3 — Collectibles Inventory</title>
+<title>The Ledger v0.9.4 — Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
@@ -39,7 +39,7 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=0.9.3" />
+<link rel="stylesheet" href="styles.css?v=0.9.4" />
 </head>
 <body>
 
@@ -94,10 +94,10 @@
       </div>
     </div>
     <div class="stats" id="statsBar">
-      <div class="stat"><span class="stat-value" id="statTotal">0</span><span class="stat-label">Items</span></div>
-      <div class="stat"><span class="stat-value" id="statActive">0</span><span class="stat-label">Active</span></div>
-      <div class="stat"><span class="stat-value" id="statSold">0</span><span class="stat-label">Sold</span></div>
-      <div class="stat"><span class="stat-value" id="statValue">$0</span><span class="stat-label">Est. Value</span></div>
+      <button type="button" class="stat" data-scope="all" title="Show all items"><span class="stat-value" id="statTotal">0</span><span class="stat-label">Items</span></button>
+      <button type="button" class="stat" data-scope="active" title="Show active inventory (drafts, ready, listed)"><span class="stat-value" id="statActive">0</span><span class="stat-label">Active</span></button>
+      <button type="button" class="stat" data-scope="sold" title="Show sold and shipped items"><span class="stat-value" id="statSold">0</span><span class="stat-label">Sold</span></button>
+      <div class="stat stat-static" title="Estimated value of active inventory"><span class="stat-value" id="statValue">$0</span><span class="stat-label">Est. Value</span></div>
     </div>
   </div>
 </header>
@@ -963,16 +963,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a> · <span id="appVersion">v0.9.3</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a> · <span id="appVersion">v0.9.4</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=0.9.3"></script>
-<script defer src="beanie-db.js?v=0.9.3"></script>
-<script defer src="demo-data.js?v=0.9.3"></script>
-<script defer src="app.js?v=0.9.3"></script>
+<script type="module" src="firebase-config.js?v=0.9.4"></script>
+<script defer src="beanie-db.js?v=0.9.4"></script>
+<script defer src="demo-data.js?v=0.9.4"></script>
+<script defer src="app.js?v=0.9.4"></script>
 </body>
 </html>
