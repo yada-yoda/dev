@@ -1564,6 +1564,9 @@ main {
   color: var(--accent-hover);
   border-bottom-color: currentColor;
 }
+/* Hide the footer "Try the demo" link (and its leading dot separator)
+   while demo mode is already active — clicking it would be a no-op. */
+body.demo-mode .footer-demo-link { display: none; }
 
 /* ============ SCROLLBAR ============ */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
