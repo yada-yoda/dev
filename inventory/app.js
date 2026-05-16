@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.0';
+const APP_VERSION = '0.9.1';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -1651,6 +1651,22 @@ function init() {
   if (tryDemoBtn) tryDemoBtn.onclick = enterDemoMode;
   const exitDemoBtn = document.getElementById('exitDemoBtn');
   if (exitDemoBtn) exitDemoBtn.onclick = exitDemoMode;
+  // Footer demo link: real href so right-click-copy gives a shareable URL,
+  // but left-click triggers demo mode in place (no page reload).
+  const demoFooterLink = document.getElementById('demoFooterLink');
+  if (demoFooterLink) {
+    demoFooterLink.onclick = (e) => {
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; // honor open-in-new-tab
+      e.preventDefault();
+      if (state.demoMode) { toast('Already in demo mode', ''); return; }
+      enterDemoMode();
+      if (state.demoMode && !location.search.includes('demo=')) {
+        const url = new URL(location.href);
+        url.searchParams.set('demo', '1');
+        history.replaceState(null, '', url.toString());
+      }
+    };
+  }
   if (new URLSearchParams(location.search).get('demo') === '1') {
     setTimeout(enterDemoMode, 50);
   }

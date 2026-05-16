@@ -1512,6 +1512,16 @@ main {
   color: var(--text-3);
   font-size: 0.8rem;
 }
+.site-footer .footer-link {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px dotted transparent;
+  transition: border-color 150ms, color 150ms;
+}
+.site-footer .footer-link:hover {
+  color: var(--accent-hover);
+  border-bottom-color: currentColor;
+}
 
 /* ============ SCROLLBAR ============ */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
