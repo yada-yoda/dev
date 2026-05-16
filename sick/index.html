@@ -63,14 +63,25 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .tag.active{border-color:var(--accent);background:var(--accent);color:#fff}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
 .stat-card{text-align:center;padding:16px}.stat-value{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace}.stat-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
-.stat-card.tappable{cursor:pointer;transition:border-color .2s,transform .2s,background .2s}
+.stat-card.tappable{cursor:pointer;position:relative;transition:border-color .2s,transform .2s,background .2s}
 .stat-card.tappable:hover{transform:translateY(-1px)}
-.stat-card.tappable.expanded{background:linear-gradient(180deg,var(--bg-card) 0%,var(--bg-tertiary) 100%)}
+.stat-card.tappable.expanded{background:linear-gradient(180deg,var(--bg-card) 0%,var(--bg-tertiary) 100%);border-top-width:3px;border-top-style:solid}
+/* Connect the active card to the detail panel below via a downward notch */
+.stat-card.tappable.expanded::after{content:'';position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top-width:10px;border-top-style:solid;z-index:2;pointer-events:none}
+.stat-card.tappable[data-stat="total"].expanded{border-top-color:var(--accent)}.stat-card.tappable[data-stat="total"].expanded::after{border-top-color:var(--accent)}
+.stat-card.tappable[data-stat="duration"].expanded{border-top-color:var(--accent-warm)}.stat-card.tappable[data-stat="duration"].expanded::after{border-top-color:var(--accent-warm)}
+.stat-card.tappable[data-stat="gap"].expanded{border-top-color:var(--success)}.stat-card.tappable[data-stat="gap"].expanded::after{border-top-color:var(--success)}
+.stat-card.tappable[data-stat="risks"].expanded{border-top-color:var(--warning)}.stat-card.tappable[data-stat="risks"].expanded::after{border-top-color:var(--warning)}
 .stat-chevron{display:inline-block;margin-left:4px;font-size:9px;opacity:.5;transition:transform .25s ease}
 .stat-card.expanded .stat-chevron{transform:rotate(180deg);opacity:.9}
 .stat-detail{max-height:0;overflow:hidden;transition:max-height .4s ease-out,margin-bottom .4s ease-out;margin-bottom:0}
 .stat-detail.open{max-height:3000px;margin-bottom:24px}
-.stat-detail-inner{animation:fadeIn .35s ease}
+/* Inner panel inherits the active stat's color on its top edge so the whole thing reads as one tab + content unit */
+.stat-detail-inner{animation:fadeIn .35s ease;border-top-width:3px;border-top-style:solid;border-top-color:var(--border)}
+.stat-detail-inner.stat-detail-total{border-top-color:var(--accent)}
+.stat-detail-inner.stat-detail-duration{border-top-color:var(--accent-warm)}
+.stat-detail-inner.stat-detail-gap{border-top-color:var(--success)}
+.stat-detail-inner.stat-detail-risks{border-top-color:var(--warning)}
 .stat-row{margin-bottom:10px}
 .stat-row-head{display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;gap:8px;align-items:center}
 .stat-bar-track{height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden}
@@ -156,7 +167,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44';
+const APP_VERSION = 'v0.45';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -788,19 +799,19 @@ function renderStatDetail(key, a) {
 }
 function renderTotalDetail(a) {
   const all = [...entries].sort((x,y) => new Date(y.symptomStart) - new Date(x.symptomStart));
-  return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:6px">All Logged Illnesses ('+all.length+')</h3>'
+  return '<div class="card stat-detail-inner stat-detail-total"><h3 style="font-size:14px;font-weight:600;color:var(--accent);margin-bottom:6px">All Logged Illnesses ('+all.length+')</h3>'
     + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Newest first. Tap any row to open it in History.</p>'
     + all.map(e => '<div class="entry-row clickable" onclick="goToEntry(\''+e.id+'\')"><div><div style="font-weight:600;font-size:14px">'+esc(e.diagnosis||'Undiagnosed')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.symptomStart)+(e.recoveryDate?' → '+fmtDate(e.recoveryDate):' · ongoing')+' · '+esc(e.severity||'—')+(e.initialTemp?' · '+tempHTML(e.initialTemp):'')+'</div></div><div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">'+(e.symptoms||[]).slice(0,3).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+((e.symptoms||[]).length>3?'<span style="font-size:11px;color:var(--text-secondary);padding:3px 6px;align-self:center">+'+(e.symptoms.length-3)+'</span>':'')+'</div></div>').join('')
     + '</div>';
 }
 function renderDurationDetail(a) {
-  const withRec = entries.filter(e => e.recoveryDate).map(e => ({d:e.diagnosis||'Undiagnosed',date:e.symptomStart,days:daysBetween(e.symptomStart, e.recoveryDate)})).sort((x,y) => y.days - x.days);
+  const withRec = entries.filter(e => e.recoveryDate).map(e => ({d:e.diagnosis||'Undiagnosed',start:e.symptomStart,end:e.recoveryDate,days:daysBetween(e.symptomStart, e.recoveryDate)})).sort((x,y) => y.days - x.days);
   const ongoing = entries.filter(e => !e.recoveryDate).length;
-  if (!withRec.length) return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--accent-warm);margin-bottom:8px">Illness Duration</h3><p style="font-size:13px;color:var(--text-secondary)">No illnesses have a recovery date logged yet — add one to start tracking duration patterns.</p></div>';
+  if (!withRec.length) return '<div class="card stat-detail-inner stat-detail-duration"><h3 style="font-size:14px;font-weight:600;color:var(--accent-warm);margin-bottom:8px">Illness Duration</h3><p style="font-size:13px;color:var(--text-secondary)">No illnesses have a recovery date logged yet — add one to start tracking duration patterns.</p></div>';
   const maxD = Math.max(...withRec.map(e => e.days), 1);
-  return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--accent-warm);margin-bottom:6px">Illness Duration</h3>'
+  return '<div class="card stat-detail-inner stat-detail-duration"><h3 style="font-size:14px;font-weight:600;color:var(--accent-warm);margin-bottom:6px">Illness Duration</h3>'
     + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Computed from '+withRec.length+' of '+entries.length+' illnesses with a recovery date'+(ongoing?', '+ongoing+' still open':'')+'. Sorted longest first.</p>'
-    + withRec.map(e => '<div class="stat-row"><div class="stat-row-head"><span style="font-weight:600">'+esc(e.d)+'<span style="color:var(--text-secondary);font-weight:400;margin-left:6px">'+fmtDate(e.date)+'</span></span><span style="font-family:JetBrains Mono,monospace;color:var(--accent-warm);font-weight:600">'+e.days+'d</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="background:var(--accent-warm);width:'+(e.days/maxD*100).toFixed(1)+'%"></div></div></div>').join('')
+    + withRec.map(e => '<div class="stat-row"><div class="stat-row-head"><span style="font-weight:600">'+esc(e.d)+'</span><span style="font-family:JetBrains Mono,monospace;color:var(--accent-warm);font-weight:600">'+e.days+'d</span></div><div style="font-size:11px;color:var(--text-secondary);margin:-2px 0 5px;font-family:JetBrains Mono,monospace">'+fmtDate(e.start)+' <span style="opacity:.5">→</span> '+fmtDate(e.end)+'</div><div class="stat-bar-track"><div class="stat-bar-fill" style="background:var(--accent-warm);width:'+(e.days/maxD*100).toFixed(1)+'%"></div></div></div>').join('')
     + (ongoing ? '<div style="margin-top:14px;padding:10px 12px;background:var(--bg-tertiary);border-radius:8px;font-size:12px;color:var(--text-secondary)">📌 '+ongoing+' illness'+(ongoing>1?'es':'')+' still ongoing (no recovery date)</div>' : '')
     + '</div>';
 }
@@ -810,16 +821,16 @@ function renderGapDetail(a) {
   for (let i = 1; i < sorted.length; i++) {
     pairs.push({from: sorted[i-1], to: sorted[i], days: daysBetween(sorted[i-1].symptomStart, sorted[i].symptomStart)});
   }
-  if (!pairs.length) return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--success);margin-bottom:8px">Gaps Between Illnesses</h3><p style="font-size:13px;color:var(--text-secondary)">Need at least 2 logged illnesses to compute gaps.</p></div>';
+  if (!pairs.length) return '<div class="card stat-detail-inner stat-detail-gap"><h3 style="font-size:14px;font-weight:600;color:var(--success);margin-bottom:8px">Gaps Between Illnesses</h3><p style="font-size:13px;color:var(--text-secondary)">Need at least 2 logged illnesses to compute gaps.</p></div>';
   const maxG = Math.max(...pairs.map(p => p.days), 1);
-  return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--success);margin-bottom:6px">Gaps Between Illnesses</h3>'
+  return '<div class="card stat-detail-inner stat-detail-gap"><h3 style="font-size:14px;font-weight:600;color:var(--success);margin-bottom:6px">Gaps Between Illnesses</h3>'
     + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">'+pairs.length+' gap'+(pairs.length>1?'s':'')+' between '+(pairs.length+1)+' illnesses, sorted oldest first.</p>'
-    + pairs.map(p => '<div class="stat-row"><div class="stat-row-head"><span><span style="color:var(--text-secondary)">'+esc(p.from.diagnosis||'?')+'</span><span style="color:var(--text-secondary);margin:0 6px;opacity:.5">→</span><span style="font-weight:600">'+esc(p.to.diagnosis||'?')+'</span></span><span style="font-family:JetBrains Mono,monospace;color:var(--success);font-weight:600">'+p.days+'d</span></div><div class="stat-bar-track"><div class="stat-bar-fill" style="background:var(--success);width:'+(p.days/maxG*100).toFixed(1)+'%"></div></div></div>').join('')
+    + pairs.map(p => '<div class="stat-row"><div class="stat-row-head"><span><span style="color:var(--text-secondary)">'+esc(p.from.diagnosis||'?')+'</span><span style="color:var(--text-secondary);margin:0 6px;opacity:.5">→</span><span style="font-weight:600">'+esc(p.to.diagnosis||'?')+'</span></span><span style="font-family:JetBrains Mono,monospace;color:var(--success);font-weight:600">'+p.days+'d</span></div><div style="font-size:11px;color:var(--text-secondary);margin:-2px 0 5px;font-family:JetBrains Mono,monospace">'+fmtDate(p.from.symptomStart)+' <span style="opacity:.5">→</span> '+fmtDate(p.to.symptomStart)+'</div><div class="stat-bar-track"><div class="stat-bar-fill" style="background:var(--success);width:'+(p.days/maxG*100).toFixed(1)+'%"></div></div></div>').join('')
     + '</div>';
 }
 function renderRisksDetail(a) {
-  if (!a || !a.risks.length) return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--warning);margin-bottom:8px">Risk Factors</h3><p style="font-size:13px;color:var(--text-secondary)">No risk factors flagged yet. They show up when ≥ 2 illnesses share a location, contact, activity, or season.</p></div>';
-  return '<div class="card stat-detail-inner"><h3 style="font-size:14px;font-weight:600;color:var(--warning);margin-bottom:6px">⚠ Risk Factors ('+a.risks.length+')</h3>'
+  if (!a || !a.risks.length) return '<div class="card stat-detail-inner stat-detail-risks"><h3 style="font-size:14px;font-weight:600;color:var(--warning);margin-bottom:8px">Risk Factors</h3><p style="font-size:13px;color:var(--text-secondary)">No risk factors flagged yet. They show up when ≥ 2 illnesses share a location, contact, activity, or season.</p></div>';
+  return '<div class="card stat-detail-inner stat-detail-risks"><h3 style="font-size:14px;font-weight:600;color:var(--warning);margin-bottom:6px">⚠ Risk Factors ('+a.risks.length+')</h3>'
     + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Recurring patterns across your logged illnesses, scored by frequency.</p>'
     + a.risks.map(r => riskBarHTML(r.score, r.factor) + '<div style="font-size:12px;color:var(--text-secondary);margin:-6px 0 14px 4px">'+esc(r.detail)+'</div>').join('')
     + '</div>';
