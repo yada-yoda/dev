@@ -75,13 +75,19 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .stat-card.tappable[data-stat="risks"].expanded{border-top-color:var(--warning)}
 .stat-chevron{display:inline-block;margin-left:4px;font-size:9px;opacity:.5;transition:transform .25s ease}
 .stat-card.expanded .stat-chevron{transform:rotate(180deg);opacity:.9}
-.stat-detail{max-height:0;overflow:hidden;transition:max-height .4s ease-out,margin-bottom .4s ease-out;margin-bottom:0}
-.stat-detail.open{max-height:3000px;margin-bottom:24px}
+/* Use grid-template-rows 0fr -> 1fr instead of max-height so we transition to
+   natural content height — gives a smooth, even reveal regardless of how tall
+   the panel is. Modern browsers only (Chrome 117+, Safari 17.1+, FF 117+);
+   older browsers just snap open with no transition. */
+.stat-detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows .55s cubic-bezier(.4,0,.2,1),margin-bottom .55s cubic-bezier(.4,0,.2,1);margin-bottom:0}
+.stat-detail.open{grid-template-rows:1fr;margin-bottom:24px}
+.stat-detail > .stat-detail-inner{min-height:0;overflow:hidden}
 /* Panel flush against the grid above: flat top corners + matching colored top border so the active card merges into it */
 .stat-detail-inner{border-top-width:3px;border-top-style:solid;border-top-color:var(--border);border-top-left-radius:0;border-top-right-radius:0}
-/* Slide-down + fade only on first open — kept off the base rule so 30s dashboard re-renders don't re-trigger it */
-@keyframes slideDownFade{from{opacity:0;transform:translateY(-12px)}to{opacity:1;transform:translateY(0)}}
-.stat-detail-inner.entering{animation:slideDownFade .35s ease}
+/* Gentle opacity fade for content polish, only on first open. The slide-from-top
+   feel comes from the grid-template-rows reveal on the wrapper above. */
+@keyframes fadeInPanel{from{opacity:0}to{opacity:1}}
+.stat-detail-inner.entering{animation:fadeInPanel .55s ease}
 .stat-detail-inner.stat-detail-total{border-top-color:var(--accent)}
 .stat-detail-inner.stat-detail-duration{border-top-color:var(--accent-warm)}
 .stat-detail-inner.stat-detail-gap{border-top-color:var(--success)}
@@ -171,7 +177,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47';
+const APP_VERSION = 'v0.48';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -785,7 +791,7 @@ function toggleStat(key) {
   if (openStat === key) {
     panel.classList.remove('open');
     openStat = null;
-    setTimeout(() => { if (!openStat) panel.innerHTML = ''; }, 400);
+    setTimeout(() => { if (!openStat) panel.innerHTML = ''; }, 600);
     return;
   }
   openStat = key;
@@ -797,7 +803,7 @@ function toggleStat(key) {
   const inner = panel.querySelector('.stat-detail-inner');
   if (inner) {
     inner.classList.add('entering');
-    setTimeout(() => inner.classList.remove('entering'), 400);
+    setTimeout(() => inner.classList.remove('entering'), 600);
   }
   const card = document.querySelector('.stat-card.tappable[data-stat="'+key+'"]');
   if (card) card.classList.add('expanded');
