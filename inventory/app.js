@@ -5,14 +5,15 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.4';
+const APP_VERSION = '0.9.5';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
-// Set once on the first auto-demo so we don't keep showing it to a visitor
-// who's already seen and dismissed it. Manual entry via the footer link or
-// ?demo=1 doesn't write this — only the silent auto-demo path does.
-const DEMO_SHOWN_KEY = 'theLedger.demoShown.v1';
+// Set ONLY when the user clicks "Exit demo" — that's an explicit "I want
+// to start fresh, don't auto-demo me again." Auto-demo otherwise fires on
+// every load when there's no inventory data and the user hasn't signed in,
+// so visitors keep seeing the populated app even on repeat visits.
+const DEMO_DISMISSED_KEY = 'theLedger.demoDismissed.v1';
 
 const DEFAULT_FIELDS = {
   id: '', name: '', category: 'Beanie Baby', sku: '', upc: '',
@@ -1392,11 +1393,12 @@ function updateDaysPanel() {
 
 // ============ DEMO MODE ============
 function shouldAutoDemo() {
-  // Auto-demo only on a truly empty first visit. Returning users — even those
-  // who exited demo and never added an item — won't get auto-demoed again.
+  // Auto-demo on every load when there's no real inventory and the user
+  // hasn't explicitly dismissed it. So a visitor who hasn't signed up sees
+  // the populated app on every visit, not just the first one.
   try {
     if (localStorage.getItem(STORAGE_KEY)) return false;
-    if (localStorage.getItem(DEMO_SHOWN_KEY)) return false;
+    if (localStorage.getItem(DEMO_DISMISSED_KEY)) return false;
   } catch (e) {
     return false; // localStorage disabled / private mode — bail safely
   }
@@ -1425,11 +1427,18 @@ function enterDemoMode() {
   toast('Demo mode on — sample data, nothing is saved', 'success');
 }
 
-function exitDemoMode() {
+// userDismissed=true means the visitor clicked "Exit demo" deliberately —
+// remember that choice so auto-demo doesn't keep loading on every reload.
+// Sign-in-driven exits (which also clear demo state) pass userDismissed=false
+// so a future sign-out restores auto-demo eligibility.
+function exitDemoMode(userDismissed = true) {
   state.demoMode = false;
   const banner = document.getElementById('demoBanner');
   if (banner) banner.hidden = true;
   document.body.classList.remove('demo-mode');
+  if (userDismissed) {
+    try { localStorage.setItem(DEMO_DISMISSED_KEY, '1'); } catch (e) {}
+  }
   loadState();
   render();
   // Strip ?demo=1 from URL so a refresh doesn't re-enter demo
@@ -1646,7 +1655,10 @@ function wireAuthUI() {
       toast('Sign-in not loaded yet, try again in a moment', 'error');
       return;
     }
-    if (state.demoMode) exitDemoMode();
+    // Clear demo state to make room for the user's cloud data — but don't
+    // mark them as having "dismissed" demo, since signing out later should
+    // restore auto-demo eligibility.
+    if (state.demoMode) exitDemoMode(false);
     signInBtn.disabled = true;
     try {
       await window.firebaseSignIn();
@@ -1700,7 +1712,7 @@ function init() {
   const tryDemoBtn = document.getElementById('tryDemoBtn');
   if (tryDemoBtn) tryDemoBtn.onclick = enterDemoMode;
   const exitDemoBtn = document.getElementById('exitDemoBtn');
-  if (exitDemoBtn) exitDemoBtn.onclick = exitDemoMode;
+  if (exitDemoBtn) exitDemoBtn.onclick = () => exitDemoMode(true);
   // Footer demo link: real href so right-click-copy gives a shareable URL,
   // but left-click triggers demo mode in place (no page reload).
   const demoFooterLink = document.getElementById('demoFooterLink');
@@ -1722,10 +1734,8 @@ function init() {
   if (urlDemo === '1') {
     setTimeout(enterDemoMode, 50);
   } else if (urlDemo !== '0' && shouldAutoDemo()) {
-    // True first visit: no local data, never auto-demoed before, and not
-    // explicitly opted out via ?demo=0. Kick demo on so the visitor sees
-    // the app populated instead of an empty state.
-    try { localStorage.setItem(DEMO_SHOWN_KEY, '1'); } catch (e) {}
+    // No inventory, not explicitly dismissed, not ?demo=0 — auto-load demo
+    // so the visitor sees the populated app every visit (not just first).
     setTimeout(enterDemoMode, 50);
   }
 
