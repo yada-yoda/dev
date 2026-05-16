@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.2';
+const APP_VERSION = '0.9.3';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -1673,6 +1673,11 @@ function init() {
 
   const verEl = document.getElementById('appVersion');
   if (verEl) verEl.textContent = 'v' + APP_VERSION;
+  // Keep <title> in sync with APP_VERSION as the single source of truth —
+  // covers the case where someone forgets to bump the static title on
+  // release. The static title still matters for SEO + social cards, so
+  // we leave a sensible hardcoded fallback in index.html.
+  document.title = 'The Ledger v' + APP_VERSION + ' — Collectibles Inventory';
 
   wireAuthUI();
 
