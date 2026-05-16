@@ -61,23 +61,24 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .tag-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
 .tag{padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
 .tag.active{border-color:var(--accent);background:var(--accent);color:#fff}
-.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;transition:margin-bottom .4s ease-out}
+/* When a stat panel is open below the grid, drop the gap so the active card merges into the panel */
+.stats-grid:has(+ .stat-detail.open){margin-bottom:0}
 .stat-card{text-align:center;padding:16px}.stat-value{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace}.stat-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
 .stat-card.tappable{cursor:pointer;position:relative;transition:border-color .2s,transform .2s,background .2s}
 .stat-card.tappable:hover{transform:translateY(-1px)}
-.stat-card.tappable.expanded{background:linear-gradient(180deg,var(--bg-card) 0%,var(--bg-tertiary) 100%);border-top-width:3px;border-top-style:solid}
-/* Connect the active card to the detail panel below via a downward notch */
-.stat-card.tappable.expanded::after{content:'';position:absolute;left:50%;bottom:-14px;transform:translateX(-50%);width:0;height:0;border-left:10px solid transparent;border-right:10px solid transparent;border-top-width:10px;border-top-style:solid;z-index:2;pointer-events:none}
-.stat-card.tappable[data-stat="total"].expanded{border-top-color:var(--accent)}.stat-card.tappable[data-stat="total"].expanded::after{border-top-color:var(--accent)}
-.stat-card.tappable[data-stat="duration"].expanded{border-top-color:var(--accent-warm)}.stat-card.tappable[data-stat="duration"].expanded::after{border-top-color:var(--accent-warm)}
-.stat-card.tappable[data-stat="gap"].expanded{border-top-color:var(--success)}.stat-card.tappable[data-stat="gap"].expanded::after{border-top-color:var(--success)}
-.stat-card.tappable[data-stat="risks"].expanded{border-top-color:var(--warning)}.stat-card.tappable[data-stat="risks"].expanded::after{border-top-color:var(--warning)}
+/* Active card: colored top border + flat bottom corners so it merges seamlessly with the panel below */
+.stat-card.tappable.expanded{background:linear-gradient(180deg,var(--bg-card) 0%,var(--bg-tertiary) 100%);border-top-width:3px;border-top-style:solid;border-bottom-left-radius:0;border-bottom-right-radius:0}
+.stat-card.tappable[data-stat="total"].expanded{border-top-color:var(--accent)}
+.stat-card.tappable[data-stat="duration"].expanded{border-top-color:var(--accent-warm)}
+.stat-card.tappable[data-stat="gap"].expanded{border-top-color:var(--success)}
+.stat-card.tappable[data-stat="risks"].expanded{border-top-color:var(--warning)}
 .stat-chevron{display:inline-block;margin-left:4px;font-size:9px;opacity:.5;transition:transform .25s ease}
 .stat-card.expanded .stat-chevron{transform:rotate(180deg);opacity:.9}
 .stat-detail{max-height:0;overflow:hidden;transition:max-height .4s ease-out,margin-bottom .4s ease-out;margin-bottom:0}
 .stat-detail.open{max-height:3000px;margin-bottom:24px}
-/* Inner panel inherits the active stat's color on its top edge so the whole thing reads as one tab + content unit */
-.stat-detail-inner{animation:fadeIn .35s ease;border-top-width:3px;border-top-style:solid;border-top-color:var(--border)}
+/* Panel flush against the grid above: flat top corners + matching colored top border so the active card merges into it */
+.stat-detail-inner{animation:fadeIn .35s ease;border-top-width:3px;border-top-style:solid;border-top-color:var(--border);border-top-left-radius:0;border-top-right-radius:0}
 .stat-detail-inner.stat-detail-total{border-top-color:var(--accent)}
 .stat-detail-inner.stat-detail-duration{border-top-color:var(--accent-warm)}
 .stat-detail-inner.stat-detail-gap{border-top-color:var(--success)}
@@ -167,7 +168,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.45';
+const APP_VERSION = 'v0.46';
 
 // ═══════════════════════════════════════════════
 // STATE
