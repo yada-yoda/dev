@@ -5,10 +5,14 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.1';
+const APP_VERSION = '0.9.2';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
+// Set once on the first auto-demo so we don't keep showing it to a visitor
+// who's already seen and dismissed it. Manual entry via the footer link or
+// ?demo=1 doesn't write this — only the silent auto-demo path does.
+const DEMO_SHOWN_KEY = 'theLedger.demoShown.v1';
 
 const DEFAULT_FIELDS = {
   id: '', name: '', category: 'Beanie Baby', sku: '', upc: '',
@@ -1372,6 +1376,18 @@ function updateDaysPanel() {
 }
 
 // ============ DEMO MODE ============
+function shouldAutoDemo() {
+  // Auto-demo only on a truly empty first visit. Returning users — even those
+  // who exited demo and never added an item — won't get auto-demoed again.
+  try {
+    if (localStorage.getItem(STORAGE_KEY)) return false;
+    if (localStorage.getItem(DEMO_SHOWN_KEY)) return false;
+  } catch (e) {
+    return false; // localStorage disabled / private mode — bail safely
+  }
+  return true;
+}
+
 function enterDemoMode() {
   if (isSignedIn()) {
     toast('Sign out first to try demo mode', 'error');
@@ -1460,6 +1476,20 @@ function onCloudAuthChanged(user) {
   cloudUserBeanies = [];
 
   if (user) {
+    // If demo auto-loaded for a visitor whose Firebase session is now
+    // restoring, silently exit demo before subscribing to cloud data so
+    // we don't flash demo content over their real inventory.
+    if (state.demoMode) {
+      state.demoMode = false;
+      document.body.classList.remove('demo-mode');
+      const banner = document.getElementById('demoBanner');
+      if (banner) banner.hidden = true;
+      if (location.search.includes('demo=')) {
+        const url = new URL(location.href);
+        url.searchParams.delete('demo');
+        history.replaceState(null, '', url.toString());
+      }
+    }
     cloudUid = user.uid;
     cloudMigrationOffered = false;
     if (!window.firestoreApi) {
@@ -1646,7 +1676,7 @@ function init() {
 
   wireAuthUI();
 
-  // Demo mode buttons + ?demo=1 URL param
+  // Demo mode buttons + ?demo=1 URL param + auto-demo on first visit
   const tryDemoBtn = document.getElementById('tryDemoBtn');
   if (tryDemoBtn) tryDemoBtn.onclick = enterDemoMode;
   const exitDemoBtn = document.getElementById('exitDemoBtn');
@@ -1667,7 +1697,15 @@ function init() {
       }
     };
   }
-  if (new URLSearchParams(location.search).get('demo') === '1') {
+  const urlParams = new URLSearchParams(location.search);
+  const urlDemo = urlParams.get('demo');
+  if (urlDemo === '1') {
+    setTimeout(enterDemoMode, 50);
+  } else if (urlDemo !== '0' && shouldAutoDemo()) {
+    // True first visit: no local data, never auto-demoed before, and not
+    // explicitly opted out via ?demo=0. Kick demo on so the visitor sees
+    // the app populated instead of an empty state.
+    try { localStorage.setItem(DEMO_SHOWN_KEY, '1'); } catch (e) {}
     setTimeout(enterDemoMode, 50);
   }
 

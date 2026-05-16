@@ -8,7 +8,44 @@
    Mix is deliberate: a couple of rare / high-value Beanies, a
    couple of routine ones, a sold one, a draft, and a non-Beanie
    item — to give a sense of how varied inventory looks.
+
+   Each item carries a single procedurally-generated SVG "photo"
+   (a gradient backdrop in the item's color family with a bear or
+   shirt silhouette + the name) so the photo feature is visible
+   out of the gate. Encoded inline as data URLs — no network
+   fetches, no copyright concerns, ~700 bytes per item.
    ============================================================ */
+
+function _demoPhoto(label, hue, kind) {
+  const c1 = `hsl(${hue},60%,40%)`;
+  const c2 = `hsl(${(hue + 30) % 360},70%,22%)`;
+  const shirt =
+    '<path d="M 70 55 L 88 45 L 100 60 L 112 45 L 130 55 L 145 90 L 130 95 L 130 145 L 70 145 L 70 95 L 55 90 Z" '
+    + 'fill="rgba(255,255,255,.85)" stroke="rgba(0,0,0,.2)" stroke-width="1.5"/>';
+  const bear =
+    '<g transform="translate(100 90)" fill="rgba(255,255,255,.92)">'
+    + '<circle cx="-25" cy="-30" r="14"/><circle cx="25" cy="-30" r="14"/>'
+    + '<circle cx="0" cy="5" r="32"/></g>'
+    + '<circle cx="89" cy="91" r="3.5" fill="#0d1117"/>'
+    + '<circle cx="111" cy="91" r="3.5" fill="#0d1117"/>'
+    + '<ellipse cx="100" cy="106" rx="5" ry="3" fill="#0d1117"/>'
+    + '<path d="M 91 113 Q 100 118 109 113" stroke="#0d1117" stroke-width="2" '
+    + 'fill="none" stroke-linecap="round"/>';
+  const icon = kind === 'shirt' ? shirt : bear;
+  const safe = String(label).replace(/[<>&]/g, '');
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">'
+    + '<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">'
+    + `<stop offset="0" stop-color="${c1}"/>`
+    + `<stop offset="1" stop-color="${c2}"/>`
+    + '</linearGradient></defs>'
+    + '<rect width="200" height="200" fill="url(#g)"/>'
+    + icon
+    + `<text x="100" y="175" text-anchor="middle" font-family="system-ui,sans-serif" `
+    + `font-size="13" font-weight="600" fill="rgba(255,255,255,.96)">${safe}</text>`
+    + '</svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
 
 const DEMO_ITEMS = [
   {
@@ -52,7 +89,7 @@ const DEMO_ITEMS = [
     box_length: '6', box_width: '4', box_height: '3',
     package_type: 'Padded Mailer / Bubble Mailer',
     carrier: 'USPS Ground Advantage', ship_cost: '4.50',
-    photos: [],
+    photos: [_demoPhoto('Princess', 280)],
     research_ebay_avg: '42.00', research_ebay_date: '2026-04-22',
     research_ebay_notes: 'eBay sold listings, last 5 avg',
     research_poshmark_avg: '50.00', research_poshmark_date: '2026-04-22',
@@ -85,8 +122,7 @@ const DEMO_ITEMS = [
     research_ebay_avg: '1100.00', research_ebay_date: '2026-04-20',
     research_ebay_notes: 'Recent sold range $950-$1300',
     research_guide_avg: '1500.00',
-    photos: [],
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Peanut Royal Blue', 220)],
     created_at: '2026-04-19T08:00:00Z', updated_at: '2026-04-20T09:45:00Z'
   },
   {
@@ -108,7 +144,7 @@ const DEMO_ITEMS = [
     url_poshmark: 'https://poshmark.com/listing/example-3',
     poshmark_order_number: 'P-65a1f23b',
     fee_poshmark: '6.40',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Patti the Platypus', 320)],
     created_at: '2026-04-08T12:00:00Z', updated_at: '2026-04-18T16:20:00Z'
   },
   {
@@ -122,7 +158,7 @@ const DEMO_ITEMS = [
     condition: 'New With Tags (NWT)',
     cost: '4.00', price: '25.00',
     status: 'Draft',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Halo', 200)],
     private_notes: 'Need to photograph the iridescent halo properly.',
     created_at: '2026-04-28T09:00:00Z', updated_at: '2026-04-28T09:00:00Z'
   },
@@ -145,7 +181,7 @@ const DEMO_ITEMS = [
     date_listed: '2026-04-22',
     research_ebay_avg: '825.00', research_ebay_date: '2026-04-22',
     research_guide_avg: '900.00',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Rex T-Rex', 15)],
     created_at: '2026-04-21T11:30:00Z', updated_at: '2026-04-22T10:00:00Z'
   },
   {
@@ -164,7 +200,7 @@ const DEMO_ITEMS = [
     status: 'Listed - Poshmark',
     date_listed: '2026-04-15',
     url_poshmark: 'https://poshmark.com/listing/example-6',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Iggy Iguana', 210)],
     created_at: '2026-04-14T13:00:00Z', updated_at: '2026-04-15T09:00:00Z'
   },
   {
@@ -185,7 +221,7 @@ const DEMO_ITEMS = [
     ebay_item_number: '285456789012',
     ship_cost: '4.95', postage_paid: '4.20',
     fee_ebay_fvf: '5.04', fee_ebay_fvf_shipping: '0.66', fee_ebay_per_order: '0.30',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Glory', 350)],
     created_at: '2026-03-28T15:00:00Z', updated_at: '2026-04-12T18:30:00Z'
   },
   {
@@ -200,7 +236,7 @@ const DEMO_ITEMS = [
     condition: 'New With Tags (NWT)',
     cost: '5.00', price: '30.00',
     status: 'Ready to List',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Holiday Teddy 2000', 0)],
     created_at: '2026-04-26T10:00:00Z', updated_at: '2026-04-26T10:00:00Z'
   },
   {
@@ -217,7 +253,7 @@ const DEMO_ITEMS = [
     cost: '4.00', price: '22.00',
     status: 'Listed - eBay',
     date_listed: '2026-04-18',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Spinner Spider', 25)],
     created_at: '2026-04-17T16:00:00Z', updated_at: '2026-04-18T11:00:00Z'
   },
   {
@@ -239,7 +275,7 @@ const DEMO_ITEMS = [
     ebay_item_number: '285567890123',
     ship_cost: '5.50', postage_paid: '4.85',
     fee_ebay_fvf: '7.95', fee_ebay_fvf_shipping: '0.73', fee_ebay_per_order: '0.30',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Lefty Donkey', 230)],
     created_at: '2026-03-14T09:00:00Z', updated_at: '2026-04-02T14:00:00Z'
   },
   {
@@ -263,7 +299,7 @@ const DEMO_ITEMS = [
     status: 'Listed - Both',
     date_listed: '2026-04-23',
     weight_value: '1.5', weight_unit: 'lb',
-    photos: [],
+    photos: [_demoPhoto("Vintage Levi's", 215, 'shirt')],
     created_at: '2026-04-22T17:00:00Z', updated_at: '2026-04-23T10:00:00Z'
   },
   {
@@ -281,7 +317,7 @@ const DEMO_ITEMS = [
     condition: 'New With Tags (NWT)',
     cost: '5.00', price: '35.00',
     status: 'Ready to List',
-    quantity: 1, photos: [],
+    quantity: 1, photos: [_demoPhoto('Garcia', 290)],
     created_at: '2026-04-27T12:00:00Z', updated_at: '2026-04-27T12:00:00Z'
   }
 ];
