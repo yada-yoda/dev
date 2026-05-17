@@ -1,0 +1,14 @@
+{
+  "name": "Scan2PDF",
+  "short_name": "Scan2PDF",
+  "description": "Scan paper documents with your iPhone camera and save a searchable PDF.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1320",
+  "theme_color": "#1a2238",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

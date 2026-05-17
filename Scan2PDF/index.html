@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="version" content="0.1.0">
+  <title>Scan2PDF · Scan paper to searchable PDF</title>
+  <meta name="description" content="Scan multi-page documents with your iPhone camera, OCR the text, and save a searchable PDF to Files or iCloud.">
+  <link rel="canonical" href="https://dev.rizzo.cc/Scan2PDF/">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1a2238">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Scan2PDF">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <h1>Scan2PDF</h1>
+      <p class="sub">Capture paper pages, build a searchable PDF, share to Files.</p>
+    </header>
+
+    <section class="step" id="step-pages" aria-labelledby="pages-h">
+      <div class="step__head">
+        <h2 id="pages-h">Pages</h2>
+        <span class="page-count" id="page-count" hidden>0</span>
+      </div>
+      <p class="empty-hint" id="empty-hint">No pages yet. Tap <strong>Scan page</strong> below to start.</p>
+      <ol class="page-list" id="page-list" hidden></ol>
+      <label class="btn btn--ghost btn--add" for="file-page">
+        <span aria-hidden="true">＋</span> Scan page
+        <input type="file" id="file-page" accept="image/*" capture="environment" multiple hidden>
+      </label>
+    </section>
+
+    <section class="step" id="step-settings" aria-labelledby="settings-h">
+      <h2 id="settings-h">Settings</h2>
+      <label class="field">
+        <span class="field__label">Filename prefix</span>
+        <input type="text" id="prefix" maxlength="40" placeholder="Scan" autocomplete="off" autocapitalize="words" spellcheck="false">
+        <span class="field__hint" id="filename-preview">Scan_2026-01-01_120000.pdf</span>
+      </label>
+      <label class="field">
+        <span class="field__label">OCR language</span>
+        <select id="language">
+          <option value="eng">English</option>
+          <option value="spa">Spanish</option>
+          <option value="fra">French</option>
+          <option value="deu">German</option>
+          <option value="ita">Italian</option>
+          <option value="por">Portuguese</option>
+          <option value="nld">Dutch</option>
+          <option value="eng+spa">English + Spanish</option>
+          <option value="eng+fra">English + French</option>
+        </select>
+      </label>
+      <label class="check">
+        <input type="checkbox" id="ocr-enabled" checked>
+        Make PDF searchable (run OCR)
+      </label>
+      <p class="field__hint">When off, the PDF contains the page images only — faster, smaller, but not searchable.</p>
+    </section>
+
+    <button type="button" class="btn btn--primary btn--cta" id="btn-generate" disabled>Generate PDF</button>
+
+    <section class="step" id="step-progress" hidden aria-live="polite">
+      <h2>Building PDF…</h2>
+      <div class="progress">
+        <div class="progress__bar" id="progress-bar" style="width:0%"></div>
+      </div>
+      <p class="progress__label" id="progress-label">Starting…</p>
+    </section>
+
+    <section class="step" id="step-done" hidden aria-labelledby="done-h">
+      <h2 id="done-h">Ready to save</h2>
+      <p class="done-info" id="done-info"></p>
+      <div class="done-actions">
+        <button type="button" class="btn btn--primary" id="btn-share">Save / share</button>
+        <button type="button" class="btn btn--ghost" id="btn-download" hidden>Download</button>
+      </div>
+      <div class="done-secondary">
+        <button type="button" class="btn btn--ghost btn--sm" id="btn-back">Edit pages</button>
+        <button type="button" class="btn btn--ghost btn--sm" id="btn-new">New scan</button>
+      </div>
+      <p class="field__hint" id="share-hint" hidden></p>
+    </section>
+
+    <footer class="foot">
+      <span>Scan2PDF</span>
+      <span class="version">v0.1.0</span>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
