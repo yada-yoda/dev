@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Ledger v0.10.0 — Collectibles Inventory</title>
+<title>The Ledger v0.10.1 — Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
@@ -39,7 +39,7 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=0.10.0" />
+<link rel="stylesheet" href="styles.css?v=0.10.1" />
 </head>
 <body>
 
@@ -933,7 +933,7 @@
   <div class="modal-backdrop"></div>
   <div class="modal-card mini-card">
     <h3>Import Inventory</h3>
-    <p>Upload a previously-exported JSON backup or a CSV file with matching columns.</p>
+    <p>Upload a previously-exported JSON backup, a Ledger CSV, or an <strong>eBay Seller Hub CSV</strong> export. Format is auto-detected from the headers.</p>
     <input type="file" id="importFile" accept=".json,.csv" />
     <div class="import-options">
       <label><input type="radio" name="importMode" value="merge" checked /> Merge with existing</label>
@@ -1003,16 +1003,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often<span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v0.10.0</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often<span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v0.10.1</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=0.10.0"></script>
-<script defer src="beanie-db.js?v=0.10.0"></script>
-<script defer src="demo-data.js?v=0.10.0"></script>
-<script defer src="app.js?v=0.10.0"></script>
+<script type="module" src="firebase-config.js?v=0.10.1"></script>
+<script defer src="beanie-db.js?v=0.10.1"></script>
+<script defer src="demo-data.js?v=0.10.1"></script>
+<script defer src="app.js?v=0.10.1"></script>
 </body>
 </html>

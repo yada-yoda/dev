@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.10.0';
+const APP_VERSION = '0.10.1';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -1121,12 +1121,21 @@ function doImport() {
     try {
       let incoming;
       let userBeanies = null;
+      let formatLabel = 'CSV';
       if (file.name.toLowerCase().endsWith('.json')) {
         const data = JSON.parse(e.target.result);
         incoming = Array.isArray(data) ? data : (data.items || []);
         if (data.userBeanies) userBeanies = data.userBeanies;
+        formatLabel = 'JSON backup';
       } else {
-        incoming = parseCSV(e.target.result);
+        const rows = parseCSV(e.target.result);
+        if (rows.length && looksLikeEbayCsv(Object.keys(rows[0]))) {
+          incoming = rows.map(ebayRowToItem);
+          formatLabel = 'eBay Seller Hub CSV';
+        } else {
+          incoming = rows;
+          formatLabel = 'The Ledger CSV';
+        }
       }
       if (!incoming.length) throw new Error('No items found in file');
 
@@ -1158,13 +1167,80 @@ function doImport() {
       }
       render();
       document.getElementById('importModal').classList.remove('open');
-      toast(`Imported ${incoming.length} items (${mode})`, 'success');
+      toast(`Imported ${incoming.length} items from ${formatLabel} (${mode})`, 'success');
     } catch (err) {
       console.error(err);
       toast('Import failed: ' + err.message, 'error');
     }
   };
   reader.readAsText(file);
+}
+
+// ============ eBay Seller Hub CSV → The Ledger schema ============
+// eBay's "Active listings" / "Sold listings" / "Unsold listings" reports
+// all share roughly the same column set. Map only what's useful to us;
+// everything else in the row is ignored (rather than dumped into a junk
+// field) so the imported item is clean.
+const EBAY_COLUMN_MAP = {
+  'Item number':         'ebay_item_number',
+  'Item ID':             'ebay_item_number',
+  'Custom label':        'sku',
+  'Custom label (SKU)':  'sku',
+  'SKU':                 'sku',
+  'Title':               'listing_title',
+  'Available quantity':  'quantity',
+  'Quantity available':  'quantity',
+  'Quantity':            'quantity',
+  'Start price':         'price',
+  'Current price':       'price',
+  'Buy It Now price':    'price',
+  'Sold for':            'sold_price',
+  'Sale price':          'sold_price',
+  'Sold price':          'sold_price',
+  'Start date':          'date_listed',
+  'Sold date':           'date_sold',
+  'Sale date':           'date_sold',
+};
+
+function looksLikeEbayCsv(headers) {
+  const set = new Set(headers.map(h => (h || '').trim()));
+  return set.has('Item number') || set.has('Item ID') ||
+         set.has('Custom label') || set.has('Custom label (SKU)') ||
+         set.has('Sold for');
+}
+
+function ebayRowToItem(row) {
+  const item = {};
+  Object.entries(row).forEach(([k, v]) => {
+    const dst = EBAY_COLUMN_MAP[(k || '').trim()];
+    if (dst) item[dst] = String(v == null ? '' : v).trim();
+  });
+  // Fallback: use the listing title as the item name
+  if (!item.name && item.listing_title) item.name = item.listing_title;
+  // Strip currency symbols / commas off price-y fields
+  ['price', 'sold_price', 'min_price'].forEach(f => {
+    if (item[f]) item[f] = item[f].replace(/[$£€¥,]/g, '').trim();
+  });
+  // Normalize dates (eBay typically gives "MMM-DD-YY" or "MM/DD/YYYY")
+  ['date_listed', 'date_sold'].forEach(f => {
+    if (item[f]) {
+      const d = new Date(item[f]);
+      if (!isNaN(d)) item[f] = d.toISOString().slice(0, 10);
+    }
+  });
+  // Status inference — if there's a sold price, treat it as a closed sale
+  const sp = parseFloat(item.sold_price);
+  if (isFinite(sp) && sp > 0) {
+    item.status = 'Sold';
+    item.sold_platform = 'eBay';
+  } else {
+    item.status = 'Listed - eBay';
+  }
+  // Default category for unmapped imports — user can adjust per item
+  if (!item.category) item.category = 'Other';
+  // Quantity defaults to 1 if missing
+  if (!item.quantity) item.quantity = 1;
+  return item;
 }
 
 function parseCSV(text) {
