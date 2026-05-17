@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.10.1';
+const APP_VERSION = '0.10.2';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -1176,6 +1176,69 @@ function doImport() {
   reader.readAsText(file);
 }
 
+// ============ Ledger CSV template (header + 1 example row) ============
+// Downloaded from the Import modal so users have a ready-to-fill template
+// matching exactly the columns parseCSV / doImport expect.
+function buildCsvTemplate() {
+  const skip = new Set(['id', 'created_at', 'updated_at', 'photos']);
+  const fields = Object.keys(DEFAULT_FIELDS).filter(f => !skip.has(f));
+  // Plausible example values for the well-known fields — every column the
+  // user might fill is demonstrated here. Fields not listed default to ''.
+  const example = {
+    name: 'Princess',
+    category: 'Beanie Baby',
+    sku: 'BB-0001',
+    brand: 'Ty Inc.',
+    color: 'Royal purple',
+    material: 'Plush, PE pellets',
+    country: 'Indonesia',
+    location: 'Bin A-3',
+    quantity: 1,
+    bb_year: 1997,
+    bb_swing_gen: '4th Gen (1996-98)',
+    bb_tush_gen: '5th Gen Tush (1997)',
+    bb_swing_cond: 'Mint (no creases/bends)',
+    bb_tush_cond: 'Mint',
+    bb_style_num: '4300',
+    bb_pellets: 'PE Pellets',
+    bb_rarity: 'Retired 1999-04-13. Diana Memorial bear.',
+    has_variations: false,
+    condition: 'New With Tags (NWT)',
+    condition_notes: 'Mint hang tag, no fading.',
+    has_packaging: 'No',
+    environment: 'Smoke-free & Pet-free home',
+    listing_title: 'VTG 1997 Ty Princess Diana Beanie Baby Mint Tags',
+    tags: 'vintage, 90s, beanie, ty, princess',
+    cost: '5.00',
+    price: '45.00',
+    min_price: '38.00',
+    item_tax: '0.40',
+    other_expenses: '0.50',
+    other_expenses_notes: 'Bubble mailer + label',
+    status: 'Listed - Both',
+    date_listed: '2026-04-25',
+    weight_value: '4',
+    weight_unit: 'oz',
+    dim_unit: 'in',
+    box_length: '6',
+    box_width: '4',
+    box_height: '3',
+    package_type: 'Padded Mailer / Bubble Mailer',
+    carrier: 'USPS Ground Advantage',
+    ship_cost: '4.50',
+    private_notes: 'Source: estate sale',
+  };
+  const header = fields.join(',');
+  const row = fields.map(f => csvEscape(example[f] != null ? example[f] : ''));
+  return header + '\n' + row.join(',') + '\n';
+}
+
+function downloadCsvTemplate(e) {
+  if (e) e.preventDefault();
+  downloadBlob(buildCsvTemplate(), 'the-ledger-import-template.csv', 'text/csv');
+  toast('Template downloaded — fill it in and re-upload via Import', 'success');
+}
+
 // ============ eBay Seller Hub CSV → The Ledger schema ============
 // eBay's "Active listings" / "Sold listings" / "Unsold listings" reports
 // all share roughly the same column set. Map only what's useful to us;
@@ -2048,6 +2111,8 @@ function init() {
   document.getElementById('importBtn').onclick = openImportModal;
   document.getElementById('importCancel').onclick = () => document.getElementById('importModal').classList.remove('open');
   document.getElementById('importConfirm').onclick = doImport;
+  const dlTpl = document.getElementById('downloadTemplateLink');
+  if (dlTpl) dlTpl.onclick = downloadCsvTemplate;
   document.querySelector('#importModal .modal-backdrop').onclick = () => document.getElementById('importModal').classList.remove('open');
 
   // Restore view

@@ -1444,6 +1444,16 @@ main {
 .mini-modal h3 { font-size: 1.15rem; margin-bottom: 0.5rem; font-weight: 600; letter-spacing: -0.01em; }
 .mini-modal p { color: var(--text-2); margin-bottom: 1.25rem; font-size: 0.88rem; }
 .mini-modal .modal-footer { padding: 1.25rem 0 0; background: transparent; border: none; }
+.import-template-note {
+  font-size: 0.78rem !important;
+  color: var(--text-2);
+  margin: 0.75rem 0 0 !important;
+}
+.import-template-note .footer-link {
+  color: var(--accent);
+  text-decoration: none;
+}
+.import-template-note .footer-link:hover { text-decoration: underline; }
 
 /* ============ SETTINGS MODAL ============ */
 .settings-card { max-width: 520px; padding: 1.5rem 1.75rem; }
