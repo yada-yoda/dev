@@ -3,14 +3,14 @@
 A static web app that turns iPhone camera shots of paper documents into a
 searchable, multi-page PDF — saved straight to Files, iCloud Drive, or
 anywhere else iOS' native share sheet can reach. Served at
-`dev.rizzo.cc/Scan2PDF/`.
+`dev.rizzo.cc/scan2pdf/`.
 
 Nothing leaves the device. OCR, image processing, and PDF assembly all run
 in the browser.
 
 ## How to use it on iPhone
 
-1. Open `https://dev.rizzo.cc/Scan2PDF/` in Safari.
+1. Open `https://dev.rizzo.cc/scan2pdf/` in Safari.
 2. Tap **Scan page** — iOS opens the rear camera. Take a photo of the page.
 3. Repeat for as many pages as you need. Reorder with ↑↓ or remove with ×.
 4. Set a **filename prefix** (e.g. `Receipt`, `Statement`). Saved between
@@ -49,7 +49,7 @@ on macOS and Windows Search both index PDF text content.
 | `app.js`                | Capture, OCR orchestration, PDF assembly, share  |
 | `manifest.webmanifest`  | PWA metadata so it installs to Home Screen       |
 | `favicon.svg`           | App icon                                         |
-| `404.html`              | Fallback for unknown URLs under `/Scan2PDF/`     |
+| `404.html`              | Fallback for unknown URLs under `/scan2pdf/`     |
 | `README.md`             | This file                                        |
 
 Tesseract.js and jsPDF are loaded from jsDelivr at runtime — no build
