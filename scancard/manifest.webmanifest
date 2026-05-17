@@ -1,0 +1,14 @@
+{
+  "name": "Scan Card",
+  "short_name": "Scan Card",
+  "description": "Scan a business card and download a vCard for Contacts.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1320",
+  "theme_color": "#1a2238",
+  "icons": [
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

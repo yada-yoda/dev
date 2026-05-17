@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="version" content="0.1.0">
+  <title>Scan Card · vCard from a business card</title>
+  <meta name="description" content="Scan a business card with your iPhone, OCR the text, edit the fields, then download a .vcf to add to Contacts.">
+  <link rel="canonical" href="https://dev.rizzo.cc/scancard/">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="apple-touch-icon" href="favicon.svg">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#1a2238">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Scan Card">
+  <meta name="robots" content="noindex">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="wrap">
+    <header class="head">
+      <h1>Scan Card</h1>
+      <p class="sub">Point your camera at a business card. Get a vCard.</p>
+    </header>
+
+    <section class="step" id="step-capture" aria-labelledby="capture-h">
+      <h2 id="capture-h">1. Capture</h2>
+      <div class="capture-grid">
+        <label class="capture-tile" for="file-front">
+          <span class="capture-tile__label">Front</span>
+          <span class="capture-tile__hint">Tap to use camera</span>
+          <img class="capture-tile__preview" id="preview-front" alt="" hidden>
+          <input type="file" id="file-front" accept="image/*" capture="environment" hidden>
+        </label>
+        <label class="capture-tile" for="file-back">
+          <span class="capture-tile__label">Back <span class="opt">(optional)</span></span>
+          <span class="capture-tile__hint">Tap to use camera</span>
+          <img class="capture-tile__preview" id="preview-back" alt="" hidden>
+          <input type="file" id="file-back" accept="image/*" capture="environment" hidden>
+        </label>
+      </div>
+      <button type="button" class="btn btn--primary" id="btn-extract" disabled>Extract text</button>
+    </section>
+
+    <section class="step" id="step-progress" hidden aria-live="polite">
+      <h2>2. Reading the card&hellip;</h2>
+      <div class="progress">
+        <div class="progress__bar" id="progress-bar" style="width:0%"></div>
+      </div>
+      <p class="progress__label" id="progress-label">Loading OCR engine&hellip;</p>
+    </section>
+
+    <section class="step" id="step-form" hidden aria-labelledby="form-h">
+      <h2 id="form-h">3. Edit &amp; save</h2>
+      <p class="form-hint">OCR isn&rsquo;t perfect &mdash; review and tidy these fields before saving.</p>
+      <form id="card-form" class="form" autocomplete="off">
+        <label>Full name<input type="text" name="name" autocomplete="name"></label>
+        <label>Title<input type="text" name="title" autocomplete="organization-title"></label>
+        <label>Company<input type="text" name="org" autocomplete="organization"></label>
+        <label>Email<input type="email" name="email" autocomplete="email" inputmode="email"></label>
+        <fieldset class="phones">
+          <legend>Phones</legend>
+          <div id="phone-list"></div>
+          <button type="button" class="btn btn--ghost btn--sm" id="btn-add-phone">+ Add phone</button>
+        </fieldset>
+        <label>Website<input type="url" name="url" inputmode="url"></label>
+        <label>Address<textarea name="address" rows="2"></textarea></label>
+        <label>Notes<textarea name="note" rows="3" placeholder="Anything else worth keeping"></textarea></label>
+        <label class="check">
+          <input type="checkbox" name="embed_photo" id="embed-photo" checked>
+          Embed the front photo in the vCard
+        </label>
+        <div class="form-actions">
+          <button type="button" class="btn btn--ghost" id="btn-reset">Start over</button>
+          <button type="submit" class="btn btn--primary" id="btn-save">Download vCard</button>
+        </div>
+        <p class="form-hint" id="save-hint" hidden></p>
+      </form>
+      <details class="raw">
+        <summary>Show raw OCR text</summary>
+        <pre id="raw-text"></pre>
+      </details>
+    </section>
+
+    <footer class="foot">
+      <span>Scan Card</span>
+      <span class="version">v0.1.0</span>
+    </footer>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
