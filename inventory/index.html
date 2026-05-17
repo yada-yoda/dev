@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Ledger v0.9.6 — Collectibles Inventory</title>
+<title>The Ledger v0.10.0 — Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
@@ -39,7 +39,7 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=0.9.6" />
+<link rel="stylesheet" href="styles.css?v=0.10.0" />
 </head>
 <body>
 
@@ -135,6 +135,9 @@
       </select>
     </div>
     <div class="actions">
+      <button class="btn btn-icon" id="settingsBtn" title="Settings" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
       <button class="btn btn-ghost" id="importBtn" title="Import JSON or CSV">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0-4-4m4 4 4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
         Import
@@ -943,6 +946,43 @@
   </div>
 </div>
 
+<!-- ============ SETTINGS MODAL ============ -->
+<div class="modal mini-modal" id="settingsModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card settings-card">
+    <header class="settings-header">
+      <h3>Settings</h3>
+      <button class="icon-btn" id="settingsClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+
+    <section class="settings-section">
+      <h4>About</h4>
+      <dl class="settings-dl">
+        <div><dt>Version</dt><dd id="settingsVersion">v0.10.0</dd></div>
+        <div><dt>Items</dt><dd id="settingsItemCount">0</dd></div>
+        <div><dt>Sync</dt><dd id="settingsSyncStatus">Guest &mdash; local only</dd></div>
+      </dl>
+    </section>
+
+    <section class="settings-section">
+      <h4>Demo</h4>
+      <p class="settings-muted">If you previously exited the demo and want to see it again on next reload, re-enable it here. The footer "Try the demo" link still works regardless.</p>
+      <button type="button" class="btn btn-ghost" id="reenableDemoBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+        Re-enable demo on next visit
+      </button>
+    </section>
+
+    <section class="settings-section settings-danger">
+      <h4>Danger zone</h4>
+      <p class="settings-muted" id="wipeNote">Clears items, settings, and demo flag from this device's localStorage. Your cloud data (if signed in) is <strong>not</strong> touched &mdash; you'd still see your items after signing in again.</p>
+      <button type="button" class="btn btn-danger" id="wipeLocalBtn">Wipe local data</button>
+    </section>
+  </div>
+</div>
+
 <!-- ============ SCANNER MODAL ============ -->
 <div class="modal mini-modal" id="scannerModal">
   <div class="modal-backdrop"></div>
@@ -963,16 +1003,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often<span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v0.9.6</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often<span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v0.10.0</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=0.9.6"></script>
-<script defer src="beanie-db.js?v=0.9.6"></script>
-<script defer src="demo-data.js?v=0.9.6"></script>
-<script defer src="app.js?v=0.9.6"></script>
+<script type="module" src="firebase-config.js?v=0.10.0"></script>
+<script defer src="beanie-db.js?v=0.10.0"></script>
+<script defer src="demo-data.js?v=0.10.0"></script>
+<script defer src="app.js?v=0.10.0"></script>
 </body>
 </html>

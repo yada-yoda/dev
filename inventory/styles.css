@@ -465,6 +465,26 @@ textarea { resize: vertical; min-height: 68px; }
   color: var(--text-0);
   border-color: var(--border-strong);
 }
+.btn-icon {
+  background: var(--bg-1);
+  color: var(--text-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 140ms, color 140ms, border-color 140ms;
+}
+.btn-icon:hover {
+  background: var(--bg-2);
+  color: var(--text-0);
+  border-color: var(--border-strong);
+}
+.btn-icon svg { width: 18px; height: 18px; }
 .btn-danger {
   background: transparent;
   color: var(--coral);
@@ -1424,6 +1444,70 @@ main {
 .mini-modal h3 { font-size: 1.15rem; margin-bottom: 0.5rem; font-weight: 600; letter-spacing: -0.01em; }
 .mini-modal p { color: var(--text-2); margin-bottom: 1.25rem; font-size: 0.88rem; }
 .mini-modal .modal-footer { padding: 1.25rem 0 0; background: transparent; border: none; }
+
+/* ============ SETTINGS MODAL ============ */
+.settings-card { max-width: 520px; padding: 1.5rem 1.75rem; }
+.settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.settings-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-0);
+  letter-spacing: -0.01em;
+}
+.settings-section {
+  padding: 1rem 0;
+  border-top: 1px solid var(--border);
+}
+.settings-section:first-of-type { border-top: none; padding-top: 0.5rem; }
+.settings-section h4 {
+  margin: 0 0 0.6rem 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.settings-dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.45rem 1rem;
+  margin: 0;
+}
+.settings-dl div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed var(--border);
+  grid-column: 1 / -1;
+}
+.settings-dl div:last-child { border-bottom: none; }
+.settings-dl dt {
+  font-size: 0.78rem;
+  color: var(--text-2);
+}
+.settings-dl dd {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 0.84rem;
+  color: var(--text-0);
+  text-align: right;
+}
+.settings-muted {
+  font-size: 0.78rem;
+  color: var(--text-2);
+  margin: 0 0 0.85rem 0;
+  line-height: 1.5;
+}
+.settings-danger h4 { color: var(--coral, #ef4444); }
+.settings-danger .settings-muted strong { color: var(--text-1); }
 
 .import-options {
   display: flex;

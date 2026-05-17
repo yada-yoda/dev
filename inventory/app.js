@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.10.0';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -1391,6 +1391,64 @@ function updateDaysPanel() {
   }
 }
 
+// ============ SETTINGS ============
+function openSettings() {
+  // Refresh the dynamic fields each open
+  document.getElementById('settingsVersion').textContent = 'v' + APP_VERSION;
+  document.getElementById('settingsItemCount').textContent = String(state.items.length);
+  const user = (window.firebaseAuth && window.firebaseAuth.currentUser) || null;
+  const syncEl = document.getElementById('settingsSyncStatus');
+  if (user) {
+    syncEl.textContent = (user.displayName || user.email || 'Signed in') + ' · synced';
+  } else if (state.demoMode) {
+    syncEl.textContent = 'Demo mode (in memory only)';
+  } else {
+    syncEl.textContent = 'Guest — local only';
+  }
+  // Wipe-button copy varies depending on auth state
+  const wipeNote = document.getElementById('wipeNote');
+  if (user) {
+    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. Your cloud data is <strong>not</strong> touched — you\'d still see your items after signing in again.';
+  } else {
+    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. <strong>Cannot be undone</strong> for guest data — export a JSON backup first if you want to keep it.';
+  }
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+function reenableDemoOnNextVisit() {
+  try { localStorage.removeItem(DEMO_DISMISSED_KEY); } catch (e) {}
+  toast('Demo will auto-load on your next visit', 'success');
+  closeSettings();
+}
+
+async function wipeLocalData() {
+  const user = (window.firebaseAuth && window.firebaseAuth.currentUser) || null;
+  const msg = user
+    ? 'Sign out (if signed in) and clear all local data on this device? Cloud data stays.'
+    : 'Clear all local items and settings on this device? This cannot be undone for guest data.';
+  const ok = await confirmDialog('Wipe local data', msg, {
+    okLabel: 'Wipe', cancelLabel: 'Cancel', okClass: 'btn-danger'
+  });
+  if (!ok) return;
+  try {
+    if (user && window.firebaseSignOut) {
+      await window.firebaseSignOut();
+    }
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(SETTINGS_KEY);
+    localStorage.removeItem(DEMO_DISMISSED_KEY);
+    localStorage.removeItem('theLedger.userBeanies.v1');
+  } catch (e) {
+    console.error('Wipe failed:', e);
+  }
+  // Reload so the app re-inits cleanly (auto-demo will fire if no inventory)
+  location.reload();
+}
+
 // ============ DEMO MODE ============
 function shouldAutoDemo() {
   // Auto-demo on every load when there's no real inventory and the user
@@ -1707,6 +1765,18 @@ function init() {
   document.title = 'The Ledger v' + APP_VERSION + ' — Collectibles Inventory';
 
   wireAuthUI();
+
+  // Settings panel
+  const settingsBtn = document.getElementById('settingsBtn');
+  if (settingsBtn) settingsBtn.onclick = openSettings;
+  const settingsClose = document.getElementById('settingsClose');
+  if (settingsClose) settingsClose.onclick = closeSettings;
+  const settingsModal = document.getElementById('settingsModal');
+  if (settingsModal) settingsModal.querySelector('.modal-backdrop').onclick = closeSettings;
+  const reenableDemoBtn = document.getElementById('reenableDemoBtn');
+  if (reenableDemoBtn) reenableDemoBtn.onclick = reenableDemoOnNextVisit;
+  const wipeLocalBtn = document.getElementById('wipeLocalBtn');
+  if (wipeLocalBtn) wipeLocalBtn.onclick = wipeLocalData;
 
   // Demo mode buttons + ?demo=1 URL param + auto-demo on first visit
   const tryDemoBtn = document.getElementById('tryDemoBtn');
