@@ -306,22 +306,26 @@ ul{list-style:none}
   min-height:clamp(80px,14vw,160px);
   font-family:'Poppins','Montserrat',sans-serif;
   font-weight:500;
-  font-size:clamp(22px,5.2vw,60px);
+  font-size:clamp(19px,5vw,60px);
   line-height:1.16;
   color:#fff;
   text-transform:uppercase;
   letter-spacing:-0.01em;
   text-shadow:0 2px 28px rgba(0,0,0,.65);
-  padding:0 12px;
+  padding:0 8px;
 }
 @media (max-width:560px){
-  .hero-quotes{padding:0 4px}
+  .hero-quotes{padding:0 2px}
 }
 .hero-quotes span{
   position:absolute;left:0;right:0;
   opacity:0;
   transform:translateY(36px);
   transition:opacity .9s ease, transform 1s cubic-bezier(.22,.61,.36,1);
+  /* Hard-cap each quote to exactly the two lines created by its <br>.
+     Long single lines (e.g. "of rejection or failure.") would otherwise
+     wrap to a third line on narrow viewports. */
+  white-space:nowrap;
 }
 .hero-quotes span.active{
   opacity:1;
@@ -807,6 +811,7 @@ footer .ver{color:var(--dim);margin-left:10px}
     <div class="hero-slide" style="background-image:url('assets/hero/hero-stage.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/hero/hero-nyc.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/hero/hero-chicago.jpg')"></div>
+    <div class="hero-slide" style="background-image:url('assets/hero/hero-road.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/hero/hero-recent.jpg')"></div>
   </div>
   <!-- /EDIT: hero-slides -->
@@ -822,11 +827,12 @@ footer .ver{color:var(--dim);margin-left:10px}
       <img src="assets/rizzo_logo_white.png" alt="RIZZO">
     </h1>
 
-    <!-- EDIT: hero-quotes — rotating slogans, paired 1:1 with hero-slides above. Keep total at 4 to match slide count, or update both. -->
+    <!-- EDIT: hero-quotes — rotating slogans, paired 1:1 with hero-slides above. Keep slide count and quote count equal. Each <span> renders as exactly 2 lines (one <br>); white-space: nowrap stops longer lines from wrapping to a 3rd line. -->
     <div class="hero-quotes" aria-hidden="true">
       <span>Separation is in<br>the preparation.</span>
       <span>Don&rsquo;t be afraid<br>of rejection or failure.</span>
       <span>Stop trying to feel.<br>Start trying to do.</span>
+      <span>Play the verb,<br>not the mood.</span>
       <span>Prepare to be<br>unprepared.</span>
     </div>
     <!-- /EDIT: hero-quotes -->
@@ -1275,7 +1281,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.12</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.13</span>
 </footer>
 
 <script>

@@ -52,6 +52,21 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.13 &mdash; 2026-05-18
+
+- **5th hero slide + quote.** Pulled `rizzo_slider2.png` from the WP
+  install (a misty wet-road shot) &mdash; resized to 1920px wide,
+  saved as `hero-road.jpg`. Paired with the new quote
+  **&ldquo;Play the verb, / not the mood.&rdquo;** Slideshow now cycles
+  5 photos with 5 quotes on a 40-second loop (still 8s per slide).
+- **Quotes hard-capped at 2 lines.** Added `white-space: nowrap` to
+  each quote `<span>`; the `<br>` is now the only line break. On
+  narrow viewports the longest single line
+  (&ldquo;of rejection or failure.&rdquo;, 23 chars) was wrapping to a
+  third line at the previous 22px floor. Floor dropped to 19px
+  (`clamp(19px,5vw,60px)`) and side padding tightened so even at
+  320px viewport every quote stays exactly two lines.
+
 ### v0.6.12 &mdash; 2026-05-12
 
 - **Bio reworded.** Dropped the &ldquo;B.B.A. from Saint Xavier University&rdquo;
