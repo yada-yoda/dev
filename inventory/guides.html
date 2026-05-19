@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Listing Guides — The Ledger v0.11.0</title>
+<meta name="description" content="Platform-by-platform listing tips for resellers: eBay, Poshmark, Mercari, Depop, Etsy, Facebook Marketplace, Craigslist, OfferUp, Nextdoor. Field-by-field mapping from The Ledger to each marketplace.">
+<link rel="canonical" href="https://dev.rizzo.cc/inventory/guides.html" />
+<meta name="theme-color" content="#0a0d11" />
+<meta property="og:type" content="article" />
+<meta property="og:title" content="Listing Guides — The Ledger" />
+<meta property="og:description" content="Platform-by-platform listing tips for resellers." />
+<meta property="og:image" content="https://dev.rizzo.cc/inventory/og-image.png" />
+<link rel="icon" type="image/svg+xml" href="favicon.svg" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<link rel="manifest" href="site.webmanifest" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" media="print" onload="this.media='all'"
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
+<link rel="stylesheet" href="styles.css?v=0.11.0" />
+<link rel="stylesheet" href="guides.css?v=0.11.0" />
+</head>
+<body class="guides-page">
+
+<header class="guides-page-header">
+  <div class="guides-page-header-inner">
+    <a href="./" class="guides-back-link" aria-label="Back to inventory">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>Back to inventory</span>
+    </a>
+    <div class="guides-page-title">
+      <h1>Listing Guides</h1>
+      <p>Platform-by-platform tips for getting your inventory listed. Each section notes which Ledger export (or fields) plugs in. Screenshots are placeholders — drop PNGs into <code>guides-screenshots/{platform}/</code> and they'll surface here.</p>
+    </div>
+  </div>
+</header>
+
+<nav class="guides-tabs" role="tablist" aria-label="Listing types">
+  <button role="tab" class="guides-tab active" data-tab="online" aria-selected="true">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 4 10 15 15 0 0 1-4 10 15 15 0 0 1-4-10 15 15 0 0 1 4-10z"/></svg>
+    <span>Online <small>(ships nationwide)</small></span>
+  </button>
+  <button role="tab" class="guides-tab" data-tab="local" aria-selected="false">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+    <span>Local <small>(pickup, no shipping)</small></span>
+  </button>
+</nav>
+
+<main class="guides-content">
+
+  <!-- ================== ONLINE TAB ================== -->
+  <section class="guides-tab-panel active" data-panel="online" role="tabpanel">
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>eBay</h2>
+        <span class="guide-platform-badge">Largest US marketplace</span>
+      </header>
+      <p class="guide-platform-blurb">Just about anything sells here — collectibles, vintage, electronics, clothing. Supports both fixed-price and auction. Best discoverability of any platform but the most fees.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>80 chars</dd></div>
+        <div><dt>Photos</dt><dd>12 free, 1600&times;1600+ for zoom</dd></div>
+        <div><dt>Fees (2026)</dt><dd>~13.25% FVF + $0.30/order; insertion $0.35 after 250 free/mo</dd></div>
+        <div><dt>Format</dt><dd>Auction / Fixed Price / GTC</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p><strong>Export → eBay File Exchange (CSV)</strong> generates an upload-ready file: Action, CustomLabel (SKU), Title, ConditionID, Description, dimensions, weight, brand, UPC, year — all mapped from your item.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Pack keywords into the title — skip filler ("L@@K", "RARE"). Search ranking weights title heavily.</li>
+          <li>Free returns boost your placement in eBay search.</li>
+          <li>Promoted Listings can move slow items but cut into margin — start at 2% ad rate.</li>
+          <li>Use UPC where applicable — eBay auto-fills product details and bumps SEO.</li>
+          <li>For Beanies: include tag generation, condition, and any errors in the title (e.g. "PVC PE" matters).</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="ebay">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/ebay/01-listing-form.png</code>, <code>02-pricing.png</code>, <code>03-shipping.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://www.ebay.com/help/selling" target="_blank" rel="noopener">Official eBay selling help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Poshmark</h2>
+        <span class="guide-platform-badge">Social, clothing-leaning</span>
+      </header>
+      <p class="guide-platform-blurb">Closet-style marketplace built around social discovery. Stronger for clothing and accessories, but Beanies and small collectibles do well too. Built-in prepaid shipping label means no shipping logistics for you.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>50 chars <small>(Ledger flags titles over this)</small></dd></div>
+        <div><dt>Photos</dt><dd>1 cover + 7 detail = 8 total</dd></div>
+        <div><dt>Fees</dt><dd>20% on sales ≥ $15, flat $2.95 below</dd></div>
+        <div><dt>Shipping</dt><dd>Poshmark handles it; buyer pays $7.97 USPS Priority</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p><strong>Export → Poshmark Listings (TXT)</strong> produces formatted, copy-paste-ready listing copy with title, SKU, brand, size, color, condition, price, description, and tags.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Cover-shot quality matters most — neutral background, daylight.</li>
+          <li>Share your closet daily (yours and others') — share-for-share is the discovery currency.</li>
+          <li>Offer a bundle discount to encourage multi-item purchases.</li>
+          <li>"Posh Parties" — themed time-windowed events you can list to. Watch the calendar.</li>
+          <li>Title gets cropped at 50 chars in feed — front-load brand and key keywords.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="poshmark">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/poshmark/01-list-item.png</code>, <code>02-cover-shot.png</code>, <code>03-price.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://poshmark.com/sell" target="_blank" rel="noopener">Poshmark selling help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Mercari</h2>
+        <span class="guide-platform-badge">Fast-turnover, anything</span>
+      </header>
+      <p class="guide-platform-blurb">Fixed-price-only marketplace with simple buyer protections. Good for items that have a defined market price and need to move quickly. Lower fees than eBay; less reach.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>80 chars</dd></div>
+        <div><dt>Description</dt><dd>1000 chars</dd></div>
+        <div><dt>Photos</dt><dd>Up to 12</dd></div>
+        <div><dt>Fees</dt><dd>10% selling fee + 2.9% + $0.50 payment processing</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>No direct export — copy fields from the editor: <strong>Listing Title</strong>, <strong>Listing Description</strong>, <strong>Price</strong>, brand, condition. Mercari has its own category picker; map your Ledger category there manually.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>"Smart Pricing" auto-discounts a listing over time — useful for slow movers; set a sensible floor.</li>
+          <li>Free shipping ($9-and-up items) ranks higher than buyer-paid.</li>
+          <li>Mercari Authenticate available for high-value items (Beanies under $200 generally not eligible).</li>
+          <li>Bundle multiple items into a Mercari Shop listing for adjacent buyers.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="mercari">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/mercari/01-list.png</code>, <code>02-pricing.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://www.mercari.com/help_center/" target="_blank" rel="noopener">Mercari help center →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Depop</h2>
+        <span class="guide-platform-badge">Young, streetwear / vintage</span>
+      </header>
+      <p class="guide-platform-blurb">Owned by Etsy, skews Gen Z, visual-first. Strong for vintage clothing, Y2K-era pieces, streetwear, and quirky collectibles. Hashtag-driven discovery.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Caption</dt><dd>~2200 chars (title is part of caption)</dd></div>
+        <div><dt>Photos</dt><dd>4 max</dd></div>
+        <div><dt>Fees</dt><dd>10% selling fee</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>No direct export — copy <strong>Listing Description</strong> into the caption. Add hashtags (Depop's #y2k #vintage #beaniebaby etc. drive most of the discovery).</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Photo aesthetic matters more than anywhere else — flat-lay or worn shots, consistent style across your shop.</li>
+          <li>Drop 5-10 relevant hashtags in the caption.</li>
+          <li>Follow + like-back is the etiquette.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="depop">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/depop/01-listing.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://help.depop.com/" target="_blank" rel="noopener">Depop help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Etsy</h2>
+        <span class="guide-platform-badge">Vintage 20+ years, handcrafted</span>
+      </header>
+      <p class="guide-platform-blurb">Best for items 20+ years old (most Beanie Babies qualify), handcrafted goods, or craft supplies. SEO-heavy — long-tail keyword matching is the whole game.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>140 chars</dd></div>
+        <div><dt>Photos</dt><dd>10 max</dd></div>
+        <div><dt>Fees</dt><dd>$0.20 insertion (4-mo) + 6.5% transaction + ~3% payment processing</dd></div>
+        <div><dt>Tags</dt><dd>13 tags allowed — use all of them</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>Copy <strong>Listing Title</strong> and <strong>Listing Description</strong>. Set Etsy category to "Vintage" if item is 20+ years old. The Ledger's <strong>tags</strong> field maps directly to Etsy tags — fill all 13.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Pack long-tail keywords in the title — "Vintage 1997 Ty Princess Diana Beanie Baby PE Pellets Mint".</li>
+          <li>Tags should be 2-3 word phrases, not single words.</li>
+          <li>"Vintage" is a strict Etsy requirement — items must be 20+ years old. They actively police it.</li>
+          <li>Renewal at month 4 is $0.20 again — factor that into pricing if you expect slow sales.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="etsy">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/etsy/01-listing-form.png</code>, <code>02-tags.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://help.etsy.com/hc/en-us/categories/115000477528-Selling-on-Etsy" target="_blank" rel="noopener">Etsy seller help →</a>
+    </article>
+
+    <div class="guides-meta-tips">
+      <h3>Universal tips for any online listing</h3>
+      <ul>
+        <li><strong>Photograph in daylight.</strong> Natural light makes plush look plush, color look accurate, and tags readable.</li>
+        <li><strong>Write the title last.</strong> Once you know the description, pick the strongest keywords for the title.</li>
+        <li><strong>List honestly.</strong> "NWT" / "NWOT" / condition grades have real meanings — buyer claims are won and lost on accuracy.</li>
+        <li><strong>Cross-list, but track it.</strong> The Ledger's status field handles "Listed - Both" for items on more than one platform. Pull from the unsold platform fast when one sells.</li>
+        <li><strong>Pack the same day.</strong> Most platforms reward fast shipping with placement bumps.</li>
+      </ul>
+    </div>
+
+  </section>
+
+  <!-- ================== LOCAL TAB ================== -->
+  <section class="guides-tab-panel" data-panel="local" role="tabpanel">
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Facebook Marketplace</h2>
+        <span class="guide-platform-badge">Largest local audience</span>
+      </header>
+      <p class="guide-platform-blurb">Local pickup is the dominant mode — no fees, no shipping logistics, cash in hand. Best for furniture, electronics, household goods, lots, and bulk Beanie collections. Shipping is also available but most listings stay local.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>~100 char recommended</dd></div>
+        <div><dt>Photos</dt><dd>10 max</dd></div>
+        <div><dt>Fees</dt><dd>Free for local pickup; ~5% for shipped items</dd></div>
+        <div><dt>Pickup radius</dt><dd>You set the area; ~25mi typical</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>Copy <strong>Listing Title</strong>, <strong>Listing Description</strong>, and <strong>Price</strong>. Set Facebook category to "Toys & Games" or similar. Bulk lots work great here — list a whole Beanie collection as one item rather than 50 separate listings.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Respond within 30 minutes if you can — buyer ghosting is the norm, fast response wins.</li>
+          <li>Public meet-up spots: police-station parking lots are common; many stations have designated areas.</li>
+          <li>Mark "Sold" promptly — Marketplace re-shows old listings otherwise.</li>
+          <li>Cash or PayPal F&F only — no Venmo to strangers, no Zelle (no buyer protection).</li>
+          <li>Use the "Boost" sparingly — most local sales come from search, not paid placement.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="facebook-marketplace">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/facebook-marketplace/01-create.png</code>, <code>02-category.png</code>, <code>03-pricing.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://www.facebook.com/help/marketplace" target="_blank" rel="noopener">Marketplace help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Craigslist</h2>
+        <span class="guide-platform-badge">Classic local, free, no account needed</span>
+      </header>
+      <p class="guide-platform-blurb">Old-school but still huge in major metros. Best for furniture, lots, bulk inventory, and odd items that don't fit other categories. Zero fees, no account required (though one helps with managing posts).</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>70 chars</dd></div>
+        <div><dt>Photos</dt><dd>24 max</dd></div>
+        <div><dt>Fees</dt><dd>Free for personal sales</dd></div>
+        <div><dt>Post duration</dt><dd>~30 days; re-post every 3 days for visibility</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>Copy <strong>Listing Title</strong>, <strong>Listing Description</strong>, <strong>Price</strong>. Set Craigslist category — Collectibles or "for sale: by owner" for general items. The Ledger's description carries over but the formatting is plain-text only.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Always use the email-relay (anonymous) address Craigslist generates. Never paste your real email.</li>
+          <li>Meet in public places, daylight, cash only. Avoid checks and money orders.</li>
+          <li>Re-post every ~3 days; listings older than a few days get buried under new ones.</li>
+          <li>Use "delete" when sold — Craigslist doesn't auto-mark as sold like other platforms.</li>
+          <li>Common scam: "I'll have my mover pick it up, can I send a check?" → no.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="craigslist">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/craigslist/01-new-post.png</code>, <code>02-photos.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://www.craigslist.org/about/help/" target="_blank" rel="noopener">Craigslist help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>OfferUp</h2>
+        <span class="guide-platform-badge">Local-first, app-native</span>
+      </header>
+      <p class="guide-platform-blurb">Local-pickup-leaning marketplace with in-app messaging and trust scores. Skews younger / mobile than Craigslist. Shipping is supported for small items but most listings are local-only.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Title</dt><dd>50 chars</dd></div>
+        <div><dt>Photos</dt><dd>12 max</dd></div>
+        <div><dt>Fees</dt><dd>Free for local pickup; 12.9% (min $1.99) on shipped items</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>Copy <strong>Listing Title</strong>, <strong>Listing Description</strong>, <strong>Price</strong>. Set "Local pickup" if you don't want to ship — that removes the marketplace fee entirely.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Verify your account (phone, email, ID) — TruYou badge boosts buyer trust significantly.</li>
+          <li>"Promote" costs OfferUp credits but isn't usually worth it for low-priced items.</li>
+          <li>In-app messaging only — never give out your phone number or move chat off-platform.</li>
+          <li>Meet at "CommunityMeetUp" verified spots if available in your area.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="offerup">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/offerup/01-post-item.png</code>, <code>02-local-pickup.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://help.offerup.com/" target="_blank" rel="noopener">OfferUp help →</a>
+    </article>
+
+    <article class="guide-platform">
+      <header class="guide-platform-header">
+        <h2>Nextdoor</h2>
+        <span class="guide-platform-badge">Neighborhood-only, trust-based</span>
+      </header>
+      <p class="guide-platform-blurb">Hyper-local — only your verified neighborhood (and nearby) can see the listing. Lower volume than other local platforms but higher trust. Good for items that benefit from face-to-face vouching: moving sales, kid toys, garage-sale lots.</p>
+      <dl class="guide-platform-stats">
+        <div><dt>Format</dt><dd>Posts in "Sell or give away" section</dd></div>
+        <div><dt>Photos</dt><dd>10 max</dd></div>
+        <div><dt>Fees</dt><dd>Free</dd></div>
+        <div><dt>Reach</dt><dd>Your neighborhood + ~5 nearby</dd></div>
+      </dl>
+      <div class="guide-section">
+        <h3>From The Ledger</h3>
+        <p>Copy <strong>Listing Title</strong>, <strong>Listing Description</strong>, <strong>Price</strong>. Or bundle multiple items as a single "garage sale" listing with a Saturday date.</p>
+      </div>
+      <div class="guide-section">
+        <h3>Quick tips</h3>
+        <ul>
+          <li>Verified-by-real-address means lower spam and ghosting risk than other local platforms.</li>
+          <li>Best for items where buyers want to inspect first (kids' toys, larger collectibles).</li>
+          <li>Garage-sale-style multi-item listings get more engagement than single items.</li>
+        </ul>
+      </div>
+      <div class="guide-screenshots" data-platform="nextdoor">
+        <h3>Screenshots</h3>
+        <p class="guide-screenshots-todo">📸 Add yours: <code>guides-screenshots/nextdoor/01-post.png</code></p>
+      </div>
+      <a class="guide-platform-help" href="https://help.nextdoor.com/" target="_blank" rel="noopener">Nextdoor help →</a>
+    </article>
+
+    <div class="guides-meta-tips">
+      <h3>Universal tips for local pickup</h3>
+      <ul>
+        <li><strong>Meet in public, daylight, cash only.</strong> Police-station parking lots are ideal — many designate "exchange zones."</li>
+        <li><strong>Don't share your home address until you trust the buyer.</strong> Use a nearby landmark for the meet.</li>
+        <li><strong>Bring exact change.</strong> "I forgot my wallet" / "I only have a hundred" is a classic stall tactic.</li>
+        <li><strong>Hold the item for buyer #1 for 24 hours max.</strong> If they ghost, sell to buyer #2 without guilt.</li>
+        <li><strong>Cash is king for local.</strong> Avoid Venmo to strangers, no Zelle (no buyer protection), no checks, no PayPal Goods & Services for in-person (it's for shipping).</li>
+        <li><strong>Multi-item garage sale</strong> often beats individual listings for low-value lots — one weekend, dozens sold.</li>
+      </ul>
+    </div>
+
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p><a href="./" class="footer-link">← Back to The Ledger</a> · Listing guides · <span>v0.11.0</span></p>
+</footer>
+
+<script>
+// Tab switching — tiny inline JS, no dependency on the main app
+(function() {
+  const tabs = document.querySelectorAll('.guides-tab');
+  const panels = document.querySelectorAll('.guides-tab-panel');
+  tabs.forEach(t => {
+    t.addEventListener('click', () => {
+      const target = t.dataset.tab;
+      tabs.forEach(x => {
+        const active = x.dataset.tab === target;
+        x.classList.toggle('active', active);
+        x.setAttribute('aria-selected', active ? 'true' : 'false');
+      });
+      panels.forEach(p => {
+        p.classList.toggle('active', p.dataset.panel === target);
+      });
+      // Update URL hash for shareability and back-button friendliness
+      history.replaceState(null, '', '#' + target);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  });
+  // Honor #online / #local in URL on load
+  const hash = (location.hash || '').replace('#', '');
+  if (hash === 'local') {
+    const localTab = document.querySelector('.guides-tab[data-tab="local"]');
+    if (localTab) localTab.click();
+  }
+})();
+</script>
+
+</body>
+</html>

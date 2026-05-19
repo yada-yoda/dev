@@ -1,0 +1,298 @@
+/* ============================================================
+   Listing Guides page — supplements styles.css
+   Same dark/teal palette + Geist typography, just a different
+   layout (centered article column, tabbed nav, no toolbar).
+   ============================================================ */
+
+body.guides-page {
+  background: var(--bg-0);
+  color: var(--text-0);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  padding-bottom: 4rem;
+}
+
+.guides-page-header {
+  border-bottom: 1px solid var(--border);
+  padding: 1.5rem 2rem 1.75rem;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.04), transparent);
+  position: relative;
+}
+.guides-page-header::after {
+  content: '';
+  position: absolute;
+  bottom: -1px; left: 0;
+  width: 100%; height: 1px;
+  background: linear-gradient(to right, var(--accent), transparent);
+}
+.guides-page-header-inner {
+  max-width: 880px;
+  margin: 0 auto;
+}
+.guides-back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  text-decoration: none;
+  margin-bottom: 1.25rem;
+  transition: color 140ms;
+}
+.guides-back-link:hover { color: var(--accent); }
+.guides-page-title h1 {
+  margin: 0 0 0.55rem 0;
+  font-size: 1.7rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--text-0);
+}
+.guides-page-title p {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-1);
+  line-height: 1.55;
+  max-width: 720px;
+}
+.guides-page-title code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--bg-2);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+}
+
+/* ============ Tabs ============ */
+.guides-tabs {
+  display: flex;
+  gap: 0.55rem;
+  max-width: 880px;
+  margin: 1.5rem auto 0;
+  padding: 0 2rem;
+  border-bottom: 1px solid var(--border);
+}
+.guides-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-2);
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.85rem 1rem;
+  cursor: pointer;
+  transition: color 140ms, border-color 140ms, background 140ms;
+  margin-bottom: -1px;
+  font-family: inherit;
+}
+.guides-tab:hover { color: var(--text-0); background: var(--bg-1); }
+.guides-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+.guides-tab small {
+  color: var(--text-3);
+  font-weight: 400;
+  font-size: 0.8em;
+}
+.guides-tab.active small { color: var(--text-2); }
+
+/* ============ Panels ============ */
+.guides-content {
+  max-width: 880px;
+  margin: 2rem auto 0;
+  padding: 0 2rem;
+}
+.guides-tab-panel { display: none; }
+.guides-tab-panel.active { display: block; }
+
+/* ============ Per-platform article ============ */
+.guide-platform {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 1.75rem 1.85rem;
+  margin-bottom: 1.5rem;
+}
+.guide-platform-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+.guide-platform-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text-0);
+}
+.guide-platform-badge {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent-dim);
+  color: var(--accent);
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid var(--accent-line);
+}
+.guide-platform-blurb {
+  margin: 0 0 1rem 0;
+  color: var(--text-1);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.guide-platform-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1.25rem 0;
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.75rem 0.85rem;
+}
+.guide-platform-stats div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.guide-platform-stats dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.guide-platform-stats dd {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-0);
+  font-family: var(--font-mono);
+}
+.guide-platform-stats dd small {
+  font-family: var(--font-sans);
+  color: var(--text-2);
+  font-size: 0.85em;
+}
+
+.guide-section {
+  margin: 0 0 1.1rem 0;
+}
+.guide-section h3 {
+  margin: 0 0 0.55rem 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.guide-section p {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-1);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.guide-section p strong {
+  color: var(--text-0);
+}
+.guide-section ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--text-1);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+.guide-section ul li { margin-bottom: 0.35rem; }
+.guide-section ul li strong { color: var(--text-0); }
+
+/* ============ Screenshot placeholder block ============ */
+.guide-screenshots {
+  background: var(--bg-2);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  padding: 0.85rem 1rem;
+  margin: 0 0 1rem 0;
+}
+.guide-screenshots h3 {
+  margin: 0 0 0.45rem 0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-2);
+  font-weight: 600;
+}
+.guide-screenshots-todo {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-2);
+  line-height: 1.55;
+}
+.guide-screenshots-todo code {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+  background: var(--bg-1);
+  padding: 0.1rem 0.35rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-1);
+}
+
+.guide-platform-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.84rem;
+  color: var(--accent);
+  text-decoration: none;
+  padding-top: 0.25rem;
+  border-bottom: 1px dotted transparent;
+  transition: border-color 140ms;
+}
+.guide-platform-help:hover {
+  border-bottom-color: currentColor;
+}
+
+/* ============ Meta tips block (bottom of each tab) ============ */
+.guides-meta-tips {
+  margin-top: 1.75rem;
+  padding: 1.5rem 1.85rem;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  border-left: 3px solid var(--accent);
+}
+.guides-meta-tips h3 {
+  margin: 0 0 0.85rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-0);
+}
+.guides-meta-tips ul {
+  margin: 0;
+  padding-left: 1.25rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text-1);
+}
+.guides-meta-tips ul li { margin-bottom: 0.45rem; }
+.guides-meta-tips ul li strong { color: var(--text-0); }
+
+/* ============ Mobile ============ */
+@media (max-width: 700px) {
+  .guides-page-header { padding: 1.25rem 1rem 1.5rem; }
+  .guides-page-title h1 { font-size: 1.4rem; }
+  .guides-tabs { padding: 0 1rem; gap: 0.25rem; overflow-x: auto; }
+  .guides-tab { padding: 0.75rem 0.7rem; font-size: 0.88rem; }
+  .guides-tab span small { display: none; }
+  .guides-content { padding: 0 1rem; margin-top: 1.25rem; }
+  .guide-platform { padding: 1.25rem 1.1rem; }
+  .guide-platform-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .guides-meta-tips { padding: 1.25rem 1.1rem; }
+}
