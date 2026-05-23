@@ -52,6 +52,21 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.3 &mdash; 2026-05-19
+
+- **Top-nav menu** editable via Decap. New `menu` list in
+  `data/site.yml`; each item has a label + URL. Add, remove, and
+  reorder by dragging in the admin. Anchor links (`#about`) scroll
+  within the page; absolute URLs go elsewhere.
+- **Footer** editable via Decap. `data/site.yml > footer.text`
+  supports `{{year}}` (filled at runtime by JS) and `{{version}}`
+  (filled at build time) tokens. `show_version` boolean toggles
+  whether the version chip appears at all.
+- **Site version** now lives as a single constant (`SITE_VERSION`) in
+  `.scripts/build-content.py` instead of being hardcoded in
+  `index.html`. Bump it there (and add a matching `### v0.X.Y` entry
+  to README.md changelog) when releasing.
+
 ### v0.7.2 &mdash; 2026-05-19
 
 - **Site Settings collection added to Decap.** SEO (page title, meta

@@ -32,3 +32,24 @@ analytics:
   # Currently shared with book/greenline. Swap to a different ID to
   # track this site separately.
   ga4_id: "G-DYME377V2S"
+
+# Top-nav menu items. Each entry has a visible label and a URL.
+# Use anchor links (#about) to scroll within the page, or full URLs
+# to link elsewhere. Reorder by moving items up/down in the list.
+menu:
+  - label: "About"
+    url: "#about"
+  - label: "Resume"
+    url: "#resume"
+  - label: "Credits"
+    url: "#credits"
+  - label: "Contact"
+    url: "#contact"
+
+# Footer text. Token {{year}} is replaced at runtime with the current
+# year. Token {{version}} is replaced at build time with the site
+# version (hardcoded in build-content.py). Set show_version to false
+# to hide the version chip entirely.
+footer:
+  text: "© {{year}} Rizzo.cc"
+  show_version: true

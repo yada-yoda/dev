@@ -75,6 +75,26 @@ collections:
             fields:
               - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently shared with book/greenline (G-DYME377V2S)." }
 
+          - label: "Top-nav menu"
+            name: "menu"
+            widget: "list"
+            label_singular: "Menu item"
+            summary: "{{fields.label}} → {{fields.url}}"
+            hint: "Reorder items by dragging up or down. Anchor links (#about) scroll within the page; full URLs go elsewhere."
+            fields:
+              - { label: "Label", name: "label", widget: "string", hint: "Visible text in the top nav (e.g. About)" }
+              - { label: "URL", name: "url", widget: "string", hint: "Anchor (#about) or absolute URL" }
+
+          - label: "Footer"
+            name: "footer"
+            widget: "object"
+            fields:
+              - label: "Footer text"
+                name: "text"
+                widget: "string"
+                hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
+              - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
+
   # ============ HERO ============
   - name: "hero"
     label: "Hero (Slideshow)"
