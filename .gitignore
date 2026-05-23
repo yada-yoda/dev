@@ -13,3 +13,6 @@ desktop.ini
 # Build artifacts
 node_modules/
 dist/
+
+# Cloudflare Wrangler local cache (should never be committed)
+oauth-worker/.wrangler/
