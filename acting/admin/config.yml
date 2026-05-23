@@ -9,7 +9,7 @@ backend:
   name: github
   repo: yada-yoda/dev
   branch: main
-  base_url: https://acting-oauth.WORKER_SUBDOMAIN.workers.dev
+  base_url: https://acting-oauth.sevendwarfs.workers.dev
   auth_endpoint: auth
 
 publish_mode: simple
