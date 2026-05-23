@@ -256,6 +256,22 @@ html, body {
   gap: 8px;
 }
 
+/* High-contrast toggle lives in the capture section, outside .form. Match the
+   look of the in-form checkbox so the two read as the same kind of control. */
+.check--inline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check--inline input { margin: 0; }
+
 .form-hint {
   margin: -4px 0 8px;
   font-size: 13px;

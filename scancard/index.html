@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="version" content="0.1.0">
+  <meta name="version" content="0.2.0">
   <title>Scan Card · vCard from a business card</title>
   <meta name="description" content="Scan a business card with your iPhone, OCR the text, edit the fields, then download a .vcf to add to Contacts.">
   <link rel="canonical" href="https://dev.rizzo.cc/scancard/">
@@ -40,6 +40,10 @@
           <input type="file" id="file-back" accept="image/*" capture="environment" hidden>
         </label>
       </div>
+      <label class="check check--inline">
+        <input type="checkbox" id="high-contrast">
+        High contrast (B&amp;W) &mdash; try this if OCR returns gibberish
+      </label>
       <button type="button" class="btn btn--primary" id="btn-extract" disabled>Extract text</button>
     </section>
 
@@ -85,7 +89,7 @@
 
     <footer class="foot">
       <span>Scan Card</span>
-      <span class="version">v0.1.0</span>
+      <span class="version">v0.2.0</span>
     </footer>
   </main>
 

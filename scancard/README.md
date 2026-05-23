@@ -41,6 +41,17 @@ Then open `http://localhost:8080/` on the same Wi-Fi from your iPhone
 
 ## Changelog
 
+### v0.2.0 — 2026-05-22
+- OCR overhaul: real-world business cards were returning gibberish. Three
+  fixes together: bumped the OCR image cap from 1600px to 2400px so small
+  print survives the downscale; ran every image through a grayscale +
+  histogram-stretch pass before handing it to Tesseract; and switched
+  Tesseract to PSM 6 ("single uniform block") with a 300 DPI hint, which
+  empirically reads card layouts better than the default auto mode.
+- Added an opt-in "High contrast (B&W)" toggle in the capture section that
+  applies Otsu binarization on top of the stretch. Off by default — it
+  helps clean printed cards but can destroy stylized ones, so it's per-scan.
+
 ### v0.1.0 — 2026-05-17
 - Initial release. Front + optional back capture, in-browser Tesseract OCR,
   heuristic field parser, editable form, vCard 3.0 download with embedded

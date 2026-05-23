@@ -20,6 +20,7 @@
     btnReset: document.getElementById('btn-reset'),
     btnSave: document.getElementById('btn-save'),
     embedPhoto: document.getElementById('embed-photo'),
+    highContrast: document.getElementById('high-contrast'),
     rawText: document.getElementById('raw-text'),
     saveHint: document.getElementById('save-hint')
   };
@@ -57,9 +58,10 @@
     setProgress(0, 'Preparing image…');
 
     try {
-      const frontOcrImg = await prepareForOcr(state.front);
+      const binarize = !!els.highContrast.checked;
+      const frontOcrImg = await prepareForOcr(state.front, binarize);
       let backOcrImg = null;
-      if (state.back) backOcrImg = await prepareForOcr(state.back);
+      if (state.back) backOcrImg = await prepareForOcr(state.back, binarize);
 
       if (els.embedPhoto.checked) {
         state.embedDataUrl = await downscaleJpegFromFile(state.front, 600, 0.82);
@@ -77,6 +79,16 @@
             setProgress(null, m.status.charAt(0).toUpperCase() + m.status.slice(1) + '…');
           }
         }
+      });
+
+      // PSM 6 = "single uniform block" — empirically best for business cards
+      // where the layout is one column of contact info. preserve_interword_spaces
+      // keeps phone/email tokens intact. user_defined_dpi helps Tesseract pick
+      // sensible glyph sizes for our preprocessed image.
+      await worker.setParameters({
+        tessedit_pageseg_mode: '6',
+        preserve_interword_spaces: '1',
+        user_defined_dpi: '300'
       });
 
       setProgress(15, 'Reading front…');
@@ -112,11 +124,10 @@
     if (label) els.progressLabel.textContent = label;
   }
 
-  async function prepareForOcr(file) {
-    return await downscaleJpegFromFile(file, 1600, 0.9);
-  }
-
-  function downscaleJpegFromFile(file, maxDim, quality) {
+  // Resize an image File to fit within maxDim, draw it on a fresh canvas,
+  // and return both the canvas and its data URL. We keep the canvas around so
+  // callers can run preprocessing on the raw pixels before encoding.
+  function loadOntoCanvas(file, maxDim) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onerror = () => reject(new Error('Failed to read image'));
@@ -125,19 +136,103 @@
         img.onerror = () => reject(new Error('Failed to decode image'));
         img.onload = () => {
           const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-          const w = Math.round(img.width * scale);
-          const h = Math.round(img.height * scale);
+          const w = Math.max(1, Math.round(img.width * scale));
+          const h = Math.max(1, Math.round(img.height * scale));
           const canvas = document.createElement('canvas');
           canvas.width = w;
           canvas.height = h;
           const ctx = canvas.getContext('2d');
+          // High-quality resampling helps small-text retention after downscale.
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
           ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', quality));
+          resolve(canvas);
         };
         img.src = reader.result;
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  function downscaleJpegFromFile(file, maxDim, quality) {
+    return loadOntoCanvas(file, maxDim).then(c => c.toDataURL('image/jpeg', quality));
+  }
+
+  // Prepare the image for Tesseract: large enough to preserve glyph detail,
+  // converted to grayscale, then histogram-stretched so faint text becomes
+  // crisp. Optional Otsu binarization helps clean cards but can wreck
+  // stylized ones, so it's opt-in via the UI toggle.
+  async function prepareForOcr(file, binarize) {
+    // 2400px on the long edge keeps ~10pt text well above Tesseract's
+    // recommended ~30px x-height; the previous 1600px cap was throwing
+    // away resolvable detail on tighter cards.
+    const canvas = await loadOntoCanvas(file, 2400);
+    grayscaleAndStretch(canvas);
+    if (binarize) otsuBinarize(canvas);
+    // PNG instead of JPEG: lossless preserves the sharp post-stretch edges
+    // that JPEG would smear, and the data is tiny after binarization.
+    return canvas.toDataURL('image/png');
+  }
+
+  // Single pass over pixels: convert to luminance, then linearly remap the
+  // observed [min..max] luminance range to [0..255]. Cheap, robust, and
+  // dramatically improves OCR on dim or low-contrast phone photos.
+  function grayscaleAndStretch(canvas) {
+    const ctx = canvas.getContext('2d');
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = img.data;
+    let min = 255, max = 0;
+    // Pass 1: compute luminance and observe min/max.
+    for (let i = 0; i < d.length; i += 4) {
+      const g = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) | 0;
+      d[i] = d[i + 1] = d[i + 2] = g;
+      if (g < min) min = g;
+      if (g > max) max = g;
+    }
+    // Pass 2: stretch to full range. Skip if the image already spans nearly
+    // the full range (saves work and avoids amplifying compression noise).
+    const range = max - min;
+    if (range > 0 && range < 240) {
+      const k = 255 / range;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = Math.max(0, Math.min(255, Math.round((d[i] - min) * k)));
+        d[i] = d[i + 1] = d[i + 2] = v;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  // Otsu's method: pick the threshold that maximizes between-class variance
+  // across the grayscale histogram, then snap every pixel to 0 or 255.
+  function otsuBinarize(canvas) {
+    const ctx = canvas.getContext('2d');
+    const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const d = img.data;
+    const hist = new Uint32Array(256);
+    const total = d.length / 4;
+    for (let i = 0; i < d.length; i += 4) hist[d[i]]++;
+    let sum = 0;
+    for (let t = 0; t < 256; t++) sum += t * hist[t];
+    let sumB = 0, wB = 0, varMax = 0, threshold = 127;
+    for (let t = 0; t < 256; t++) {
+      wB += hist[t];
+      if (wB === 0) continue;
+      const wF = total - wB;
+      if (wF === 0) break;
+      sumB += t * hist[t];
+      const mB = sumB / wB;
+      const mF = (sum - sumB) / wF;
+      const between = wB * wF * (mB - mF) * (mB - mF);
+      if (between > varMax) {
+        varMax = between;
+        threshold = t;
+      }
+    }
+    for (let i = 0; i < d.length; i += 4) {
+      const v = d[i] > threshold ? 255 : 0;
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(img, 0, 0);
   }
 
   const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
@@ -418,6 +513,8 @@
     els.stepProgress.hidden = true;
     els.form.reset();
     els.embedPhoto.checked = true;
+    // Leave high-contrast toggle alone — it's a per-user preference, not
+    // a per-card decision, so a "Start over" shouldn't flip it back.
     els.phoneList.innerHTML = '';
     els.rawText.textContent = '';
     els.saveHint.hidden = true;
