@@ -52,6 +52,42 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.0 &mdash; 2026-05-19
+
+- **Decap CMS scaffolding (Phase 1).** Big architectural addition:
+  bio / credits / training content extracted into structured files,
+  a Python build script regenerates `index.html` from them, and an
+  admin page at `/acting/admin/` lets a non-technical editor manage
+  the content through web forms.
+- **New files:**
+  - `data/bio.md` &mdash; bio paragraph (Markdown with front-matter)
+  - `data/credits.yml` &mdash; Film / TV / Theater credits as structured lists
+  - `data/training.yml` &mdash; training entries
+  - `.scripts/build-content.py` &mdash; reads the data files, regenerates the
+    nine matching `EDIT:` blocks in `index.html` (Bio, Training screen +
+    print, Film screen + print, TV screen + print, Theater screen + print)
+  - `admin/index.html` &mdash; Decap CMS bootstrap (loads from CDN)
+  - `admin/config.yml` &mdash; collection schema; placeholder
+    `acting-oauth.WORKER_SUBDOMAIN.workers.dev` URL needs to be replaced
+    after deploying the Worker in Phase 2
+  - `oauth-worker/wrangler.toml` &mdash; Cloudflare Worker config
+  - `oauth-worker/src/worker.js` &mdash; OAuth proxy
+    (`/auth` + `/callback`) following Decap&rsquo;s postMessage protocol
+  - `oauth-worker/README.md` &mdash; deployment instructions
+  - `.github/workflows/build-acting.yml` &mdash; runs the build script
+    automatically on every push that touches `acting/data/**`, commits
+    the rebuilt `index.html` with `[skip-rebuild]` to avoid loops
+- **`EDITING.md` updated.** Documents the new dual-path workflow:
+  bio / credits / training edit via Decap (or direct YAML), everything
+  else uses the HTML EDIT markers as before.
+- Build script tested locally; verified it produces structurally
+  identical output to the existing `index.html` (only cosmetic
+  differences: single-line bio, raw Unicode quotes instead of HTML
+  entities &mdash; renders identically in the browser).
+- Phase 2 is now your turn: deploy the Worker, create the GitHub
+  OAuth App, set Worker secrets, paste the Worker URL into
+  `admin/config.yml`. Steps printed by Claude in this session.
+
 ### v0.6.15 &mdash; 2026-05-19
 
 - **Slideshow assets reorganized** into a clearer folder structure

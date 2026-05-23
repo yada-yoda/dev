@@ -1,0 +1,54 @@
+# Regenerate acting/index.html from acting/data/ files whenever
+# Decap (or anyone) commits changes to the data/. The Action then
+# commits the rebuilt index.html back, which triggers GH Pages to
+# redeploy the live site.
+
+name: Build acting content
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'acting/data/**'
+      - 'acting/.scripts/build-content.py'
+  workflow_dispatch: {}     # allow manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Skip if the last commit was already this Action's auto-rebuild
+    # (prevents infinite loop)
+    if: "!contains(github.event.head_commit.message, '[skip-rebuild]')"
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          # Use a token that can push back; the default GITHUB_TOKEN is fine
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install PyYAML
+        run: pip install --quiet PyYAML
+
+      - name: Run build script
+        working-directory: acting
+        run: python .scripts/build-content.py
+
+      - name: Commit rebuilt index.html (if changed)
+        run: |
+          if git diff --quiet acting/index.html; then
+            echo "No content changes - nothing to commit."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add acting/index.html
+          git commit -m "build: regenerate acting/index.html from data/ [skip-rebuild]"
+          git push

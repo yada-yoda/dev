@@ -1,0 +1,94 @@
+# Decap CMS configuration for rizzo.cc / dev.rizzo.cc/acting
+#
+# Auth: custom GitHub OAuth App proxied by a Cloudflare Worker.
+# IMPORTANT: replace <WORKER_URL> below with your deployed Worker URL
+# (looks like https://acting-oauth.<your-subdomain>.workers.dev).
+# Wrangler will print it after `npx wrangler deploy`.
+
+backend:
+  name: github
+  repo: yada-yoda/dev
+  branch: main
+  base_url: https://acting-oauth.WORKER_SUBDOMAIN.workers.dev
+  auth_endpoint: auth
+
+publish_mode: simple
+site_url: https://dev.rizzo.cc/acting/
+display_url: https://dev.rizzo.cc/acting/
+logo_url: https://dev.rizzo.cc/acting/assets/rizzo_logo_dark.png
+
+# Where Decap uploads new media (headshots, etc.)
+media_folder: "acting/assets/headshots"
+public_folder: "/acting/assets/headshots"
+
+collections:
+  - name: "bio"
+    label: "Bio"
+    description: "Short third-person paragraph next to the headshot. Use **bold** for school names and *italic* for film titles."
+    files:
+      - file: "acting/data/bio.md"
+        label: "Bio paragraph"
+        name: "bio"
+        fields:
+          - { label: "Body", name: "body", widget: "markdown", buttons: ["bold", "italic", "link"] }
+
+  - name: "credits"
+    label: "Credits"
+    description: "Film, TV, and Theater credits. Newest at the top."
+    files:
+      - file: "acting/data/credits.yml"
+        label: "Credits"
+        name: "credits"
+        fields:
+          - label: "Film"
+            name: "film"
+            widget: "list"
+            label_singular: "Film credit"
+            summary: "{{fields.title}} ({{fields.type}}, {{fields.year}})"
+            fields:
+              - { label: "Title", name: "title", widget: "string" }
+              - { label: "Year", name: "year", widget: "number", value_type: "int", min: 1900, max: 2099 }
+              - label: "Type"
+                name: "type"
+                widget: "select"
+                options: ["Short", "Feature", "Web Series", "Music Video"]
+              - { label: "Role / Character", name: "role", widget: "string" }
+              - { label: "Director", name: "director", widget: "string" }
+              - { label: "IMDB tt ID", name: "imdb", widget: "string", required: false, hint: "e.g. tt12345678 - leave blank to fall back to IMDB search by title" }
+          - label: "TV"
+            name: "tv"
+            widget: "list"
+            label_singular: "TV credit"
+            summary: "{{fields.title}} ({{fields.season}})"
+            fields:
+              - { label: "Title", name: "title", widget: "string" }
+              - { label: "Season", name: "season", widget: "string", hint: "e.g. S01, S02 E04" }
+              - { label: "Role", name: "role", widget: "string" }
+              - { label: "Network", name: "network", widget: "string" }
+          - label: "Theater"
+            name: "theater"
+            widget: "list"
+            label_singular: "Theater credit"
+            summary: "{{fields.production}} — {{fields.venue}}"
+            fields:
+              - { label: "Production", name: "production", widget: "string" }
+              - { label: "Role / Sketches", name: "role", widget: "string", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
+              - { label: "Stage / Venue", name: "venue", widget: "string", hint: "All theater is currently at The Second City Training Center, Chicago - just enter the specific stage" }
+
+  - name: "training"
+    label: "Training"
+    description: "Education and training history. Newest classes at the top."
+    files:
+      - file: "acting/data/training.yml"
+        label: "Training entries"
+        name: "training"
+        fields:
+          - label: "Entries"
+            name: "entries"
+            widget: "list"
+            label_singular: "Training entry"
+            summary: "{{fields.title}} — {{fields.school}}"
+            fields:
+              - { label: "Course / Show Title", name: "title", widget: "string" }
+              - { label: "Teacher(s)", name: "teachers", widget: "string", required: false }
+              - { label: "School / Location", name: "school", widget: "string" }

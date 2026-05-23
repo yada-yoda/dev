@@ -1,0 +1,16 @@
+# Cloudflare Worker config for the Decap CMS OAuth proxy.
+#
+# Deploy:
+#   cd oauth-worker
+#   npx wrangler login        (first time only)
+#   npx wrangler deploy
+#
+# Set secrets (after creating GitHub OAuth App):
+#   npx wrangler secret put GITHUB_CLIENT_ID
+#   npx wrangler secret put GITHUB_CLIENT_SECRET
+#   npx wrangler deploy        (redeploy to pick up new secrets)
+
+name = "acting-oauth"
+main = "src/worker.js"
+compatibility_date = "2026-01-01"
+workers_dev = true

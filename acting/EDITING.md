@@ -4,6 +4,40 @@ This guide is for making content updates to the site directly &mdash; in
 GitHub&rsquo;s web editor, on a phone via the GitHub app, or in any text editor
 &mdash; without needing AI assistance.
 
+## Two editing paths
+
+Bio, Film / TV / Theater credits, and Training all have a **second
+option**: the Decap CMS at `https://dev.rizzo.cc/acting/admin/`. Form
+fields, no HTML required.
+
+| Content | Decap CMS | Or direct edit |
+|---|---|---|
+| Bio | `/admin/` → Bio | `data/bio.md` |
+| Film / TV / Theater credits | `/admin/` → Credits | `data/credits.yml` |
+| Training | `/admin/` → Training | `data/training.yml` |
+| Everything else | &mdash; | `index.html` with EDIT markers (see below) |
+
+**When you edit through Decap or the data files**, a GitHub Action
+regenerates `index.html` automatically within ~60 seconds. Don&rsquo;t
+edit the bio / credits / training blocks inside `index.html`
+directly &mdash; your change will be overwritten the next time the
+build runs. Edit the data files instead.
+
+For all OTHER content (hero quotes, socials, panels, skills list,
+section copy, etc.) keep using the HTML EDIT markers below. Those
+aren&rsquo;t touched by the build script.
+
+## Adding a film credit (Decap path &mdash; recommended)
+
+1. Visit `https://dev.rizzo.cc/acting/admin/`
+2. Log in with GitHub
+3. Credits collection &rarr; **+ Add Film credit** at the top of the Film list
+4. Fill the fields (Title, Year, Type, Role, Director, optional IMDB tt ID)
+5. **Publish** &rarr; GitHub commits the YAML, Action regenerates HTML
+6. Note: the JSON-LD `Movie` schema in `index.html` is **not** auto-regenerated;
+   it&rsquo;s a small block to keep in sync manually under `EDIT: json-ld`
+   if SEO completeness matters.
+
 ## How to find the right block
 
 Every editable area in `index.html` is wrapped in a comment marker pair:
