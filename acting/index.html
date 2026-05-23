@@ -451,6 +451,19 @@ section + section{border-top:1px solid var(--line)}
 }
 .profile-bio strong{color:#fff;font-weight:600}
 .profile-bio em{color:var(--accent);font-style:italic;font-weight:500}
+.headshot-gallery{
+  display:flex;gap:8px;margin-top:18px;flex-wrap:wrap;
+}
+@media (max-width:760px){.headshot-gallery{justify-content:center}}
+.headshot-gallery button{
+  background:transparent;border:1px solid var(--line-2);border-radius:6px;
+  padding:0;overflow:hidden;cursor:pointer;
+  height:65px;width:65px;
+  transition:border-color .15s ease, transform .15s ease;
+}
+.headshot-gallery button:hover{border-color:var(--accent);transform:translateY(-1px)}
+.headshot-gallery button.active{border-color:var(--accent);box-shadow:0 0 0 2px rgba(0,188,212,.25)}
+.headshot-gallery img{width:100%;height:100%;object-fit:cover;display:block}
 .socials{
   display:flex;gap:10px;margin-top:22px;flex-wrap:wrap;
 }
@@ -473,6 +486,15 @@ section + section{border-top:1px solid var(--line)}
   display:grid;
   grid-template-columns:repeat(12,1fr);
   gap:20px;
+  align-items:start;
+}
+/* Nested vertical stack used in the right column under credits panels
+   so Key Skills (short) can sit above a side-by-side Favorite Films +
+   Inspirations row instead of stretching to match Education/Training. */
+.panel-stack{display:flex;flex-direction:column;gap:20px}
+.panel-stack .panel-row{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+@media (max-width:760px){
+  .panel-stack .panel-row{grid-template-columns:1fr}
 }
 .panel{
   background:var(--card);
@@ -568,6 +590,15 @@ table.credits thead th{
 }
 table.credits tr:last-child td{border-bottom:none}
 table.credits td.title{color:#fff;font-weight:600}
+table.credits td.title a{
+  color:inherit;text-decoration:none;
+  border-bottom:1px solid transparent;
+  transition:color .15s ease, border-color .15s ease;
+}
+table.credits td.title a:hover{
+  color:var(--accent);
+  border-bottom-color:var(--accent);
+}
 table.credits td.role{color:var(--accent)}
 table.credits td.dir{color:var(--muted);font-size:13px}
 table.credits td.dir .venue-sub{
@@ -891,10 +922,12 @@ footer .ver{color:var(--dim);margin-left:10px}
         <div class="role">Chicago</div>
         <!-- EDIT: bio — short third-person paragraph next to the headshot -->
         <p class="profile-bio">
-          Formal training out of <strong>The Second City</strong> and
-          <strong>Acting Studio Chicago</strong>. A working background in music management
-          and finance brings authentic professional-world texture to character work on
-          screen. Selected credits include <em>Waiter Boys</em> and <em>Deadly Domicile</em>.
+          Frank draws on diverse life experiences to develop his acting, improvisation,
+          and on-camera skills through the Conservatory program at <strong>The Second City</strong>
+          and <strong>Acting Studio Chicago</strong>. A working background in music
+          management and finance brings authentic professional-world texture to
+          character work on screen. Selected credits include <em>Waiter Boys</em>
+          and <em>Deadly Domicile</em>.
         </p>
         <!-- /EDIT: bio -->
 
@@ -917,6 +950,15 @@ footer .ver{color:var(--dim);margin-left:10px}
           </a>
         </div>
         <!-- /EDIT: socials -->
+
+        <!-- EDIT: headshot-gallery — thumbnails (65px tall) that swap into the main headshot when clicked.
+             To add a new look: drop a JPG in assets/headshots/, then add a <button> here that points at it. -->
+        <div class="headshot-gallery" aria-label="Headshot gallery">
+          <button type="button" class="active" data-src="assets/headshots/01-main.jpg" aria-label="Main headshot">
+            <img src="assets/headshots/01-main.jpg" alt="Frank Rizzo headshot 1">
+          </button>
+        </div>
+        <!-- /EDIT: headshot-gallery -->
       </div>
     </div>
   </div>
@@ -1004,46 +1046,53 @@ footer .ver{color:var(--dim);margin-left:10px}
       </div>
       <!-- /EDIT: training -->
 
-      <!-- EDIT: skills — separate items with &middot; (the · dot). Keep the list focused; aim for 8-12 marketable entries. -->
-      <div class="panel col-6">
-        <h4>Key Skills</h4>
-        <p>
-          Bike Riding &middot; Chess &middot; Finance &middot; Frisbee Golf &middot; Gaming (Video / Computer)
-          &middot; Guitar (General) &middot; IT / Computer Science &middot; Marketing &middot; Music Industry
-          &middot; Music Management &middot; Photographic Memory &middot; Poker &middot; Road Driving
-          &middot; Football &middot; Ice Skating &middot; Roller Skating &middot; Running &middot; Soccer
-          &middot; Track and Field (Discus / Shotput) &middot; Weight Lifting &middot; Yoga
-          &middot; Stock Market &middot; Swimming &middot; Tour Management
-        </p>
-      </div>
-      <!-- /EDIT: skills -->
+      <!-- Right-side stack: Key Skills full-width above, Favorite Films + Inspirations split below.
+           This pairs with Education/Training (col-6 left) and uses panel-stack/panel-row to
+           keep heights balanced instead of letting Key Skills stretch with empty padding. -->
+      <div class="col-6 panel-stack">
+        <!-- EDIT: skills — separate items with &middot; (the · dot). Keep the list focused; aim for 8-12 marketable entries. -->
+        <div class="panel">
+          <h4>Key Skills</h4>
+          <p>
+            Bike Riding &middot; Chess &middot; Finance &middot; Frisbee Golf &middot; Gaming (Video / Computer)
+            &middot; Guitar (General) &middot; IT / Computer Science &middot; Marketing &middot; Music Industry
+            &middot; Music Management &middot; Photographic Memory &middot; Poker &middot; Road Driving
+            &middot; Football &middot; Ice Skating &middot; Roller Skating &middot; Running &middot; Soccer
+            &middot; Track and Field (Discus / Shotput) &middot; Weight Lifting &middot; Yoga
+            &middot; Stock Market &middot; Swimming &middot; Tour Management
+          </p>
+        </div>
+        <!-- /EDIT: skills -->
 
-      <!-- EDIT: favorite-films — pattern: <li>Title <span class="sub">Director, Year</span></li> -->
-      <div class="panel col-6">
-        <h4>Favorite Films</h4>
-        <ul>
-          <li>Mikey &amp; Nicky <span class="sub">Elaine May, 1976</span></li>
-          <li>Black Bear <span class="sub">Lawrence Michael Levine, 2020</span></li>
-          <li>Serial Mom <span class="sub">John Waters, 1994</span></li>
-          <li>Rounders <span class="sub">John Dahl, 1998</span></li>
-          <li>Rosemary&rsquo;s Baby <span class="sub">Roman Polanski, 1968</span></li>
-        </ul>
-      </div>
-      <!-- /EDIT: favorite-films -->
+        <div class="panel-row">
+          <!-- EDIT: favorite-films — pattern: <li>Title <span class="sub">Director, Year</span></li> -->
+          <div class="panel">
+            <h4>Favorite Films</h4>
+            <ul>
+              <li>Mikey &amp; Nicky <span class="sub">Elaine May, 1976</span></li>
+              <li>Black Bear <span class="sub">Lawrence Michael Levine, 2020</span></li>
+              <li>Serial Mom <span class="sub">John Waters, 1994</span></li>
+              <li>Rounders <span class="sub">John Dahl, 1998</span></li>
+              <li>Rosemary&rsquo;s Baby <span class="sub">Roman Polanski, 1968</span></li>
+            </ul>
+          </div>
+          <!-- /EDIT: favorite-films -->
 
-      <!-- EDIT: inspirations — directors, creators, actors that inform the work. One <li> per name. -->
-      <div class="panel col-6">
-        <h4>Inspirations</h4>
-        <ul>
-          <li>Hal Ashby</li>
-          <li>Ingmar Bergman</li>
-          <li>John Cassavetes</li>
-          <li>John Hughes</li>
-          <li>John Waters</li>
-          <li>Stanley Kubrick</li>
-        </ul>
+          <!-- EDIT: inspirations — directors, creators, actors that inform the work. One <li> per name. -->
+          <div class="panel">
+            <h4>Inspirations</h4>
+            <ul>
+              <li>Hal Ashby</li>
+              <li>Ingmar Bergman</li>
+              <li>John Cassavetes</li>
+              <li>John Hughes</li>
+              <li>John Waters</li>
+              <li>Stanley Kubrick</li>
+            </ul>
+          </div>
+          <!-- /EDIT: inspirations -->
+        </div>
       </div>
-      <!-- /EDIT: inspirations -->
 
     </div>
   </div>
@@ -1065,14 +1114,15 @@ footer .ver{color:var(--dim);margin-left:10px}
       <button class="tab" data-tab="commercial" role="tab">Commercial</button>
     </div>
 
-    <!-- EDIT: film-credits — to add a credit, copy any <tr> row and edit. Update the matching row in /EDIT: print-film-credits below too. Don't forget to update the JSON-LD Movie nodes. -->
+    <!-- EDIT: film-credits — to add a credit, copy any <tr> row and edit. Update the matching row in /EDIT: print-film-credits below too. Don't forget to update the JSON-LD Movie nodes.
+         Title links go to IMDB. To swap the placeholder search URL for a real title page, replace the href with https://www.imdb.com/title/ttXXXXXXX/ (find the tt ID on imdb.com). -->
     <div class="tab-panel active" id="film">
       <table class="credits">
         <thead><tr><th>Title</th><th>Role</th><th>Director</th></tr></thead>
         <tbody>
-          <tr><td class="title">Deadly Domicile <span class="sub" style="color:var(--dim)">(Short, 2024)</span></td><td class="role">Mike</td><td class="dir">dir. Skylar Kendall</td></tr>
-          <tr><td class="title">El Fr&iacute;o Silencio <span class="sub" style="color:var(--dim)">(Feature, 2027)</span></td><td class="role">Homeowner</td><td class="dir">dir. Zach Cortino</td></tr>
-          <tr><td class="title">Waiter Boys <span class="sub" style="color:var(--dim)">(Short, 2025)</span></td><td class="role">Randy</td><td class="dir">dir. Skylar Kendall</td></tr>
+          <tr><td class="title"><a href="https://www.imdb.com/find/?s=tt&q=Deadly+Domicile" target="_blank" rel="noopener" title="View on IMDB">Deadly Domicile</a> <span class="sub" style="color:var(--dim)">(Short, 2024)</span></td><td class="role">Mike</td><td class="dir">dir. Skylar Kendall</td></tr>
+          <tr><td class="title"><a href="https://www.imdb.com/find/?s=tt&q=El+Frio+Silencio" target="_blank" rel="noopener" title="View on IMDB">El Fr&iacute;o Silencio</a> <span class="sub" style="color:var(--dim)">(Feature, 2027)</span></td><td class="role">Homeowner</td><td class="dir">dir. Zach Cortino</td></tr>
+          <tr><td class="title"><a href="https://www.imdb.com/find/?s=tt&q=Waiter+Boys" target="_blank" rel="noopener" title="View on IMDB">Waiter Boys</a> <span class="sub" style="color:var(--dim)">(Short, 2025)</span></td><td class="role">Randy</td><td class="dir">dir. Skylar Kendall</td></tr>
         </tbody>
       </table>
     </div>
@@ -1281,7 +1331,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 </div>
 
 <footer>
-  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.13</span>
+  &copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.6.14</span>
 </footer>
 
 <script>
@@ -1321,6 +1371,27 @@ footer .ver{color:var(--dim);margin-left:10px}
       slides[i].classList.add('active');
       if (quotes[i]) quotes[i].classList.add('active');
     }, 8000);
+  })();
+
+  // Headshot gallery: clicking a thumbnail swaps it into the main headshot.
+  // No lightbox; just an inline image swap with a brief fade.
+  (function headshotGallery(){
+    const main = document.querySelector('img.headshot');
+    const thumbs = document.querySelectorAll('.headshot-gallery button');
+    if (!main || !thumbs.length) return;
+    thumbs.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const next = btn.dataset.src;
+        if (!next || main.src.endsWith(next)) return;
+        main.style.transition = 'opacity .15s ease';
+        main.style.opacity = '0';
+        setTimeout(() => {
+          main.src = next;
+          main.style.opacity = '1';
+        }, 160);
+        thumbs.forEach(t => t.classList.toggle('active', t === btn));
+      });
+    });
   })();
 
   // Year

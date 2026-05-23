@@ -52,6 +52,31 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.6.14 &mdash; 2026-05-19
+
+- **Bio** updated to incorporate the Actors Access language. Now leads
+  with &ldquo;Frank draws on diverse life experiences to develop his
+  acting, improvisation, and on-camera skills through the Conservatory
+  program at The Second City and Acting Studio Chicago,&rdquo; preserving
+  the music management / finance professional-world line.
+- **Panel layout rebalanced.** Education/Training (tall) keeps its
+  col-6 spot on the left. Right side is now a nested stack:
+  Key Skills full-width on top, then Favorite Films + Inspirations
+  split side-by-side beneath. Killed the awkward dead space below
+  Key Skills. Added `align-items: start` to `.panels` so cells take
+  natural height instead of stretching to row height.
+- **Film titles now link to IMDB** &mdash; subtle styling: same color
+  as before, no underline, cursor stays default until hover, then
+  cyan with a thin underline. Currently using IMDB search URLs as
+  placeholders; swap each `href` to the real `https://www.imdb.com/title/ttXXXXXXX/`
+  when ready.
+- **Headshot gallery scaffold** added under the social links.
+  65px-tall thumbnail buttons; clicking swaps the main headshot in
+  place with a brief fade (no lightbox). Currently has one tile
+  (the existing headshot). Drop additional headshots into
+  `assets/headshots/` and add a `<button>` block for each in the
+  marked `EDIT: headshot-gallery` area.
+
 ### v0.6.13 &mdash; 2026-05-18
 
 - **5th hero slide + quote.** Pulled `rizzo_slider2.png` from the WP
