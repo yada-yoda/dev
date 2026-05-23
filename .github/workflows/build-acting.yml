@@ -1,7 +1,8 @@
-# Regenerate acting/index.html from acting/data/ files whenever
-# Decap (or anyone) commits changes to the data/. The Action then
-# commits the rebuilt index.html back, which triggers GH Pages to
-# redeploy the live site.
+# Regenerate acting/index.html from acting/data/ files whenever Decap
+# (or anyone) commits changes to the data/. Also regenerates the
+# favicon set + OG image + QR code when the favicon source or build
+# script change. Commits the rebuilt files back, which triggers GH
+# Pages to redeploy.
 
 name: Build acting content
 
@@ -10,7 +11,10 @@ on:
     branches: [main]
     paths:
       - 'acting/data/**'
-      - 'acting/.scripts/build-content.py'
+      - 'acting/.scripts/**'
+      - 'acting/assets/favicon-192.png'
+      - 'acting/assets/rizzo_logo_dark.png'
+      - 'acting/assets/rizzo_logo_white.png'
   workflow_dispatch: {}     # allow manual runs from the Actions tab
 
 permissions:
@@ -26,7 +30,6 @@ jobs:
       - name: Check out repo
         uses: actions/checkout@v4
         with:
-          # Use a token that can push back; the default GITHUB_TOKEN is fine
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Python
@@ -34,21 +37,25 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install PyYAML
-        run: pip install --quiet PyYAML
+      - name: Install Python dependencies
+        run: pip install --quiet PyYAML Pillow qrcode
 
-      - name: Run build script
+      - name: Regenerate generated assets (favicons, OG image, QR)
+        working-directory: acting
+        run: python .scripts/build-assets.py
+
+      - name: Regenerate index.html from data/
         working-directory: acting
         run: python .scripts/build-content.py
 
-      - name: Commit rebuilt index.html (if changed)
+      - name: Commit rebuilt files (if changed)
         run: |
-          if git diff --quiet acting/index.html; then
-            echo "No content changes - nothing to commit."
+          if git diff --quiet acting/index.html acting/assets acting/site.webmanifest; then
+            echo "No changes to commit."
             exit 0
           fi
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add acting/index.html
-          git commit -m "build: regenerate acting/index.html from data/ [skip-rebuild]"
+          git add acting/index.html acting/assets acting/site.webmanifest
+          git commit -m "build: regenerate acting/ from data/ [skip-rebuild]"
           git push

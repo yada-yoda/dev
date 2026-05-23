@@ -20,6 +20,61 @@ public_folder: "/acting/assets/headshots"
 
 collections:
 
+  # ============ SITE SETTINGS (SEO / OG / Favicon / GA4) ============
+  - name: "site"
+    label: "Site Settings (SEO + OG + Favicon)"
+    description: "Page title, meta description, Open Graph card, Twitter card, GA4 tracking, favicon source."
+    files:
+      - file: "acting/data/site.yml"
+        label: "Site-level settings"
+        name: "site"
+        fields:
+          - label: "SEO"
+            name: "seo"
+            widget: "object"
+            fields:
+              - { label: "Page title (in browser tab + Google results)", name: "title", widget: "string", hint: "Keep under ~60 chars" }
+              - { label: "Meta description", name: "description", widget: "text", hint: "Shown in Google results. Keep under ~155 chars" }
+              - { label: "Canonical URL", name: "canonical_url", widget: "string", hint: "The single canonical home. Currently https://rizzo.cc/" }
+              - { label: "Robots directive", name: "robots", widget: "string", hint: "Default: index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" }
+              - { label: "Author", name: "author", widget: "string" }
+
+          - label: "Open Graph (Social link previews)"
+            name: "og"
+            widget: "object"
+            hint: "What Slack, iMessage, Discord, Twitter, etc. show when the link is shared."
+            fields:
+              - { label: "Site name", name: "site_name", widget: "string" }
+              - { label: "OG type", name: "type", widget: "select", options: ["profile", "website", "article"] }
+              - { label: "OG title", name: "title", widget: "string", hint: "Title shown on social previews; usually shorter than the SEO title" }
+              - { label: "OG description", name: "description", widget: "text" }
+              - { label: "OG image URL", name: "image", widget: "string", hint: "Absolute URL to a 1200x630 image. Run build-assets.py to regenerate the default if you change the logo." }
+              - { label: "OG image alt text", name: "image_alt", widget: "string" }
+              - { label: "Locale", name: "locale", widget: "string", default: "en_US" }
+
+          - label: "Twitter / X"
+            name: "twitter"
+            widget: "object"
+            fields:
+              - { label: "Card type", name: "card", widget: "select", options: ["summary", "summary_large_image"] }
+
+          - label: "Favicon source"
+            name: "favicon"
+            widget: "object"
+            fields:
+              - label: "Source image"
+                name: "source"
+                widget: "image"
+                media_folder: "/acting/assets"
+                public_folder: "/acting/assets"
+                hint: "Upload a square image (512x512+ recommended) to replace assets/favicon-192.png. The GitHub Action will regenerate the full favicon set (16/32/180/192/512 + multi-res ICO + maskable) on commit."
+
+          - label: "Analytics"
+            name: "analytics"
+            widget: "object"
+            fields:
+              - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently shared with book/greenline (G-DYME377V2S)." }
+
   # ============ HERO ============
   - name: "hero"
     label: "Hero (Slideshow)"

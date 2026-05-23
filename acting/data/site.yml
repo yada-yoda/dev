@@ -1,0 +1,34 @@
+# Site-level settings: SEO meta, Open Graph / Twitter card, favicon
+# source, analytics. The build script regenerates the matching tags
+# in index.html <head>.
+
+seo:
+  title: "Frank Rizzo — Actor | Rizzo.cc"
+  description: "Frank Rizzo — Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film & TV credits, headshot, training, contact, downloadable resume."
+  canonical_url: "https://rizzo.cc/"
+  robots: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
+  author: "Frank Rizzo"
+
+og:
+  site_name: "Rizzo.cc"
+  type: "profile"
+  title: "Frank Rizzo — Actor"
+  description: "Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film & TV credits, headshot, training, contact."
+  image: "https://rizzo.cc/assets/og-image.png"
+  image_alt: "Rizzo.cc — Frank Rizzo, Chicago-based actor"
+  locale: "en_US"
+
+twitter:
+  card: "summary_large_image"
+
+favicon:
+  # Source image for the favicon set. The Action runs build-assets.py
+  # whenever this file changes to regenerate the multi-resolution set:
+  # 16/32/180/192/512 PNG + multi-res ICO + maskable.
+  # Upload a square image at least 512x512 for clean downscaling.
+  source: "assets/favicon-192.png"
+
+analytics:
+  # Currently shared with book/greenline. Swap to a different ID to
+  # track this site separately.
+  ga4_id: "G-DYME377V2S"

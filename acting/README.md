@@ -52,6 +52,26 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.2 &mdash; 2026-05-19
+
+- **Site Settings collection added to Decap.** SEO (page title, meta
+  description, robots, canonical URL, author), Open Graph (site name,
+  type, title, description, image, alt, locale), Twitter card type,
+  GA4 tracking ID, and favicon source &mdash; all editable through
+  a single &ldquo;Site Settings&rdquo; admin panel.
+- **New `data/site.yml`** consolidates all head-meta data.
+- **Build script extended** with `gen_site_meta`, `gen_og_tags`, and
+  `gen_ga4` &mdash; regenerates the matching EDIT-marked blocks in
+  the `<head>` whenever site.yml changes.
+- **GitHub Action expanded** to also run `build-assets.py` so that
+  uploading a new favicon source through Decap automatically
+  regenerates the full set (16 / 32 / 180 Apple / 192 / 512 / maskable
+  / multi-res ICO + manifest) and the OG image + QR code. Pillow
+  and qrcode added to the Action&rsquo;s pip install.
+- Note: the JSON-LD structured data block stays manual &mdash; it
+  cross-references credits and Person via `@id` and would tangle
+  with auto-generation. Edit via the existing EDIT marker.
+
 ### v0.7.1 &mdash; 2026-05-19
 
 - **Full Decap coverage.** Extended Phase 1 to cover almost every
