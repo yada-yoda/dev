@@ -32,8 +32,8 @@ resume info into clean panels at the bottom.
 
 ## TODO before going live
 
-- Drop a real header video at `assets/header.mp4`
-  (recommend 1920&times;1080, 10&ndash;20s loop, h.264 faststart, no audio).
+- Drop video clips in `assets/slideshow/videos/` (see the
+  `README.md` there for specs) to enrich the hero slideshow.
 - Wire up the reel `<iframe>` (Vimeo or YouTube embed).
 - Tighten the Special Skills list (current draft has all 25; recommended
   cut down to 8&ndash;12 high-impact entries).
@@ -51,6 +51,28 @@ Requires `qrcode` and `Pillow`. Re-run after changing the destination
 URL or the OG layout.
 
 ## Changelog
+
+### v0.6.15 &mdash; 2026-05-19
+
+- **Slideshow assets reorganized** into a clearer folder structure
+  that scales when video clips arrive:
+  ```
+  assets/
+    slideshow/
+      photos/          chicago.jpg, nyc.jpg, recent.jpg, road.jpg, stage.jpg
+      videos/          (empty — ready for drops; README.md inside has specs)
+  ```
+- Old `assets/hero/` folder retired. All five JPGs moved via
+  `git mv` so history is preserved, and filenames dropped the
+  redundant `hero-` prefix since the folder path now provides the
+  context.
+- **`assets/slideshow/videos/README.md`** documents the encoding
+  recipe (FFmpeg one-liner for H.264 faststart, audio-stripped,
+  1920px) and how to wire a clip into the hero rotation when ready.
+- Inline EDIT comment in `index.html` updated to point at the new
+  location, and the top-level TODO list in `README.md` swapped its
+  stale `assets/header.mp4` reference for the new
+  `assets/slideshow/videos/` path.
 
 ### v0.6.14 &mdash; 2026-05-19
 
