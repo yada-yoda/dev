@@ -1,0 +1,66 @@
+# Resume panels — the cards in the Resume section (below the hero/about/profile).
+# Training lives in its own file (data/training.yml).
+
+physical:
+  age_range: "34–47"
+  height: "6'0\""
+  eyes: "Blue"
+  hair: "Bald / Buzz / Brown"
+  tattoos: "None"
+  piercings: "None"
+
+languages:
+  - name: "English"
+    level: "Native"
+  - name: "Spanish"
+    level: "2 yrs HS / 1 yr University"
+  - name: "Italian"
+    level: "Novice — Learning"
+  - name: "Swedish"
+    level: "Novice — Learning"
+
+measurements:
+  shoe: "12.5–13 US"
+  shirt: "L"
+  coat: "44R"
+  neck: "17.5\""
+  sleeve: "33/34\""
+  hat: "23.6\" / L"
+
+licensing:
+  documents:
+    - "Valid Driver's License"
+    - "Valid US Passport"
+    - "TSA PreCheck"
+  union: "Non-Union"
+  local_hire: "Chicago"
+
+# One paragraph; separate items with "· " (a space + middle-dot).
+# Industry rule of thumb: 8–12 high-impact entries beats a long list of hobbies.
+skills: "Bike Riding · Chess · Finance · Frisbee Golf · Gaming (Video / Computer) · Guitar (General) · IT / Computer Science · Marketing · Music Industry · Music Management · Photographic Memory · Poker · Road Driving · Football · Ice Skating · Roller Skating · Running · Soccer · Track and Field (Discus / Shotput) · Weight Lifting · Yoga · Stock Market · Swimming · Tour Management"
+
+favorite_films:
+  - title: "Mikey & Nicky"
+    director: "Elaine May"
+    year: 1976
+  - title: "Black Bear"
+    director: "Lawrence Michael Levine"
+    year: 2020
+  - title: "Serial Mom"
+    director: "John Waters"
+    year: 1994
+  - title: "Rounders"
+    director: "John Dahl"
+    year: 1998
+  - title: "Rosemary's Baby"
+    director: "Roman Polanski"
+    year: 1968
+
+# Directors, creators, actors that inform the work — one name per entry.
+inspirations:
+  - "Hal Ashby"
+  - "Ingmar Bergman"
+  - "John Cassavetes"
+  - "John Hughes"
+  - "John Waters"
+  - "Stanley Kubrick"

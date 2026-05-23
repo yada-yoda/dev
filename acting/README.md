@@ -52,6 +52,34 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.1 &mdash; 2026-05-19
+
+- **Full Decap coverage.** Extended Phase 1 to cover almost every
+  visible content area on the site. Four new data files, eight Decap
+  collections, sixteen new build-script generators.
+- **New data files:**
+  - `data/hero.yml` &mdash; 5 slides paired with two-line quotes.
+    Decap `image` widget lets you upload or pick existing photos in
+    `assets/slideshow/photos/`.
+  - `data/about.yml` &mdash; RIZZO definition entries + the pull quote
+    text and attribution.
+  - `data/panels.yml` &mdash; Physical, Languages, Measurements,
+    Licensing &amp; Hire, Key Skills, Favorite Films, Inspirations.
+  - `data/contact.yml` &mdash; email, social link URLs, contact section
+    copy, reel (URL or uploaded file).
+- **Reel supports both URL and file upload.** Decap exposes two fields;
+  build script prefers URL over file, falls back to placeholder text.
+  Uploaded files go to `assets/reel/`.
+- **Hero image upload** works the same way &mdash; Decap&rsquo;s image
+  widget points at `assets/slideshow/photos/`; you can upload a new
+  photo from the admin UI or git-drop one and pick it from the media
+  library.
+- **EDITING.md** updated &mdash; the dual-path table now lists every
+  editable section and which YAML file backs it.
+- Build script tested locally; output diffs are cosmetic (entities
+  switched to literal Unicode, multi-line skills paragraph collapsed
+  to single line). Site renders identically.
+
 ### v0.7.0 &mdash; 2026-05-19
 
 - **Decap CMS scaffolding (Phase 1).** Big architectural addition:

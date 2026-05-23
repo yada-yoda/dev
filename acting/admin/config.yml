@@ -1,9 +1,6 @@
 # Decap CMS configuration for rizzo.cc / dev.rizzo.cc/acting
 #
 # Auth: custom GitHub OAuth App proxied by a Cloudflare Worker.
-# IMPORTANT: replace <WORKER_URL> below with your deployed Worker URL
-# (looks like https://acting-oauth.<your-subdomain>.workers.dev).
-# Wrangler will print it after `npx wrangler deploy`.
 
 backend:
   name: github
@@ -17,11 +14,37 @@ site_url: https://dev.rizzo.cc/acting/
 display_url: https://dev.rizzo.cc/acting/
 logo_url: https://dev.rizzo.cc/acting/assets/rizzo_logo_dark.png
 
-# Where Decap uploads new media (headshots, etc.)
+# Default media folder (overrideable per field below)
 media_folder: "acting/assets/headshots"
 public_folder: "/acting/assets/headshots"
 
 collections:
+
+  # ============ HERO ============
+  - name: "hero"
+    label: "Hero (Slideshow)"
+    description: "Rotating background photos + paired two-line quotes. Each slide cycles every 8 seconds."
+    files:
+      - file: "acting/data/hero.yml"
+        label: "Hero slides"
+        name: "hero"
+        fields:
+          - label: "Slides"
+            name: "slides"
+            widget: "list"
+            label_singular: "Slide"
+            summary: "{{fields.quote_line_1}} / {{fields.quote_line_2}}"
+            fields:
+              - label: "Photo"
+                name: "photo"
+                widget: "image"
+                media_folder: "/acting/assets/slideshow/photos"
+                public_folder: "/acting/assets/slideshow/photos"
+                hint: "Upload an image or pick one from the slideshow/photos folder. 1920×1080 is the target size."
+              - { label: "Quote line 1", name: "quote_line_1", widget: "string", hint: "First line of the overlaid quote." }
+              - { label: "Quote line 2", name: "quote_line_2", widget: "string", hint: "Second line of the overlaid quote." }
+
+  # ============ BIO ============
   - name: "bio"
     label: "Bio"
     description: "Short third-person paragraph next to the headshot. Use **bold** for school names and *italic* for film titles."
@@ -32,6 +55,34 @@ collections:
         fields:
           - { label: "Body", name: "body", widget: "markdown", buttons: ["bold", "italic", "link"] }
 
+  # ============ ABOUT ============
+  - name: "about"
+    label: "About (Definition + Pull Quote)"
+    description: "The RIZZO dictionary entry and the pull quote on the right."
+    files:
+      - file: "acting/data/about.yml"
+        label: "About content"
+        name: "about"
+        fields:
+          - label: "Definition"
+            name: "definition"
+            widget: "object"
+            fields:
+              - { label: "Word", name: "word", widget: "string" }
+              - { label: "Part of speech", name: "part_of_speech", widget: "string" }
+              - { label: "Pronunciation", name: "pronunciation", widget: "string" }
+              - label: "Entries"
+                name: "entries"
+                widget: "list"
+                field: { label: "Definition line", name: "text", widget: "string" }
+          - label: "Pull Quote"
+            name: "pull_quote"
+            widget: "object"
+            fields:
+              - { label: "Quote text", name: "text", widget: "text" }
+              - { label: "Attribution", name: "attribution", widget: "string" }
+
+  # ============ CREDITS ============
   - name: "credits"
     label: "Credits"
     description: "Film, TV, and Theater credits. Newest at the top."
@@ -75,6 +126,7 @@ collections:
               - { label: "Role / Sketches", name: "role", widget: "string", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
               - { label: "Stage / Venue", name: "venue", widget: "string", hint: "All theater is currently at The Second City Training Center, Chicago - just enter the specific stage" }
 
+  # ============ TRAINING ============
   - name: "training"
     label: "Training"
     description: "Education and training history. Newest classes at the top."
@@ -92,3 +144,124 @@ collections:
               - { label: "Course / Show Title", name: "title", widget: "string" }
               - { label: "Teacher(s)", name: "teachers", widget: "string", required: false }
               - { label: "School / Location", name: "school", widget: "string" }
+
+  # ============ PANELS (Physical, Languages, Measurements, Licensing, Skills, Favorites, Inspirations) ============
+  - name: "panels"
+    label: "Stats, Skills & Influences"
+    description: "Physical, Languages, Measurements, Licensing, Key Skills, Favorite Films, Inspirations."
+    files:
+      - file: "acting/data/panels.yml"
+        label: "Resume panels"
+        name: "panels"
+        fields:
+          - label: "Physical"
+            name: "physical"
+            widget: "object"
+            fields:
+              - { label: "Age Range", name: "age_range", widget: "string" }
+              - { label: "Height", name: "height", widget: "string" }
+              - { label: "Eyes", name: "eyes", widget: "string" }
+              - { label: "Hair", name: "hair", widget: "string" }
+              - { label: "Tattoos", name: "tattoos", widget: "string" }
+              - { label: "Piercings", name: "piercings", widget: "string" }
+
+          - label: "Languages"
+            name: "languages"
+            widget: "list"
+            label_singular: "Language"
+            summary: "{{fields.name}} ({{fields.level}})"
+            fields:
+              - { label: "Language", name: "name", widget: "string" }
+              - { label: "Level / Note", name: "level", widget: "string" }
+
+          - label: "Measurements"
+            name: "measurements"
+            widget: "object"
+            fields:
+              - { label: "Shoe", name: "shoe", widget: "string" }
+              - { label: "Shirt", name: "shirt", widget: "string" }
+              - { label: "Coat", name: "coat", widget: "string" }
+              - { label: "Neck", name: "neck", widget: "string" }
+              - { label: "Sleeve", name: "sleeve", widget: "string" }
+              - { label: "Hat", name: "hat", widget: "string" }
+
+          - label: "Licensing & Hire"
+            name: "licensing"
+            widget: "object"
+            fields:
+              - label: "Documents"
+                name: "documents"
+                widget: "list"
+                field: { label: "Document", name: "doc", widget: "string" }
+              - { label: "Union status", name: "union", widget: "string" }
+              - { label: "Local Hire", name: "local_hire", widget: "string" }
+
+          - label: "Key Skills"
+            name: "skills"
+            widget: "text"
+            hint: "One paragraph. Separate items with ' · ' (space-middot-space). Aim for 8-12 high-impact items."
+
+          - label: "Favorite Films"
+            name: "favorite_films"
+            widget: "list"
+            label_singular: "Film"
+            summary: "{{fields.title}} — {{fields.director}}, {{fields.year}}"
+            fields:
+              - { label: "Title", name: "title", widget: "string" }
+              - { label: "Director", name: "director", widget: "string" }
+              - { label: "Year", name: "year", widget: "number", value_type: "int", min: 1900, max: 2099 }
+
+          - label: "Inspirations"
+            name: "inspirations"
+            widget: "list"
+            field: { label: "Name", name: "name", widget: "string" }
+            hint: "Directors, creators, actors that inform the work — one per entry."
+
+  # ============ CONTACT, SOCIALS, REEL ============
+  - name: "contact"
+    label: "Contact, Socials, Reel"
+    description: "Email, social links, contact section copy, and the reel embed."
+    files:
+      - file: "acting/data/contact.yml"
+        label: "Contact + socials + reel"
+        name: "contact"
+        fields:
+          - { label: "Email", name: "email", widget: "string", hint: "Public-facing contact address." }
+
+          - label: "Contact Section"
+            name: "contact_section"
+            widget: "object"
+            fields:
+              - { label: "Heading", name: "heading", widget: "string" }
+              - { label: "Body", name: "body", widget: "text" }
+
+          - label: "Social Links"
+            name: "socials"
+            widget: "list"
+            label_singular: "Social link"
+            summary: "{{fields.platform}}"
+            fields:
+              - label: "Platform"
+                name: "platform"
+                widget: "select"
+                options: ["Instagram", "Letterboxd", "IMDb", "Actors Access", "Email"]
+                hint: "Only these five have icons; other names will render without an icon."
+              - { label: "URL", name: "url", widget: "string" }
+
+          - label: "Reel"
+            name: "reel"
+            widget: "object"
+            fields:
+              - label: "Reel URL"
+                name: "url"
+                widget: "string"
+                required: false
+                hint: "Vimeo or YouTube embed URL, e.g. https://player.vimeo.com/video/12345678. Leave blank to use a file upload below."
+              - label: "Reel file (upload)"
+                name: "file"
+                widget: "file"
+                required: false
+                media_folder: "/acting/assets/reel"
+                public_folder: "/acting/assets/reel"
+                hint: "Optional: upload an MP4 directly. URL above wins if both are set."
+              - { label: "Placeholder text (when no reel set)", name: "placeholder", widget: "string", default: "Reel coming soon" }

@@ -1,0 +1,17 @@
+# About section content: RIZZO dictionary entry + the "Random Girl"
+# pull quote on the right side of the section.
+
+definition:
+  word: "RIZZO"
+  part_of_speech: "proper noun"
+  pronunciation: "ri·zzo  [/r IH — z oh/]"
+  entries:
+    - "A surname of Italian origin, often denoting a familial or ancestral lineage."
+    - "Not a Jerky Boy."
+    - "Not the Philadelphia mayor."
+    - "Not a rat from the Muppets."
+    - "Not related to Betty Rizzo, leader of the \"Pink Ladies\"."
+
+pull_quote:
+  text: "I don't understand. Frank, if you can be so charismatic and so likable and get whatever you want… why don't you just go get what you want?"
+  attribution: "Random Girl, 2023"

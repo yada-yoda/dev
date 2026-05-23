@@ -6,26 +6,29 @@ GitHub&rsquo;s web editor, on a phone via the GitHub app, or in any text editor
 
 ## Two editing paths
 
-Bio, Film / TV / Theater credits, and Training all have a **second
-option**: the Decap CMS at `https://dev.rizzo.cc/acting/admin/`. Form
-fields, no HTML required.
+Almost all visible content has a **second option**: the Decap CMS at
+`https://dev.rizzo.cc/acting/admin/`. Form fields, no HTML required.
 
-| Content | Decap CMS | Or direct edit |
+| Content | Decap CMS collection | Data file |
 |---|---|---|
-| Bio | `/admin/` → Bio | `data/bio.md` |
-| Film / TV / Theater credits | `/admin/` → Credits | `data/credits.yml` |
-| Training | `/admin/` → Training | `data/training.yml` |
-| Everything else | &mdash; | `index.html` with EDIT markers (see below) |
+| Hero photos + quotes | Hero (Slideshow) | `data/hero.yml` |
+| Bio paragraph | Bio | `data/bio.md` |
+| RIZZO definition + pull quote | About | `data/about.yml` |
+| Film / TV / Theater credits | Credits | `data/credits.yml` |
+| Training entries | Training | `data/training.yml` |
+| Physical / Languages / Measurements / Licensing / Skills / Favorite Films / Inspirations | Stats, Skills &amp; Influences | `data/panels.yml` |
+| Email, socials, contact copy, reel URL/file | Contact, Socials, Reel | `data/contact.yml` |
+| Everything else (CSS, layout, structural HTML) | &mdash; | `index.html` |
 
 **When you edit through Decap or the data files**, a GitHub Action
 regenerates `index.html` automatically within ~60 seconds. Don&rsquo;t
-edit the bio / credits / training blocks inside `index.html`
-directly &mdash; your change will be overwritten the next time the
-build runs. Edit the data files instead.
+edit the marked sections in `index.html` directly &mdash; your
+change will be overwritten the next time the build runs. Edit the
+data file instead.
 
-For all OTHER content (hero quotes, socials, panels, skills list,
-section copy, etc.) keep using the HTML EDIT markers below. Those
-aren&rsquo;t touched by the build script.
+For STRUCTURAL content not in any data file (version string, GA4 ID,
+page meta, JSON-LD schema, layout CSS), keep using the HTML EDIT
+markers in `index.html`. Those aren&rsquo;t touched by the build script.
 
 ## Adding a film credit (Decap path &mdash; recommended)
 

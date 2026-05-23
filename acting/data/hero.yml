@@ -1,0 +1,24 @@
+# Hero slideshow — paired image + quote (two-line). Each entry is one
+# slide that cross-fades on an 8-second loop. Quote_line_1 + quote_line_2
+# render as exactly two lines (no extra wrapping).
+
+slides:
+  - photo: "assets/slideshow/photos/stage.jpg"
+    quote_line_1: "Separation is in"
+    quote_line_2: "the preparation."
+
+  - photo: "assets/slideshow/photos/nyc.jpg"
+    quote_line_1: "Don't be afraid"
+    quote_line_2: "of rejection or failure."
+
+  - photo: "assets/slideshow/photos/chicago.jpg"
+    quote_line_1: "Stop trying to feel."
+    quote_line_2: "Start trying to do."
+
+  - photo: "assets/slideshow/photos/road.jpg"
+    quote_line_1: "Play the verb,"
+    quote_line_2: "not the mood."
+
+  - photo: "assets/slideshow/photos/recent.jpg"
+    quote_line_1: "Prepare to be"
+    quote_line_2: "unprepared."
