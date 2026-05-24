@@ -292,6 +292,50 @@ video.hero-slide{
   object-fit:cover;
   background:#1a1c2a;
 }
+
+/* Floating volume control — only visible while a video slide is active. */
+.hero-volume{
+  position:absolute;bottom:24px;right:24px;z-index:4;
+  display:flex;align-items:center;gap:10px;
+  background:rgba(0,0,0,.5);
+  padding:8px 14px;border-radius:999px;
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border:1px solid rgba(255,255,255,.1);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .3s ease, visibility 0s linear .3s;
+}
+.hero-volume.visible{
+  opacity:1;visibility:visible;pointer-events:auto;
+  transition:opacity .3s ease, visibility 0s linear 0s;
+}
+.hero-mute{
+  background:transparent;border:none;color:#fff;
+  padding:0;cursor:pointer;display:flex;align-items:center;
+}
+.hero-mute svg{width:20px;height:20px}
+.hero-mute .icon-muted{display:none}
+.hero-mute.muted .icon-muted{display:inline-block}
+.hero-mute.muted .icon-unmuted{display:none}
+.hero-volume-slider{
+  -webkit-appearance:none;appearance:none;
+  width:90px;height:4px;
+  background:rgba(255,255,255,.3);
+  border-radius:999px;outline:none;cursor:pointer;
+}
+.hero-volume-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;
+  width:14px;height:14px;background:var(--accent);
+  border-radius:50%;cursor:pointer;
+}
+.hero-volume-slider::-moz-range-thumb{
+  width:14px;height:14px;background:var(--accent);
+  border-radius:50%;cursor:pointer;border:none;
+}
+@media (max-width:560px){
+  .hero-volume{bottom:18px;right:14px;padding:6px 10px;gap:8px}
+  .hero-volume-slider{width:70px}
+}
+
 /* Dark gradient over slideshow so logo + quotes stay readable */
 .hero::after{
   content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -852,12 +896,10 @@ footer .ver{color:var(--dim);margin-left:10px}
        Photos live in assets/slideshow/photos/. Videos (when ready) go in assets/slideshow/videos/ — see the README there for specs. -->
   <div class="hero-slides" aria-hidden="true">
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/stage.jpg')"></div>
-    <div class="hero-slide" style="background-image:url('assets/slideshow/photos/nyc.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/chicago.jpg')"></div>
-    <div class="hero-slide" style="background-image:url('assets/slideshow/photos/road.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/recent.jpg')"></div>
-    <video class="hero-slide" muted loop playsinline preload="metadata"><source src="assets/slideshow/videos/1Revised-05-23-2026-WaiterBoysOnly.mp4" type="video/mp4"></video>
-    <video class="hero-slide" muted loop playsinline preload="metadata"><source src="assets/slideshow/videos/2Revised-05-23-2026-DeadlyDomicileOnly.mp4" type="video/mp4"></video>
+    <video class="hero-slide" muted playsinline preload="metadata"><source src="assets/slideshow/videos/1Revised-05-23-2026-WaiterBoysOnly.mp4" type="video/mp4"></video>
+    <video class="hero-slide" muted playsinline preload="metadata"><source src="assets/slideshow/videos/2Revised-05-23-2026-DeadlyDomicileOnly.mp4" type="video/mp4"></video>
   </div>
   <!-- /EDIT: hero-slides -->
 
@@ -875,17 +917,24 @@ footer .ver{color:var(--dim);margin-left:10px}
     <!-- EDIT: hero-quotes — rotating slogans, paired 1:1 with hero-slides above. Keep slide count and quote count equal. Each <span> renders as exactly 2 lines (one <br>); white-space: nowrap stops longer lines from wrapping to a 3rd line. -->
     <div class="hero-quotes" aria-hidden="true">
       <span>Separation is in<br>the preparation.</span>
-      <span>Don't be afraid<br>of rejection or failure.</span>
       <span>Stop trying to feel.<br>Start trying to do.</span>
-      <span>Play the verb,<br>not the mood.</span>
       <span>Prepare to be<br>unprepared.</span>
-      <span><br></span>
-      <span><br></span>
+      <span>Play the verb,<br>not the mood.</span>
+      <span>Don't be afraid<br>of rejection or failure.</span>
     </div>
     <!-- /EDIT: hero-quotes -->
   </div>
 
   <a href="#about" class="scrolldown" aria-label="Scroll down">Scroll</a>
+
+  <!-- Volume control — JS shows this only when a <video> hero-slide is active -->
+  <div class="hero-volume muted" id="heroVolume" aria-label="Video volume">
+    <button class="hero-mute muted" type="button" aria-label="Toggle mute" title="Mute / unmute">
+      <svg class="icon-unmuted" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3zm13.5 3a4.5 4.5 0 0 0-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06A7.001 7.001 0 0 1 19 12a7.001 7.001 0 0 1-5 6.71v2.06A9.004 9.004 0 0 0 21 12 9.004 9.004 0 0 0 14 3.23z"/></svg>
+      <svg class="icon-muted" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 5L6 9H2v6h4l5 4V5zm10.5 7l2.4-2.4-1.4-1.4-2.4 2.4-2.4-2.4-1.4 1.4 2.4 2.4-2.4 2.4 1.4 1.4 2.4-2.4 2.4 2.4 1.4-1.4z"/></svg>
+    </button>
+    <input type="range" min="0" max="100" value="0" step="1" class="hero-volume-slider" aria-label="Volume">
+  </div>
 </section>
 
 <!-- ============ About ============ -->
@@ -1335,7 +1384,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.4</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.5</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1355,40 +1404,122 @@ footer .ver{color:var(--dim);margin-left:10px}
     });
   });
 
-  // Hero slideshow + paired quote rotation (JS-driven; works regardless of
-  // CSS animation state). The first .active class is applied via
-  // requestAnimationFrame so the browser paints the initial (opacity:0,
-  // translateY 36px) state first, then transitions to active - otherwise
-  // the entrance animation snaps and the first quote appears flat.
-  // Slides that are <video> elements get play()/pause() so they only
-  // consume bandwidth + battery while visible.
+  // Hero slideshow + paired quote rotation (JS-driven). Photos advance
+  // after a fixed 8s. Video slides play their full length (we listen for
+  // the 'ended' event) before advancing — with a safety timeout in case
+  // the video errors or never fires 'ended'. The floating volume control
+  // (#heroVolume) becomes visible while a video slide is active and
+  // controls that video's audio.
   (function heroRotate(){
     const slides = document.querySelectorAll('.hero-slide');
     const quotes = document.querySelectorAll('.hero-quotes span');
     if (!slides.length) return;
 
+    const volCtrl   = document.getElementById('heroVolume');
+    const muteBtn   = volCtrl && volCtrl.querySelector('.hero-mute');
+    const volSlider = volCtrl && volCtrl.querySelector('.hero-volume-slider');
+
+    const PHOTO_MS   = 8000;
+    const VIDEO_FALLBACK_MS = 90000;  // safety net if a video never fires 'ended'
+
+    let currentIdx   = 0;
+    let timer        = null;
+    let endedHandler = null;
+    let userVolume   = 0;          // 0-1 scale; 0 = muted
+    let lastNonZero  = 0.6;        // for quick mute/unmute toggle
+
+    function isVideo(el){ return el && el.tagName === 'VIDEO'; }
+
+    function applyVolumeTo(videoEl){
+      if (userVolume > 0){
+        videoEl.muted = false;
+        videoEl.volume = userVolume;
+      } else {
+        videoEl.muted = true;
+      }
+    }
+
     function setActive(idx, on){
       const el = slides[idx];
       el.classList.toggle('active', on);
       if (quotes[idx]) quotes[idx].classList.toggle('active', on);
-      if (el.tagName === 'VIDEO'){
+      if (isVideo(el)){
         if (on){
+          applyVolumeTo(el);
           try { el.currentTime = 0; } catch(e){}
           const p = el.play();
-          if (p && p.catch) p.catch(()=>{});  // ignore autoplay rejections (iOS Low Power Mode etc.)
+          if (p && p.catch) p.catch(()=>{});
         } else {
           try { el.pause(); } catch(e){}
         }
       }
     }
 
-    requestAnimationFrame(() => requestAnimationFrame(() => setActive(0, true)));
-    let i = 0;
-    setInterval(() => {
-      setActive(i, false);
-      i = (i + 1) % slides.length;
-      setActive(i, true);
-    }, 8000);
+    function clearScheduled(){
+      if (timer){ clearTimeout(timer); timer = null; }
+      if (endedHandler){
+        const cur = slides[currentIdx];
+        if (cur) cur.removeEventListener('ended', endedHandler);
+        endedHandler = null;
+      }
+    }
+
+    function scheduleAdvance(){
+      clearScheduled();
+      const el = slides[currentIdx];
+      if (isVideo(el)){
+        endedHandler = function(){
+          endedHandler = null;
+          advance();
+        };
+        el.addEventListener('ended', endedHandler);
+        // Safety: if the video never fires 'ended' (network error, codec, etc.)
+        timer = setTimeout(advance, VIDEO_FALLBACK_MS);
+      } else {
+        timer = setTimeout(advance, PHOTO_MS);
+      }
+    }
+
+    function advance(){
+      clearScheduled();
+      setActive(currentIdx, false);
+      currentIdx = (currentIdx + 1) % slides.length;
+      setActive(currentIdx, true);
+      updateVolumeVisibility();
+      scheduleAdvance();
+    }
+
+    function updateVolumeVisibility(){
+      if (!volCtrl) return;
+      volCtrl.classList.toggle('visible', isVideo(slides[currentIdx]));
+    }
+
+    function setVolume(v){
+      userVolume = Math.max(0, Math.min(1, v));
+      if (volSlider) volSlider.value = Math.round(userVolume * 100);
+      if (muteBtn) muteBtn.classList.toggle('muted', userVolume === 0);
+      const cur = slides[currentIdx];
+      if (isVideo(cur)) applyVolumeTo(cur);
+    }
+
+    if (volSlider){
+      volSlider.addEventListener('input', () => {
+        const v = (parseInt(volSlider.value, 10) || 0) / 100;
+        if (v > 0) lastNonZero = v;
+        setVolume(v);
+      });
+    }
+    if (muteBtn){
+      muteBtn.addEventListener('click', () => {
+        setVolume(userVolume > 0 ? 0 : lastNonZero);
+      });
+    }
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setActive(0, true);
+      updateVolumeVisibility();
+      scheduleAdvance();
+    }));
   })();
 
   // Headshot gallery: clicking a thumbnail swaps it into the main headshot.

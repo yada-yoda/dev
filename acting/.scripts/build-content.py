@@ -72,7 +72,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.4"
+SITE_VERSION = "v0.7.5"
 
 
 # ---------- helpers ----------
@@ -313,9 +313,12 @@ def gen_hero_slides(hero):
         video = s.get("video", "").strip() if s.get("video") else ""
         photo = s.get("photo", "").strip() if s.get("photo") else ""
         if video:
-            # JS will trigger play/pause as the slide becomes active.
+            # Note: no `loop` attribute - the JS rotator waits for the
+            # video's `ended` event before advancing to the next slide,
+            # so videos play their full length once. Muted by default
+            # (autoplay requirement); the floating volume control unmutes.
             lines.append(
-                f'    <video class="hero-slide" muted loop playsinline preload="metadata">'
+                f'    <video class="hero-slide" muted playsinline preload="metadata">'
                 f'<source src="{esc(video)}" type="video/mp4">'
                 f'</video>'
             )

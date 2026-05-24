@@ -52,6 +52,30 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.5 &mdash; 2026-05-23
+
+- **Hero slideshow reshuffled**: dropped the Road photo and the NYC
+  photo per request. Their quotes moved onto the two video slides:
+  - Slide 4 (Waiter Boys video) carries the former Road quote
+    &ldquo;Play the verb, / not the mood.&rdquo;
+  - Slide 5 (Deadly Domicile video) carries the former NYC quote
+    &ldquo;Don&rsquo;t be afraid / of rejection or failure.&rdquo;
+  - Final 5-slide rotation: Stage &rarr; Chicago &rarr; Recent
+    &rarr; Waiter Boys video &rarr; Deadly Domicile video.
+- **Videos play their full length.** Removed the `loop` attribute on
+  hero `<video>` elements; the JS rotator now listens for the
+  `ended` event and only advances when the video finishes. Photo
+  slides still rotate after a fixed 8s. 90-second safety timeout
+  on videos in case `ended` never fires (network error, codec
+  issue).
+- **Floating volume control** added in the lower-right corner of the
+  hero, only visible while a video slide is active. Pill chip with
+  a speaker icon (toggles quick mute) and a horizontal slider
+  (0&ndash;100). Videos start muted (browser autoplay requirement);
+  the user can drag the slider up to unmute. Volume preference
+  carries over to the next video. Mobile breakpoint shrinks the
+  control.
+
 ### v0.7.4 &mdash; 2026-05-23
 
 - **Slideshow now supports videos.** Each slide can hold EITHER a

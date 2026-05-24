@@ -8,26 +8,18 @@ slides:
     quote_line_1: "Separation is in"
     quote_line_2: "the preparation."
 
-  - photo: "assets/slideshow/photos/nyc.jpg"
-    quote_line_1: "Don't be afraid"
-    quote_line_2: "of rejection or failure."
-
   - photo: "assets/slideshow/photos/chicago.jpg"
     quote_line_1: "Stop trying to feel."
     quote_line_2: "Start trying to do."
-
-  - photo: "assets/slideshow/photos/road.jpg"
-    quote_line_1: "Play the verb,"
-    quote_line_2: "not the mood."
 
   - photo: "assets/slideshow/photos/recent.jpg"
     quote_line_1: "Prepare to be"
     quote_line_2: "unprepared."
 
   - video: "assets/slideshow/videos/1Revised-05-23-2026-WaiterBoysOnly.mp4"
-    quote_line_1: ""
-    quote_line_2: ""
+    quote_line_1: "Play the verb,"
+    quote_line_2: "not the mood."
 
   - video: "assets/slideshow/videos/2Revised-05-23-2026-DeadlyDomicileOnly.mp4"
-    quote_line_1: ""
-    quote_line_2: ""
+    quote_line_1: "Don't be afraid"
+    quote_line_2: "of rejection or failure."
