@@ -52,6 +52,25 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.4 &mdash; 2026-05-23
+
+- **Slideshow now supports videos.** Each slide can hold EITHER a
+  photo OR a video; video wins if both are set. Schema in
+  `data/hero.yml` adds an optional `video` field alongside `photo`.
+- Two videos wired in as slides 6 and 7:
+  `1Revised-05-23-2026-WaiterBoysOnly.mp4` and
+  `2Revised-05-23-2026-DeadlyDomicileOnly.mp4`. Photo rotation (slides
+  1&ndash;5) is unchanged.
+- **Performance**: videos use `preload="metadata"` (light) plus a JS
+  `play()`/`pause()` handler that only plays a video while its slide
+  is the active one. Pausing on slide-out saves bandwidth and
+  battery, especially on mobile.
+- **CSS**: `video.hero-slide` gets `object-fit:cover` + a dark
+  fallback background so the layout matches photo slides exactly.
+- **Decap** schema updated &mdash; each slide now has a Photo field
+  AND a Video field (both optional). You can swap between them per
+  slide.
+
 ### v0.7.3 &mdash; 2026-05-19
 
 - **Top-nav menu** editable via Decap. New `menu` list in

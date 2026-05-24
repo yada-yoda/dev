@@ -287,6 +287,11 @@ ul{list-style:none}
 .hero-slide.active{
   opacity:1;
 }
+video.hero-slide{
+  width:100%;height:100%;
+  object-fit:cover;
+  background:#1a1c2a;
+}
 /* Dark gradient over slideshow so logo + quotes stay readable */
 .hero::after{
   content:"";position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -851,6 +856,8 @@ footer .ver{color:var(--dim);margin-left:10px}
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/chicago.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/road.jpg')"></div>
     <div class="hero-slide" style="background-image:url('assets/slideshow/photos/recent.jpg')"></div>
+    <video class="hero-slide" muted loop playsinline preload="metadata"><source src="assets/slideshow/videos/1Revised-05-23-2026-WaiterBoysOnly.mp4" type="video/mp4"></video>
+    <video class="hero-slide" muted loop playsinline preload="metadata"><source src="assets/slideshow/videos/2Revised-05-23-2026-DeadlyDomicileOnly.mp4" type="video/mp4"></video>
   </div>
   <!-- /EDIT: hero-slides -->
 
@@ -872,6 +879,8 @@ footer .ver{color:var(--dim);margin-left:10px}
       <span>Stop trying to feel.<br>Start trying to do.</span>
       <span>Play the verb,<br>not the mood.</span>
       <span>Prepare to be<br>unprepared.</span>
+      <span><br></span>
+      <span><br></span>
     </div>
     <!-- /EDIT: hero-quotes -->
   </div>
@@ -1326,7 +1335,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.3</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.4</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1351,21 +1360,34 @@ footer .ver{color:var(--dim);margin-left:10px}
   // requestAnimationFrame so the browser paints the initial (opacity:0,
   // translateY 36px) state first, then transitions to active - otherwise
   // the entrance animation snaps and the first quote appears flat.
+  // Slides that are <video> elements get play()/pause() so they only
+  // consume bandwidth + battery while visible.
   (function heroRotate(){
     const slides = document.querySelectorAll('.hero-slide');
     const quotes = document.querySelectorAll('.hero-quotes span');
     if (!slides.length) return;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      slides[0].classList.add('active');
-      if (quotes[0]) quotes[0].classList.add('active');
-    }));
+
+    function setActive(idx, on){
+      const el = slides[idx];
+      el.classList.toggle('active', on);
+      if (quotes[idx]) quotes[idx].classList.toggle('active', on);
+      if (el.tagName === 'VIDEO'){
+        if (on){
+          try { el.currentTime = 0; } catch(e){}
+          const p = el.play();
+          if (p && p.catch) p.catch(()=>{});  // ignore autoplay rejections (iOS Low Power Mode etc.)
+        } else {
+          try { el.pause(); } catch(e){}
+        }
+      }
+    }
+
+    requestAnimationFrame(() => requestAnimationFrame(() => setActive(0, true)));
     let i = 0;
     setInterval(() => {
-      slides[i].classList.remove('active');
-      if (quotes[i]) quotes[i].classList.remove('active');
+      setActive(i, false);
       i = (i + 1) % slides.length;
-      slides[i].classList.add('active');
-      if (quotes[i]) quotes[i].classList.add('active');
+      setActive(i, true);
     }, 8000);
   })();
 

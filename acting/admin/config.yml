@@ -113,11 +113,19 @@ collections:
               - label: "Photo"
                 name: "photo"
                 widget: "image"
+                required: false
                 media_folder: "/acting/assets/slideshow/photos"
                 public_folder: "/acting/assets/slideshow/photos"
-                hint: "Upload an image or pick one from the slideshow/photos folder. 1920×1080 is the target size."
-              - { label: "Quote line 1", name: "quote_line_1", widget: "string", hint: "First line of the overlaid quote." }
-              - { label: "Quote line 2", name: "quote_line_2", widget: "string", hint: "Second line of the overlaid quote." }
+                hint: "Upload an image or pick from the slideshow/photos folder. 1920×1080 target. Leave empty if using a video below."
+              - label: "Video"
+                name: "video"
+                widget: "file"
+                required: false
+                media_folder: "/acting/assets/slideshow/videos"
+                public_folder: "/acting/assets/slideshow/videos"
+                hint: "OR upload an MP4 reel clip. If set, video plays in place of photo. Keep clips short (8-15s) and small (< ~25MB)."
+              - { label: "Quote line 1", name: "quote_line_1", widget: "string", required: false, hint: "First line of the overlaid quote. Leave blank for slides where the visual speaks for itself." }
+              - { label: "Quote line 2", name: "quote_line_2", widget: "string", required: false, hint: "Second line of the overlaid quote." }
 
   # ============ BIO ============
   - name: "bio"

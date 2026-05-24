@@ -1,6 +1,7 @@
-# Hero slideshow — paired image + quote (two-line). Each entry is one
-# slide that cross-fades on an 8-second loop. Quote_line_1 + quote_line_2
-# render as exactly two lines (no extra wrapping).
+# Hero slideshow — each entry is one slide that cross-fades on an
+# 8-second loop. Each slide has EITHER a photo OR a video (video wins
+# if both are set). Quote_line_1 + quote_line_2 render as exactly two
+# lines; leave them empty to show the slide with no overlay text.
 
 slides:
   - photo: "assets/slideshow/photos/stage.jpg"
@@ -22,3 +23,11 @@ slides:
   - photo: "assets/slideshow/photos/recent.jpg"
     quote_line_1: "Prepare to be"
     quote_line_2: "unprepared."
+
+  - video: "assets/slideshow/videos/1Revised-05-23-2026-WaiterBoysOnly.mp4"
+    quote_line_1: ""
+    quote_line_2: ""
+
+  - video: "assets/slideshow/videos/2Revised-05-23-2026-DeadlyDomicileOnly.mp4"
+    quote_line_1: ""
+    quote_line_2: ""

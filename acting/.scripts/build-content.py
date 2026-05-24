@@ -72,7 +72,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.3"
+SITE_VERSION = "v0.7.4"
 
 
 # ---------- helpers ----------
@@ -310,9 +310,19 @@ def gen_theater_print(theater):
 def gen_hero_slides(hero):
     lines = []
     for s in hero["slides"]:
-        lines.append(
-            f'    <div class="hero-slide" style="background-image:url(\'{esc(s["photo"])}\')"></div>'
-        )
+        video = s.get("video", "").strip() if s.get("video") else ""
+        photo = s.get("photo", "").strip() if s.get("photo") else ""
+        if video:
+            # JS will trigger play/pause as the slide becomes active.
+            lines.append(
+                f'    <video class="hero-slide" muted loop playsinline preload="metadata">'
+                f'<source src="{esc(video)}" type="video/mp4">'
+                f'</video>'
+            )
+        else:
+            lines.append(
+                f'    <div class="hero-slide" style="background-image:url(\'{esc(photo)}\')"></div>'
+            )
     return "\n  <div class=\"hero-slides\" aria-hidden=\"true\">\n" + "\n".join(lines) + "\n  </div>\n  "
 
 
