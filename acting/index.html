@@ -293,9 +293,11 @@ video.hero-slide{
   background:#1a1c2a;
 }
 
-/* Floating volume control — only visible while a video slide is active. */
+/* Floating volume control — only visible while a video slide is active.
+   Positioned bottom-left so it doesn't collide with the Save Resume PDF
+   button in the bottom-right. */
 .hero-volume{
-  position:absolute;bottom:24px;right:24px;z-index:4;
+  position:absolute;bottom:24px;left:24px;z-index:4;
   display:flex;align-items:center;gap:10px;
   background:rgba(0,0,0,.5);
   padding:8px 14px;border-radius:999px;
@@ -332,7 +334,7 @@ video.hero-slide{
   border-radius:50%;cursor:pointer;border:none;
 }
 @media (max-width:560px){
-  .hero-volume{bottom:18px;right:14px;padding:6px 10px;gap:8px}
+  .hero-volume{bottom:18px;left:14px;padding:6px 10px;gap:8px}
   .hero-volume-slider{width:70px}
 }
 
@@ -1384,7 +1386,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.6</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.7</span>
 </footer>
 <!-- /EDIT: footer -->
 

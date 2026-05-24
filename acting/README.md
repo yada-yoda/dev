@@ -52,6 +52,13 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.7 &mdash; 2026-05-23
+
+- Moved the **floating volume control** from bottom-right to
+  bottom-left of the hero. The Save Resume PDF button lives in
+  bottom-right and was overlapping the mute/slider chip.
+  Mobile breakpoint mirrored the change.
+
 ### v0.7.6 &mdash; 2026-05-23
 
 - **Hero videos re-encoded for the web.** Both clips dropped from
