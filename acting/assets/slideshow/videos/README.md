@@ -16,16 +16,30 @@ Drop short video clips here for use in the hero slideshow.
 
 ## How to encode
 
-Quick FFmpeg recipe to strip audio, encode H.264 faststart, and resize:
+Recipe used for the current clips (720p, audio kept, ~5MB each from
+~25MB originals — 80% smaller, visually fine as background):
 
 ```
-ffmpeg -i source.mov \
-  -vf "scale=1920:-2" \
-  -c:v libx264 -preset slow -crf 23 -pix_fmt yuv420p \
+ffmpeg -i source.mp4 \
+  -vf "scale=-2:720" \
+  -c:v libx264 -preset slow -crf 26 -pix_fmt yuv420p \
+  -c:a aac -b:a 96k \
   -movflags +faststart \
-  -an \
   output.mp4
 ```
+
+If you want a higher-quality version (1080p, audio kept, ~15MB):
+
+```
+ffmpeg -i source.mp4 \
+  -c:v libx264 -preset slow -crf 24 -pix_fmt yuv420p \
+  -c:a aac -b:a 96k \
+  -movflags +faststart \
+  output.mp4
+```
+
+Strip audio (smaller, but the hero volume control becomes irrelevant):
+append `-an` before the output filename.
 
 ## Wiring a video into the slideshow
 

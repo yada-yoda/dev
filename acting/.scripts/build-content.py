@@ -72,7 +72,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.5"
+SITE_VERSION = "v0.7.6"
 
 
 # ---------- helpers ----------

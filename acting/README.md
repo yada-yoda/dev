@@ -52,6 +52,23 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.6 &mdash; 2026-05-23
+
+- **Hero videos re-encoded for the web.** Both clips dropped from
+  ~26 MB / ~16 MB at 1080p &raquo; ~5 MB / ~4 MB at 720p. Combined
+  payload now **8.7 MB vs the previous 42 MB &mdash; 79% smaller**.
+  First-paint is dramatically faster on mobile / slow connections.
+  Recipe: `libx264 -preset slow -crf 26 -pix_fmt yuv420p` + AAC 96k
+  audio + `+faststart` so playback starts before the full file
+  buffers. Recipe captured in `assets/slideshow/videos/README.md`
+  for future clips.
+- **Filenames cleaned up**: `waiter-boys.mp4` and
+  `deadly-domicile.mp4` (was the longer
+  `1Revised-05-23-2026-WaiterBoysOnly.mp4` /
+  `2Revised-05-23-2026-DeadlyDomicileOnly.mp4`). Original files
+  removed from the working tree (still in git history if needed).
+- `data/hero.yml` updated to point at the new shorter filenames.
+
 ### v0.7.5 &mdash; 2026-05-23
 
 - **Hero slideshow reshuffled**: dropped the Road photo and the NYC
