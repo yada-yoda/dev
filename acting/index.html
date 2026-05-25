@@ -739,12 +739,16 @@ footer .ver{color:var(--dim);margin-left:10px}
 .resume-sheet{display:none}
 
 @media print{
-  /* Use letter portrait, tight margins */
-  @page{size:letter portrait;margin:0.35in}
+  /* HARD RULE: the printed resume must fit on ONE letter page.
+     Margins, fonts, and section spacing tuned tight enough that even
+     with growing credits + 9 training entries, content stays on a
+     single page. If you add content and it spills to page 2, prefer
+     trimming content over loosening these values. */
+  @page{size:letter portrait;margin:0.3in}
 
   /* Reset everything visual on the page */
   html,body{background:#fff!important;color:#000!important}
-  body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:9.5pt;line-height:1.3}
+  body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:9pt;line-height:1.22}
 
   /* Hide everything except the resume sheet */
   body > *{display:none!important}
@@ -764,20 +768,20 @@ footer .ver{color:var(--dim);margin-left:10px}
     display:grid;grid-template-columns:1fr auto;gap:16px;align-items:end;
     padding-bottom:6px;
     border-bottom:2px solid #2c2e3d;
-    margin-bottom:9px;
+    margin-bottom:6px;
   }
   .rs-head h1{
     font-family:'Montserrat',sans-serif;font-weight:900;
-    font-size:34pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
+    font-size:30pt;letter-spacing:.04em;line-height:.95;color:#2c2e3d;
     margin:0;text-transform:uppercase;
   }
   .rs-head .rs-meta{
-    margin:5px 0 0 0;
-    font-size:9.5pt;color:#333;line-height:1.45;
-    display:flex;flex-wrap:wrap;align-items:center;gap:0 14px;
+    margin:3px 0 0 0;
+    font-size:9pt;color:#333;line-height:1.35;
+    display:flex;flex-wrap:wrap;align-items:center;gap:0 12px;
   }
   .rs-head .rs-meta .rs-sub{
-    font-family:'Montserrat',sans-serif;font-weight:700;font-size:9pt;
+    font-family:'Montserrat',sans-serif;font-weight:700;font-size:8.5pt;
     letter-spacing:.4em;text-transform:uppercase;color:#00bcd4;
     padding-right:10px;border-right:1px solid #ccc;
   }
@@ -792,30 +796,34 @@ footer .ver{color:var(--dim);margin-left:10px}
   }
 
   .rs-stats{
-    display:grid;grid-template-columns:repeat(6,1fr);gap:3px 12px;
-    padding:5px 0 6px;
+    display:grid;grid-template-columns:repeat(6,1fr);gap:2px 10px;
+    padding:4px 0 5px;
     border-bottom:1px solid #ccc;
-    margin-bottom:9px;
-    font-size:8.5pt;
+    margin-bottom:6px;
+    font-size:8pt;
   }
   .rs-stats div strong{
     display:block;font-family:'Montserrat',sans-serif;font-weight:700;
-    font-size:7pt;letter-spacing:.18em;text-transform:uppercase;color:#00bcd4;
+    font-size:6.5pt;letter-spacing:.18em;text-transform:uppercase;color:#00bcd4;
     margin-bottom:0;
   }
 
-  .rs-section{margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}
+  .rs-section{margin-bottom:5px;break-inside:avoid;page-break-inside:avoid}
   .rs-section h2{
     font-family:'Montserrat',sans-serif;font-weight:700;
-    font-size:9.5pt;letter-spacing:.26em;text-transform:uppercase;
-    color:#2c2e3d;margin:0 0 4px 0;
-    padding-bottom:2px;border-bottom:1.5px solid #00bcd4;
+    font-size:9pt;letter-spacing:.24em;text-transform:uppercase;
+    color:#2c2e3d;margin:0 0 3px 0;
+    padding-bottom:1px;border-bottom:1.5px solid #00bcd4;
+  }
+  .rs-theater-note{
+    font-size:6.5pt;color:#888;font-style:italic;
+    margin:0 0 3px 0;letter-spacing:.02em;
   }
   .rs-table{width:100%;border-collapse:collapse}
   .rs-table td{
-    padding:2px 6px 2px 0;
+    padding:1px 6px 1px 0;
     vertical-align:top;
-    font-size:9pt;
+    font-size:8.5pt;
   }
   .rs-table td.t{font-weight:700;color:#000;width:42%}
   .rs-table td.r{color:#00697a;width:28%}
@@ -832,41 +840,41 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-table.rs-theater td.r{width:42%}
   .rs-table.rs-theater td.d{width:30%}
 
-  .rs-skills-list{font-size:9pt;line-height:1.4}
+  .rs-skills-list{font-size:8pt;line-height:1.25}
   .rs-training-list{
     column-count:2;
-    column-gap:24px;
+    column-gap:20px;
     -webkit-column-count:2;
-    font-size:9pt;line-height:1.35;
+    font-size:8.5pt;line-height:1.18;
   }
   .rs-training-list div{
-    margin-bottom:3px;
+    margin-bottom:2px;
     break-inside:avoid;
     page-break-inside:avoid;
   }
-  .rs-training-list strong{color:#2c2e3d;display:block}
-  .rs-training-list em{color:#666;font-style:normal;font-size:8pt;display:block;margin-left:0}
+  .rs-training-list strong{color:#2c2e3d;display:block;font-size:8.5pt}
+  .rs-training-list em{color:#666;font-style:normal;font-size:7.5pt;display:block;margin-left:0;line-height:1.2}
 
   .rs-foot{
-    margin-top:8px;padding-top:6px;
+    margin-top:5px;padding-top:4px;
     border-top:1px solid #ccc;
-    display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+    display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
   }
   .rs-foot .rs-foot-text{
-    font-family:'Montserrat',sans-serif;font-size:8pt;
+    font-family:'Montserrat',sans-serif;font-size:7.5pt;
     letter-spacing:.22em;text-transform:uppercase;color:#666;
-    line-height:1.45;
+    line-height:1.35;
   }
   .rs-foot .rs-foot-text strong{
-    color:#2c2e3d;font-size:9.5pt;letter-spacing:.18em;display:block;
+    color:#2c2e3d;font-size:8.5pt;letter-spacing:.18em;display:block;
     margin-bottom:1px;
   }
   .rs-foot .rs-qr{
-    width:0.8in;height:0.8in;display:block;
+    width:0.7in;height:0.7in;display:block;
   }
   .rs-foot .rs-qr-label{
     text-align:center;font-family:'Montserrat',sans-serif;
-    font-size:6pt;letter-spacing:.2em;text-transform:uppercase;
+    font-size:5.5pt;letter-spacing:.2em;text-transform:uppercase;
     color:#888;margin-top:1px;
   }
 }
@@ -1315,14 +1323,15 @@ footer .ver{color:var(--dim);margin-left:10px}
   <!-- EDIT: print-theater-credits — printed PDF version of the Theater table. Mirror /EDIT: theater-credits above. -->
   <div class="rs-section">
     <h2>Theater &middot; Sketch / Improv</h2>
+    <div class="rs-theater-note">All shows at The Second City Training Center, Chicago.</div>
     <table class="rs-table rs-theater">
-      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy's Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy's Beat Lounge<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
-      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>
+      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox</td></tr>
+      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge</td></tr>
+      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge</td></tr>
+      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy's Beat Lounge</td></tr>
+      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox</td></tr>
+      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy's Beat Lounge</td></tr>
+      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio</td></tr>
     </table>
   </div>
   <!-- /EDIT: print-theater-credits -->
@@ -1386,7 +1395,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.8</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.9</span>
 </footer>
 <!-- /EDIT: footer -->
 

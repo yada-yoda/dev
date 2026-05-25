@@ -72,7 +72,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.8"
+SITE_VERSION = "v0.7.9"
 
 
 # ---------- helpers ----------
@@ -293,11 +293,12 @@ def gen_theater_print(theater):
         rows.append(
             f'      <tr><td class="t">{esc(t["production"])}</td>'
             f'<td class="r">{esc(t["role"])}</td>'
-            f'<td class="d">{esc(t["venue"])}<span class="rs-venue-sub">The Second City Training Center, Chicago</span></td></tr>'
+            f'<td class="d">{esc(t["venue"])}</td></tr>'
         )
     return (
         "\n  <div class=\"rs-section\">\n"
         "    <h2>Theater &middot; Sketch / Improv</h2>\n"
+        "    <div class=\"rs-theater-note\">All shows at The Second City Training Center, Chicago.</div>\n"
         "    <table class=\"rs-table rs-theater\">\n"
         + "\n".join(rows)
         + "\n    </table>\n"

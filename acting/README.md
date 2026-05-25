@@ -52,6 +52,39 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.9 &mdash; 2026-05-23
+
+- **One-page PDF resume pass (again).** Resume was spilling to 2
+  pages because content grew (Theater table now 7 rows with repeated
+  &ldquo;Second City Training Center&rdquo; sub-lines + Training section now 9
+  entries). Tightened across the board so the printed resume fits
+  on a single letter page comfortably.
+- **Theater section** &mdash; dropped the redundant
+  &ldquo;The Second City Training Center, Chicago&rdquo; sub-line under each
+  stage name on print. Replaced with one small footnote line under
+  the section H2 (&ldquo;All shows at The Second City Training Center,
+  Chicago&rdquo;). Saves ~6 lines of vertical space. Screen view
+  unchanged.
+- **Density adjustments** (print only, all measured to keep
+  readability):
+  - Page margin: `0.35in` &rarr; `0.3in`
+  - Body type: `9.5pt` &rarr; `9pt`, line-height `1.3` &rarr; `1.22`
+  - H1 (name): `34pt` &rarr; `30pt`
+  - H2 (section): `9.5pt` &rarr; `9pt`, margin-bottom `4px` &rarr;
+    `3px`
+  - Section margin-bottom: `8px` &rarr; `5px`
+  - Stats grid: `8.5pt` &rarr; `8pt`, label `7pt` &rarr; `6.5pt`,
+    less gap and padding
+  - Table row padding: `2px` &rarr; `1px`, font `9pt` &rarr; `8.5pt`
+  - Training list: `9pt` &rarr; `8.5pt`, line-height `1.35` &rarr;
+    `1.18`, em sub-line `8pt` &rarr; `7.5pt`
+  - Skills/Languages/Licensing list: `9pt` &rarr; `8pt`, line-height
+    `1.4` &rarr; `1.25`
+  - Footer + QR code: smaller fonts and QR shrunk `0.8in` &rarr;
+    `0.7in`
+- Added a header comment in the print CSS noting the one-page rule
+  so future content additions stay disciplined.
+
 ### v0.7.8 &mdash; 2026-05-23
 
 - **Hero slideshow re-ordered.** Waiter Boys video moves to slide 1
