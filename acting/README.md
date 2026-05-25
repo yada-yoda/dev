@@ -52,6 +52,13 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.8 &mdash; 2026-05-23
+
+- **Hero slideshow re-ordered.** Waiter Boys video moves to slide 1
+  so the first impression is motion. Photos play slides 2&ndash;4 in
+  the middle. Deadly Domicile video closes at slide 5, so the loop
+  is bookended by video. Quote pairings preserved.
+
 ### v0.7.7 &mdash; 2026-05-23
 
 - Moved the **floating volume control** from bottom-right to

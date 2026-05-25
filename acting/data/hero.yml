@@ -4,6 +4,10 @@
 # lines; leave them empty to show the slide with no overlay text.
 
 slides:
+  - video: "assets/slideshow/videos/waiter-boys.mp4"
+    quote_line_1: "Play the verb,"
+    quote_line_2: "not the mood."
+
   - photo: "assets/slideshow/photos/stage.jpg"
     quote_line_1: "Separation is in"
     quote_line_2: "the preparation."
@@ -15,10 +19,6 @@ slides:
   - photo: "assets/slideshow/photos/recent.jpg"
     quote_line_1: "Prepare to be"
     quote_line_2: "unprepared."
-
-  - video: "assets/slideshow/videos/waiter-boys.mp4"
-    quote_line_1: "Play the verb,"
-    quote_line_2: "not the mood."
 
   - video: "assets/slideshow/videos/deadly-domicile.mp4"
     quote_line_1: "Don't be afraid"
