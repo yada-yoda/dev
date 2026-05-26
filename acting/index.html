@@ -850,10 +850,15 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-table td.span3{font-style:italic;color:#555}
 
   /* Theater table has shorter production names + longer sketch lists,
-     so it needs different column proportions than Film/TV. */
-  .rs-table.rs-theater td.t{width:28%}
-  .rs-table.rs-theater td.r{width:42%}
-  .rs-table.rs-theater td.d{width:30%}
+     so it needs different column proportions than Film/TV.
+     Role column gets the bulk of the width + a slightly smaller font
+     so the longest sketch lists ("Goodbye Kitty, Jesus Says,
+     Declaration, First Love, Party @ 30, Rikki" / "Black Mollies,
+     Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears") fit
+     on a single line. */
+  .rs-table.rs-theater td.t{width:22%}
+  .rs-table.rs-theater td.r{width:55%;font-size:8pt;letter-spacing:-0.005em}
+  .rs-table.rs-theater td.d{width:23%}
 
   .rs-skills-list{font-size:8pt;line-height:1.25}
   .rs-training-list{
@@ -1403,7 +1408,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.11</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.12</span>
 </footer>
 <!-- /EDIT: footer -->
 

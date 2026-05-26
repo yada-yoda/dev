@@ -52,6 +52,19 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.12 &mdash; 2026-05-23
+
+- **Theater sketch lists fit on one line in the PDF.** The longest
+  sketch lists (Conservatory I, Acting III) were wrapping to a
+  second line, eating vertical space and making the table look
+  uneven. Two-prong fix in the print CSS only:
+  - Redistributed Theater column widths: Production 28 &rarr; 22%,
+    Role/Sketches 42 &rarr; **55%**, Stage 30 &rarr; 23%.
+  - Theater Role cell font: 8.5pt &rarr; **8pt** with -0.005em
+    tracking, so the longest 73-character sketch list now fits
+    inside ~4.35 inches of column width with room to spare.
+- Screen view of Theater is unaffected (different CSS rule path).
+
 ### v0.7.11 &mdash; 2026-05-23
 
 - **Credit-tab visibility controls** added to Decap. New
