@@ -739,20 +739,39 @@ footer .ver{color:var(--dim);margin-left:10px}
 .resume-sheet{display:none}
 
 @media print{
-  /* HARD RULE: the printed resume must fit on ONE letter page.
-     Margins, fonts, and section spacing tuned tight enough that even
-     with growing credits + 9 training entries, content stays on a
-     single page. If you add content and it spills to page 2, prefer
-     trimming content over loosening these values. */
+  /* HARD RULES for the printed PDF resume:
+     1) Always fits on ONE letter page (margins/fonts tuned for it).
+     2) NEVER inherits system dark mode — explicit light scheme, white
+        page, black text. color-scheme + print-color-adjust below
+        force this regardless of OS/browser dark preference.
+     3) Mobile printing produces the same layout as desktop —
+        explicit @page dimensions plus width/transform resets stop
+        mobile browsers from scaling content to the screen viewport. */
   @page{size:letter portrait;margin:0.3in}
 
-  /* Reset everything visual on the page */
-  html,body{background:#fff!important;color:#000!important}
+  /* Reset everything visual on the page (force light mode for print) */
+  html,body{
+    background:#fff!important;color:#000!important;
+    color-scheme:light!important;
+    forced-color-adjust:none!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    margin:0!important;padding:0!important;
+    width:auto!important;min-width:0!important;
+    transform:none!important;zoom:1!important;
+    -webkit-transform:none!important;
+  }
   body{font-family:'Source Sans 3','Source Sans Pro',Helvetica,Arial,sans-serif;font-size:9pt;line-height:1.22}
 
   /* Hide everything except the resume sheet */
   body > *{display:none!important}
-  body > .resume-sheet{display:block!important}
+  body > .resume-sheet{
+    display:block!important;
+    width:100%!important;max-width:100%!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+    color-scheme:light!important;
+  }
 
   /* Show the sheet */
   .resume-sheet{
@@ -1395,7 +1414,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.9</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.10</span>
 </footer>
 <!-- /EDIT: footer -->
 

@@ -52,6 +52,20 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.10 &mdash; 2026-05-23
+
+- **Print PDF locked to light mode** regardless of system / browser
+  dark preference. Added explicit `color-scheme: light`,
+  `forced-color-adjust: none`, and `print-color-adjust: exact` on
+  html/body and `.resume-sheet`. The white-page + black-text layout
+  now wins over any OS-level inversion.
+- **Mobile print output matches desktop.** Added margin/padding/width
+  resets plus `transform: none` and `zoom: 1` so mobile browsers
+  don&rsquo;t scale the resume to fit the phone&rsquo;s screen viewport &mdash;
+  they render to the `@page letter portrait` size like Chrome
+  desktop does. Saving as PDF from a phone should now produce the
+  same one-page output as Chrome desktop.
+
 ### v0.7.9 &mdash; 2026-05-23
 
 - **One-page PDF resume pass (again).** Resume was spilling to 2
