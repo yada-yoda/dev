@@ -168,12 +168,22 @@ collections:
   # ============ CREDITS ============
   - name: "credits"
     label: "Credits"
-    description: "Film, TV, and Theater credits. Newest at the top."
+    description: "Film, TV, and Theater credits. Newest at the top. Tab visibility lets you hide categories that aren't ready yet."
     files:
       - file: "acting/data/credits.yml"
         label: "Credits"
         name: "credits"
         fields:
+          - label: "Tab visibility"
+            name: "tab_visibility"
+            widget: "object"
+            hint: "Toggle which credit tabs appear on the website. Hidden tabs disappear entirely (no empty placeholder). The first visible tab opens by default."
+            fields:
+              - { label: "Show Film tab", name: "film", widget: "boolean", default: true }
+              - { label: "Show TV tab", name: "tv", widget: "boolean", default: true }
+              - { label: "Show Theater tab", name: "theater", widget: "boolean", default: true }
+              - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
+
           - label: "Film"
             name: "film"
             widget: "list"
@@ -208,6 +218,18 @@ collections:
               - { label: "Production", name: "production", widget: "string" }
               - { label: "Role / Sketches", name: "role", widget: "string", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
               - { label: "Stage / Venue", name: "venue", widget: "string", hint: "All theater is currently at The Second City Training Center, Chicago - just enter the specific stage" }
+
+          - label: "Commercial"
+            name: "commercial"
+            widget: "list"
+            label_singular: "Commercial credit"
+            summary: "{{fields.title}} — {{fields.brand}}"
+            required: false
+            hint: "Empty by default. Add entries when you have commercial credits and flip the Tab visibility toggle on."
+            fields:
+              - { label: "Title / Spot", name: "title", widget: "string" }
+              - { label: "Role", name: "role", widget: "string" }
+              - { label: "Brand / Agency", name: "brand", widget: "string" }
 
   # ============ TRAINING ============
   - name: "training"

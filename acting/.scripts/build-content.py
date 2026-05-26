@@ -24,6 +24,8 @@ Updates these EDIT-marked blocks in index.html (and only these):
   EDIT: print-tv-credits      ← from data/credits.yml (tv)
   EDIT: theater-credits       ← from data/credits.yml (theater)
   EDIT: print-theater-credits ← from data/credits.yml (theater)
+  EDIT: commercial-credits    ← from data/credits.yml (commercial)
+  EDIT: credits-tabs          ← from data/credits.yml (tab_visibility)
   EDIT: hero-slides           ← from data/hero.yml
   EDIT: hero-quotes           ← from data/hero.yml
   EDIT: rizzo-definition      ← from data/about.yml
@@ -72,7 +74,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.10"
+SITE_VERSION = "v0.7.11"
 
 
 # ---------- helpers ----------
@@ -176,7 +178,54 @@ def gen_training_print(training):
     )
 
 
-def gen_film_screen(films):
+# Order of the credit tabs (slug → display label). The tabs strip is
+# rendered in this order; the first tab whose visibility is true gets
+# the active state. Hidden tabs are omitted from both the strip and
+# the panel area below.
+TAB_ORDER = [
+    ("film",       "Film"),
+    ("tv",         "TV"),
+    ("theater",    "Theater"),
+    ("commercial", "Commercial"),
+]
+
+
+def _visible_tabs(credits):
+    vis = credits.get("tab_visibility") or {}
+    # Default to visible if a flag is omitted from credits.yml; commercial
+    # defaults to hidden (placeholder until real entries exist).
+    defaults = {"film": True, "tv": True, "theater": True, "commercial": False}
+    return [
+        (slug, label)
+        for slug, label in TAB_ORDER
+        if vis.get(slug, defaults.get(slug, True))
+    ]
+
+
+def _is_first_visible(credits, slug):
+    vt = _visible_tabs(credits)
+    return bool(vt) and vt[0][0] == slug
+
+
+def gen_credits_tabs(credits):
+    visible = _visible_tabs(credits)
+    if not visible:
+        return "\n    <div class=\"tabs\" role=\"tablist\"></div>\n    "
+    buttons = []
+    for i, (slug, label) in enumerate(visible):
+        active = " active" if i == 0 else ""
+        buttons.append(
+            f'      <button class="tab{active}" data-tab="{esc(slug)}" role="tab">{esc(label)}</button>'
+        )
+    return (
+        "\n    <div class=\"tabs\" role=\"tablist\">\n"
+        + "\n".join(buttons)
+        + "\n    </div>\n    "
+    )
+
+
+def gen_film_screen(films, is_active=True):
+    cls = "tab-panel active" if is_active else "tab-panel"
     rows = []
     for f in films:
         title = esc(f["title"])
@@ -192,7 +241,7 @@ def gen_film_screen(films):
             f'<td class="dir">dir. {esc(f["director"])}</td></tr>'
         )
     return (
-        "\n    <div class=\"tab-panel active\" id=\"film\">\n"
+        f'\n    <div class="{cls}" id="film">\n'
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Title</th><th>Role</th><th>Director</th></tr></thead>\n"
         "        <tbody>\n"
@@ -222,7 +271,8 @@ def gen_film_print(films):
     )
 
 
-def gen_tv_screen(tv):
+def gen_tv_screen(tv, is_active=False):
+    cls = "tab-panel active" if is_active else "tab-panel"
     rows = []
     for t in tv:
         rows.append(
@@ -232,7 +282,7 @@ def gen_tv_screen(tv):
             f'<td class="dir">{esc(t["network"])}</td></tr>'
         )
     return (
-        "\n    <div class=\"tab-panel\" id=\"tv\">\n"
+        f'\n    <div class="{cls}" id="tv">\n'
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Title</th><th>Role</th><th>Network</th></tr></thead>\n"
         "        <tbody>\n"
@@ -262,7 +312,8 @@ def gen_tv_print(tv):
     )
 
 
-def gen_theater_screen(theater):
+def gen_theater_screen(theater, is_active=False):
+    cls = "tab-panel active" if is_active else "tab-panel"
     rows = []
     for t in theater:
         role_cell = (
@@ -276,12 +327,40 @@ def gen_theater_screen(theater):
             f'<td class="dir">{esc(t["venue"])}<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>'
         )
     return (
-        "\n    <div class=\"tab-panel\" id=\"theater\">\n"
+        f'\n    <div class="{cls}" id="theater">\n'
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Production</th><th>Role / Sketches</th><th>Stage</th></tr></thead>\n"
         "        <tbody>\n"
         + "\n".join(rows)
         + "\n        </tbody>\n"
+        "      </table>\n"
+        "    </div>\n    "
+    )
+
+
+def gen_commercial_screen(commercial, is_active=False):
+    cls = "tab-panel active" if is_active else "tab-panel"
+    if not commercial:
+        body = (
+            '          <tr><td class="title" colspan="3" '
+            'style="text-align:center;color:var(--muted)">Available upon request.</td></tr>'
+        )
+    else:
+        rows = []
+        for c in commercial:
+            rows.append(
+                f'          <tr><td class="title">{esc(c.get("title", ""))}</td>'
+                f'<td class="role">{esc(c.get("role", ""))}</td>'
+                f'<td class="dir">{esc(c.get("brand", ""))}</td></tr>'
+            )
+        body = "\n".join(rows)
+    return (
+        f'\n    <div class="{cls}" id="commercial">\n'
+        "      <table class=\"credits\">\n"
+        "        <thead><tr><th>Title</th><th>Role</th><th>Brand</th></tr></thead>\n"
+        "        <tbody>\n"
+        + body + "\n"
+        "        </tbody>\n"
         "      </table>\n"
         "    </div>\n    "
     )
@@ -709,11 +788,30 @@ def main():
     html = replace_block(html, "bio", gen_bio())
     html = replace_block(html, "training", gen_training_screen(training))
     html = replace_block(html, "print-training", gen_training_print(training))
-    html = replace_block(html, "film-credits", gen_film_screen(credits["film"]))
+    # Tabs strip — only includes visible tabs; first visible gets active state
+    html = replace_block(html, "credits-tabs", gen_credits_tabs(credits))
+
+    # Per-tab panels: render only when the tab is visible. The build script's
+    # replace_block fills with empty content so the panel <div> disappears.
+    def panel_or_hidden(slug, gen, *args):
+        visible_slugs = {s for s, _ in _visible_tabs(credits)}
+        if slug not in visible_slugs:
+            return "\n    "
+        return gen(*args, is_active=_is_first_visible(credits, slug))
+
+    html = replace_block(html, "film-credits",
+                         panel_or_hidden("film", gen_film_screen, credits["film"]))
+    html = replace_block(html, "tv-credits",
+                         panel_or_hidden("tv", gen_tv_screen, credits["tv"]))
+    html = replace_block(html, "theater-credits",
+                         panel_or_hidden("theater", gen_theater_screen, credits["theater"]))
+    html = replace_block(html, "commercial-credits",
+                         panel_or_hidden("commercial", gen_commercial_screen, credits.get("commercial", [])))
+
+    # Printed PDF resume always uses all sections except Commercial
+    # (Commercial is intentionally omitted from print).
     html = replace_block(html, "print-film-credits", gen_film_print(credits["film"]))
-    html = replace_block(html, "tv-credits", gen_tv_screen(credits["tv"]))
     html = replace_block(html, "print-tv-credits", gen_tv_print(credits["tv"]))
-    html = replace_block(html, "theater-credits", gen_theater_screen(credits["theater"]))
     html = replace_block(html, "print-theater-credits", gen_theater_print(credits["theater"]))
 
     # Hero

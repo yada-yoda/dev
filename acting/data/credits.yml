@@ -3,6 +3,15 @@
 # and the JSON-LD Movie nodes whenever this file changes.
 # Newest credits go at the TOP of each list.
 
+# Show / hide each tab in the website Credits section. The first visible
+# tab gets the active state. The printed PDF resume always omits the
+# Commercial section regardless of this setting.
+tab_visibility:
+  film: true
+  tv: true
+  theater: true
+  commercial: false
+
 film:
   - title: "Deadly Domicile"
     year: 2024
@@ -53,3 +62,7 @@ theater:
   - production: "Improv IV Show"
     role: "Ensemble"
     venue: "De Maat Studio"
+
+# Commercial credits (placeholder list). When you book commercial work,
+# flip tab_visibility.commercial to true above and add entries here.
+commercial: []

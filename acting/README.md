@@ -52,6 +52,29 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.11 &mdash; 2026-05-23
+
+- **Credit-tab visibility controls** added to Decap. New
+  `tab_visibility` block in `data/credits.yml` with one boolean per
+  tab (`film`, `tv`, `theater`, `commercial`). Hidden tabs are
+  omitted from both the tabs strip AND the panel area &mdash; not just
+  CSS-hidden but actually not rendered. The first visible tab gets
+  the `active` state automatically, so hiding Film no longer breaks
+  the default tab.
+- **Commercial tab hidden by default** until real entries exist.
+  Add credits to `commercial:` list in `credits.yml` and flip
+  `tab_visibility.commercial` to `true` when ready. Empty list with
+  visibility on shows the &ldquo;Available upon request&rdquo; placeholder.
+- New `EDIT: credits-tabs` marker wraps the tabs strip so the build
+  script can regenerate the buttons array.
+- Cleaned up pre-existing duplicate `<meta name="author">`,
+  `theme-color`, `robots`, and canonical `<link>` tags that were
+  sitting outside the `EDIT: site-meta` marker (artifacts from when
+  the marker was first introduced; now properly inside the
+  auto-regenerated block).
+- Decap admin gains a **Tab visibility** section inside the Credits
+  collection with four toggles (one per category).
+
 ### v0.7.10 &mdash; 2026-05-23
 
 - **Print PDF locked to light mode** regardless of system / browser

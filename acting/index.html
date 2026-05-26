@@ -11,10 +11,6 @@
 <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
 <link rel="canonical" href="https://rizzo.cc/">
 <!-- /EDIT: site-meta -->
-<meta name="author" content="Frank Rizzo">
-<meta name="theme-color" content="#2c2e3d">
-<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">
-<link rel="canonical" href="https://rizzo.cc/">
 
 <!-- Open Graph -->
 <!-- EDIT: og-tags — what Slack / iMessage / Discord / Twitter show when the link is shared -->
@@ -1191,12 +1187,13 @@ footer .ver{color:var(--dim);margin-left:10px}
       <span class="rule"></span>
     </div>
 
+    <!-- EDIT: credits-tabs — auto-generated from data/credits.yml > tab_visibility. -->
     <div class="tabs" role="tablist">
       <button class="tab active" data-tab="film" role="tab">Film</button>
       <button class="tab" data-tab="tv" role="tab">TV</button>
       <button class="tab" data-tab="theater" role="tab">Theater</button>
-      <button class="tab" data-tab="commercial" role="tab">Commercial</button>
     </div>
+    <!-- /EDIT: credits-tabs -->
 
     <!-- EDIT: film-credits — to add a credit, copy any <tr> row and edit. Update the matching row in /EDIT: print-film-credits below too. Don't forget to update the JSON-LD Movie nodes.
          Title links go to IMDB. To swap the placeholder search URL for a real title page, replace the href with https://www.imdb.com/title/ttXXXXXXX/ (find the tt ID on imdb.com). -->
@@ -1241,14 +1238,6 @@ footer .ver{color:var(--dim);margin-left:10px}
     <!-- /EDIT: theater-credits -->
 
     <!-- EDIT: commercial-credits — placeholder; add real entries when conflicts allow. (Note: this section is hidden from the printed PDF resume.) -->
-    <div class="tab-panel" id="commercial">
-      <table class="credits">
-        <thead><tr><th>Title</th><th>Role</th><th>Brand</th></tr></thead>
-        <tbody>
-          <tr><td class="title" colspan="3" style="text-align:center;color:var(--muted)">Available upon request.</td></tr>
-        </tbody>
-      </table>
-    </div>
     <!-- /EDIT: commercial-credits -->
 
     <!-- Reel embed (placeholder; drop a Vimeo/YouTube embed URL when ready) -->
@@ -1414,7 +1403,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.10</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.11</span>
 </footer>
 <!-- /EDIT: footer -->
 
