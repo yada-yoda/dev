@@ -873,8 +873,17 @@ main {
   background: var(--bg-1);
   overflow-x: auto;
   padding: 0 0.5rem;
+  /* Fade out the right edge on mobile/narrow screens so users see there's
+     more content to scroll to. Subtle on desktop where all tabs usually fit. */
+  -webkit-mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
+          mask-image: linear-gradient(to right, black 0, black calc(100% - 28px), transparent 100%);
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
-.modal-tabs::-webkit-scrollbar { height: 0; display: none; }
+.modal-tabs::-webkit-scrollbar { height: 3px; }
+.modal-tabs::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+.modal-tabs::-webkit-scrollbar-track { background: transparent; }
+.modal-tabs .tab-btn { scroll-snap-align: start; }
 .tab-btn {
   padding: 0.85rem 1rem;
   background: transparent;
