@@ -52,6 +52,30 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.13 &mdash; 2026-05-23
+
+- **Section show/hide toggles in Decap.** Eight site-wide sections can
+  now be toggled on or off without losing their data. Decap &rarr;
+  Site Settings &rarr; **Sections (Show / Hide)**:
+  - About (RIZZO definition + pull quote)
+  - Profile &mdash; Bio paragraph
+  - Profile &mdash; Headshot gallery
+  - Profile &mdash; Social links
+  - Resume (panels + training)
+  - Credits (filmography tabs)
+  - Reel (Selected Work block)
+  - Contact (bottom email section)
+- New `sections:` object in `data/site.yml` holds the bool flags.
+  Build script emits a tiny `<style>` block in `<head>` with
+  `display:none !important` rules for any section toggled off &mdash;
+  renders zero-flicker because the CSS applies before body paint.
+- Section selector map lives in `.scripts/build-content.py >
+  SECTION_SELECTORS`. To make a new sub-element toggleable, add
+  `(key, css-selector)` pair there and expose it in admin/config.yml.
+- Added `id="reel-wrapper"` to the reel subsection&rsquo;s outer div so
+  the visibility toggle hides the section-head + reel together as
+  one block.
+
 ### v0.7.12 &mdash; 2026-05-23
 
 - **Theater sketch lists fit on one line in the PDF.** The longest

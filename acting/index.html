@@ -148,6 +148,12 @@
 </script>
 <!-- /EDIT: ga4 -->
 
+<!-- EDIT: section-visibility — auto-generated from data/site.yml > sections.
+     Inline CSS rules hide any section toggled off. Renders zero-flicker
+     because the rules are in <head> before the body is parsed. -->
+<!-- all sections visible -->
+<!-- /EDIT: section-visibility -->
+
 <style>
 :root{
   --bg:        #2c2e3d;
@@ -1246,7 +1252,7 @@ footer .ver{color:var(--dim);margin-left:10px}
     <!-- /EDIT: commercial-credits -->
 
     <!-- Reel embed (placeholder; drop a Vimeo/YouTube embed URL when ready) -->
-    <div style="margin-top:32px">
+    <div id="reel-wrapper" style="margin-top:32px">
       <div class="section-head" style="margin-bottom:18px">
         <span class="kicker">Reel</span>
         <h2 style="font-size:20px">Selected Work</h2>
@@ -1408,7 +1414,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.12</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.13</span>
 </footer>
 <!-- /EDIT: footer -->
 

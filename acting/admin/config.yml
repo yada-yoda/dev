@@ -95,6 +95,20 @@ collections:
                 hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
               - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
 
+          - label: "Sections (Show / Hide)"
+            name: "sections"
+            widget: "object"
+            hint: "Toggle individual sections off to temporarily hide them from the live site without losing the data. The section's YAML stays put and re-enabling the toggle brings it back instantly."
+            fields:
+              - { label: "About (RIZZO definition + pull quote)", name: "about",           widget: "boolean", default: true }
+              - { label: "Profile - Bio paragraph",               name: "profile_bio",     widget: "boolean", default: true }
+              - { label: "Profile - Headshot gallery",            name: "profile_gallery", widget: "boolean", default: true }
+              - { label: "Profile - Social links",                name: "profile_socials", widget: "boolean", default: true }
+              - { label: "Resume (Stats / Training / Skills)",    name: "resume",          widget: "boolean", default: true }
+              - { label: "Credits (Film / TV / Theater tabs)",    name: "credits",         widget: "boolean", default: true }
+              - { label: "Reel (Selected Work block)",            name: "reel",            widget: "boolean", default: true }
+              - { label: "Contact (bottom email section)",        name: "contact",         widget: "boolean", default: true }
+
   # ============ HERO ============
   - name: "hero"
     label: "Hero (Slideshow)"
