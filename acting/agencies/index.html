@@ -67,6 +67,19 @@ h1,h2,h3,h4{font-family:'Montserrat',sans-serif;letter-spacing:.02em;color:#fff}
 .card .meta-row .chip.commercial{border-color:rgba(245,158,11,.4);color:#f5c47a}
 .card .meta-row .chip.voiceover{border-color:rgba(192,132,252,.4);color:#d6a8ff}
 .card .meta-row .chip.improv{border-color:rgba(132,204,132,.4);color:#9adb9a}
+
+/* SAG-AFTRA badge — sits next to the agency name in the H3. */
+.sag-badge{
+  display:inline-block;
+  font-family:'Montserrat',sans-serif;
+  font-size:9px;font-weight:700;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:#1a1c25;background:var(--gold);
+  padding:2px 7px;border-radius:3px;
+  vertical-align:middle;
+  margin-left:6px;
+  white-space:nowrap;
+}
 .card p{color:var(--text);font-size:14.5px;margin-bottom:6px}
 .card .why{color:var(--muted);font-size:14px;font-style:italic}
 
@@ -167,7 +180,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; Top of market</div>
 
     <div class="card gold">
-      <h3>Stewart Talent <span class="focus">— full-service, est. 1981</span></h3>
+      <h3>Stewart Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service, est. 1981</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -179,7 +192,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card gold">
-      <h3>Paonessa Talent Agency <span class="focus">— full-service</span></h3>
+      <h3>Paonessa Talent Agency <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -190,7 +203,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card gold">
-      <h3>Big Mouth Talent <span class="focus">— comedy &amp; improv specialty</span></h3>
+      <h3>Big Mouth Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— comedy &amp; improv specialty</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -202,7 +215,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card gold">
-      <h3>Gray Talent Group <span class="focus">— full-service</span></h3>
+      <h3>Gray Talent Group <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -215,7 +228,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     <div class="tier-label silver" style="margin-top:30px"><span class="dot"></span>Tier 2 &mdash; Solid mid-tier</div>
 
     <div class="card silver">
-      <h3>Shirley Hamilton Talent <span class="focus">— one of the oldest in Chicago</span></h3>
+      <h3>Shirley Hamilton Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— one of the oldest in Chicago</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip voiceover">Voiceover (strong)</span>
@@ -225,7 +238,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card silver">
-      <h3>Lily&rsquo;s Talent Agency</h3>
+      <h3>Lily&rsquo;s Talent Agency <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -236,7 +249,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card silver">
-      <h3>3rd Coast Talent</h3>
+      <h3>3rd Coast Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -245,7 +258,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card silver">
-      <h3>Geddes Agency</h3>
+      <h3>Geddes Agency <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip voiceover">Voiceover</span>
         <span class="chip theatrical">Theatrical</span>
@@ -254,7 +267,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card silver">
-      <h3>Linda Jack Talent</h3>
+      <h3>Linda Jack Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip commercial">Commercial</span>
         <span class="chip theatrical">Theatrical</span>
@@ -266,7 +279,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     <div class="tier-label bronze" style="margin-top:30px"><span class="dot"></span>Tier 3 &mdash; Boutique &amp; specialty</div>
 
     <div class="card bronze">
-      <h3>NorthStar Talent</h3>
+      <h3>NorthStar Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip theatrical">Theatrical</span>
         <span class="chip commercial">Commercial</span>
@@ -275,7 +288,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card bronze">
-      <h3>Talent Group, Inc.</h3>
+      <h3>Talent Group, Inc. <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip commercial">Commercial</span>
         <span class="chip">Print</span>
@@ -284,7 +297,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
     </div>
 
     <div class="card bronze">
-      <h3>Ford Models Chicago (Wilhelmina markets sometimes named instead)</h3>
+      <h3>Ford Models Chicago (Wilhelmina markets sometimes named instead) <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span></h3>
       <div class="meta-row">
         <span class="chip commercial">Commercial</span>
         <span class="chip">Print</span>
@@ -299,6 +312,18 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
       <a href="https://www.actorsaccess.com/">Actors Access</a>, or
       <a href="https://www.sagaftra.org/contracts-industry-resources/chicago-resources">SAG-AFTRA Chicago resources</a>.
       Avoid &ldquo;agency directory&rdquo; aggregator sites &mdash; they go stale fast.
+    </div>
+
+    <div class="note" style="margin-top:14px">
+      <strong>About the <span class="sag-badge" style="margin-left:0;background:var(--gold)">SAG</span> badges:</strong>
+      All agencies above are listed as SAG-AFTRA franchised based on
+      their established standing in the Chicago market. Franchise status
+      can change. Verify any agency&rsquo;s current franchise on the
+      <a href="https://www.sagaftra.org/find-agent">SAG-AFTRA Find an Agent directory</a>
+      before assuming. As Non-Union, you can submit to both SAG and
+      non-franchised agencies; SAG status matters most once you&rsquo;re
+      eligible to join (after qualifying SAG work or via SAG-eligible
+      vouchers).
     </div>
   </section>
 
@@ -429,6 +454,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <th>Agency</th>
           <th>Tier</th>
+          <th>SAG</th>
           <th>Method</th>
           <th>Submitted</th>
           <th>Response</th>
@@ -439,6 +465,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Stewart Talent</td>
           <td>Tier 1</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -447,6 +474,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Paonessa Talent Agency</td>
           <td>Tier 1</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -455,6 +483,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Big Mouth Talent</td>
           <td>Tier 1</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -463,6 +492,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Gray Talent Group</td>
           <td>Tier 1</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -471,6 +501,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Shirley Hamilton Talent</td>
           <td>Tier 2</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -479,6 +510,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Lily&rsquo;s Talent Agency</td>
           <td>Tier 2</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -487,6 +519,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">3rd Coast Talent</td>
           <td>Tier 2</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>
@@ -495,6 +528,7 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
         <tr>
           <td class="name">Geddes Agency</td>
           <td>Tier 2</td>
+          <td>✓</td>
           <td>—</td>
           <td>—</td>
           <td>—</td>

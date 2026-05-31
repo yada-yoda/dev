@@ -52,6 +52,17 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.15 &mdash; 2026-05-23
+
+- **SAG-AFTRA badges** added to every agency card on
+  `/agencies/`. Small gold pill labeled `SAG` next to the agency
+  name. All 12 listed agencies are marked SAG-franchised based on
+  their established Chicago presence; a verification note +
+  link to the official SAG-AFTRA Find an Agent directory tells
+  the user to confirm current franchise status before assuming.
+- Tracker table gained a **SAG** column so submission tracking
+  records each agency&rsquo;s verified franchise status.
+
 ### v0.7.14 &mdash; 2026-05-23
 
 - **Private prep page** at `acting/agencies/index.html`. Served at
