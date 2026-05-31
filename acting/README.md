@@ -52,6 +52,32 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.16 &mdash; 2026-05-23
+
+- **Agencies prep page now covers 4 markets** via a tabbed interface:
+  Chicago / NYC / LA / Georgia. Tab strip at the top of the agency
+  section; JS switches panels with a tiny fade-in. Page title renamed
+  from &ldquo;Chicago Agency Submission Prep&rdquo; to
+  &ldquo;Talent Agency Submission Prep&rdquo;.
+- **NYC tab**: 5 Tier-1 majors (CAA, WME, UTA, Gersh, Paradigm),
+  7 Tier-2 mid-tier (Don Buchwald, CESD, Innovative, DGRW,
+  Henderson/Hogan, A3, Stewart NY), 4 Tier-3 boutique (Hartig-Hilepo,
+  Bret Adams, Take 3, Frontier Booking). All marked SAG-AFTRA.
+- **LA tab**: 6 Tier-1 majors (CAA, WME, UTA, Gersh, Paradigm, APA),
+  7 Tier-2 mid-tier (A3, Innovative, CESD-LA, Greene, AKA, Daniel Hoff,
+  Stone Manners Salners), 5 Tier-3 commercial-focused (Coast to Coast,
+  Commercials Unlimited, Osbrink, TGMD, Aqua). All marked SAG-AFTRA.
+- **Georgia tab**: 4 Tier-1 (Houghton, People Store, Stilwell,
+  Privilege), 3 Tier-2 (AMT, BLOC Atlanta, Aplus), 3 Tier-3 (Big Picture,
+  Madison, Hudson). Tier-3 entries explicitly flagged as
+  &ldquo;verify SAG status&rdquo; since the Atlanta market evolves
+  faster than other markets.
+- **Multi-market reality-check callout** added to caveats: explicitly
+  notes that submitting to NYC/LA/Georgia from Chicago without local
+  hire status is a longshot; lists realistic strategies (Chicago primary
+  + others secondary, self-tape reps, local-hire designation, or
+  relocate first).
+
 ### v0.7.15 &mdash; 2026-05-23
 
 - **SAG-AFTRA badges** added to every agency card on

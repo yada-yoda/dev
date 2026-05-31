@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chicago Agency Submission Prep — Private</title>
+<title>Talent Agency Submission Prep — Private</title>
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta name="referrer" content="no-referrer">
 <link rel="icon" href="../assets/favicon.ico" sizes="any">
@@ -83,6 +83,33 @@ h1,h2,h3,h4{font-family:'Montserrat',sans-serif;letter-spacing:.02em;color:#fff}
 .card p{color:var(--text);font-size:14.5px;margin-bottom:6px}
 .card .why{color:var(--muted);font-size:14px;font-style:italic}
 
+/* Market tabs — switch between Chicago / NYC / LA / Georgia agency lists */
+.market-tabs{
+  display:flex;gap:4px;background:var(--bg-2);
+  padding:5px;border-radius:999px;
+  width:max-content;max-width:100%;
+  margin:0 auto 28px;
+  border:1px solid var(--line);
+  flex-wrap:wrap;justify-content:center;
+}
+.market-tab{
+  font-family:'Montserrat',sans-serif;font-size:12px;
+  letter-spacing:.22em;text-transform:uppercase;
+  padding:9px 18px;border-radius:999px;
+  cursor:pointer;color:var(--muted);
+  border:none;background:transparent;
+  transition:all .15s ease;
+  white-space:nowrap;
+}
+.market-tab:hover{color:#fff}
+.market-tab.active{background:var(--accent);color:#0d2226;font-weight:700}
+@media (max-width:560px){
+  .market-tab{padding:7px 12px;font-size:11px;letter-spacing:.16em}
+}
+.market-panel{display:none}
+.market-panel.active{display:block;animation:marketIn .25s ease}
+@keyframes marketIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
 .tier-label{font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.32em;text-transform:uppercase;color:var(--muted);margin:20px 0 6px;display:flex;align-items:center;gap:10px}
 .tier-label .dot{width:10px;height:10px;border-radius:50%}
 .tier-label.gold .dot{background:var(--gold)}
@@ -117,8 +144,8 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
 
   <header class="hdr">
     <span class="tag">Private &middot; Unindexed &middot; Not linked publicly</span>
-    <h1>Chicago Agency Submission Prep</h1>
-    <p>Working list of Chicago talent agencies, what to submit, when to submit, and a tracking template. Maintained outside the public site so it stays personal.</p>
+    <h1>Talent Agency Submission Prep</h1>
+    <p>Working list of talent agencies across Chicago, NYC, LA, and Georgia &mdash; what to submit, when to submit, and a tracking template. Maintained outside the public site so it stays personal.</p>
     <div class="meta">Last reviewed: 2026-05-23 &middot; verify every address &amp; policy on the agency&rsquo;s own site before mailing</div>
   </header>
 
@@ -138,6 +165,21 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
       Stewart, Paonessa) actively scout the Second City pipeline.
       Mention your conservatory completion + grad revues prominently
       in your cover letter.
+    </div>
+    <div class="note">
+      <strong>Multi-market reality check.</strong> Submitting to
+      agencies in markets where you don&rsquo;t live is harder than
+      submitting locally. Without &ldquo;Local Hire&rdquo; status
+      (you cover your own travel/lodging) in NYC, LA, or Atlanta,
+      most agents won&rsquo;t consider taking you on because they
+      can&rsquo;t pitch you for last-minute auditions. Realistic
+      multi-market plays:
+      <ul style="margin-top:8px;margin-bottom:0">
+        <li><strong>Chicago primary, NYC/LA secondary</strong> &mdash; build credits locally; submit to other markets when you have something they can&rsquo;t source locally.</li>
+        <li><strong>Self-tape-only reps</strong> in remote markets &mdash; some boutique agencies will sign you for self-tape auditions only, no in-person meetings required.</li>
+        <li><strong>Local hire in additional markets</strong> &mdash; add &ldquo;Local hire in NYC&rdquo; to your resume only if you have a verifiable address / contact there.</li>
+        <li><strong>Relocate first, then submit</strong> &mdash; most actors who break in NYC/LA had moved there first. Submitting from Chicago to an LA agency is a real long shot.</li>
+      </ul>
     </div>
   </section>
 
@@ -171,25 +213,36 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
 
   <!-- ============ AGENCY LIST ============ -->
   <section class="section" id="agencies">
-    <h2><span class="num">02</span> Chicago Agencies &mdash; ranked starting points</h2>
-    <p>Grouped by reputation &amp; reach in the Chicago market. &ldquo;Most sought after&rdquo; in Chicago means: longest track record, largest client roster, biggest casting relationships, and (for improv-trained actors) closest to The Second City pipeline.</p>
+    <h2><span class="num">02</span> Agencies by market &mdash; ranked starting points</h2>
+    <p>Four markets covered: Chicago (your home base), NYC, LA, and Georgia (Atlanta). Each market has its own tier ranking based on reputation, casting relationships, and reach. Switch tabs to see each market&rsquo;s list.</p>
 
     <p style="color:var(--muted);font-size:14px;margin-top:6px">Verify each agency&rsquo;s current submission policy on their own site. Most have an &ldquo;Are you a talent?&rdquo; or &ldquo;Submissions&rdquo; page that spells out exact format, address, and any restrictions (open vs. by-referral).</p>
 
-    <!-- TIER 1 -->
-    <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; Top of market</div>
-
-    <div class="card gold">
-      <h3>Stewart Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service, est. 1981</span></h3>
-      <div class="meta-row">
-        <span class="chip theatrical">Theatrical</span>
-        <span class="chip commercial">Commercial</span>
-        <span class="chip voiceover">Voiceover</span>
-        <span class="chip">Kids</span>
-      </div>
-      <p>One of the largest agencies in Chicago. Strong reputation with both ad agencies and local film/TV casting (Chicago P.D., The Bear, Fargo, etc.). Submissions usually via email; check stewarttalent.com.</p>
-      <p class="why">Why fit: Stewart actively reps Second City &amp; improv-trained actors. Your conservatory + improv credits read in their lane.</p>
+    <div class="market-tabs" role="tablist" style="margin-top:24px">
+      <button class="market-tab active" type="button" data-market="chicago" role="tab">Chicago</button>
+      <button class="market-tab" type="button" data-market="nyc" role="tab">NYC</button>
+      <button class="market-tab" type="button" data-market="la" role="tab">LA</button>
+      <button class="market-tab" type="button" data-market="georgia" role="tab">Georgia</button>
     </div>
+
+    <!-- ============ CHICAGO PANEL ============ -->
+    <div class="market-panel active" id="market-chicago">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px"><strong style="color:#fff">Chicago</strong> &mdash; &ldquo;most sought after&rdquo; means longest track record, biggest casting relationships, and (for improv-trained actors) closest to The Second City pipeline.</p>
+
+      <!-- TIER 1 -->
+      <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; Top of market</div>
+
+      <div class="card gold">
+        <h3>Stewart Talent <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service, est. 1981</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+          <span class="chip voiceover">Voiceover</span>
+          <span class="chip">Kids</span>
+        </div>
+        <p>One of the largest agencies in Chicago. Strong reputation with both ad agencies and local film/TV casting (Chicago P.D., The Bear, Fargo, etc.). Submissions usually via email; check stewarttalent.com.</p>
+        <p class="why">Why fit: Stewart actively reps Second City &amp; improv-trained actors. Your conservatory + improv credits read in their lane.</p>
+      </div>
 
     <div class="card gold">
       <h3>Paonessa Talent Agency <span class="sag-badge" title="SAG-AFTRA franchised — verify current status">SAG</span> <span class="focus">— full-service</span></h3>
@@ -304,6 +357,451 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
       </div>
       <p>Print &amp; commercial focused. Confirm current name &amp; presence in Chicago market &mdash; some major-market models agencies have shifted Chicago footprints.</p>
     </div>
+    </div><!-- /market-chicago -->
+
+    <!-- ============ NYC PANEL ============ -->
+    <div class="market-panel" id="market-nyc">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px"><strong style="color:#fff">New York City</strong> &mdash; biggest theater market in the US, second-biggest film/TV. Top agencies represent A-list clients and are essentially closed to newcomers without major credits or referrals. Mid-tier agencies are realistic submission targets if your reel and credits hold up. Comedy/improv background reads well in NYC too &mdash; Upright Citizens Brigade is the East Coast equivalent of Second City and the pipeline is similar.</p>
+
+      <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; The Majors (longshot for non-credited talent)</div>
+
+      <div class="card gold">
+        <h3>CAA &mdash; Creative Artists Agency <span class="sag-badge">SAG</span> <span class="focus">— major / NY office</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+          <span class="chip">Literary</span>
+        </div>
+        <p>Largest agency in the world. NY office handles theater/film/TV/lit/music. By-referral effectively; submissions to junior agents only.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>WME &mdash; William Morris Endeavor <span class="sag-badge">SAG</span> <span class="focus">— major / NY office</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-tier global agency. Strong NY presence. By-referral.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>UTA &mdash; United Talent Agency <span class="sag-badge">SAG</span> <span class="focus">— major / NY office</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-three agency. NY office covers film, TV, theater, voiceover. By-referral.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Gersh Agency <span class="sag-badge">SAG</span> <span class="focus">— major / strong both coasts</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip">Literary</span>
+        </div>
+        <p>Excellent reputation across film, TV, and theater. NY office is one of the strongest theatrical departments in the city.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Paradigm Talent Agency <span class="sag-badge">SAG</span> <span class="focus">— major</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-tier full-service. NY office handles theater + film/TV.</p>
+      </div>
+
+      <div class="tier-label silver" style="margin-top:30px"><span class="dot"></span>Tier 2 &mdash; Realistic submissions for actors with reels</div>
+
+      <div class="card silver">
+        <h3>Don Buchwald &amp; Associates <span class="sag-badge">SAG</span> <span class="focus">— major theatrical, very NY</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip voiceover">Voiceover (strong)</span>
+        </div>
+        <p>Long-established NY agency. Strong theater and voiceover departments. Submissions reviewed periodically.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>CESD Talent Agency <span class="sag-badge">SAG</span> <span class="focus">— commercial &amp; voiceover heavy</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial (strong)</span>
+          <span class="chip voiceover">Voiceover</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Cunningham Escott Slevin Doherty. Dominant in commercial and voiceover; growing theatrical. Has both NY and LA offices.</p>
+        <p class="why">Why fit: commercial-heavy roster makes them more open to working with developing on-camera talent.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Innovative Artists <span class="sag-badge">SAG</span> <span class="focus">— bicoastal</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-major with both NY and LA offices. Theater &amp; film/TV roster.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>DGRW &mdash; Douglas, Gorman, Rothacker &amp; Wilhelm <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theater-strong</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Established mid-tier. Strong theater connections in NY.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Henderson/Hogan Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Boutique-to-mid with respected theater &amp; TV reputation.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>A3 Artists Agency <span class="sag-badge">SAG</span> <span class="focus">— formerly Abrams Artists</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip voiceover">Voiceover</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-major with broad rep across categories. NY and LA offices.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Stewart Talent (NY) <span class="sag-badge">SAG</span> <span class="focus">— same franchise as Chicago Stewart</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>The NY office of Stewart Talent. <strong>Cross-office referral angle</strong>: if you sign with Stewart Chicago, the NY office relationship is built-in.</p>
+        <p class="why">Why fit: realistic path is Chicago Stewart first &mdash; NY office becomes available later via referral.</p>
+      </div>
+
+      <div class="tier-label bronze" style="margin-top:30px"><span class="dot"></span>Tier 3 &mdash; Boutique &amp; specialty</div>
+
+      <div class="card bronze">
+        <h3>Hartig-Hilepo Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip">Character actors</span>
+        </div>
+        <p>Boutique. Character-actor friendly.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Bret Adams Ltd. <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theater-focused</span>
+        </div>
+        <p>Long-established theater-focused agency (writers + actors).</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Take 3 Talent <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-boutique. Open submissions periodically.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Frontier Booking International <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-tier commercial/print.</p>
+      </div>
+    </div><!-- /market-nyc -->
+
+    <!-- ============ LA PANEL ============ -->
+    <div class="market-panel" id="market-la">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px"><strong style="color:#fff">Los Angeles</strong> &mdash; entertainment capital. Top five agencies (CAA / WME / UTA / Gersh / Paradigm) are essentially closed to talent without significant credits, recognizable reels, or industry referrals. Realistic submissions for newer actors are mid-tier and commercial-focused boutiques. <strong>Reality check:</strong> most LA agents won&rsquo;t consider an actor without LA residence or willingness to relocate &mdash; in-person auditions can be same-day notice.</p>
+
+      <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; The Majors</div>
+
+      <div class="card gold">
+        <h3>CAA &mdash; Creative Artists Agency <span class="sag-badge">SAG</span> <span class="focus">— #1 globally</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+          <span class="chip">Literary</span>
+        </div>
+        <p>Largest in the world. LA HQ. By-referral.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>WME &mdash; William Morris Endeavor <span class="sag-badge">SAG</span> <span class="focus">— top-three</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-tier. LA HQ. By-referral.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>UTA &mdash; United Talent Agency <span class="sag-badge">SAG</span> <span class="focus">— top-three</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-tier. LA HQ. By-referral.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Gersh Agency <span class="sag-badge">SAG</span> <span class="focus">— major</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip">Literary</span>
+        </div>
+        <p>Excellent film/TV reputation. LA office.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Paradigm Talent Agency <span class="sag-badge">SAG</span> <span class="focus">— major</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Top-tier. LA HQ.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>APA &mdash; Agency for the Performing Arts <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip">Music</span>
+        </div>
+        <p>Major full-service. Sometimes counted in the top tier; sometimes upper-mid.</p>
+      </div>
+
+      <div class="tier-label silver" style="margin-top:30px"><span class="dot"></span>Tier 2 &mdash; Realistic submissions for talent with credits</div>
+
+      <div class="card silver">
+        <h3>A3 Artists Agency <span class="sag-badge">SAG</span> <span class="focus">— formerly Abrams Artists</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip voiceover">Voiceover</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-major. Broad rep. LA &amp; NY offices.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Innovative Artists <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-major bicoastal. Solid roster.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>CESD Talent Agency (LA) <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial (strong)</span>
+          <span class="chip voiceover">Voiceover</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>LA office of CESD. Commercial-heavy. Open to developing talent in commercial division.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Greene &amp; Associates <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Established mid-tier. LA boutique with respected theatrical roster.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>AKA Talent Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-tier theatrical.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>The Daniel Hoff Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-tier full-service. Reasonable submissions track record.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Stone Manners Salners Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-tier theatrical with long history.</p>
+      </div>
+
+      <div class="tier-label bronze" style="margin-top:30px"><span class="dot"></span>Tier 3 &mdash; Commercial-focused &amp; boutique</div>
+
+      <div class="card bronze">
+        <h3>Coast to Coast Talent <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-tier; open submissions occasionally.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Commercials Unlimited <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial (pure)</span>
+        </div>
+        <p>Pure commercial agency. Great for building commercial credits before moving to theatrical.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Osbrink Agency <span class="sag-badge">SAG</span> <span class="focus">— kids &amp; commercials</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip">Kids/Young Adults</span>
+        </div>
+        <p>Major kids agency; also commercial adults.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>TGMD Talent <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-tier boutique.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Aqua Talent Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-boutique.</p>
+      </div>
+    </div><!-- /market-la -->
+
+    <!-- ============ GEORGIA PANEL ============ -->
+    <div class="market-panel" id="market-georgia">
+      <p style="color:var(--muted);font-size:14px;margin-bottom:14px"><strong style="color:#fff">Georgia (Atlanta)</strong> &mdash; rapidly growing market thanks to Georgia&rsquo;s film tax credits. Heavy episodic TV production (Marvel/Disney/Netflix shoots, AMC, Tyler Perry Studios). Atlanta agencies often work both commercial and film/TV; some specialize in &ldquo;feature-day&rdquo; (co-star / day-player) work on the volume of productions filming there. Local hire status carries real weight in Atlanta because productions love avoiding travel costs.</p>
+
+      <div class="note" style="margin-top:0;margin-bottom:18px">
+        <strong>Limited-info caveat:</strong> the Atlanta market has
+        evolved fast since the tax credit boom. The agencies below are
+        the well-established names; verify current rosters, submission
+        policies, and that the agency still exists / hasn&rsquo;t merged
+        before mailing. <a href="https://www.sagaftra.org/find-agent">SAG-AFTRA Find an Agent</a>
+        and the Georgia film office directories are good
+        cross-references.
+      </div>
+
+      <div class="tier-label gold"><span class="dot"></span>Tier 1 &mdash; Established Atlanta majors</div>
+
+      <div class="card gold">
+        <h3>Houghton Talent <span class="sag-badge">SAG</span> <span class="focus">— established full-service</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+          <span class="chip voiceover">Voiceover</span>
+        </div>
+        <p>One of the most respected Atlanta agencies. Strong relationships with local casting offices for major studio productions filming in Georgia.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>People Store <span class="sag-badge">SAG</span> <span class="focus">— one of the biggest in Atlanta</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Large roster, heavy on film/TV casting connections. Major source of Atlanta-based talent for studio productions.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Stilwell Talent Partners <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Strong reputation. Full-service.</p>
+      </div>
+
+      <div class="card gold">
+        <h3>Privilege Talent Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Established Atlanta full-service.</p>
+      </div>
+
+      <div class="tier-label silver" style="margin-top:30px"><span class="dot"></span>Tier 2 &mdash; Solid mid-tier</div>
+
+      <div class="card silver">
+        <h3>Atlanta Models &amp; Talent (AMT) <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip">Print</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>One of the older established agencies in Atlanta. Commercial/print strong; theatrical growing.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>BLOC Atlanta <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip">Dance / Movement</span>
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Originally dance-focused; expanded to full talent. National presence with strong Atlanta office.</p>
+      </div>
+
+      <div class="card silver">
+        <h3>Aplus Talent Agency <span class="sag-badge">SAG</span></h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Mid-tier full-service.</p>
+      </div>
+
+      <div class="tier-label bronze" style="margin-top:30px"><span class="dot"></span>Tier 3 &mdash; Smaller / specialty</div>
+
+      <div class="card bronze">
+        <h3>Big Picture Casting / Talent</h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip">Background</span>
+        </div>
+        <p>More heavily background-focused; useful entry point for SAG voucher accumulation in Atlanta&rsquo;s volume-heavy market. Confirm SAG-AFTRA franchise status before assuming.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>Madison Talent Group</h3>
+        <div class="meta-row">
+          <span class="chip commercial">Commercial</span>
+          <span class="chip theatrical">Theatrical</span>
+        </div>
+        <p>Mid-tier; verify current Atlanta footprint &amp; SAG status.</p>
+      </div>
+
+      <div class="card bronze">
+        <h3>The Hudson Agency</h3>
+        <div class="meta-row">
+          <span class="chip theatrical">Theatrical</span>
+          <span class="chip commercial">Commercial</span>
+        </div>
+        <p>Boutique; verify current status &mdash; Atlanta agency landscape shifts faster than other markets.</p>
+      </div>
+    </div><!-- /market-georgia -->
 
     <div class="note" style="margin-top:24px">
       <strong>Where to confirm current details for each agency:</strong>
@@ -540,5 +1038,20 @@ table.tracker tbody td.name{color:#fff;font-weight:600}
 
   <div class="foot">Private &middot; do not share &middot; dev.rizzo.cc/acting/agencies/</div>
 </div>
+
+<script>
+  // Market tab switcher
+  document.querySelectorAll('.market-tab').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var target = btn.dataset.market;
+      document.querySelectorAll('.market-tab').forEach(function(t){
+        t.classList.toggle('active', t === btn);
+      });
+      document.querySelectorAll('.market-panel').forEach(function(p){
+        p.classList.toggle('active', p.id === 'market-' + target);
+      });
+    });
+  });
+</script>
 </body>
 </html>
