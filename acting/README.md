@@ -52,6 +52,25 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.14 &mdash; 2026-05-23
+
+- **Private prep page** at `acting/agencies/index.html`. Served at
+  `dev.rizzo.cc/acting/agencies/` (trailing slash). Not linked from
+  anywhere on the public site. Lists Chicago talent agencies grouped
+  by tier (Top / Mid / Boutique), submission materials checklist,
+  submission process (email / mail / portal), phased plan, concrete
+  week-by-week timeline, and a personal submission tracker.
+- **Search visibility hard-blocked**:
+  - `<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">`
+    on the page itself
+  - `Disallow: /agencies/` added to `acting/robots.txt`
+  - `meta name="referrer" content="no-referrer"` to keep referer
+    headers from leaking the URL when clicking outbound links
+- Page is honestly limited: agency names + tiers given with
+  confidence, specific addresses intentionally omitted because
+  industry directory info goes stale. Each agency entry tells you
+  to verify on their own site before mailing.
+
 ### v0.7.13 &mdash; 2026-05-23
 
 - **Section show/hide toggles in Decap.** Eight site-wide sections can
