@@ -52,6 +52,33 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.17 &mdash; 2026-05-23
+
+- **Pull-quote slider.** The right side of the About section
+  (&ldquo;Random Girl, 2023&rdquo; quote) now supports an arbitrary
+  number of quotes/facts. With 1 item it renders statically; with 2+
+  it auto-rotates every 7s with a left-slide transition (outgoing
+  slide moves left, incoming slides in from the right). Left side
+  (RIZZO definition) stays untouched and separate.
+  - `data/about.yml > pull_quote` (single object) renamed to
+    `pull_quotes` (list of objects). Each item has `text` +
+    optional `attribution`. Build script reads either form.
+  - Decap UI: &ldquo;Pull Quotes / Facts&rdquo; list with summary;
+    drag to reorder, click &ldquo;+ Add Quote or Fact&rdquo; to extend.
+  - Hint in Decap notes that the attribution is optional &mdash;
+    leave blank for interesting-fact entries that don&rsquo;t have a
+    quotable source.
+- **Workshop badge** added next to &ldquo;Intimacy Tools For Actors&rdquo;.
+  Generalized as a per-entry `kind` field on training entries.
+  - Renders as a small cyan pill next to the title on both screen
+    and printed resume.
+  - Decap UI: &ldquo;Kind / Badge&rdquo; free-text field on each
+    training entry. Hint suggests common values (Workshop, Class,
+    Conservatory, Showcase, Revue, Course). Leave blank for no
+    badge.
+  - On print, badge is even smaller (6pt) to fit the dense
+    one-page layout.
+
 ### v0.7.16 &mdash; 2026-05-23
 
 - **Agencies prep page now covers 4 markets** via a tabbed interface:

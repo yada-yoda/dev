@@ -12,6 +12,14 @@ definition:
     - "Not a rat from the Muppets."
     - "Not related to Betty Rizzo, leader of the \"Pink Ladies\"."
 
-pull_quote:
-  text: "I don't understand. Frank, if you can be so charismatic and so likable and get whatever you want… why don't you just go get what you want?"
-  attribution: "Random Girl, 2023"
+# Pull quotes / facts shown on the right side of the About section.
+# Add as many as you want. With 1 item it displays statically; with 2+
+# it rotates every 7 seconds with a left-slide transition. Attribution
+# is optional — leave blank for an interesting-fact entry that doesn't
+# have a quotable source.
+pull_quotes:
+  - text: "I don't understand. Frank, if you can be so charismatic and so likable and get whatever you want… why don't you just go get what you want?"
+    attribution: "Random Girl, 2023"
+  # Add more quotes or facts below over time, e.g.:
+  # - text: "Has been working on his Italian for two years."
+  #   attribution: ""

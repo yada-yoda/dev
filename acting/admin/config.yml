@@ -172,12 +172,15 @@ collections:
                 name: "entries"
                 widget: "list"
                 field: { label: "Definition line", name: "text", widget: "string" }
-          - label: "Pull Quote"
-            name: "pull_quote"
-            widget: "object"
+          - label: "Pull Quotes / Facts"
+            name: "pull_quotes"
+            widget: "list"
+            label_singular: "Quote or Fact"
+            summary: "{{fields.text}}"
+            hint: "Add as many as you want. With 1 item it displays statically; with 2 or more, they rotate every 7s in a left-slide carousel. Attribution is optional - leave blank for an interesting fact that doesn't have a source."
             fields:
-              - { label: "Quote text", name: "text", widget: "text" }
-              - { label: "Attribution", name: "attribution", widget: "string" }
+              - { label: "Quote text or fact", name: "text", widget: "text" }
+              - { label: "Attribution (optional)", name: "attribution", widget: "string", required: false, hint: "e.g. 'Random Girl, 2023'. Leave blank for facts." }
 
   # ============ CREDITS ============
   - name: "credits"
@@ -261,6 +264,11 @@ collections:
             summary: "{{fields.title}} — {{fields.school}}"
             fields:
               - { label: "Course / Show Title", name: "title", widget: "string" }
+              - label: "Kind / Badge"
+                name: "kind"
+                widget: "string"
+                required: false
+                hint: "Optional small badge shown next to the title. Common values: Workshop, Class, Conservatory, Showcase, Revue, Course. Leave blank for no badge."
               - { label: "Teacher(s)", name: "teachers", widget: "string", required: false }
               - { label: "School / Location", name: "school", widget: "string" }
 

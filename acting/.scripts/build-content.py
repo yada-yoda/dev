@@ -75,7 +75,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.16"
+SITE_VERSION = "v0.7.17"
 
 
 # ---------- helpers ----------
@@ -144,10 +144,14 @@ def gen_training_screen(training):
     for e in training["entries"]:
         sub_parts = [p for p in (e.get("teachers", ""), e.get("school", "")) if p]
         sub = " &middot; ".join(esc(p) for p in sub_parts)
+        kind = (e.get("kind") or "").strip()
+        kind_html = f'<span class="kind">{esc(kind)}</span>' if kind else ""
         lines.append(
             '          <li><span class="label">'
             + esc(e["title"])
-            + '</span><span class="sub">'
+            + '</span>'
+            + kind_html
+            + '<span class="sub">'
             + sub
             + "</span></li>"
         )
@@ -166,8 +170,10 @@ def gen_training_print(training):
     for e in training["entries"]:
         sub_parts = [p for p in (e.get("teachers", ""), e.get("school", "")) if p]
         sub = " &middot; ".join(esc(p) for p in sub_parts)
+        kind = (e.get("kind") or "").strip()
+        kind_html = f' <span class="kind">{esc(kind)}</span>' if kind else ""
         lines.append(
-            f"      <div><strong>{esc(e['title'])}</strong><em>{sub}</em></div>"
+            f"      <div><strong>{esc(e['title'])}{kind_html}</strong><em>{sub}</em></div>"
         )
     return (
         "\n  <div class=\"rs-section\">\n"
@@ -436,11 +442,37 @@ def gen_definition(about):
 
 
 def gen_pull_quote(about):
-    q = about["pull_quote"]
+    """Pull-quote slider. Supports legacy single-object (pull_quote) and
+    new list form (pull_quotes). With one item, renders static; with 2+,
+    renders as a slider that JS rotates every 7s with a left-slide
+    transition (see pullQuoteRotate in the main <script>)."""
+    items = about.get("pull_quotes")
+    if not items:
+        single = about.get("pull_quote")
+        items = [single] if single else []
+    if not items:
+        return "\n      <!-- no pull quotes configured -->\n      "
+
+    multi = len(items) > 1
+    slides_class = "pullquote-slides" + (" multi" if multi else " single")
+    slide_html = []
+    for i, q in enumerate(items):
+        active = " active" if i == 0 else ""
+        attribution = (q.get("attribution") or "").strip()
+        cite_html = (
+            f"\n            <cite>&mdash; {esc(attribution)}</cite>"
+            if attribution else ""
+        )
+        slide_html.append(
+            f'          <div class="pullquote-slide{active}">\n'
+            f'            <p>{esc(q["text"])}</p>{cite_html}\n'
+            f'          </div>'
+        )
     return (
         "\n      <div class=\"pullquote\">\n"
-        f"        <p>{esc(q['text'])}</p>\n"
-        f"        <cite>&mdash; {esc(q['attribution'])}</cite>\n"
+        f'        <div class="{slides_class}">\n'
+        + "\n".join(slide_html) + "\n"
+        "        </div>\n"
         "      </div>\n      "
     )
 

@@ -480,6 +480,30 @@ section + section{border-top:1px solid var(--line)}
   letter-spacing:.18em;text-transform:uppercase;
 }
 
+/* Pull-quote slider: with one item, renders static. With 2+, JS rotates
+   every 7s using a left-slide transition (new quote slides in from the
+   right, outgoing slides out to the left). */
+.pullquote-slides{position:relative}
+.pullquote-slides.single .pullquote-slide{position:relative;opacity:1;transform:none}
+.pullquote-slides.multi{min-height:220px}
+.pullquote-slides.multi .pullquote-slide{
+  position:absolute;top:0;left:0;right:0;
+  opacity:0;
+  transform:translateX(40px);
+  transition:opacity .55s ease, transform .65s cubic-bezier(.4,0,.2,1);
+  pointer-events:none;
+}
+.pullquote-slides.multi .pullquote-slide.active{
+  opacity:1;
+  transform:translateX(0);
+  pointer-events:auto;
+}
+.pullquote-slides.multi .pullquote-slide.leaving{
+  opacity:0;
+  transform:translateX(-40px);
+}
+@media (max-width:840px){.pullquote-slides.multi{min-height:260px}}
+
 /* ------- Profile card ------- */
 .profile{
   display:grid;grid-template-columns:280px 1fr;gap:36px;align-items:start;
@@ -584,6 +608,18 @@ section + section{border-top:1px solid var(--line)}
 .panel ul li:last-child{border-bottom:none}
 .panel .label{color:var(--accent);font-weight:600;margin-right:6px}
 .panel .sub{color:var(--dim);font-size:13px;display:block;margin-top:2px}
+.panel .kind{
+  display:inline-block;
+  font-family:'Montserrat',sans-serif;
+  font-size:9px;font-weight:700;
+  letter-spacing:.14em;text-transform:uppercase;
+  padding:2px 7px;border-radius:3px;
+  background:rgba(0,188,212,.15);
+  color:var(--accent);
+  vertical-align:middle;
+  white-space:nowrap;
+  margin-left:2px;
+}
 .panel p{font-size:14.5px;color:#dde0e8}
 
 .col-3{grid-column:span 3}
@@ -880,6 +916,17 @@ footer .ver{color:var(--dim);margin-left:10px}
   }
   .rs-training-list strong{color:#2c2e3d;display:block;font-size:8.5pt}
   .rs-training-list em{color:#666;font-style:normal;font-size:7.5pt;display:block;margin-left:0;line-height:1.2}
+  .rs-training-list .kind{
+    display:inline-block;
+    font-family:'Montserrat',sans-serif;
+    font-size:6pt;font-weight:700;
+    letter-spacing:.1em;text-transform:uppercase;
+    padding:1px 4px;border-radius:2px;
+    background:rgba(0,188,212,.18);
+    color:#00697a;
+    vertical-align:middle;
+    margin-left:3px;
+  }
 
   .rs-foot{
     margin-top:5px;padding-top:4px;
@@ -999,8 +1046,12 @@ footer .ver{color:var(--dim);margin-left:10px}
 
       <!-- EDIT: pull-quote — the "Random Girl, 2023" quote on the right side of the About section -->
       <div class="pullquote">
-        <p>I don't understand. Frank, if you can be so charismatic and so likable and get whatever you want… why don't you just go get what you want?</p>
-        <cite>&mdash; Random Girl, 2023</cite>
+        <div class="pullquote-slides single">
+          <div class="pullquote-slide active">
+            <p>I don't understand. Frank, if you can be so charismatic and so likable and get whatever you want… why don't you just go get what you want?</p>
+            <cite>&mdash; Random Girl, 2023</cite>
+          </div>
+        </div>
       </div>
       <!-- /EDIT: pull-quote -->
     </div>
@@ -1131,7 +1182,7 @@ footer .ver{color:var(--dim);margin-left:10px}
         <ul>
           <li><span class="label">Grad Revue II</span><span class="sub">Jeffrey Bouthiette &middot; The Second City</span></li>
           <li><span class="label">Grad Revue I</span><span class="sub">Brian Morrow &middot; The Second City</span></li>
-          <li><span class="label">Intimacy Tools For Actors</span><span class="sub">Sydney Rene Cox &middot; Acting Studio Chicago</span></li>
+          <li><span class="label">Intimacy Tools For Actors</span><span class="kind">Workshop</span><span class="sub">Sydney Rene Cox &middot; Acting Studio Chicago</span></li>
           <li><span class="label">On Camera I</span><span class="sub">Sarah Charipar &middot; Acting Studio Chicago</span></li>
           <li><span class="label">Conservatory I–III</span><span class="sub">Corey Bradberry, Dee Ryan, Sam Super &middot; The Second City</span></li>
           <li><span class="label">Improv I–V</span><span class="sub">Mo Phillips-Spotts, Mari DeOleo, Maya Haughton, Aram Rayzian, Mark Czokse &middot; The Second City</span></li>
@@ -1362,7 +1413,7 @@ footer .ver{color:var(--dim);margin-left:10px}
     <div class="rs-training-list">
       <div><strong>Grad Revue II</strong><em>Jeffrey Bouthiette &middot; The Second City</em></div>
       <div><strong>Grad Revue I</strong><em>Brian Morrow &middot; The Second City</em></div>
-      <div><strong>Intimacy Tools For Actors</strong><em>Sydney Rene Cox &middot; Acting Studio Chicago</em></div>
+      <div><strong>Intimacy Tools For Actors <span class="kind">Workshop</span></strong><em>Sydney Rene Cox &middot; Acting Studio Chicago</em></div>
       <div><strong>On Camera I</strong><em>Sarah Charipar &middot; Acting Studio Chicago</em></div>
       <div><strong>Conservatory I–III</strong><em>Corey Bradberry, Dee Ryan, Sam Super &middot; The Second City</em></div>
       <div><strong>Improv I–V</strong><em>Mo Phillips-Spotts, Mari DeOleo, Maya Haughton, Aram Rayzian, Mark Czokse &middot; The Second City</em></div>
@@ -1414,7 +1465,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.16</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.17</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1550,6 +1601,29 @@ footer .ver{color:var(--dim);margin-left:10px}
       updateVolumeVisibility();
       scheduleAdvance();
     }));
+  })();
+
+  // Pull-quote slider: with 2+ quotes, rotate every 7s. Outgoing slide
+  // moves to the left while the incoming slide fades in from the right.
+  // Single-item case is rendered statically by the build script and
+  // doesn't enter this loop.
+  (function pullQuoteRotate(){
+    const slidesEl = document.querySelector('.pullquote-slides.multi');
+    if (!slidesEl) return;
+    const slides = slidesEl.querySelectorAll('.pullquote-slide');
+    if (slides.length < 2) return;
+    let i = 0;
+    setInterval(() => {
+      const cur = slides[i];
+      i = (i + 1) % slides.length;
+      const next = slides[i];
+      cur.classList.add('leaving');
+      cur.classList.remove('active');
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        next.classList.add('active');
+      }));
+      setTimeout(() => cur.classList.remove('leaving'), 700);
+    }, 7000);
   })();
 
   // Headshot gallery: clicking a thumbnail swaps it into the main headshot.
