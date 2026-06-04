@@ -168,6 +168,14 @@ collections:
               - { label: "Word", name: "word", widget: "string" }
               - { label: "Part of speech", name: "part_of_speech", widget: "string" }
               - { label: "Pronunciation", name: "pronunciation", widget: "string" }
+              - label: "Pronunciation audio (optional)"
+                name: "pronunciation_audio"
+                widget: "file"
+                required: false
+                media_folder: "/acting/assets/audio"
+                public_folder: "/acting/assets/audio"
+                hint: "Upload an MP3 or WAV of the name being spoken. A speaker icon appears next to Pronunciation on the live site - clicking it plays this audio. Leave blank to use the browser's built-in voice (it will say the text below)."
+              - { label: "Spoken text (fallback for browser voice)", name: "speak_text", widget: "string", required: false, default: "Rizzo", hint: "If no audio file is uploaded above, the browser's text-to-speech voice will say this word when the speaker icon is clicked." }
               - label: "Entries"
                 name: "entries"
                 widget: "list"

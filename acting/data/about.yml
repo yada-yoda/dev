@@ -5,6 +5,11 @@ definition:
   word: "RIZZO"
   part_of_speech: "proper noun"
   pronunciation: "ri·zzo  [/r IH — z oh/]"
+  # Optional MP3/WAV of the name being spoken. Click the speaker icon on
+  # the live site to play. If empty, the browser's built-in Web Speech
+  # voice falls back to pronouncing the word from the 'speak_text' below.
+  pronunciation_audio: ""
+  speak_text: "Rizzo"
   entries:
     - "A surname of Italian origin, often denoting a familial or ancestral lineage."
     - "Not a Jerky Boy."

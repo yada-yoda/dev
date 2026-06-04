@@ -79,7 +79,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.22"
+SITE_VERSION = "v0.7.23"
 
 
 # ---------- helpers ----------
@@ -462,10 +462,35 @@ def gen_hero_quotes(hero):
 def gen_definition(about):
     d = about["definition"]
     items = "\n".join(f"          <li>{esc(e)}</li>" for e in d["entries"])
+
+    # Speaker button next to Pronunciation. Uses an uploaded audio file
+    # when set; otherwise falls back to the browser's SpeechSynthesis
+    # voice speaking 'speak_text'. The audio-lines SVG matches the
+    # Lucide icon set so it stylistically fits the training badges.
+    audio_src = (d.get("pronunciation_audio") or "").strip()
+    speak_text = (d.get("speak_text") or d.get("word") or "").strip()
+    speaker_svg = (
+        '<svg viewBox="0 0 24 24" aria-hidden="true">'
+        '<line x1="2" x2="2" y1="10" y2="14"/>'
+        '<line x1="6" x2="6" y1="6" y2="18"/>'
+        '<line x1="10" x2="10" y1="9" y2="15"/>'
+        '<line x1="14" x2="14" y1="6" y2="18"/>'
+        '<line x1="18" x2="18" y1="11" y2="13"/>'
+        '<line x1="22" x2="22" y1="10" y2="14"/>'
+        '</svg>'
+    )
+    speaker_btn = (
+        '<button class="pron-play" type="button"'
+        ' aria-label="Hear pronunciation"'
+        f' data-audio="{esc(audio_src)}"'
+        f' data-text="{esc(speak_text)}">'
+        f'{speaker_svg}</button>'
+    )
+
     return (
         "\n      <div class=\"def\">\n"
         f'        <h3>{esc(d["word"])} <small style="color:var(--muted);font-size:14px;font-weight:400">({esc(d["part_of_speech"])})</small></h3>\n'
-        f'        <div class="pron">Pronunciation: {esc(d["pronunciation"])}</div>\n'
+        f'        <div class="pron">Pronunciation: {esc(d["pronunciation"])} {speaker_btn}</div>\n'
         "        <ol>\n"
         + items + "\n"
         "        </ol>\n"

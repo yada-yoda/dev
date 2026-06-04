@@ -449,7 +449,39 @@ section + section{border-top:1px solid var(--line)}
 .def .pron{
   margin-top:6px;color:var(--muted);
   font-family:'Source Sans 3',sans-serif;font-style:italic;font-size:15px;
+  display:flex;align-items:center;gap:6px;flex-wrap:wrap;
 }
+.def .pron-play{
+  display:inline-flex;align-items:center;justify-content:center;
+  background:transparent;border:0;padding:3px 5px;
+  color:var(--accent);cursor:pointer;border-radius:4px;
+  transition:background .15s ease, transform .1s ease;
+}
+.def .pron-play:hover{background:rgba(0,188,212,.15)}
+.def .pron-play:active{transform:translateY(1px)}
+.def .pron-play:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.def .pron-play svg{
+  width:18px;height:18px;
+  stroke:currentColor;stroke-width:2.2;
+  fill:none;stroke-linecap:round;stroke-linejoin:round;
+  display:block;
+}
+.def .pron-play.playing svg line{animation:pron-bars 0.9s ease-in-out infinite}
+.def .pron-play.playing svg line:nth-child(1){animation-delay:.0s}
+.def .pron-play.playing svg line:nth-child(2){animation-delay:.15s}
+.def .pron-play.playing svg line:nth-child(3){animation-delay:.30s}
+.def .pron-play.playing svg line:nth-child(4){animation-delay:.05s}
+.def .pron-play.playing svg line:nth-child(5){animation-delay:.20s}
+.def .pron-play.playing svg line:nth-child(6){animation-delay:.10s}
+@keyframes pron-bars{
+  0%,100%{transform:scaleY(1);transform-origin:center}
+  50%{transform:scaleY(.55);transform-origin:center}
+}
+@media (prefers-reduced-motion: reduce){
+  .def .pron-play.playing svg line{animation:none}
+}
+/* Hide the speaker button when printing the resume */
+@media print{ .def .pron-play{display:none} }
 .def ol{
   margin-top:22px;list-style:decimal;padding-left:22px;
   color:var(--text);
@@ -1047,7 +1079,7 @@ footer .ver{color:var(--dim);margin-left:10px}
       <!-- EDIT: rizzo-definition — the dictionary-style "Not a Jerky Boy" disambiguation list. Add/remove <li> rows. -->
       <div class="def">
         <h3>RIZZO <small style="color:var(--muted);font-size:14px;font-weight:400">(proper noun)</small></h3>
-        <div class="pron">Pronunciation: ri·zzo  [/r IH — z oh/]</div>
+        <div class="pron">Pronunciation: ri·zzo  [/r IH — z oh/] <button class="pron-play" type="button" aria-label="Hear pronunciation" data-audio="" data-text="Rizzo"><svg viewBox="0 0 24 24" aria-hidden="true"><line x1="2" x2="2" y1="10" y2="14"/><line x1="6" x2="6" y1="6" y2="18"/><line x1="10" x2="10" y1="9" y2="15"/><line x1="14" x2="14" y1="6" y2="18"/><line x1="18" x2="18" y1="11" y2="13"/><line x1="22" x2="22" y1="10" y2="14"/></svg></button></div>
         <ol>
           <li>A surname of Italian origin, often denoting a familial or ancestral lineage.</li>
           <li>Not a Jerky Boy.</li>
@@ -1481,7 +1513,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.22</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.23</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1640,6 +1672,47 @@ footer .ver{color:var(--dim);margin-left:10px}
       }));
       setTimeout(() => cur.classList.remove('leaving'), 700);
     }, 7000);
+  })();
+
+  // Pronunciation speaker: clicking the speaker icon next to "Pronunciation"
+  // plays the uploaded audio file (if any), or falls back to the browser's
+  // SpeechSynthesis voice speaking the configured text. .playing class
+  // animates the equalizer bars during playback.
+  (function pronunciationSpeaker(){
+    const btn = document.querySelector('.def .pron-play');
+    if (!btn) return;
+    let audio = null;
+    const audioSrc = btn.dataset.audio || '';
+    const speakText = btn.dataset.text || '';
+
+    function setPlaying(on){ btn.classList.toggle('playing', !!on); }
+    function stopAll(){
+      if (audio){ try{ audio.pause(); audio.currentTime = 0; }catch(_){ } }
+      if (window.speechSynthesis){ try{ speechSynthesis.cancel(); }catch(_){ } }
+      setPlaying(false);
+    }
+
+    btn.addEventListener('click', () => {
+      // Toggle off if currently playing
+      if (btn.classList.contains('playing')){ stopAll(); return; }
+
+      if (audioSrc) {
+        if (!audio){ audio = new Audio(audioSrc); }
+        audio.currentTime = 0;
+        setPlaying(true);
+        audio.onended = () => setPlaying(false);
+        audio.onerror = () => setPlaying(false);
+        audio.play().catch(() => setPlaying(false));
+      } else if (window.speechSynthesis && speakText) {
+        speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(speakText);
+        u.rate = 0.92; u.pitch = 1.0;
+        u.onend = () => setPlaying(false);
+        u.onerror = () => setPlaying(false);
+        setPlaying(true);
+        speechSynthesis.speak(u);
+      }
+    });
   })();
 
   // Headshot gallery: clicking a thumbnail swaps it into the main headshot.
