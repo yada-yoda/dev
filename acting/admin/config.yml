@@ -216,6 +216,29 @@ collections:
               - { label: "Show Theater tab",    name: "theater",    widget: "boolean", default: true }
               - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
 
+      - file: "acting/data/theater-footnotes.yml"
+        label: "Theater Footnotes & Strict Mode"
+        name: "theater_footnotes"
+        fields:
+          - label: "Strict Mode (drop stage names, show parent company)"
+            name: "strict_mode"
+            widget: "boolean"
+            default: false
+            hint: "When ON, each Theater venue cell is replaced with the matching footnote's 'short' text (the parent company, e.g. 'The Second City') and the footnote list at the bottom is hidden. Use this for agency theatrical submissions that follow the strict 'producing company only' resume convention. Stage detail is preserved in the data — Strict Mode is purely a render toggle, you can flip back any time."
+          - label: "Footnote definitions"
+            name: "footnotes"
+            widget: "list"
+            label_singular: "Footnote"
+            summary: "{{fields.marker}} → {{fields.long}}"
+            hint: "Each row defines what a footnote marker means. Only markers used by at least one theater entry will actually render. To add a new marker (say ** for 'Workshop production'), add a row here and set that marker on the relevant entries."
+            fields:
+              - label: "Marker"
+                name: "marker"
+                widget: "string"
+                hint: "The symbol used on theater entries — *, **, †, ‡, ¹, ², ³, etc."
+              - { label: "Long form (footnote text)", name: "long", widget: "string", hint: "The full text shown at the bottom of the Theater section, e.g. 'The Second City Training Center, Chicago'." }
+              - { label: "Short form (Strict Mode replacement)", name: "short", widget: "string", hint: "Used when Strict Mode is ON — replaces the stage name in the venue cell. Keep it short to fit the column, e.g. 'The Second City'." }
+
       - file: "acting/data/film.yml"
         label: "Film"
         name: "film"
@@ -262,13 +285,28 @@ collections:
             name: "entries"
             widget: "list"
             label_singular: "Theater credit"
-            summary: "{{fields.production}} — {{fields.venue}}"
+            summary: "{{fields.production}} — {{fields.venue}}{{fields.footnote}}"
             add_to_top: true
-            hint: "All theater currently at The Second City Training Center, Chicago. New entries pre-fill with Ensemble + Judy's Beat Lounge — your most common combo. Trim or change before saving."
+            hint: "All current entries are at Second City stages and use the * footnote. For a non-Second City credit, set Footnote marker to '— None —' and the entry won't be covered by the * footnote."
             fields:
               - { label: "Production", name: "production", widget: "string" }
               - { label: "Role / Sketches", name: "role", widget: "string", default: "Ensemble", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
-              - { label: "Stage / Venue", name: "venue", widget: "string", default: "New Judy's Beat Lounge", hint: "Just the specific stage name (e.g. Donny's Skybox, New Judy's Beat Lounge, De Maat Studio)" }
+              - { label: "Stage / Venue", name: "venue", widget: "string", default: "New Judy's Beat Lounge", hint: "Just the specific stage name (e.g. Donny's Skybox, New Judy's Beat Lounge, De Maat Studio). For non-Second City credits, enter the actual venue name." }
+              - label: "Footnote marker"
+                name: "footnote"
+                widget: "select"
+                required: false
+                default: "*"
+                hint: "Marks this venue with a superscript symbol. The matching footnote text at the bottom of the Theater section is set in Credits > Theater Footnotes & Strict Mode. Pick '— None —' for credits that don't need a footnote."
+                options:
+                  - { label: "— None —",            value: "" }
+                  - { label: "* (asterisk)",        value: "*" }
+                  - { label: "** (double asterisk)", value: "**" }
+                  - { label: "† (dagger)",          value: "†" }
+                  - { label: "‡ (double dagger)",   value: "‡" }
+                  - { label: "¹ (superscript 1)",   value: "¹" }
+                  - { label: "² (superscript 2)",   value: "²" }
+                  - { label: "³ (superscript 3)",   value: "³" }
 
       - file: "acting/data/commercial.yml"
         label: "Commercial"

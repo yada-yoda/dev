@@ -101,7 +101,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.27"
+SITE_VERSION = "v0.7.28"
 
 
 # ---------- helpers ----------
@@ -373,19 +373,69 @@ def gen_tv_print(tv):
     )
 
 
-def gen_theater_screen(theater, is_active=False):
-    cls = "tab-panel active" if is_active else "tab-panel"
+def _theater_resolve(theater, footnotes_doc):
+    """Returns (rows, active_footnotes) where each row is a dict of resolved
+    cell values, and active_footnotes is the list of {marker, long} pairs
+    whose marker appears on at least one entry."""
+    strict = bool(footnotes_doc.get("strict_mode", False))
+    notes = footnotes_doc.get("footnotes") or []
+    by_marker = {(n.get("marker") or ""): n for n in notes}
+
     rows = []
+    used_markers = []
     for t in theater:
+        marker = (t.get("footnote") or "").strip()
+        if strict and marker and marker in by_marker:
+            # Strict Mode: swap venue for the footnote's short form
+            venue_text = by_marker[marker].get("short") or t["venue"]
+            venue_marker = ""
+        else:
+            venue_text = t["venue"]
+            venue_marker = marker if marker in by_marker else ""
+        if venue_marker and venue_marker not in used_markers:
+            used_markers.append(venue_marker)
+        rows.append({
+            "production": t["production"],
+            "role": t["role"],
+            "venue": venue_text,
+            "marker": venue_marker,
+        })
+
+    active_footnotes = [] if strict else [
+        {"marker": m, "long": by_marker[m].get("long", "")} for m in used_markers
+    ]
+    return rows, active_footnotes
+
+
+def gen_theater_screen(theater, footnotes_doc, is_active=False):
+    cls = "tab-panel active" if is_active else "tab-panel"
+    resolved, active_footnotes = _theater_resolve(theater, footnotes_doc)
+    rows = []
+    for t in resolved:
         role_cell = (
             f'Sketches: <span style="color:var(--muted);font-weight:400">{esc(t["role"])}</span>'
             if "," in t["role"]
             else esc(t["role"])
         )
+        marker_html = (
+            f'<sup class="venue-mark">{esc(t["marker"])}</sup>'
+            if t["marker"] else ""
+        )
         rows.append(
             f'          <tr><td class="title">{esc(t["production"])}</td>'
             f'<td class="role">{role_cell}</td>'
-            f'<td class="dir">{esc(t["venue"])}<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>'
+            f'<td class="dir">{esc(t["venue"])}{marker_html}</td></tr>'
+        )
+    foot_html = ""
+    if active_footnotes:
+        items = "\n".join(
+            f'        <li><span class="m">{esc(n["marker"])}</span> {esc(n["long"])}</li>'
+            for n in active_footnotes
+        )
+        foot_html = (
+            '\n      <ul class="theater-footnotes">\n'
+            + items
+            + "\n      </ul>"
         )
     return (
         f'\n    <div class="{cls}" id="theater">\n'
@@ -394,8 +444,9 @@ def gen_theater_screen(theater, is_active=False):
         "        <tbody>\n"
         + "\n".join(rows)
         + "\n        </tbody>\n"
-        "      </table>\n"
-        "    </div>\n    "
+        "      </table>"
+        + foot_html
+        + "\n    </div>\n    "
     )
 
 
@@ -427,22 +478,39 @@ def gen_commercial_screen(commercial, is_active=False):
     )
 
 
-def gen_theater_print(theater):
+def gen_theater_print(theater, footnotes_doc):
+    resolved, active_footnotes = _theater_resolve(theater, footnotes_doc)
     rows = []
-    for t in theater:
+    for t in resolved:
+        marker_html = (
+            f'<sup>{esc(t["marker"])}</sup>' if t["marker"] else ""
+        )
         rows.append(
             f'      <tr><td class="t">{esc(t["production"])}</td>'
             f'<td class="r">{esc(t["role"])}</td>'
-            f'<td class="d">{esc(t["venue"])}</td></tr>'
+            f'<td class="d">{esc(t["venue"])}{marker_html}</td></tr>'
         )
+
+    foot_html = ""
+    if active_footnotes:
+        lines = [
+            f'<span class="rs-theater-foot-row"><span class="m">{esc(n["marker"])}</span> {esc(n["long"])}</span>'
+            for n in active_footnotes
+        ]
+        foot_html = (
+            '\n    <p class="rs-theater-foot">'
+            + " &nbsp; ".join(lines)
+            + "</p>"
+        )
+
     return (
         "\n  <div class=\"rs-section\">\n"
         "    <h2>Theater &middot; Sketch / Improv</h2>\n"
-        "    <div class=\"rs-theater-note\">All shows at The Second City Training Center, Chicago.</div>\n"
         "    <table class=\"rs-table rs-theater\">\n"
         + "\n".join(rows)
-        + "\n    </table>\n"
-        "  </div>\n  "
+        + "\n    </table>"
+        + foot_html
+        + "\n  </div>\n  "
     )
 
 
@@ -932,12 +1000,14 @@ def main():
 
     # ---- Credits ----------------------------------------------------
     tabs_doc = _load_obj(DATA / "credits-tabs.yml")
+    theater_footnotes_doc = _load_obj(DATA / "theater-footnotes.yml")
     credits = {
         "film": _load_list(DATA / "film.yml"),
         "tv": _load_list(DATA / "tv.yml"),
         "theater": _load_list(DATA / "theater.yml"),
         "commercial": _load_list(DATA / "commercial.yml"),
         "tab_visibility": tabs_doc.get("tabs") or {},
+        "theater_footnotes": theater_footnotes_doc,
     }
 
     # ---- Stats / Skills / Influences -------------------------------
@@ -1007,7 +1077,7 @@ def main():
     html = replace_block(html, "tv-credits",
                          panel_or_hidden("tv", gen_tv_screen, credits["tv"]))
     html = replace_block(html, "theater-credits",
-                         panel_or_hidden("theater", gen_theater_screen, credits["theater"]))
+                         panel_or_hidden("theater", gen_theater_screen, credits["theater"], credits["theater_footnotes"]))
     html = replace_block(html, "commercial-credits",
                          panel_or_hidden("commercial", gen_commercial_screen, credits.get("commercial", [])))
 
@@ -1015,7 +1085,7 @@ def main():
     # (Commercial is intentionally omitted from print).
     html = replace_block(html, "print-film-credits", gen_film_print(credits["film"]))
     html = replace_block(html, "print-tv-credits", gen_tv_print(credits["tv"]))
-    html = replace_block(html, "print-theater-credits", gen_theater_print(credits["theater"]))
+    html = replace_block(html, "print-theater-credits", gen_theater_print(credits["theater"], credits["theater_footnotes"]))
 
     # Hero
     html = replace_block(html, "hero-slides", gen_hero_slides(hero))

@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Credit Tabs Transition Preview — Private</title>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<link rel="icon" href="../assets/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1f212e;
+  --bg-2:#171823;
+  --card:#2c2e3d;
+  --card-2:#252738;
+  --line:rgba(255,255,255,.10);
+  --text:#e7e9ef;
+  --muted:#a8acba;
+  --dim:#6e7282;
+  --accent:#00bcd4;
+  --radius:6px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:'Montserrat',sans-serif;color:#fff}
+
+.wrap{max-width:1080px;margin:0 auto;padding:48px 24px 96px}
+.hdr{padding-bottom:28px;border-bottom:1px solid var(--line);margin-bottom:36px}
+.hdr .tag{display:inline-block;font-family:'Montserrat',sans-serif;font-size:10px;letter-spacing:.32em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:4px 10px;border-radius:999px;margin-bottom:14px}
+.hdr h1{font-size:30px;font-weight:900;letter-spacing:.02em;margin-bottom:8px}
+.hdr p{color:var(--muted);max-width:680px}
+
+.section{margin:48px 0}
+.section h2{font-size:20px;letter-spacing:.04em;text-transform:uppercase;margin-bottom:6px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.section h2 .num{color:var(--accent);font-weight:300;margin-right:8px}
+.section .lede{color:var(--muted);font-size:14.5px;margin-bottom:18px}
+
+.note{background:var(--bg-2);border-left:3px solid var(--accent);padding:14px 18px;margin:18px 0;border-radius:4px;font-size:14px;color:var(--muted)}
+.note strong{color:#fff}
+
+/* ============== Shared tab demo styles ============== */
+/* These mirror the live site's tabs CSS so the previews look the way
+   the real site would after we make the change. */
+.demo{
+  background:#1a1c28;border:1px solid var(--line);border-radius:10px;
+  padding:28px 24px;margin-bottom:10px;
+}
+.tabs-demo{
+  display:flex;gap:4px;background:var(--card-2);
+  padding:6px;border-radius:30px;
+  width:max-content;max-width:100%;
+  margin:0 auto 20px;
+  border:1px solid var(--line);
+  position:relative;
+}
+.tab-btn{
+  font-family:'Montserrat',sans-serif;font-size:12px;
+  letter-spacing:.22em;text-transform:uppercase;
+  padding:10px 22px;border-radius:999px;
+  cursor:pointer;color:var(--muted);
+  border:none;background:transparent;
+  white-space:nowrap;
+  position:relative;z-index:2;
+  transition:color .25s ease;
+}
+.tab-btn:hover{color:#fff}
+.tab-btn.active{color:#0d2226;font-weight:700}
+
+.panels-wrap{position:relative}
+.panel-demo{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:18px 22px;
+}
+.panel-demo h4{font-family:'Montserrat',sans-serif;font-size:11px;letter-spacing:.24em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.panel-demo ul{list-style:none;padding:0;margin:0}
+.panel-demo li{
+  padding:8px 0;border-bottom:1px dashed var(--line);font-size:14px;
+  display:flex;justify-content:space-between;gap:12px;
+}
+.panel-demo li:last-child{border-bottom:none}
+.panel-demo li b{color:#fff;font-weight:600}
+.panel-demo li em{color:var(--accent);font-style:normal}
+.panel-demo li span{color:var(--muted);font-size:13px}
+
+/* ===========================================================
+   OPTION 1 — Crossfade + min-height
+   - Old panel fades out, new panel fades in, brief overlap
+   - Container has min-height so total page height doesn't jump
+=========================================================== */
+.opt1 .tab-btn.active{background:var(--accent)}
+.opt1 .panels-wrap{min-height:280px}
+.opt1 .panel-demo{
+  position:absolute;inset:0;
+  opacity:0;pointer-events:none;
+  transition:opacity .25s ease;
+}
+.opt1 .panel-demo.active{opacity:1;pointer-events:auto;position:relative}
+.opt1 .panel-demo.leaving{
+  opacity:0;position:absolute;inset:0;pointer-events:none;
+}
+
+/* ===========================================================
+   OPTION 2 — Sliding indicator pill
+   - The cyan tab background SLIDES between tabs instead of
+     instantly jumping (uses a single absolutely-positioned pill
+     that tracks the active tab via inline style)
+   - Panels still hard-cut but indicator animation gives the
+     eye something to follow
+=========================================================== */
+.opt2 .tabs-demo .indicator{
+  position:absolute;top:6px;left:6px;
+  height:calc(100% - 12px);
+  background:var(--accent);
+  border-radius:999px;
+  z-index:1;
+  transition:left .35s cubic-bezier(.4,0,.2,1), width .35s cubic-bezier(.4,0,.2,1);
+}
+.opt2 .tab-btn.active{background:transparent}
+.opt2 .panel-demo{display:none}
+.opt2 .panel-demo.active{display:block}
+
+/* ===========================================================
+   OPTION 3 — Sliding indicator + crossfade (combined)
+   - Best of both: indicator animates between tabs AND the
+     panels crossfade so nothing hard-cuts. Recommended.
+=========================================================== */
+.opt3 .tabs-demo .indicator{
+  position:absolute;top:6px;left:6px;
+  height:calc(100% - 12px);
+  background:var(--accent);
+  border-radius:999px;
+  z-index:1;
+  transition:left .35s cubic-bezier(.4,0,.2,1), width .35s cubic-bezier(.4,0,.2,1);
+}
+.opt3 .tab-btn.active{background:transparent}
+.opt3 .panels-wrap{min-height:280px;position:relative}
+.opt3 .panel-demo{
+  position:absolute;inset:0;
+  opacity:0;pointer-events:none;
+  transition:opacity .3s ease;
+}
+.opt3 .panel-demo.active{opacity:1;pointer-events:auto;position:relative}
+.opt3 .panel-demo.leaving{
+  opacity:0;position:absolute;inset:0;pointer-events:none;
+}
+
+/* ===========================================================
+   OPTION 4 — Current behavior (for comparison)
+   - Hard cut between panels, slidein keyframe on entry
+=========================================================== */
+.opt4 .tab-btn.active{background:var(--accent)}
+.opt4 .panel-demo{display:none}
+.opt4 .panel-demo.active{
+  display:block;
+  animation:slideincurrent .25s ease;
+}
+@keyframes slideincurrent{
+  from{opacity:0;transform:translateY(6px)}
+  to{opacity:1;transform:none}
+}
+
+@media (prefers-reduced-motion: reduce){
+  .opt1 .panel-demo,.opt3 .panel-demo{transition:none}
+  .opt2 .tabs-demo .indicator,.opt3 .tabs-demo .indicator{transition:none}
+  .opt4 .panel-demo.active{animation:none}
+}
+
+.foot{margin-top:60px;padding-top:18px;border-top:1px solid var(--line);text-align:center;font-size:12px;color:var(--dim);font-family:'Montserrat',sans-serif;letter-spacing:.2em;text-transform:uppercase}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hdr">
+    <span class="tag">Private &middot; Decision preview</span>
+    <h1>Credit Tab Transitions</h1>
+    <p>Four ways to handle the Film / TV / Theater / Commercial tab switching on the Selected Credits section. Click between tabs in each demo to feel the motion. Pick one and Claude ships it on the live site.</p>
+  </header>
+
+  <!-- ============ OPTION 3 (recommended first since it's the combined best) ============ -->
+  <section class="section">
+    <h2><span class="num">3</span> Sliding indicator <em style="font-style:normal">+</em> crossfade <em style="color:var(--accent);font-size:14px;text-transform:none;letter-spacing:.04em;font-style:normal;margin-left:6px">(recommended)</em></h2>
+    <p class="lede">Combines both effects. The cyan tab pill slides between buttons so your eye can track it; panels crossfade so nothing hard-cuts. Container is fixed-height so the page below doesn't shift.</p>
+    <div class="demo opt3" data-demo="opt3">
+      <div class="tabs-demo">
+        <span class="indicator"></span>
+        <button class="tab-btn active">Film</button>
+        <button class="tab-btn">TV</button>
+        <button class="tab-btn">Theater</button>
+        <button class="tab-btn">Commercial</button>
+      </div>
+      <div class="panels-wrap">
+        <div class="panel-demo active" data-panel="0">
+          <h4>Film</h4>
+          <ul>
+            <li><b>El Frío Silencio</b> <span>Feature, 2027</span><em>Homeowner</em></li>
+            <li><b>Waiter Boys</b> <span>Short, 2025</span><em>Randy</em></li>
+            <li><b>Deadly Domicile</b> <span>Short, 2024</span><em>Mike</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="1">
+          <h4>Television</h4>
+          <ul>
+            <li><b>Deli Boys</b> <span>S01 · Hulu</span><em>Stand-in for Shahjehan Khan</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="2">
+          <h4>Theater · Sketch / Improv</h4>
+          <ul>
+            <li><b>Grad Revue II Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+            <li><b>Conservatory III Show</b> <span>Judy's Beat Lounge*</span><em>Ensemble</em></li>
+            <li><b>Improv V Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="3">
+          <h4>Commercial</h4>
+          <ul><li><b style="color:var(--muted);font-style:italic">Available upon request.</b></li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OPTION 1 ============ -->
+  <section class="section">
+    <h2><span class="num">1</span> Crossfade only</h2>
+    <p class="lede">Tabs hard-snap (cyan pill jumps instantly), but panels crossfade. Subtle, easy on the eyes.</p>
+    <div class="demo opt1" data-demo="opt1">
+      <div class="tabs-demo">
+        <button class="tab-btn active">Film</button>
+        <button class="tab-btn">TV</button>
+        <button class="tab-btn">Theater</button>
+        <button class="tab-btn">Commercial</button>
+      </div>
+      <div class="panels-wrap">
+        <div class="panel-demo active" data-panel="0">
+          <h4>Film</h4>
+          <ul>
+            <li><b>El Frío Silencio</b> <span>Feature, 2027</span><em>Homeowner</em></li>
+            <li><b>Waiter Boys</b> <span>Short, 2025</span><em>Randy</em></li>
+            <li><b>Deadly Domicile</b> <span>Short, 2024</span><em>Mike</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="1">
+          <h4>Television</h4>
+          <ul><li><b>Deli Boys</b> <span>S01 · Hulu</span><em>Stand-in for Shahjehan Khan</em></li></ul>
+        </div>
+        <div class="panel-demo" data-panel="2">
+          <h4>Theater · Sketch / Improv</h4>
+          <ul>
+            <li><b>Grad Revue II Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+            <li><b>Conservatory III Show</b> <span>Judy's Beat Lounge*</span><em>Ensemble</em></li>
+            <li><b>Improv V Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="3">
+          <h4>Commercial</h4>
+          <ul><li><b style="color:var(--muted);font-style:italic">Available upon request.</b></li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OPTION 2 ============ -->
+  <section class="section">
+    <h2><span class="num">2</span> Sliding indicator only</h2>
+    <p class="lede">The cyan tab pill slides between buttons (visually smooth), but the content panel still hard-cuts. Minimal change.</p>
+    <div class="demo opt2" data-demo="opt2">
+      <div class="tabs-demo">
+        <span class="indicator"></span>
+        <button class="tab-btn active">Film</button>
+        <button class="tab-btn">TV</button>
+        <button class="tab-btn">Theater</button>
+        <button class="tab-btn">Commercial</button>
+      </div>
+      <div class="panels-wrap">
+        <div class="panel-demo active" data-panel="0">
+          <h4>Film</h4>
+          <ul>
+            <li><b>El Frío Silencio</b> <span>Feature, 2027</span><em>Homeowner</em></li>
+            <li><b>Waiter Boys</b> <span>Short, 2025</span><em>Randy</em></li>
+            <li><b>Deadly Domicile</b> <span>Short, 2024</span><em>Mike</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="1">
+          <h4>Television</h4>
+          <ul><li><b>Deli Boys</b> <span>S01 · Hulu</span><em>Stand-in for Shahjehan Khan</em></li></ul>
+        </div>
+        <div class="panel-demo" data-panel="2">
+          <h4>Theater · Sketch / Improv</h4>
+          <ul>
+            <li><b>Grad Revue II Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+            <li><b>Conservatory III Show</b> <span>Judy's Beat Lounge*</span><em>Ensemble</em></li>
+            <li><b>Improv V Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="3">
+          <h4>Commercial</h4>
+          <ul><li><b style="color:var(--muted);font-style:italic">Available upon request.</b></li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ OPTION 4 (current, for comparison) ============ -->
+  <section class="section">
+    <h2><span class="num">4</span> Current behavior (for comparison)</h2>
+    <p class="lede">What's there today — tabs hard-snap, panel slides in from below 6px with a fade-in. Container reflows when panel height changes.</p>
+    <div class="demo opt4" data-demo="opt4">
+      <div class="tabs-demo">
+        <button class="tab-btn active">Film</button>
+        <button class="tab-btn">TV</button>
+        <button class="tab-btn">Theater</button>
+        <button class="tab-btn">Commercial</button>
+      </div>
+      <div class="panels-wrap">
+        <div class="panel-demo active" data-panel="0">
+          <h4>Film</h4>
+          <ul>
+            <li><b>El Frío Silencio</b> <span>Feature, 2027</span><em>Homeowner</em></li>
+            <li><b>Waiter Boys</b> <span>Short, 2025</span><em>Randy</em></li>
+            <li><b>Deadly Domicile</b> <span>Short, 2024</span><em>Mike</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="1">
+          <h4>Television</h4>
+          <ul><li><b>Deli Boys</b> <span>S01 · Hulu</span><em>Stand-in for Shahjehan Khan</em></li></ul>
+        </div>
+        <div class="panel-demo" data-panel="2">
+          <h4>Theater · Sketch / Improv</h4>
+          <ul>
+            <li><b>Grad Revue II Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+            <li><b>Conservatory III Show</b> <span>Judy's Beat Lounge*</span><em>Ensemble</em></li>
+            <li><b>Improv V Show</b> <span>Donny's Skybox*</span><em>Ensemble</em></li>
+          </ul>
+        </div>
+        <div class="panel-demo" data-panel="3">
+          <h4>Commercial</h4>
+          <ul><li><b style="color:var(--muted);font-style:italic">Available upon request.</b></li></ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2><span class="num">·</span> How to pick</h2>
+    <div class="note">
+      Tell Claude: <strong>"go 1"</strong> / <strong>"go 2"</strong> / <strong>"go 3"</strong>. Option 3 is the recommendation — it solves the layout jump AND gives the tab transition a connected feel. Option 1 is the most conservative if you'd rather keep the tab pill behavior identical.
+    </div>
+  </section>
+
+  <div class="foot">Private &middot; preview only &middot; dev.rizzo.cc/acting/preview-tabs/</div>
+</div>
+
+<script>
+// Wire each demo independently. The pattern is the same: clicking a tab
+// updates .active on the buttons and panels, and (for opts 2 + 3) moves
+// the sliding indicator pill to the new tab's position.
+document.querySelectorAll('.demo').forEach(demo => {
+  const buttons = demo.querySelectorAll('.tab-btn');
+  const panels = demo.querySelectorAll('.panel-demo');
+  const indicator = demo.querySelector('.tabs-demo .indicator');
+
+  function setActive(idx, animate){
+    buttons.forEach((b,i) => b.classList.toggle('active', i === idx));
+    if (indicator) moveIndicator(idx, animate);
+
+    panels.forEach((p,i) => {
+      if (i === idx){
+        p.classList.remove('leaving');
+        // Force a tick so the transition runs
+        requestAnimationFrame(() => p.classList.add('active'));
+      } else {
+        if (p.classList.contains('active')){
+          p.classList.add('leaving');
+          p.classList.remove('active');
+          setTimeout(() => p.classList.remove('leaving'), 350);
+        }
+      }
+    });
+  }
+
+  function moveIndicator(idx, animate){
+    if (!indicator) return;
+    const btn = buttons[idx];
+    if (!btn) return;
+    const tabs = demo.querySelector('.tabs-demo');
+    const tabsRect = tabs.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    const left = btnRect.left - tabsRect.left;
+    const width = btnRect.width;
+    if (!animate){
+      const prev = indicator.style.transition;
+      indicator.style.transition = 'none';
+      indicator.style.left = left + 'px';
+      indicator.style.width = width + 'px';
+      // Force reflow then restore
+      void indicator.offsetWidth;
+      indicator.style.transition = prev;
+    } else {
+      indicator.style.left = left + 'px';
+      indicator.style.width = width + 'px';
+    }
+  }
+
+  buttons.forEach((b,i) => b.addEventListener('click', () => setActive(i, true)));
+
+  // Position indicator initially without animation
+  setTimeout(() => moveIndicator(0, false), 0);
+  // Re-position on window resize
+  window.addEventListener('resize', () => {
+    const activeIdx = Array.from(buttons).findIndex(b => b.classList.contains('active'));
+    moveIndicator(activeIdx >= 0 ? activeIdx : 0, false);
+  });
+});
+</script>
+</body>
+</html>

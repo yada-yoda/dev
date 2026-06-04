@@ -1,0 +1,24 @@
+# Theater footnote markers + Strict Mode toggle.
+# Each Theater entry in data/theater.yml can carry a "footnote" marker
+# (e.g. "*", "**", "†", "¹"). For each marker that's actually used by
+# at least one entry, the matching footnote text below is rendered at
+# the bottom of the Theater section on both the live site and the PDF.
+#
+# To add a NEW footnote (say, for a "Workshop production" marker):
+#   1. Add a row to the footnotes list below with marker + long + short.
+#   2. Set that marker on the relevant theater entries.
+# The footnote at the bottom only appears for markers in active use.
+#
+# Strict Mode (industry-strict resume convention): when ON, each entry's
+# venue cell is replaced with the matching footnote's "short" text (the
+# parent venue / producing company), and the bottom footnote list is
+# hidden. Use this for agency theatrical submissions that prefer the
+# "producing company only" convention. Stage detail is preserved in the
+# YAML — Strict Mode is purely a render toggle, doesn't lose data.
+
+strict_mode: false
+
+footnotes:
+  - marker: "*"
+    long: "The Second City Training Center, Chicago"
+    short: "The Second City"

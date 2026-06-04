@@ -682,7 +682,7 @@ section + section{border-top:1px solid var(--line)}
   .col-3,.col-4,.col-6,.col-8{grid-column:span 12}
 }
 
-/* ------- Filmography tabs ------- */
+/* ------- Selected Credits tabs ------- */
 .tabs{
   display:flex;gap:4px;background:var(--card-2);
   padding:6px;border-radius:30px;
@@ -743,6 +743,25 @@ table.credits td.dir{color:var(--muted);font-size:13px}
 table.credits td.dir .venue-sub{
   display:block;color:var(--dim);font-size:11px;
   margin-top:2px;letter-spacing:.02em;font-style:italic;
+}
+table.credits td.dir .venue-mark{
+  color:var(--accent);font-weight:700;font-size:10px;
+  margin-left:1px;vertical-align:super;line-height:0;
+  letter-spacing:0;
+}
+.theater-footnotes{
+  list-style:none;padding:8px 18px 4px;margin:0;
+  background:var(--card-2);
+  border-top:1px solid var(--line);
+  border-radius:0 0 var(--radius) var(--radius);
+  font-family:'Source Sans 3',sans-serif;
+  font-size:11.5px;color:var(--dim);font-style:italic;
+  letter-spacing:.02em;line-height:1.45;
+}
+.theater-footnotes li{padding:0}
+.theater-footnotes .m{
+  color:var(--accent);font-weight:700;font-style:normal;
+  font-family:'Montserrat',sans-serif;margin-right:4px;
 }
 @media (max-width:640px){
   table.credits th:nth-child(3),table.credits td:nth-child(3){display:none}
@@ -921,6 +940,22 @@ footer .ver{color:var(--dim);margin-left:10px}
   .rs-theater-note{
     font-size:6.5pt;color:#888;font-style:italic;
     margin:0 0 3px 0;letter-spacing:.02em;
+  }
+  /* Footnote markers next to venue cells. Superscript, accent color, bold. */
+  .rs-table td.d sup{
+    font-size:7pt;font-style:normal;color:#00697a;font-weight:700;
+    margin-left:1px;vertical-align:super;line-height:0;
+  }
+  /* Footnote text at the bottom of the Theater section. Mirrors the
+     old rs-theater-note styling but lives below the table. */
+  .rs-theater-foot{
+    font-size:6.5pt;color:#888;font-style:italic;
+    margin:3px 0 0 0;letter-spacing:.02em;
+    padding-top:2px;border-top:1px dotted #ddd;
+  }
+  .rs-theater-foot .m{
+    color:#00697a;font-weight:700;font-style:normal;
+    font-family:'Montserrat',sans-serif;margin-right:2px;
   }
   /* Unified column widths across Film / TV / Theater so the Role
      column starts at the same X across all three sections. The right
@@ -1299,7 +1334,7 @@ footer .ver{color:var(--dim);margin-left:10px}
   <div class="wrap">
     <div class="section-head">
       <span class="kicker">03 &mdash; Credits</span>
-      <h2>Filmography</h2>
+      <h2>Selected Credits</h2>
       <span class="rule"></span>
     </div>
 
@@ -1341,16 +1376,19 @@ footer .ver{color:var(--dim);margin-left:10px}
       <table class="credits">
         <thead><tr><th>Production</th><th>Role / Sketches</th><th>Stage</th></tr></thead>
         <tbody>
-          <tr><td class="title">Grad Revue II Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Grad Revue I Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Conservatory III Show</td><td class="role">Ensemble</td><td class="dir">New Judy's Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Conservatory II Show</td><td class="role">Ensemble</td><td class="dir">New Judy's Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Conservatory I Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</span></td><td class="dir">New Judy's Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Improv V Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Acting III Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</span></td><td class="dir">Judy's Beat Lounge<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
-          <tr><td class="title">Improv IV Show</td><td class="role">Ensemble</td><td class="dir">De Maat Studio<span class="venue-sub">The Second City Training Center, Chicago</span></td></tr>
+          <tr><td class="title">Grad Revue II Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Grad Revue I Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Conservatory III Show</td><td class="role">Ensemble</td><td class="dir">New Judy's Beat Lounge<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Conservatory II Show</td><td class="role">Ensemble</td><td class="dir">New Judy's Beat Lounge<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Conservatory I Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</span></td><td class="dir">New Judy's Beat Lounge<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Improv V Show</td><td class="role">Ensemble</td><td class="dir">Donny's Skybox<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Acting III Show</td><td class="role">Sketches: <span style="color:var(--muted);font-weight:400">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</span></td><td class="dir">Judy's Beat Lounge<sup class="venue-mark">*</sup></td></tr>
+          <tr><td class="title">Improv IV Show</td><td class="role">Ensemble</td><td class="dir">De Maat Studio<sup class="venue-mark">*</sup></td></tr>
         </tbody>
       </table>
+      <ul class="theater-footnotes">
+        <li><span class="m">*</span> The Second City Training Center, Chicago</li>
+      </ul>
     </div>
     <!-- /EDIT: theater-credits -->
 
@@ -1448,17 +1486,17 @@ footer .ver{color:var(--dim);margin-left:10px}
   <!-- EDIT: print-theater-credits — printed PDF version of the Theater table. Mirror /EDIT: theater-credits above. -->
   <div class="rs-section">
     <h2>Theater &middot; Sketch / Improv</h2>
-    <div class="rs-theater-note">All shows at The Second City Training Center, Chicago.</div>
     <table class="rs-table rs-theater">
-      <tr><td class="t">Grad Revue II Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox</td></tr>
-      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox</td></tr>
-      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge</td></tr>
-      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge</td></tr>
-      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy's Beat Lounge</td></tr>
-      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox</td></tr>
-      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy's Beat Lounge</td></tr>
-      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio</td></tr>
+      <tr><td class="t">Grad Revue II Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox<sup>*</sup></td></tr>
+      <tr><td class="t">Grad Revue I Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox<sup>*</sup></td></tr>
+      <tr><td class="t">Conservatory III Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge<sup>*</sup></td></tr>
+      <tr><td class="t">Conservatory II Show</td><td class="r">Ensemble</td><td class="d">New Judy's Beat Lounge<sup>*</sup></td></tr>
+      <tr><td class="t">Conservatory I Show</td><td class="r">Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki</td><td class="d">New Judy's Beat Lounge<sup>*</sup></td></tr>
+      <tr><td class="t">Improv V Show</td><td class="r">Ensemble</td><td class="d">Donny's Skybox<sup>*</sup></td></tr>
+      <tr><td class="t">Acting III Show</td><td class="r">Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears</td><td class="d">Judy's Beat Lounge<sup>*</sup></td></tr>
+      <tr><td class="t">Improv IV Show</td><td class="r">Ensemble</td><td class="d">De Maat Studio<sup>*</sup></td></tr>
     </table>
+    <p class="rs-theater-foot"><span class="rs-theater-foot-row"><span class="m">*</span> The Second City Training Center, Chicago</span></p>
   </div>
   <!-- /EDIT: print-theater-credits -->
 
@@ -1521,7 +1559,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.27</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.28</span>
 </footer>
 <!-- /EDIT: footer -->
 

@@ -1,25 +1,44 @@
+# Theater credits — edited via Decap CMS at /acting/admin/.
+# Newest credits go at the TOP of the list.
+#
+# Each entry can have an optional "footnote" marker (*, **, †, ‡, ¹, ², ³, ...)
+# The marker renders as superscript next to the venue, and the matching
+# footnote text appears at the bottom of the Theater section. Markers
+# and their meanings live in data/theater-footnotes.yml.
+# Strict Mode (in theater-footnotes.yml) swaps the venue cell for the
+# parent venue name and hides the footnote — for agency submissions
+# that follow the strict "producing company only" resume convention.
+
 entries:
-  - role: Ensemble
-    venue: Donny's Skybox
-    production: Grad Revue II Show
-  - production: Grad Revue I Show
-    role: Ensemble
-    venue: Donny's Skybox
-  - production: Conservatory III Show
-    role: Ensemble
-    venue: New Judy's Beat Lounge
-  - production: Conservatory II Show
-    role: Ensemble
-    venue: New Judy's Beat Lounge
-  - production: Conservatory I Show
-    role: Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki
-    venue: New Judy's Beat Lounge
-  - production: Improv V Show
-    role: Ensemble
-    venue: Donny's Skybox
-  - production: Acting III Show
-    role: Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears
-    venue: Judy's Beat Lounge
-  - production: Improv IV Show
-    role: Ensemble
-    venue: De Maat Studio
+  - production: "Grad Revue II Show"
+    role: "Ensemble"
+    venue: "Donny's Skybox"
+    footnote: "*"
+  - production: "Grad Revue I Show"
+    role: "Ensemble"
+    venue: "Donny's Skybox"
+    footnote: "*"
+  - production: "Conservatory III Show"
+    role: "Ensemble"
+    venue: "New Judy's Beat Lounge"
+    footnote: "*"
+  - production: "Conservatory II Show"
+    role: "Ensemble"
+    venue: "New Judy's Beat Lounge"
+    footnote: "*"
+  - production: "Conservatory I Show"
+    role: "Goodbye Kitty, Jesus Says, Declaration, First Love, Party @ 30, Rikki"
+    venue: "New Judy's Beat Lounge"
+    footnote: "*"
+  - production: "Improv V Show"
+    role: "Ensemble"
+    venue: "Donny's Skybox"
+    footnote: "*"
+  - production: "Acting III Show"
+    role: "Black Mollies, Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears"
+    venue: "Judy's Beat Lounge"
+    footnote: "*"
+  - production: "Improv IV Show"
+    role: "Ensemble"
+    venue: "De Maat Studio"
+    footnote: "*"

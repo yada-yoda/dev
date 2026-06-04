@@ -57,7 +57,7 @@ Allow: /
 User-agent: *
 Disallow: /agencies/
 Disallow: /agencies
-Disallow: /preview-theater/
-Disallow: /preview-theater
+Disallow: /preview-tabs/
+Disallow: /preview-tabs
 
 Sitemap: https://rizzo.cc/sitemap.xml
