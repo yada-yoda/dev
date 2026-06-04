@@ -53,9 +53,11 @@ Allow: /
 User-agent: Bytespider
 Allow: /
 
-# Private prep page — not linked publicly, kept out of search indexes.
+# Private pages — not linked publicly, kept out of search indexes.
 User-agent: *
 Disallow: /agencies/
 Disallow: /agencies
+Disallow: /preview-badges/
+Disallow: /preview-badges
 
 Sitemap: https://rizzo.cc/sitemap.xml
