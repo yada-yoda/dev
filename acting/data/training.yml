@@ -1,37 +1,36 @@
-# Training — edited via Decap CMS at /acting/admin/.
-# Newest classes go at the TOP. Build script regenerates both the
-# screen panel and the printed resume training section.
-#
-# Each entry can have an optional `kind` field that renders as a
-# small badge next to the title. Common values: Workshop, Class,
-# Conservatory, Showcase, Revue, Course. Leave blank for no badge.
-
 entries:
-  - title: "Grad Revue II"
-    teachers: "Jeffrey Bouthiette"
-    school: "The Second City"
-  - title: "Grad Revue I"
-    teachers: "Brian Morrow"
-    school: "The Second City"
-  - title: "Intimacy Tools For Actors"
-    kind: "Workshop"
-    teachers: "Sydney Rene Cox"
-    school: "Acting Studio Chicago"
-  - title: "On Camera I"
-    teachers: "Sarah Charipar"
-    school: "Acting Studio Chicago"
-  - title: "Conservatory I–III"
-    teachers: "Corey Bradberry, Dee Ryan, Sam Super"
-    school: "The Second City"
-  - title: "Improv I–V"
-    teachers: "Mo Phillips-Spotts, Mari DeOleo, Maya Haughton, Aram Rayzian, Mark Czokse"
-    school: "The Second City"
-  - title: "Acting I–III"
-    teachers: "Michael Pieper, Emily Anderson, Dee Ryan"
-    school: "The Second City"
-  - title: "Vocal Coaching"
-    teachers: "Amanda Murphy"
-    school: "Chicago, IL"
-  - title: "B.B.A."
+  - title: Grad Revue II
+    teachers: Jeffrey Bouthiette
+    school: The Second City
+    kind: Revue
+  - title: Grad Revue I
+    teachers: Brian Morrow
+    school: The Second City
+    kind: Revue
+  - title: Intimacy Tools For Actors
+    kind: Workshop
+    teachers: Sydney Rene Cox
+    school: Acting Studio Chicago
+  - title: On Camera I
+    teachers: Sarah Charipar
+    school: Acting Studio Chicago
+    kind: Class
+  - title: Conservatory I–III
+    teachers: Corey Bradberry, Dee Ryan, Sam Super
+    school: The Second City
+    kind: Conservatory
+  - title: Improv I–V
+    teachers: Mo Phillips-Spotts, Mari DeOleo, Maya Haughton, Aram Rayzian, Mark Czokse
+    school: The Second City
+    kind: Class
+  - title: Acting I–III
+    teachers: Michael Pieper, Emily Anderson, Dee Ryan
+    school: The Second City
+    kind: Class
+  - title: Vocal Coaching
+    teachers: Amanda Murphy
+    school: Chicago, IL
+    kind: Coaching
+  - title: B.B.A.
     teachers: ""
-    school: "Saint Xavier University, Chicago, IL"
+    school: Saint Xavier University, Chicago, IL
