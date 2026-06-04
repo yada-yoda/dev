@@ -6,11 +6,12 @@ the structured files in data/. Run from the acting/ root:
 
 Inputs:
   data/bio.md          — bio paragraph (with optional front-matter)
-  data/film.yml        — film credits  (entries:)
-  data/tv.yml          — tv credits    (entries:)
-  data/theater.yml     — theater credits (entries:)
-  data/commercial.yml  — commercial credits (entries:)
-  data/training.yml    — training entries
+  data/film.yml         — film credits     (entries:)
+  data/tv.yml           — tv credits       (entries:)
+  data/theater.yml      — theater credits  (entries:)
+  data/commercial.yml   — commercial credits (entries:)
+  data/credits-tabs.yml — credit tab show/hide toggles (tabs:)
+  data/training.yml     — training entries
   data/hero.yml        — hero slideshow (paired image + 2-line quote per slide)
   data/about.yml       — RIZZO definition list + pull quote
   data/panels.yml      — physical, languages, measurements, licensing, skills, favorite_films, inspirations
@@ -28,7 +29,7 @@ Updates these EDIT-marked blocks in index.html (and only these):
   EDIT: theater-credits       ← from data/theater.yml
   EDIT: print-theater-credits ← from data/theater.yml
   EDIT: commercial-credits    ← from data/commercial.yml
-  EDIT: credits-tabs          ← from data/site.yml (credits_tabs)
+  EDIT: credits-tabs          ← from data/credits-tabs.yml (tabs)
   EDIT: hero-slides           ← from data/hero.yml
   EDIT: hero-quotes           ← from data/hero.yml
   EDIT: rizzo-definition      ← from data/about.yml
@@ -78,7 +79,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.21"
+SITE_VERSION = "v0.7.22"
 
 
 # ---------- helpers ----------
@@ -870,14 +871,16 @@ def _load_list(path):
 def main():
     # Credits are split into four files: film.yml, tv.yml, theater.yml,
     # commercial.yml. The Decap Credits collection exposes each as a
-    # separate entry. tab_visibility lives in site.yml under credits_tabs.
+    # separate entry. tab_visibility lives in its own credits-tabs.yml file
+    # so it appears as a 5th entry under the Credits collection in Decap.
     site = yaml.safe_load((DATA / "site.yml").read_text(encoding="utf-8"))
+    tabs_doc = yaml.safe_load((DATA / "credits-tabs.yml").read_text(encoding="utf-8")) or {}
     credits = {
         "film": _load_list(DATA / "film.yml"),
         "tv": _load_list(DATA / "tv.yml"),
         "theater": _load_list(DATA / "theater.yml"),
         "commercial": _load_list(DATA / "commercial.yml"),
-        "tab_visibility": site.get("credits_tabs") or {},
+        "tab_visibility": tabs_doc.get("tabs") or {},
     }
     training = yaml.safe_load((DATA / "training.yml").read_text(encoding="utf-8"))
     hero = yaml.safe_load((DATA / "hero.yml").read_text(encoding="utf-8"))

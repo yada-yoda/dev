@@ -1,0 +1,11 @@
+# Credits tab visibility — edited via Decap CMS at /acting/admin/.
+# Toggle which credit tabs appear on the website. Hidden tabs disappear
+# entirely (no empty placeholder). The first visible tab opens by default.
+# The printed PDF resume always omits the Commercial section regardless
+# of this setting.
+
+tabs:
+  film: true
+  tv: true
+  theater: true
+  commercial: false

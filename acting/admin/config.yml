@@ -95,16 +95,6 @@ collections:
                 hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
               - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
 
-          - label: "Credits Tabs (Show / Hide)"
-            name: "credits_tabs"
-            widget: "object"
-            hint: "Toggle which credit tabs appear on the website. Hidden tabs disappear entirely (no empty placeholder). The first visible tab opens by default."
-            fields:
-              - { label: "Show Film tab",       name: "film",       widget: "boolean", default: true }
-              - { label: "Show TV tab",         name: "tv",         widget: "boolean", default: true }
-              - { label: "Show Theater tab",    name: "theater",    widget: "boolean", default: true }
-              - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
-
           - label: "Sections (Show / Hide)"
             name: "sections"
             widget: "object"
@@ -195,11 +185,25 @@ collections:
   # ============ CREDITS ============
   # Each credit type is its own file so clicking Credits in the sidebar
   # shows Film / TV / Theater / Commercial as separate entries.
-  # Tab visibility lives in Site Settings > Credits Tabs.
+  # A fifth "Tab Visibility" entry holds the show/hide toggles for each tab.
   - name: "credits"
     label: "Credits"
-    description: "Film, TV, Theater, Commercial credits. Newest at the top. Click an entry to edit just that credit type."
+    description: "Film, TV, Theater, Commercial credits. Newest at the top. Click an entry to edit just that credit type. Tab Visibility controls which tabs show on the live site."
     files:
+      - file: "acting/data/credits-tabs.yml"
+        label: "Tab Visibility (Show / Hide)"
+        name: "credits_tabs"
+        fields:
+          - label: "Tabs"
+            name: "tabs"
+            widget: "object"
+            hint: "Toggle which credit tabs appear on the website. Hidden tabs disappear entirely (no empty placeholder). The first visible tab opens by default. The printed PDF resume always omits Commercial regardless."
+            fields:
+              - { label: "Show Film tab",       name: "film",       widget: "boolean", default: true }
+              - { label: "Show TV tab",         name: "tv",         widget: "boolean", default: true }
+              - { label: "Show Theater tab",    name: "theater",    widget: "boolean", default: true }
+              - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
+
       - file: "acting/data/film.yml"
         label: "Film"
         name: "film"
