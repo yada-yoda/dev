@@ -266,9 +266,21 @@ collections:
               - { label: "Course / Show Title", name: "title", widget: "string" }
               - label: "Kind / Badge"
                 name: "kind"
-                widget: "string"
+                widget: "select"
                 required: false
-                hint: "Optional small badge shown next to the title. Common values: Workshop, Class, Conservatory, Showcase, Revue, Course. Leave blank for no badge."
+                default: ""
+                hint: "Optional small badge shown next to the title. Pick None for no badge. To add a value not listed here, edit acting/admin/config.yml > training > kind > options."
+                options:
+                  - { label: "— None —",      value: "" }
+                  - { label: "Workshop",      value: "Workshop" }
+                  - { label: "Class",         value: "Class" }
+                  - { label: "Intensive",     value: "Intensive" }
+                  - { label: "Masterclass",   value: "Masterclass" }
+                  - { label: "Conservatory",  value: "Conservatory" }
+                  - { label: "Showcase",      value: "Showcase" }
+                  - { label: "Revue",         value: "Revue" }
+                  - { label: "Coaching",      value: "Coaching" }
+                  - { label: "Course",        value: "Course" }
               - { label: "Teacher(s)", name: "teachers", widget: "string", required: false }
               - { label: "School / Location", name: "school", widget: "string" }
 

@@ -52,6 +52,19 @@ URL or the OG layout.
 
 ## Changelog
 
+### v0.7.18 &mdash; 2026-05-23
+
+- **Training Kind / Badge field** in Decap converted from free-text
+  string to a dropdown (`select` widget). Picking from the list
+  prevents typos and inconsistent labels across entries. Options:
+  Workshop &middot; Class &middot; Intensive &middot; Masterclass
+  &middot; Conservatory &middot; Showcase &middot; Revue
+  &middot; Coaching &middot; Course &middot; plus a &ldquo;None&rdquo;
+  option for entries that shouldn&rsquo;t carry a badge.
+- To add a value not listed (rare), edit the `options:` array in
+  `acting/admin/config.yml > training > kind` and push. Build
+  script needs no changes &mdash; the field still produces a string.
+
 ### v0.7.17 &mdash; 2026-05-23
 
 - **Pull-quote slider.** The right side of the About section
