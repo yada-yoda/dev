@@ -904,7 +904,7 @@ footer .ver{color:var(--dim);margin-left:10px}
     margin-bottom:0;
   }
 
-  .rs-section{margin-bottom:5px;break-inside:avoid;page-break-inside:avoid}
+  .rs-section{margin-bottom:8px;break-inside:avoid;page-break-inside:avoid}
   .rs-section h2{
     font-family:'Montserrat',sans-serif;font-weight:700;
     font-size:9pt;letter-spacing:.24em;text-transform:uppercase;
@@ -915,31 +915,32 @@ footer .ver{color:var(--dim);margin-left:10px}
     font-size:6.5pt;color:#888;font-style:italic;
     margin:0 0 3px 0;letter-spacing:.02em;
   }
-  .rs-table{width:100%;border-collapse:collapse}
+  /* Unified column widths across Film / TV / Theater so the Role
+     column starts at the same X across all three sections. The right
+     column already aligns to the page edge. Long Theater sketch
+     lists wrap to 2 lines (still cleaner than the previous misaligned
+     look). Table-layout:fixed locks the columns so longer roles
+     can't expand and bump the right column out of alignment. */
+  .rs-table{width:100%;border-collapse:collapse;table-layout:fixed}
   .rs-table td{
-    padding:1px 6px 1px 0;
+    padding:1.5px 6px 1.5px 0;
     vertical-align:top;
     font-size:8.5pt;
   }
-  .rs-table td.t{font-weight:700;color:#000;width:42%}
-  .rs-table td.r{color:#00697a;width:28%}
-  .rs-table td.d{color:#555;font-style:italic;width:30%;font-size:8.5pt}
+  .rs-table td.t{font-weight:700;color:#000;width:32%}
+  .rs-table td.r{color:#00697a;width:38%}
+  .rs-table td.d{color:#555;font-style:italic;width:30%;font-size:8.5pt;text-align:right}
   .rs-table td.d .rs-venue-sub{
     display:block;color:#999;font-size:7pt;font-style:italic;
     margin-top:1px;line-height:1.2;
   }
   .rs-table td.span3{font-style:italic;color:#555}
 
-  /* Theater table has shorter production names + longer sketch lists,
-     so it needs different column proportions than Film/TV.
-     Role column gets the bulk of the width + a slightly smaller font
-     so the longest sketch lists ("Goodbye Kitty, Jesus Says,
-     Declaration, First Love, Party @ 30, Rikki" / "Black Mollies,
-     Superlatives, Bad Boys, Rabbit Hole, Capt. Apathy, Bears") fit
-     on a single line. */
-  .rs-table.rs-theater td.t{width:22%}
-  .rs-table.rs-theater td.r{width:55%;font-size:8pt;letter-spacing:-0.005em}
-  .rs-table.rs-theater td.d{width:23%}
+  /* Theater: same column widths as Film/TV, but Role gets a slightly
+     smaller font + tighter letter-spacing so the long sketch lists
+     ("Goodbye Kitty, Jesus Says, Declaration..." / "Black Mollies,
+     Superlatives, Bad Boys...") fit in fewer lines. */
+  .rs-table.rs-theater td.r{font-size:8pt;letter-spacing:-0.005em;line-height:1.2}
 
   .rs-skills-list{font-size:8pt;line-height:1.25}
   .rs-training-list{
@@ -1513,7 +1514,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.24</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.25</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1706,7 +1707,10 @@ footer .ver{color:var(--dim);margin-left:10px}
       } else if (window.speechSynthesis && speakText) {
         speechSynthesis.cancel();
         const u = new SpeechSynthesisUtterance(speakText);
-        u.rate = 0.92; u.pitch = 1.0;
+        // 0.82 = noticeably slower than default 1.0 without sounding
+        // weirdly drawn-out. Helps listeners pick up the syllables.
+        // (Once an MP3 is uploaded via CMS, this path is bypassed.)
+        u.rate = 0.82; u.pitch = 1.0;
         u.onend = () => setPlaying(false);
         u.onerror = () => setPlaying(false);
         setPlaying(true);
