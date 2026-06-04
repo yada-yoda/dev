@@ -78,7 +78,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.20"
+SITE_VERSION = "v0.7.21"
 
 
 # ---------- helpers ----------
@@ -142,13 +142,42 @@ def gen_bio():
     )
 
 
+# Lucide-style line-icon SVG paths (24x24 viewBox). One per training "kind"
+# value. The badge CSS strokes them with currentColor and sets width/height,
+# so these paths only need d-data. Keep the keys aligned with the Decap
+# select options in admin/config.yml > training > kind > options.
+TRAINING_ICONS = {
+    "Workshop":     '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94"/>',
+    "Class":        '<path d="M2 3h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+    "Course":       '<path d="M2 3h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>',
+    "Intensive":    '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0"/>',
+    "Masterclass":  '<circle cx="12" cy="9" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/>',
+    "Conservatory": '<path d="M3 21h18M5 21V8l7-4 7 4v13M9 9v4M12 9v4M15 9v4M9 17v4M15 17v4"/>',
+    "Showcase":     '<path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="22"/>',
+    "Revue":        '<circle cx="9" cy="11" r="5"/><circle cx="15" cy="13" r="5"/>',
+    "Coaching":     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
+}
+
+
+def kind_badge(kind, leading_space=False):
+    """Render a training kind/badge <span> with its matching line icon.
+    Returns '' when kind is empty. leading_space=True prepends a space so the
+    badge sits cleanly after another inline element (used in the print path)."""
+    kind = (kind or "").strip()
+    if not kind:
+        return ""
+    icon = TRAINING_ICONS.get(kind, "")
+    svg = f'<svg viewBox="0 0 24 24" aria-hidden="true">{icon}</svg>' if icon else ""
+    lead = " " if leading_space else ""
+    return f'{lead}<span class="kind">{svg}{esc(kind)}</span>'
+
+
 def gen_training_screen(training):
     lines = []
     for e in training["entries"]:
         sub_parts = [p for p in (e.get("teachers", ""), e.get("school", "")) if p]
         sub = " &middot; ".join(esc(p) for p in sub_parts)
-        kind = (e.get("kind") or "").strip()
-        kind_html = f'<span class="kind">{esc(kind)}</span>' if kind else ""
+        kind_html = kind_badge(e.get("kind"))
         lines.append(
             '          <li><span class="label">'
             + esc(e["title"])
@@ -173,8 +202,7 @@ def gen_training_print(training):
     for e in training["entries"]:
         sub_parts = [p for p in (e.get("teachers", ""), e.get("school", "")) if p]
         sub = " &middot; ".join(esc(p) for p in sub_parts)
-        kind = (e.get("kind") or "").strip()
-        kind_html = f' <span class="kind">{esc(kind)}</span>' if kind else ""
+        kind_html = kind_badge(e.get("kind"), leading_space=True)
         lines.append(
             f"      <div><strong>{esc(e['title'])}{kind_html}</strong><em>{sub}</em></div>"
         )
