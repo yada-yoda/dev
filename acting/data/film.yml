@@ -1,0 +1,24 @@
+# Film credits — edited via Decap CMS at /acting/admin/.
+# The build script regenerates the matching <table> in index.html
+# and the JSON-LD Movie nodes whenever this file changes.
+# Newest credits go at the TOP of the list.
+
+entries:
+  - title: "Deadly Domicile"
+    year: 2024
+    type: "Short"
+    role: "Mike"
+    director: "Skylar Kendall"
+    imdb: ""    # tt-prefixed IMDB id (e.g. tt12345678) once known
+  - title: "El Frío Silencio"
+    year: 2027
+    type: "Feature"
+    role: "Homeowner"
+    director: "Zach Cortino"
+    imdb: ""
+  - title: "Waiter Boys"
+    year: 2025
+    type: "Short"
+    role: "Randy"
+    director: "Skylar Kendall"
+    imdb: ""

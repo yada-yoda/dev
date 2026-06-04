@@ -95,6 +95,16 @@ collections:
                 hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
               - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
 
+          - label: "Credits Tabs (Show / Hide)"
+            name: "credits_tabs"
+            widget: "object"
+            hint: "Toggle which credit tabs appear on the website. Hidden tabs disappear entirely (no empty placeholder). The first visible tab opens by default."
+            fields:
+              - { label: "Show Film tab",       name: "film",       widget: "boolean", default: true }
+              - { label: "Show TV tab",         name: "tv",         widget: "boolean", default: true }
+              - { label: "Show Theater tab",    name: "theater",    widget: "boolean", default: true }
+              - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
+
           - label: "Sections (Show / Hide)"
             name: "sections"
             widget: "object"
@@ -183,29 +193,23 @@ collections:
               - { label: "Attribution (optional)", name: "attribution", widget: "string", required: false, hint: "e.g. 'Random Girl, 2023'. Leave blank for facts." }
 
   # ============ CREDITS ============
+  # Each credit type is its own file so clicking Credits in the sidebar
+  # shows Film / TV / Theater / Commercial as separate entries.
+  # Tab visibility lives in Site Settings > Credits Tabs.
   - name: "credits"
     label: "Credits"
-    description: "Film, TV, and Theater credits. Newest at the top. Tab visibility lets you hide categories that aren't ready yet."
+    description: "Film, TV, Theater, Commercial credits. Newest at the top. Click an entry to edit just that credit type."
     files:
-      - file: "acting/data/credits.yml"
-        label: "Credits"
-        name: "credits"
+      - file: "acting/data/film.yml"
+        label: "Film"
+        name: "film"
         fields:
-          - label: "Tab visibility"
-            name: "tab_visibility"
-            widget: "object"
-            hint: "Toggle which credit tabs appear on the website. Hidden tabs disappear entirely (no empty placeholder). The first visible tab opens by default."
-            fields:
-              - { label: "Show Film tab", name: "film", widget: "boolean", default: true }
-              - { label: "Show TV tab", name: "tv", widget: "boolean", default: true }
-              - { label: "Show Theater tab", name: "theater", widget: "boolean", default: true }
-              - { label: "Show Commercial tab", name: "commercial", widget: "boolean", default: false, hint: "Off by default. Turn on once you have commercial credits to display." }
-
-          - label: "Film"
-            name: "film"
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Film credit"
             summary: "{{fields.title}} ({{fields.type}}, {{fields.year}})"
+            add_to_top: true
             fields:
               - { label: "Title", name: "title", widget: "string" }
               - { label: "Year", name: "year", widget: "number", value_type: "int", min: 1900, max: 2099 }
@@ -213,36 +217,55 @@ collections:
                 name: "type"
                 widget: "select"
                 options: ["Short", "Feature", "Web Series", "Music Video"]
+                default: "Short"
               - { label: "Role / Character", name: "role", widget: "string" }
               - { label: "Director", name: "director", widget: "string" }
               - { label: "IMDB tt ID", name: "imdb", widget: "string", required: false, hint: "e.g. tt12345678 - leave blank to fall back to IMDB search by title" }
-          - label: "TV"
-            name: "tv"
+
+      - file: "acting/data/tv.yml"
+        label: "TV"
+        name: "tv"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "TV credit"
             summary: "{{fields.title}} ({{fields.season}})"
+            add_to_top: true
             fields:
               - { label: "Title", name: "title", widget: "string" }
               - { label: "Season", name: "season", widget: "string", hint: "e.g. S01, S02 E04" }
               - { label: "Role", name: "role", widget: "string" }
               - { label: "Network", name: "network", widget: "string" }
-          - label: "Theater"
-            name: "theater"
+
+      - file: "acting/data/theater.yml"
+        label: "Theater"
+        name: "theater"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Theater credit"
             summary: "{{fields.production}} — {{fields.venue}}"
+            add_to_top: true
+            hint: "All theater currently at The Second City Training Center, Chicago. New entries pre-fill with Ensemble + Judy's Beat Lounge — your most common combo. Trim or change before saving."
             fields:
               - { label: "Production", name: "production", widget: "string" }
-              - { label: "Role / Sketches", name: "role", widget: "string", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
-              - { label: "Stage / Venue", name: "venue", widget: "string", hint: "All theater is currently at The Second City Training Center, Chicago - just enter the specific stage" }
+              - { label: "Role / Sketches", name: "role", widget: "string", default: "Ensemble", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
+              - { label: "Stage / Venue", name: "venue", widget: "string", default: "New Judy's Beat Lounge", hint: "Just the specific stage name (e.g. Donny's Skybox, New Judy's Beat Lounge, De Maat Studio)" }
 
-          - label: "Commercial"
-            name: "commercial"
+      - file: "acting/data/commercial.yml"
+        label: "Commercial"
+        name: "commercial"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Commercial credit"
             summary: "{{fields.title}} — {{fields.brand}}"
+            add_to_top: true
             required: false
-            hint: "Empty by default. Add entries when you have commercial credits and flip the Tab visibility toggle on."
+            hint: "Empty by default. Add entries here when you book commercial work, then flip Site Settings > Credits Tabs > 'Show Commercial tab' to ON."
             fields:
               - { label: "Title / Spot", name: "title", widget: "string" }
               - { label: "Role", name: "role", widget: "string" }
@@ -262,6 +285,7 @@ collections:
             widget: "list"
             label_singular: "Training entry"
             summary: "{{fields.title}} — {{fields.school}}"
+            add_to_top: true
             fields:
               - { label: "Course / Show Title", name: "title", widget: "string" }
               - label: "Kind / Badge"
