@@ -1,0 +1,18 @@
+# Favorite films — appears in the Resume section.
+
+entries:
+  - title: "Mikey & Nicky"
+    director: "Elaine May"
+    year: 1976
+  - title: "Black Bear"
+    director: "Lawrence Michael Levine"
+    year: 2020
+  - title: "Serial Mom"
+    director: "John Waters"
+    year: 1994
+  - title: "Rounders"
+    director: "John Dahl"
+    year: 1998
+  - title: "Rosemary's Baby"
+    director: "Roman Polanski"
+    year: 1968

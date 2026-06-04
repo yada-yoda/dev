@@ -1,31 +1,9 @@
-# Contact, social links, and reel embed.
+# Public-facing email + the bottom Contact section copy.
+# Social links live in data/socials.yml, reel in data/reel.yml.
 
 email: "frank@rizzo.cc"
 
-# Bottom Contact section copy
+# Bottom Contact section copy ("Let's Work" / "For bookings, sides, or just to say hi.")
 contact_section:
   heading: "Let's Work"
   body: "For bookings, sides, or just to say hi."
-
-# Social pills in the profile block.
-# Platform names map 1:1 to SVG icons in index.html — supported set:
-# Instagram, Letterboxd, IMDb, Actors Access, Email.
-# Adding a different platform name will show no icon (just a circle).
-socials:
-  - platform: "Instagram"
-    url: "https://www.instagram.com/heyfrank/"
-  - platform: "Letterboxd"
-    url: "https://letterboxd.com/heyfrank/"
-  - platform: "IMDb"
-    url: "https://www.imdb.com/name/nm16283183/"
-  - platform: "Actors Access"
-    url: "https://resumes.actorsaccess.com/frankrizzo"
-  - platform: "Email"
-    url: "mailto:frank@rizzo.cc"
-
-# Reel embed in the Credits section. The build script prefers URL over file
-# if both are set. Leave both empty to show the "Reel coming soon" placeholder.
-reel:
-  url: ""              # e.g. "https://player.vimeo.com/video/12345678" or YouTube embed URL
-  file: ""             # e.g. "assets/reel/reel.mp4"
-  placeholder: "Reel coming soon"

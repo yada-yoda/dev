@@ -1,0 +1,16 @@
+# Social pills in the profile block.
+# Platform names map 1:1 to SVG icons in index.html — supported set:
+# Instagram, Letterboxd, IMDb, Actors Access, Email.
+# Adding a different platform name will show no icon (just a circle).
+
+entries:
+  - platform: "Instagram"
+    url: "https://www.instagram.com/heyfrank/"
+  - platform: "Letterboxd"
+    url: "https://letterboxd.com/heyfrank/"
+  - platform: "IMDb"
+    url: "https://www.imdb.com/name/nm16283183/"
+  - platform: "Actors Access"
+    url: "https://resumes.actorsaccess.com/frankrizzo"
+  - platform: "Email"
+    url: "mailto:frank@rizzo.cc"

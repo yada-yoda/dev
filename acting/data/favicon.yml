@@ -1,0 +1,5 @@
+# Favicon source image. Upload a square 512x512+ image — the GitHub
+# Action runs build-assets.py on commit to regenerate the multi-resolution
+# set: 16/32/180/192/512 PNG + multi-res ICO + maskable.
+
+source: "assets/favicon-192.png"

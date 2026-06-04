@@ -1,0 +1,7 @@
+# Footer text. Token {{year}} is replaced at runtime with the current
+# year. Token {{version}} is replaced at build time with the site
+# version (hardcoded in build-content.py). Set show_version to false
+# to hide the version chip entirely.
+
+text: "© {{year}} Rizzo.cc"
+show_version: true

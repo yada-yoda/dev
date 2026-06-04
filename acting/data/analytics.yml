@@ -1,0 +1,5 @@
+# Google Analytics 4 measurement ID.
+# Currently shared with book/greenline. Swap to a different ID to track
+# this site separately.
+
+ga4_id: "G-DYME377V2S"

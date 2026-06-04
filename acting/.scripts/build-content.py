@@ -4,19 +4,41 @@ the structured files in data/. Run from the acting/ root:
 
     python .scripts/build-content.py
 
-Inputs:
-  data/bio.md          — bio paragraph (with optional front-matter)
-  data/film.yml         — film credits     (entries:)
-  data/tv.yml           — tv credits       (entries:)
-  data/theater.yml      — theater credits  (entries:)
-  data/commercial.yml   — commercial credits (entries:)
-  data/credits-tabs.yml — credit tab show/hide toggles (tabs:)
-  data/training.yml     — training entries
-  data/hero.yml        — hero slideshow (paired image + 2-line quote per slide)
-  data/about.yml       — RIZZO definition list + pull quote
-  data/panels.yml      — physical, languages, measurements, licensing, skills, favorite_films, inspirations
-  data/contact.yml     — email, socials, reel (URL or file), contact section copy
-  data/site.yml        — SEO meta, OG/Twitter, favicon source, GA4 ID
+Inputs (split across per-topic files so the Decap sidebar lists each
+as a separate clickable entry):
+  data/bio.md             — bio paragraph (with optional front-matter)
+  data/hero.yml           — hero slideshow (paired image + 2-line quote per slide)
+  data/about.yml          — RIZZO definition + pronunciation audio + pull quotes
+  data/training.yml       — training entries
+
+  Credits collection:
+    data/film.yml         — film credits     (entries:)
+    data/tv.yml           — tv credits       (entries:)
+    data/theater.yml      — theater credits  (entries:)
+    data/commercial.yml   — commercial credits (entries:)
+    data/credits-tabs.yml — credit tab show/hide toggles (tabs:)
+
+  Stats / Skills / Influences collection:
+    data/physical.yml       — appearance (age, height, eyes, hair, ...)
+    data/measurements.yml   — wardrobe sizes
+    data/languages.yml      — spoken languages (entries:)
+    data/licensing.yml      — documents + union + local_hire
+    data/skills.yml         — Key Skills paragraph (text:)
+    data/favorite-films.yml — favorite films (entries:)
+    data/inspirations.yml   — directors/creators that inform work (entries:)
+
+  Contact, Socials, Reel collection:
+    data/contact.yml      — email + contact_section copy
+    data/socials.yml      — social pills (entries:)
+    data/reel.yml         — reel embed (url, file, placeholder)
+
+  Site Settings collection:
+    data/seo.yml          — SEO + Open Graph + Twitter card
+    data/favicon.yml      — favicon source image
+    data/analytics.yml    — GA4 measurement ID
+    data/menu.yml         — top-nav items (entries:)
+    data/footer.yml       — footer text + show_version
+    data/sections.yml     — section show/hide toggles (about/profile_bio/...)
 
 Updates these EDIT-marked blocks in index.html (and only these):
   EDIT: bio                   ← from data/bio.md
@@ -34,26 +56,26 @@ Updates these EDIT-marked blocks in index.html (and only these):
   EDIT: hero-quotes           ← from data/hero.yml
   EDIT: rizzo-definition      ← from data/about.yml
   EDIT: pull-quote            ← from data/about.yml
-  EDIT: physical              ← from data/panels.yml
-  EDIT: languages             ← from data/panels.yml
-  EDIT: print-languages       ← from data/panels.yml
-  EDIT: measurements          ← from data/panels.yml
-  EDIT: licensing             ← from data/panels.yml
-  EDIT: print-licensing       ← from data/panels.yml
-  EDIT: skills                ← from data/panels.yml
-  EDIT: print-skills          ← from data/panels.yml
-  EDIT: favorite-films        ← from data/panels.yml
-  EDIT: inspirations          ← from data/panels.yml
-  EDIT: print-stats           ← from data/panels.yml (physical + measurements)
-  EDIT: socials               ← from data/contact.yml
-  EDIT: reel                  ← from data/contact.yml
-  EDIT: contact-section       ← from data/contact.yml
-  EDIT: site-meta             ← from data/site.yml (title, description, robots)
-  EDIT: og-tags               ← from data/site.yml (OG + Twitter)
-  EDIT: ga4                   ← from data/site.yml (GA4 ID)
-  EDIT: menu                  ← from data/site.yml (nav links)
-  EDIT: footer                ← from data/site.yml (footer text + version)
-  EDIT: section-visibility    ← from data/site.yml (sections; emits CSS rules to hide off sections)
+  EDIT: physical              ← from data/physical.yml
+  EDIT: languages             ← from data/languages.yml
+  EDIT: print-languages       ← from data/languages.yml
+  EDIT: measurements          ← from data/measurements.yml
+  EDIT: licensing             ← from data/licensing.yml
+  EDIT: print-licensing       ← from data/licensing.yml
+  EDIT: skills                ← from data/skills.yml
+  EDIT: print-skills          ← from data/skills.yml
+  EDIT: favorite-films        ← from data/favorite-films.yml
+  EDIT: inspirations          ← from data/inspirations.yml
+  EDIT: print-stats           ← from data/physical.yml + data/measurements.yml
+  EDIT: socials               ← from data/socials.yml
+  EDIT: reel                  ← from data/reel.yml
+  EDIT: contact-section       ← from data/contact.yml (contact_section)
+  EDIT: site-meta             ← from data/seo.yml (SEO subtree)
+  EDIT: og-tags               ← from data/seo.yml (OG + Twitter)
+  EDIT: ga4                   ← from data/analytics.yml
+  EDIT: menu                  ← from data/menu.yml
+  EDIT: footer                ← from data/footer.yml
+  EDIT: section-visibility    ← from data/sections.yml (emits CSS rules to hide off sections)
 
 NOTE: the JSON-LD Movie nodes in index.html are NOT regenerated by this
 script (they cross-reference Person via @id which would tangle the
@@ -79,7 +101,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.23"
+SITE_VERSION = "v0.7.24"
 
 
 # ---------- helpers ----------
@@ -893,13 +915,23 @@ def _load_list(path):
     return data.get("entries", []) or []
 
 
+def _load_obj(path):
+    """Load a YAML file and return its top-level dict.
+    Returns {} if the file is missing or empty."""
+    if not path.exists():
+        return {}
+    return yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+
+
 def main():
-    # Credits are split into four files: film.yml, tv.yml, theater.yml,
-    # commercial.yml. The Decap Credits collection exposes each as a
-    # separate entry. tab_visibility lives in its own credits-tabs.yml file
-    # so it appears as a 5th entry under the Credits collection in Decap.
-    site = yaml.safe_load((DATA / "site.yml").read_text(encoding="utf-8"))
-    tabs_doc = yaml.safe_load((DATA / "credits-tabs.yml").read_text(encoding="utf-8")) or {}
+    # Each collection's data is split across multiple per-topic files so
+    # Decap's sidebar lists Film / TV / Theater / Physical / Skills / Menu
+    # / Footer / etc. as separate clickable entries instead of one giant
+    # blob. The dicts here re-assemble the old shapes so the gen_*
+    # functions don't need to change.
+
+    # ---- Credits ----------------------------------------------------
+    tabs_doc = _load_obj(DATA / "credits-tabs.yml")
     credits = {
         "film": _load_list(DATA / "film.yml"),
         "tv": _load_list(DATA / "tv.yml"),
@@ -907,11 +939,42 @@ def main():
         "commercial": _load_list(DATA / "commercial.yml"),
         "tab_visibility": tabs_doc.get("tabs") or {},
     }
+
+    # ---- Stats / Skills / Influences -------------------------------
+    panels = {
+        "physical":       _load_obj(DATA / "physical.yml"),
+        "measurements":   _load_obj(DATA / "measurements.yml"),
+        "languages":      _load_list(DATA / "languages.yml"),
+        "licensing":      _load_obj(DATA / "licensing.yml"),
+        "skills":         _load_obj(DATA / "skills.yml").get("text", ""),
+        "favorite_films": _load_list(DATA / "favorite-films.yml"),
+        "inspirations":   _load_list(DATA / "inspirations.yml"),
+    }
+
+    # ---- Contact / Socials / Reel ----------------------------------
+    contact = {
+        **_load_obj(DATA / "contact.yml"),         # email + contact_section
+        "socials": _load_list(DATA / "socials.yml"),
+        "reel":    _load_obj(DATA / "reel.yml"),
+    }
+
+    # ---- Site Settings ---------------------------------------------
+    seo_doc = _load_obj(DATA / "seo.yml")
+    site = {
+        "seo":       seo_doc.get("seo", {}),
+        "og":        seo_doc.get("og", {}),
+        "twitter":   seo_doc.get("twitter", {}),
+        "favicon":   _load_obj(DATA / "favicon.yml"),
+        "analytics": _load_obj(DATA / "analytics.yml"),
+        "menu":      _load_list(DATA / "menu.yml"),
+        "footer":    _load_obj(DATA / "footer.yml"),
+        "sections":  _load_obj(DATA / "sections.yml"),
+    }
+
+    # ---- Other single-file inputs ----------------------------------
     training = yaml.safe_load((DATA / "training.yml").read_text(encoding="utf-8"))
     hero = yaml.safe_load((DATA / "hero.yml").read_text(encoding="utf-8"))
     about = yaml.safe_load((DATA / "about.yml").read_text(encoding="utf-8"))
-    panels = yaml.safe_load((DATA / "panels.yml").read_text(encoding="utf-8"))
-    contact = yaml.safe_load((DATA / "contact.yml").read_text(encoding="utf-8"))
     html = INDEX.read_text(encoding="utf-8")
 
     # Head: SEO meta, OG, GA4

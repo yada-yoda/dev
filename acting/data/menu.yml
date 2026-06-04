@@ -1,0 +1,13 @@
+# Top-nav menu items. Each entry has a visible label and a URL.
+# Use anchor links (#about) to scroll within the page, or full URLs
+# to link elsewhere. Reorder by moving items up/down in the list.
+
+entries:
+  - label: "About"
+    url: "#about"
+  - label: "Resume"
+    url: "#resume"
+  - label: "Credits"
+    url: "#credits"
+  - label: "Contact"
+    url: "#contact"

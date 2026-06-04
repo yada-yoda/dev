@@ -20,14 +20,15 @@ public_folder: "/acting/assets/headshots"
 
 collections:
 
-  # ============ SITE SETTINGS (SEO / OG / Favicon / GA4) ============
+  # ============ SITE SETTINGS ============
+  # Site-level config split per topic so each entry is a focused edit.
   - name: "site"
-    label: "Site Settings (SEO + OG + Favicon)"
-    description: "Page title, meta description, Open Graph card, Twitter card, GA4 tracking, favicon source."
+    label: "Site Settings"
+    description: "SEO + social previews, favicon, analytics, top-nav, footer, section visibility. One entry per topic."
     files:
-      - file: "acting/data/site.yml"
-        label: "Site-level settings"
-        name: "site"
+      - file: "acting/data/seo.yml"
+        label: "SEO + Social Previews"
+        name: "seo"
         fields:
           - label: "SEO"
             name: "seo"
@@ -58,25 +59,29 @@ collections:
             fields:
               - { label: "Card type", name: "card", widget: "select", options: ["summary", "summary_large_image"] }
 
-          - label: "Favicon source"
-            name: "favicon"
-            widget: "object"
-            fields:
-              - label: "Source image"
-                name: "source"
-                widget: "image"
-                media_folder: "/acting/assets"
-                public_folder: "/acting/assets"
-                hint: "Upload a square image (512x512+ recommended) to replace assets/favicon-192.png. The GitHub Action will regenerate the full favicon set (16/32/180/192/512 + multi-res ICO + maskable) on commit."
+      - file: "acting/data/favicon.yml"
+        label: "Favicon"
+        name: "favicon"
+        fields:
+          - label: "Source image"
+            name: "source"
+            widget: "image"
+            media_folder: "/acting/assets"
+            public_folder: "/acting/assets"
+            hint: "Upload a square image (512x512+ recommended) to replace assets/favicon-192.png. The GitHub Action will regenerate the full favicon set (16/32/180/192/512 + multi-res ICO + maskable) on commit."
 
-          - label: "Analytics"
-            name: "analytics"
-            widget: "object"
-            fields:
-              - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently shared with book/greenline (G-DYME377V2S)." }
+      - file: "acting/data/analytics.yml"
+        label: "Analytics"
+        name: "analytics"
+        fields:
+          - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently shared with book/greenline (G-DYME377V2S)." }
 
-          - label: "Top-nav menu"
-            name: "menu"
+      - file: "acting/data/menu.yml"
+        label: "Top-Nav Menu"
+        name: "menu"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Menu item"
             summary: "{{fields.label}} → {{fields.url}}"
@@ -85,29 +90,28 @@ collections:
               - { label: "Label", name: "label", widget: "string", hint: "Visible text in the top nav (e.g. About)" }
               - { label: "URL", name: "url", widget: "string", hint: "Anchor (#about) or absolute URL" }
 
-          - label: "Footer"
-            name: "footer"
-            widget: "object"
-            fields:
-              - label: "Footer text"
-                name: "text"
-                widget: "string"
-                hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
-              - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
+      - file: "acting/data/footer.yml"
+        label: "Footer"
+        name: "footer"
+        fields:
+          - label: "Footer text"
+            name: "text"
+            widget: "string"
+            hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
+          - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
 
-          - label: "Sections (Show / Hide)"
-            name: "sections"
-            widget: "object"
-            hint: "Toggle individual sections off to temporarily hide them from the live site without losing the data. The section's YAML stays put and re-enabling the toggle brings it back instantly."
-            fields:
-              - { label: "About (RIZZO definition + pull quote)", name: "about",           widget: "boolean", default: true }
-              - { label: "Profile - Bio paragraph",               name: "profile_bio",     widget: "boolean", default: true }
-              - { label: "Profile - Headshot gallery",            name: "profile_gallery", widget: "boolean", default: true }
-              - { label: "Profile - Social links",                name: "profile_socials", widget: "boolean", default: true }
-              - { label: "Resume (Stats / Training / Skills)",    name: "resume",          widget: "boolean", default: true }
-              - { label: "Credits (Film / TV / Theater tabs)",    name: "credits",         widget: "boolean", default: true }
-              - { label: "Reel (Selected Work block)",            name: "reel",            widget: "boolean", default: true }
-              - { label: "Contact (bottom email section)",        name: "contact",         widget: "boolean", default: true }
+      - file: "acting/data/sections.yml"
+        label: "Section Visibility (Show / Hide)"
+        name: "sections"
+        fields:
+          - { label: "About (RIZZO definition + pull quote)", name: "about",           widget: "boolean", default: true }
+          - { label: "Profile - Bio paragraph",               name: "profile_bio",     widget: "boolean", default: true }
+          - { label: "Profile - Headshot gallery",            name: "profile_gallery", widget: "boolean", default: true }
+          - { label: "Profile - Social links",                name: "profile_socials", widget: "boolean", default: true }
+          - { label: "Resume (Stats / Training / Skills)",    name: "resume",          widget: "boolean", default: true }
+          - { label: "Credits (Film / TV / Theater tabs)",    name: "credits",         widget: "boolean", default: true }
+          - { label: "Reel (Selected Work block)",            name: "reel",            widget: "boolean", default: true }
+          - { label: "Contact (bottom email section)",        name: "contact",         widget: "boolean", default: true }
 
   # ============ HERO ============
   - name: "hero"
@@ -320,28 +324,41 @@ collections:
               - { label: "Teacher(s)", name: "teachers", widget: "string", required: false }
               - { label: "School / Location", name: "school", widget: "string" }
 
-  # ============ PANELS (Physical, Languages, Measurements, Licensing, Skills, Favorites, Inspirations) ============
+  # ============ STATS, SKILLS & INFLUENCES ============
+  # Split into 7 per-topic files so each entry in the sidebar is a focused
+  # edit (Physical, Measurements, Languages, Licensing, Skills, Films, Inspirations).
   - name: "panels"
     label: "Stats, Skills & Influences"
-    description: "Physical, Languages, Measurements, Licensing, Key Skills, Favorite Films, Inspirations."
+    description: "Resume panels — physical, measurements, languages, licensing, key skills, favorite films, inspirations. One entry per topic."
     files:
-      - file: "acting/data/panels.yml"
-        label: "Resume panels"
-        name: "panels"
+      - file: "acting/data/physical.yml"
+        label: "Physical"
+        name: "physical"
         fields:
-          - label: "Physical"
-            name: "physical"
-            widget: "object"
-            fields:
-              - { label: "Age Range", name: "age_range", widget: "string" }
-              - { label: "Height", name: "height", widget: "string" }
-              - { label: "Eyes", name: "eyes", widget: "string" }
-              - { label: "Hair", name: "hair", widget: "string" }
-              - { label: "Tattoos", name: "tattoos", widget: "string" }
-              - { label: "Piercings", name: "piercings", widget: "string" }
+          - { label: "Age Range", name: "age_range", widget: "string" }
+          - { label: "Height", name: "height", widget: "string" }
+          - { label: "Eyes", name: "eyes", widget: "string" }
+          - { label: "Hair", name: "hair", widget: "string" }
+          - { label: "Tattoos", name: "tattoos", widget: "string" }
+          - { label: "Piercings", name: "piercings", widget: "string" }
 
-          - label: "Languages"
-            name: "languages"
+      - file: "acting/data/measurements.yml"
+        label: "Measurements"
+        name: "measurements"
+        fields:
+          - { label: "Shoe", name: "shoe", widget: "string" }
+          - { label: "Shirt", name: "shirt", widget: "string" }
+          - { label: "Coat", name: "coat", widget: "string" }
+          - { label: "Neck", name: "neck", widget: "string" }
+          - { label: "Sleeve", name: "sleeve", widget: "string" }
+          - { label: "Hat", name: "hat", widget: "string" }
+
+      - file: "acting/data/languages.yml"
+        label: "Languages"
+        name: "languages"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Language"
             summary: "{{fields.name}} ({{fields.level}})"
@@ -349,35 +366,32 @@ collections:
               - { label: "Language", name: "name", widget: "string" }
               - { label: "Level / Note", name: "level", widget: "string" }
 
-          - label: "Measurements"
-            name: "measurements"
-            widget: "object"
-            fields:
-              - { label: "Shoe", name: "shoe", widget: "string" }
-              - { label: "Shirt", name: "shirt", widget: "string" }
-              - { label: "Coat", name: "coat", widget: "string" }
-              - { label: "Neck", name: "neck", widget: "string" }
-              - { label: "Sleeve", name: "sleeve", widget: "string" }
-              - { label: "Hat", name: "hat", widget: "string" }
+      - file: "acting/data/licensing.yml"
+        label: "Licensing & Hire"
+        name: "licensing"
+        fields:
+          - label: "Documents"
+            name: "documents"
+            widget: "list"
+            field: { label: "Document", name: "doc", widget: "string" }
+          - { label: "Union status", name: "union", widget: "string" }
+          - { label: "Local Hire", name: "local_hire", widget: "string" }
 
-          - label: "Licensing & Hire"
-            name: "licensing"
-            widget: "object"
-            fields:
-              - label: "Documents"
-                name: "documents"
-                widget: "list"
-                field: { label: "Document", name: "doc", widget: "string" }
-              - { label: "Union status", name: "union", widget: "string" }
-              - { label: "Local Hire", name: "local_hire", widget: "string" }
-
-          - label: "Key Skills"
-            name: "skills"
+      - file: "acting/data/skills.yml"
+        label: "Key Skills"
+        name: "skills"
+        fields:
+          - label: "Skills paragraph"
+            name: "text"
             widget: "text"
-            hint: "One paragraph. Separate items with ' · ' (space-middot-space). Aim for 8-12 high-impact items."
+            hint: "One paragraph. Separate items with ' · ' (space-middot-space). Industry rule of thumb: 8-12 high-impact items beats a long list of hobbies."
 
-          - label: "Favorite Films"
-            name: "favorite_films"
+      - file: "acting/data/favorite-films.yml"
+        label: "Favorite Films"
+        name: "favorite_films"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Film"
             summary: "{{fields.title}} — {{fields.director}}, {{fields.year}}"
@@ -386,32 +400,41 @@ collections:
               - { label: "Director", name: "director", widget: "string" }
               - { label: "Year", name: "year", widget: "number", value_type: "int", min: 1900, max: 2099 }
 
-          - label: "Inspirations"
-            name: "inspirations"
+      - file: "acting/data/inspirations.yml"
+        label: "Inspirations"
+        name: "inspirations"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             field: { label: "Name", name: "name", widget: "string" }
             hint: "Directors, creators, actors that inform the work — one per entry."
 
   # ============ CONTACT, SOCIALS, REEL ============
+  # Split into 3 per-topic files (contact info, social links, reel).
   - name: "contact"
     label: "Contact, Socials, Reel"
-    description: "Email, social links, contact section copy, and the reel embed."
+    description: "Public email + bottom Contact section copy, social link pills, and the reel embed. One entry per topic."
     files:
       - file: "acting/data/contact.yml"
-        label: "Contact + socials + reel"
+        label: "Contact (email + section copy)"
         name: "contact"
         fields:
           - { label: "Email", name: "email", widget: "string", hint: "Public-facing contact address." }
-
           - label: "Contact Section"
             name: "contact_section"
             widget: "object"
+            hint: "The heading + body copy at the very bottom of the page."
             fields:
               - { label: "Heading", name: "heading", widget: "string" }
               - { label: "Body", name: "body", widget: "text" }
 
-          - label: "Social Links"
-            name: "socials"
+      - file: "acting/data/socials.yml"
+        label: "Social Links"
+        name: "socials"
+        fields:
+          - label: "Entries"
+            name: "entries"
             widget: "list"
             label_singular: "Social link"
             summary: "{{fields.platform}}"
@@ -423,20 +446,20 @@ collections:
                 hint: "Only these five have icons; other names will render without an icon."
               - { label: "URL", name: "url", widget: "string" }
 
-          - label: "Reel"
-            name: "reel"
-            widget: "object"
-            fields:
-              - label: "Reel URL"
-                name: "url"
-                widget: "string"
-                required: false
-                hint: "Vimeo or YouTube embed URL, e.g. https://player.vimeo.com/video/12345678. Leave blank to use a file upload below."
-              - label: "Reel file (upload)"
-                name: "file"
-                widget: "file"
-                required: false
-                media_folder: "/acting/assets/reel"
-                public_folder: "/acting/assets/reel"
-                hint: "Optional: upload an MP4 directly. URL above wins if both are set."
-              - { label: "Placeholder text (when no reel set)", name: "placeholder", widget: "string", default: "Reel coming soon" }
+      - file: "acting/data/reel.yml"
+        label: "Reel"
+        name: "reel"
+        fields:
+          - label: "Reel URL"
+            name: "url"
+            widget: "string"
+            required: false
+            hint: "Vimeo or YouTube embed URL, e.g. https://player.vimeo.com/video/12345678. Leave blank to use a file upload below."
+          - label: "Reel file (upload)"
+            name: "file"
+            widget: "file"
+            required: false
+            media_folder: "/acting/assets/reel"
+            public_folder: "/acting/assets/reel"
+            hint: "Optional: upload an MP4 directly. URL above wins if both are set."
+          - { label: "Placeholder text (when no reel set)", name: "placeholder", widget: "string", default: "Reel coming soon" }
