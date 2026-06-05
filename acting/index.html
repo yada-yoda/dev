@@ -683,33 +683,67 @@ section + section{border-top:1px solid var(--line)}
 }
 
 /* ------- Selected Credits tabs ------- */
+/* The cyan .pill is positioned absolutely inside .tabs and JS sets its
+   transform + width to track the active tab — sliding indicator. Tab
+   buttons sit on a higher z-index so they appear above the pill. */
 .tabs{
+  position:relative;
   display:flex;gap:4px;background:var(--card-2);
   padding:6px;border-radius:30px;
   width:max-content;max-width:100%;
   margin:0 auto 20px;
   border:1px solid var(--line);
-  flex-wrap:wrap;
+  flex-wrap:nowrap;
   justify-content:center;
 }
+.tabs .pill{
+  position:absolute;top:6px;left:0;
+  height:calc(100% - 12px);
+  background:var(--accent);
+  border-radius:999px;
+  z-index:1;
+  width:0;                    /* JS sets actual width once layout settles */
+  pointer-events:none;
+  transition:transform .30s cubic-bezier(.4,0,.2,1),
+             width .30s cubic-bezier(.4,0,.2,1);
+}
 .tab{
+  position:relative;z-index:2;
   font-family:'Montserrat',sans-serif;font-size:12px;
   letter-spacing:.22em;text-transform:uppercase;
   padding:10px 22px;border-radius:999px;
   cursor:pointer;color:var(--muted);
   border:none;background:transparent;
-  transition:all .15s ease;
+  transition:color .25s ease;
   white-space:nowrap;
 }
 @media (max-width:560px){
   .tabs{padding:4px;gap:2px;width:auto}
+  .tabs .pill{top:4px;height:calc(100% - 8px)}
   .tab{padding:8px 14px;font-size:11px;letter-spacing:.16em}
 }
 .tab:hover{color:#fff}
-.tab.active{background:var(--accent);color:#0d2226;font-weight:700}
-.tab-panel{display:none}
-.tab-panel.active{display:block;animation:slidein .25s ease}
-@keyframes slidein{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.tab.active{color:#0d2226;font-weight:700}
+
+/* Crossfade panel container. Every panel is position:absolute, only the
+   .active one is opacity:1. JS sets min-height to the tallest panel so
+   the page below doesn't shift when switching tabs. */
+.tab-panels-wrap{
+  position:relative;
+  min-height:380px;      /* Fallback before JS measures */
+}
+.tab-panel{
+  position:absolute;top:0;left:0;right:0;
+  opacity:0;pointer-events:none;
+  transition:opacity .30s ease;
+}
+.tab-panel.active{
+  opacity:1;pointer-events:auto;
+}
+
+@media (prefers-reduced-motion: reduce){
+  .tabs .pill, .tab-panel{transition:none}
+}
 
 table.credits{
   width:100%;border-collapse:collapse;
@@ -1340,11 +1374,18 @@ footer .ver{color:var(--dim);margin-left:10px}
 
     <!-- EDIT: credits-tabs — auto-generated from data/credits.yml > tab_visibility. -->
     <div class="tabs" role="tablist">
+      <span class="pill" aria-hidden="true"></span>
       <button class="tab active" data-tab="film" role="tab">Film</button>
       <button class="tab" data-tab="tv" role="tab">TV</button>
       <button class="tab" data-tab="theater" role="tab">Theater</button>
     </div>
     <!-- /EDIT: credits-tabs -->
+
+    <!-- .tab-panels-wrap is the crossfade container. Every .tab-panel
+         lives inside it as position:absolute, only the .active one is
+         opaque. JS measures the tallest panel and sets min-height so
+         switching tabs doesn't shift the page below. -->
+    <div class="tab-panels-wrap">
 
     <!-- EDIT: film-credits — to add a credit, copy any <tr> row and edit. Update the matching row in /EDIT: print-film-credits below too. Don't forget to update the JSON-LD Movie nodes.
          Title links go to IMDB. To swap the placeholder search URL for a real title page, replace the href with https://www.imdb.com/title/ttXXXXXXX/ (find the tt ID on imdb.com). -->
@@ -1394,6 +1435,9 @@ footer .ver{color:var(--dim);margin-left:10px}
 
     <!-- EDIT: commercial-credits — placeholder; add real entries when conflicts allow. (Note: this section is hidden from the printed PDF resume.) -->
     <!-- /EDIT: commercial-credits -->
+
+    </div>
+    <!-- /.tab-panels-wrap -->
 
     <!-- Reel embed (placeholder; drop a Vimeo/YouTube embed URL when ready) -->
     <div id="reel-wrapper" style="margin-top:32px">
@@ -1559,7 +1603,7 @@ footer .ver{color:var(--dim);margin-left:10px}
 
 <!-- EDIT: footer — auto-generated from data/site.yml > footer. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.30</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.7.31</span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -1570,14 +1614,71 @@ footer .ver{color:var(--dim);margin-left:10px}
     bar.classList.toggle('scrolled', window.scrollY > 40);
   }, {passive:true});
 
-  // Tabs
-  document.querySelectorAll('.tab').forEach(btn => {
-    btn.addEventListener('click', () => {
+  // Tabs — sliding cyan pill + crossfaded panels. The pill is a single
+  // absolutely-positioned <span> inside .tabs whose transform+width are
+  // updated by JS to track the active tab. Panels crossfade via CSS
+  // opacity transition on .active. Wrapper min-height is set to the
+  // tallest panel so switching tabs doesn't shift the page below.
+  (function tabsInit(){
+    const tabs = document.querySelector('.tabs');
+    if (!tabs) return;
+    const pill = tabs.querySelector('.pill');
+    const buttons = Array.from(tabs.querySelectorAll('.tab'));
+    const wrap = document.querySelector('.tab-panels-wrap');
+    const panels = wrap ? Array.from(wrap.querySelectorAll('.tab-panel')) : [];
+    if (!pill || !buttons.length) return;
+
+    function positionPill(btn, instant){
+      if (!btn) return;
+      const left = btn.offsetLeft;
+      const width = btn.offsetWidth;
+      if (instant){
+        const prev = pill.style.transition;
+        pill.style.transition = 'none';
+        pill.style.transform = 'translateX(' + left + 'px)';
+        pill.style.width = width + 'px';
+        void pill.offsetWidth;       // force reflow
+        pill.style.transition = prev;
+      } else {
+        pill.style.transform = 'translateX(' + left + 'px)';
+        pill.style.width = width + 'px';
+      }
+    }
+
+    function measurePanels(){
+      if (!wrap || !panels.length) return;
+      let max = 0;
+      panels.forEach(p => { max = Math.max(max, p.offsetHeight); });
+      if (max > 0) wrap.style.minHeight = max + 'px';
+    }
+
+    function setActive(btn){
       const target = btn.dataset.tab;
-      document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t === btn));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === target));
+      buttons.forEach(t => t.classList.toggle('active', t === btn));
+      panels.forEach(p => p.classList.toggle('active', p.id === target));
+      positionPill(btn, false);
+    }
+
+    buttons.forEach(b => b.addEventListener('click', () => setActive(b)));
+
+    function init(){
+      const initial = buttons.find(b => b.classList.contains('active')) || buttons[0];
+      positionPill(initial, true);
+      measurePanels();
+    }
+    // Wait for fonts so button widths are stable before positioning the pill
+    if (document.fonts && document.fonts.ready){
+      document.fonts.ready.then(init);
+    } else {
+      setTimeout(init, 200);
+    }
+
+    window.addEventListener('resize', () => {
+      const active = buttons.find(b => b.classList.contains('active'));
+      if (active) positionPill(active, true);
+      measurePanels();
     });
-  });
+  })();
 
   // Hero slideshow + paired quote rotation (JS-driven). Photos advance
   // after a fixed 8s. Video slides play their full length (we listen for

@@ -101,7 +101,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.30"
+SITE_VERSION = "v0.7.31"
 
 
 # ---------- helpers ----------
@@ -278,8 +278,11 @@ def gen_credits_tabs(credits):
         buttons.append(
             f'      <button class="tab{active}" data-tab="{esc(slug)}" role="tab">{esc(label)}</button>'
         )
+    # The .pill is the sliding cyan background behind the active tab.
+    # JS sets its transform + width to track the active button.
     return (
         "\n    <div class=\"tabs\" role=\"tablist\">\n"
+        "      <span class=\"pill\" aria-hidden=\"true\"></span>\n"
         + "\n".join(buttons)
         + "\n    </div>\n    "
     )
