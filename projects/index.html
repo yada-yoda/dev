@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Projects · dev.rizzo.cc</title>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="theme-color" content="#1f212e">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="/acting/assets/favicon.ico" sizes="any">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;700;900&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#1f212e;
+  --bg-2:#171823;
+  --card:#2c2e3d;
+  --card-2:#252738;
+  --line:rgba(255,255,255,.10);
+  --text:#e7e9ef;
+  --muted:#a8acba;
+  --dim:#6e7282;
+  --accent:#00bcd4;
+  --radius:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  background:radial-gradient(ellipse at top, #2a2c3e 0%, var(--bg) 65%) fixed;
+  color:var(--text);
+  font-family:'Source Sans 3',system-ui,-apple-system,sans-serif;
+  font-size:16px;line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+}
+a{color:inherit;text-decoration:none}
+h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
+
+.wrap{max-width:1100px;margin:0 auto;padding:64px 24px 96px}
+
+/* ============ Header ============ */
+.hdr{padding-bottom:32px;border-bottom:1px solid var(--line);margin-bottom:48px;position:relative}
+.hdr .tag{
+  display:inline-block;
+  font-family:'Montserrat',sans-serif;font-size:10px;
+  letter-spacing:.32em;text-transform:uppercase;
+  color:var(--accent);border:1px solid var(--accent);
+  padding:4px 10px;border-radius:999px;margin-bottom:14px;
+}
+.hdr h1{
+  font-size:clamp(36px,5vw,56px);font-weight:900;
+  letter-spacing:.02em;margin-bottom:10px;
+}
+.hdr .domain{
+  font-family:'Montserrat',sans-serif;font-weight:400;
+  color:var(--dim);font-size:14px;letter-spacing:.18em;text-transform:uppercase;
+}
+.hdr .domain b{color:var(--accent);font-weight:600}
+.hdr p{color:var(--muted);max-width:640px;margin-top:18px;font-size:15.5px}
+
+/* ============ Grid ============ */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:18px;
+}
+.card{
+  position:relative;
+  display:flex;flex-direction:column;
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:24px 24px 22px;
+  transition:border-color .2s ease, transform .2s ease, box-shadow .2s ease;
+  overflow:hidden;
+}
+.card::before{
+  content:"";
+  position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--accent-card,var(--accent));
+  opacity:0;transition:opacity .2s ease;
+}
+.card:hover{
+  border-color:var(--accent-card,var(--accent));
+  transform:translateY(-2px);
+  box-shadow:0 6px 24px rgba(0,0,0,.32);
+}
+.card:hover::before{opacity:1}
+
+.card .top{
+  display:flex;align-items:center;gap:12px;margin-bottom:12px;
+}
+.card .glyph{
+  width:36px;height:36px;
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Montserrat',sans-serif;font-weight:900;
+  font-size:14px;color:#0d2226;
+  background:var(--accent-card,var(--accent));
+  letter-spacing:.04em;
+  flex-shrink:0;
+}
+.card h2{
+  font-size:17px;font-weight:700;letter-spacing:.02em;
+  line-height:1.2;
+}
+.card .slug{
+  display:block;
+  font-family:'Montserrat',sans-serif;font-size:10.5px;font-weight:500;
+  color:var(--dim);letter-spacing:.18em;text-transform:uppercase;
+  margin-top:3px;
+}
+.card .slug b{color:var(--accent-card,var(--accent));font-weight:600}
+.card p{
+  color:var(--muted);font-size:14.5px;
+  line-height:1.5;flex-grow:1;
+}
+.card .meta{
+  margin-top:14px;padding-top:14px;
+  border-top:1px dashed var(--line);
+  display:flex;justify-content:space-between;align-items:center;
+  font-family:'Montserrat',sans-serif;font-size:10.5px;
+  letter-spacing:.2em;text-transform:uppercase;color:var(--dim);
+}
+.card .meta .open{
+  color:var(--accent-card,var(--accent));font-weight:700;
+}
+.card .meta .open::after{
+  content:" \2192";font-weight:700;
+  transition:transform .2s ease;display:inline-block;
+}
+.card:hover .meta .open::after{transform:translateX(3px)}
+
+/* Per-card accent overrides (subtle differentiation) */
+.card.c-inventory{--accent-card:#14b8a6}
+.card.c-usage    {--accent-card:#00bcd4}
+.card.c-sick     {--accent-card:#f87171}
+.card.c-sceneseed{--accent-card:#a78bfa}
+.card.c-scan2pdf {--accent-card:#fbbf24}
+.card.c-scancard {--accent-card:#34d399}
+
+/* ============ Footer ============ */
+.foot{
+  margin-top:72px;padding-top:24px;
+  border-top:1px solid var(--line);
+  display:flex;flex-wrap:wrap;gap:14px 24px;justify-content:space-between;align-items:center;
+  font-family:'Montserrat',sans-serif;font-size:11px;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--dim);
+}
+.foot a{color:var(--dim);transition:color .15s ease}
+.foot a:hover{color:var(--accent)}
+.foot .pin b{color:var(--accent);font-weight:700;letter-spacing:.18em}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hdr">
+    <span class="tag">Private &middot; dev hub</span>
+    <h1>Projects</h1>
+    <span class="domain"><b>dev.rizzo.cc</b> &middot; not indexed</span>
+    <p>Workshop space for things being built or staged at this domain. Each project below has its own subfolder and may also mirror to a public canonical URL elsewhere. The acting portfolio lives at <a href="/acting/" style="color:var(--accent);border-bottom:1px solid var(--accent)">/acting/</a> &mdash; this hub covers everything else.</p>
+  </header>
+
+  <div class="grid">
+
+    <a class="card c-inventory" href="/inventory/">
+      <div class="top">
+        <div class="glyph">L</div>
+        <div>
+          <h2>The Ledger</h2>
+          <span class="slug"><b>/inventory/</b></span>
+        </div>
+      </div>
+      <p>Collectibles inventory built for Beanie Baby valuation: cost &amp; fee P&amp;L, pricing research, demo mode with AI photos, eBay CSV import, Firebase-backed. Dark mode + plush mascot.</p>
+      <div class="meta"><span>Static SPA &middot; Firebase</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-usage" href="/usage/">
+      <div class="top">
+        <div class="glyph">U</div>
+        <div>
+          <h2>Usage Tracker</h2>
+          <span class="slug"><b>/usage/</b></span>
+        </div>
+      </div>
+      <p>Track product / grocery depletion, reorder reminders by lifespan, FDA recall alerts, UPC barcode scanner + brand logo lookup. Cross-device sync via Firestore, demo mode, email digests.</p>
+      <div class="meta"><span>Static SPA &middot; Firebase + Worker</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-sick" href="/sick/">
+      <div class="top">
+        <div class="glyph">+</div>
+        <div>
+          <h2>Illness Tracker</h2>
+          <span class="slug"><b>/sick/</b></span>
+        </div>
+      </div>
+      <p>Log illnesses + symptoms over time, surface patterns, sync to Google Calendar. Single-file HTML + Firebase, installable PWA, demo mode at <code style="font-family:inherit;font-style:italic">?demo=1</code>.</p>
+      <div class="meta"><span>Single-file SPA &middot; PWA</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-sceneseed" href="/sceneseed/">
+      <div class="top">
+        <div class="glyph">S</div>
+        <div>
+          <h2>SceneSeed</h2>
+          <span class="slug"><b>/sceneseed/</b></span>
+        </div>
+      </div>
+      <p>Improv suggestion generator for live shows: relationships, locations, objects, emotions. P5e line-art logo, color-coded suggestion types, public share codes.</p>
+      <div class="meta"><span>Vanilla JS &middot; Firebase</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-scan2pdf" href="/scan2pdf/">
+      <div class="top">
+        <div class="glyph">PDF</div>
+        <div>
+          <h2>Scan to PDF</h2>
+          <span class="slug"><b>/scan2pdf/</b></span>
+        </div>
+      </div>
+      <p>Phone-camera document scanner &rarr; searchable PDF. Auto-crop, perspective correction, multi-page batching. Installable PWA, runs entirely client-side.</p>
+      <div class="meta"><span>PWA &middot; Client-only</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-scancard" href="/scancard/">
+      <div class="top">
+        <div class="glyph">vCF</div>
+        <div>
+          <h2>Scan Card</h2>
+          <span class="slug"><b>/scancard/</b></span>
+        </div>
+      </div>
+      <p>Snap a business card, parse it into a vCard you can drop into Contacts. Single-file PWA, no server, no upload.</p>
+      <div class="meta"><span>PWA &middot; Client-only</span><span class="open">Open</span></div>
+    </a>
+
+  </div>
+
+  <footer class="foot">
+    <span class="pin"><b>Hub:</b> dev.rizzo.cc/projects/</span>
+    <span><a href="/acting/">&larr; Acting portfolio</a></span>
+    <span>&copy; <span id="yr"></span> Rizzo.cc</span>
+  </footer>
+</div>
+
+<script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
+</body>
+</html>
