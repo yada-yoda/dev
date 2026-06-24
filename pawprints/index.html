@@ -32,13 +32,19 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
 <!-- html2canvas (PNG card) and Chart.js (trends) are lazy-loaded on first use -->
+<!-- Apply saved/system theme before first paint to avoid a flash -->
+<script>try{var t=localStorage.getItem('pawprints_theme');if(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme: light)').matches)t='light';if(t==='light')document.documentElement.setAttribute('data-theme','light');}catch(e){}</script>
 <style>
 :root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-tertiary:#21262d;--bg-input:#0d1117;--text-primary:#e6edf3;--text-secondary:#8b949e;
---accent:#f4a261;--accent-2:#2dd4bf;--accent-purple:#a371f7;--border:#30363d;--danger:#f85149;--success:#3fb950;--warning:#d29922;--blue:#58a6ff}
+--accent:#f4a261;--accent-2:#2dd4bf;--accent-purple:#a371f7;--border:#30363d;--danger:#f85149;--success:#3fb950;--warning:#d29922;--blue:#58a6ff;
+--on-accent:#08231f;--header-bg:linear-gradient(135deg,#161b22,#0d1117);--shadow:rgba(0,0,0,.45)}
+[data-theme="light"]{--bg-primary:#f6f8fa;--bg-card:#ffffff;--bg-tertiary:#eef1f5;--bg-input:#ffffff;--text-primary:#1f2328;--text-secondary:#59636e;
+--accent:#b45309;--accent-2:#0d9488;--accent-purple:#7c3aed;--border:#d0d7de;--danger:#cf222e;--success:#1a7f37;--warning:#9a6700;--blue:#0969da;
+--on-accent:#ffffff;--header-bg:linear-gradient(135deg,#ffffff,#eef1f5);--shadow:rgba(140,149,159,.22)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-.header{background:linear-gradient(135deg,#161b22,#0d1117);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header{background:var(--header-bg);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .header-left{display:flex;align-items:center;gap:12px;cursor:pointer}
 .logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#f4a261,#2dd4bf);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
 .pet-photo{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-tertiary)}
@@ -63,7 +69,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .section-title{margin:0 0 14px;font-size:15px;font-weight:600;color:var(--accent)}
 .tag-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
 .tag{padding:7px 15px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
-.tag.active{border-color:var(--accent);background:var(--accent);color:#08231f;font-weight:600}
+.tag.active{border-color:var(--accent);background:var(--accent);color:var(--on-accent);font-weight:600}
 .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
 .stat-card{text-align:center;padding:16px}.stat-value{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace}.stat-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
 .chip{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(244,162,97,.13);color:var(--accent);display:inline-block}
@@ -94,7 +100,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .reminder.over{border-color:rgba(248,81,73,.35);background:rgba(248,81,73,.08)}
 .subtab{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .subtab button{padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;font-family:inherit;cursor:pointer}
-.subtab button.active{background:var(--accent);border-color:var(--accent);color:#08231f;font-weight:600}
+.subtab button.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .hidden{display:none !important}
@@ -132,7 +138,8 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
     <div><h1 id="header-title">PawPrints</h1><div class="sub" id="header-sub">Feed · Walk · Care <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500" id="app-version"></span></div></div>
   </div>
   <div class="header-actions">
-    <select id="pet-select" class="pet-select hidden" onchange="selectPet(this.value)"></select>
+    <select id="pet-select" class="pet-select hidden" onchange="onPetSelect(this.value)"></select>
+    <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
     <button class="btn" onclick="exportJSON()" id="btn-export-json">💾 Export</button>
     <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📂 Import</button>
     <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
@@ -171,7 +178,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.3.0';
+const APP_VERSION = 'v0.4.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -344,6 +351,7 @@ async function loadFromFirestore(){
       });
       data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
       data.settings = Object.assign({}, d.settings||{}, data.settings||{});
+      if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       saveLocal(); render();
@@ -899,7 +907,23 @@ function updateHeader(){
     selEl.innerHTML = data.pets.map(pt => '<option value="'+pt.id+'"'+(pt.id===data.activePetId?' selected':'')+'>🐾 '+esc(pt.name)+'</option>').join('') + '<option value="__add">＋ Add a dog…</option>';
   } else selEl.classList.add('hidden');
 }
-function onPetSelectChange(){}
+function onPetSelect(v){ if(v === '__add'){ petModal(); updateHeader(); return; } selectPet(v); }
+
+// ── THEME (light / dark) ──
+function currentTheme(){ return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark'; }
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = document.getElementById('theme-toggle'); if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
+  const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute('content', t === 'light' ? '#ffffff' : '#0d1117');
+  if(weightChart){ try { weightChart.destroy(); } catch(e){} weightChart = null; maybeDrawWeightChart(); }
+}
+function toggleTheme(){
+  const t = currentTheme() === 'light' ? 'dark' : 'light';
+  try { localStorage.setItem('pawprints_theme', t); } catch(e){}
+  data.settings = data.settings || {}; data.settings.theme = t;
+  applyTheme(t);
+  if(!demoMode) persist();
+}
 
 function render(){
   updateHeader();
@@ -914,8 +938,6 @@ function render(){
   if(currentView === 'calendar' && gcalAccessToken && !window._gcalCalendars) loadCalendarList();
 }
 
-// intercept "Add a dog" in selector
-document.addEventListener('change', e => { if(e.target && e.target.id==='pet-select' && e.target.value==='__add'){ petModal(); updateHeader(); } });
 
 // ── TODAY ──
 function statusCard(label, icon, dt, overdueHrs){
@@ -1135,11 +1157,12 @@ function renderCalendar(){
     const k = view.y+'-'+pad(view.m+1)+'-'+pad(day);
     const evs = byDay[k] || [];
     const isToday = k === todayK;
-    html += '<div style="min-height:62px;border-radius:8px;border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';background:'+(isToday?'rgba(244,162,97,.08)':'var(--bg-tertiary)')+';padding:4px 5px;overflow:hidden">'
+    html += '<div style="min-height:58px;border-radius:8px;border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';background:'+(isToday?'rgba(244,162,97,.08)':'var(--bg-tertiary)')+';padding:4px 5px;overflow:hidden">'
       + '<div style="font-size:11px;color:'+(isToday?'var(--accent)':'var(--text-secondary)')+';font-weight:'+(isToday?'700':'400')+'">'+day+'</div>'
-      + evs.slice(0,3).map(e=>'<div onclick="'+e.open+'" title="'+esc(e.title)+'" style="cursor:pointer;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">'+e.icon+' <span style="color:var(--text-secondary)">'+esc(e.type)+'</span></div>').join('')
-      + (evs.length>3?'<div style="font-size:9px;color:var(--text-secondary)">+'+(evs.length-3)+' more</div>':'')
-      + '</div>';
+      + '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">'
+        + evs.slice(0,4).map(e=>'<span onclick="'+e.open+'" title="'+esc(e.title)+'" style="cursor:pointer;font-size:12px;line-height:1">'+e.icon+'</span>').join('')
+        + (evs.length>4?'<span style="font-size:9px;color:var(--text-secondary);align-self:center">+'+(evs.length-4)+'</span>':'')
+      + '</div></div>';
   }
   html += '</div></div>';
   // Upcoming list
@@ -1286,10 +1309,14 @@ function maybeDrawWeightChart(){
   loadChart().then(()=>{
     const c2 = document.getElementById('weight-chart'); if(!c2) return;
     if(weightChart){ try{weightChart.destroy();}catch(e){} }
+    const css = getComputedStyle(document.documentElement);
+    const txtCol = css.getPropertyValue('--text-secondary').trim() || '#8b949e';
+    const gridCol = css.getPropertyValue('--border').trim() || '#30363d';
+    const lineCol = css.getPropertyValue('--accent-purple').trim() || '#a371f7';
     weightChart = new Chart(c2.getContext('2d'), {
       type:'line',
-      data:{ labels:weights.map(w=>fmtDate(w.dateTime)), datasets:[{ label:'Weight ('+(weights[0].unit||'lb')+')', data:weights.map(w=>num(w.value)), borderColor:'#a371f7', backgroundColor:'rgba(163,113,247,.12)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:'#a371f7' }] },
-      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#8b949e',maxTicksLimit:6},grid:{color:'#30363d'}}, y:{ticks:{color:'#8b949e'},grid:{color:'#30363d'}} } }
+      data:{ labels:weights.map(w=>fmtDate(w.dateTime)), datasets:[{ label:'Weight ('+(weights[0].unit||'lb')+')', data:weights.map(w=>num(w.value)), borderColor:lineCol, backgroundColor:'rgba(124,58,237,.12)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:lineCol }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:txtCol,maxTicksLimit:6},grid:{color:gridCol}}, y:{ticks:{color:txtCol},grid:{color:gridCol}} } }
     });
   }).catch(()=>{});
 }
@@ -1350,7 +1377,7 @@ function enterDemo(){
 function exitDemo(){
   if(!demoMode) return;
   demoMode = false;
-  data = demoBackup || { pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] };
+  data = demoBackup || JSON.parse(JSON.stringify(DATA_DEFAULTS));
   demoBackup = null;
   if(history.replaceState) history.replaceState(null,'',location.pathname);
   document.getElementById('demo-banner').classList.add('hidden');
@@ -1365,6 +1392,7 @@ document.getElementById('app-version').textContent = APP_VERSION;
 document.getElementById('app-version-footer').textContent = APP_VERSION;
 document.title = 'PawPrints ' + APP_VERSION + ' — Feed · Walk · Care';
 loadLocal();
+applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.settings.theme) || currentTheme());
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
 else render();

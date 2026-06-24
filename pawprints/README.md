@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.3.0**
+**Current Version: v0.4.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,12 @@ covers both.
 
 ## Version History
 
+- **v0.4.0** — Light / dark mode + mobile polish. A theme toggle (🌙/☀️) in the header
+  switches between the dark default and a clean light palette, remembered per-device
+  (localStorage) and synced across devices (Firestore); first-load respects your system
+  preference with no flash. All colors run through CSS variables (including the chart and a
+  new `--on-accent` token) so both themes stay legible. Also fixed the dog-switcher "Add a
+  dog…" option (it no longer briefly clears the active pet) and tidied mobile button layout.
 - **v0.3.0** — "Connect Google Calendar once, forever." When the companion
   `pawprints-worker` is deployed, the Calendar tab connects through a proper
   server-side OAuth flow (refresh token stored server-side), so signing in on any
