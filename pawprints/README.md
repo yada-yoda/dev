@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.1.0**
+**Current Version: v0.2.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -35,6 +35,12 @@ covers both.
   (heartworm, flea & tick, vaccines) with next-due reminders, and an illness log
 - **Profile** — current weight + a weight-trend chart, and a merged Health Timeline of vet
   visits, grooming, illnesses, and meds
+- **Contacts** — save your vet, emergency vet, groomer, sitter, boarding, trainer and more;
+  each downloads or shares as a phone contact card (**vCard / .vcf**). Plus a "share your dog's
+  info card" vCard for handing off to a sitter
+- **Calendar** — a month view of every dated item (vet, follow-ups, grooming + next-due, med
+  due-dates); **two-way Google Calendar sync** writes the schedule to a calendar you pick (re-sync
+  updates the same events, no duplicates), plus a no-account `.ics` download
 - **Supplies** — inventory of food/treats/supplies/meds with purchase history, a running-low
   restock list, and year-to-date spend
 - **Insights** — meals today, walks & walk-time, weight trend, and a vet/grooming/supplies
@@ -60,6 +66,15 @@ covers both.
 
 ## Version History
 
+- **v0.2.0** — Contacts + Calendar. New **Contacts** section on the Profile tab for the care
+  team (vet, emergency vet, groomer, sitter, boarding, trainer, pharmacy, walker), each with a
+  one-tap Call link and **downloadable / shareable vCard (.vcf)** so they drop straight into a
+  phone's contacts — plus a "share [dog]'s info card" vCard for sitters. New **Calendar** tab
+  with a month grid of all dated items (vet visits, follow-ups, grooming + next-due, med
+  due-dates) and **Google Calendar sync**: connect via the existing Google sign-in, pick which
+  calendar to write to, and push the schedule (re-syncing updates the same events instead of
+  duplicating, tracked via stored event ids). Also a no-account `.ics` export. Reuses the
+  Illness Tracker's Calendar API enablement on the shared Firebase project.
 - **v0.1.0** — Initial release. Single-file app modeled on the Illness Tracker: shared Google
   login (same Firebase project, separate `pawprints/{uid}` doc), multi-dog profiles with inline
   photos, Today dashboard with quick-log + status + reminders, Log tab (feed/water/potty/walk/

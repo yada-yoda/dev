@@ -144,6 +144,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <button data-view="log" onclick="switchView('log')"><span class="nav-icon">✚</span> Log</button>
   <button data-view="profile" onclick="switchView('profile')"><span class="nav-icon">🐶</span> Profile</button>
   <button data-view="care" onclick="switchView('care')"><span class="nav-icon">🩺</span> Care</button>
+  <button data-view="calendar" onclick="switchView('calendar')"><span class="nav-icon">📅</span> Calendar</button>
   <button data-view="supplies" onclick="switchView('supplies')"><span class="nav-icon">🛒</span> Supplies</button>
   <button data-view="insights" onclick="switchView('insights')"><span class="nav-icon">📊</span> Insights</button>
 </div>
@@ -153,6 +154,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <div id="view-log" class="hidden"></div>
   <div id="view-profile" class="hidden"></div>
   <div id="view-care" class="hidden"></div>
+  <div id="view-calendar" class="hidden"></div>
   <div id="view-supplies" class="hidden"></div>
   <div id="view-insights" class="hidden"></div>
 </div>
@@ -169,21 +171,24 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.1.0';
+const APP_VERSION = 'v0.2.0';
 
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-let data = { pets: [], activePetId: null, logs: [], vetVisits: [], grooming: [], illnesses: [], meds: [], inventory: [] };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{} };
+let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
 let careSubtab = 'vet';
 let suppliesCat = 'all';
+let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
 let currentUser = null;
 let db = null;
 let demoMode = false;
 let demoBackup = null;
+let gcalAccessToken = null;
 
 // ═══════════════════════════════════════════════
 // CONSTANTS
@@ -199,6 +204,8 @@ const INV_CATEGORIES = ['Food','Treats','Supplies','Meds'];
 const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
 const SEVERITY = ['Mild','Moderate','Severe'];
 const SEXES = ['Male','Female','Male (neutered)','Female (spayed)'];
+const CONTACT_ROLES = ['Vet','Emergency Vet','Groomer','Pet Sitter','Boarding / Daycare','Trainer','Pharmacy','Walker','Other'];
+const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 
 // ═══════════════════════════════════════════════
 // HELPERS
@@ -309,12 +316,17 @@ function updateAuthUI(){
   document.getElementById('btn-signout').classList.toggle('hidden', !cu);
   if(cu){ document.getElementById('user-avatar').src = cu.photoURL||''; document.getElementById('user-name').textContent = cu.displayName||cu.email; }
 }
-function signIn(){
+function signIn(withCalendar){
   if(!firebaseReady){ showToast('⚠️ Firebase not ready'); return; }
   const p = new firebase.auth.GoogleAuthProvider();
-  firebase.auth().signInWithPopup(p).then(() => showToast('✅ Signed in')).catch(e => showToast('⚠️ Sign-in failed: ' + e.message));
+  if(withCalendar) GCAL_SCOPES.split(' ').forEach(s => p.addScope(s));
+  firebase.auth().signInWithPopup(p).then(r => {
+    if(r.credential && r.credential.accessToken){ gcalAccessToken = r.credential.accessToken; }
+    showToast('✅ Signed in'+(withCalendar?' — Calendar connected':''));
+    render();
+  }).catch(e => showToast('⚠️ Sign-in failed: ' + e.message));
 }
-function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); showToast('Signed out'); }
+function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAccessToken = null; showToast('Signed out'); }
 
 async function loadFromFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
@@ -324,10 +336,12 @@ async function loadFromFirestore(){
     if(doc.exists){
       const d = doc.data();
       // Merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
+      data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
+      data.settings = Object.assign({}, d.settings||{}, data.settings||{});
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       saveLocal(); render();
@@ -349,7 +363,7 @@ async function saveToFirestore(){
 // PERSISTENCE
 // ═══════════════════════════════════════════════
 function saveLocal(){ if(demoMode) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
-function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign({ pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] }, d); } } catch(e){} }
+function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); } } catch(e){} }
 function persist(){ saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(rerender !== false) render(); }
 
@@ -360,7 +374,7 @@ function importJSON(evt){
   const r = new FileReader();
   r.onload = (e) => { try {
     const d = JSON.parse(e.target.result);
-    if(d && d.pets){ data = Object.assign({ pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] }, d); persist(); render(); showToast('✅ Imported'); }
+    if(d && d.pets){ data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); persist(); render(); showToast('✅ Imported'); }
     else showToast('⚠️ Not a PawPrints export');
   } catch { showToast('⚠️ Invalid JSON'); } };
   r.readAsText(f); evt.target.value = '';
@@ -643,6 +657,154 @@ function saveInv(id){
 function toggleLow(id){ const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; save(); } }
 
 // ═══════════════════════════════════════════════
+// CONTACTS + vCARDS
+// ═══════════════════════════════════════════════
+function contactModal(id){
+  const c = id ? data.contacts.find(x=>x.id===id) : null;
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  // First add: prefill a Vet from the active dog's saved vet info
+  const pre = (!c && activePet()) ? { role:'Vet', org:activePet().vetName||'', phone:activePet().vetPhone||'' } : {};
+  openModal('<h3>📇 '+(c?'Edit contact':'Add contact')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="ct-role">'+sel(CONTACT_ROLES, c?c.role:(pre.role||'Vet'))+'</select></div>'
+    +'<div><label class="label">Name (person)</label><input class="input" id="ct-name" value="'+(c?esc(c.name||''):'')+'" placeholder="Dr. Patel"></div></div>'
+    +'<label class="label">Clinic / Business</label><input class="input" id="ct-org" value="'+(c?esc(c.org||''):esc(pre.org||''))+'" placeholder="Riverside Animal Hospital">'
+    +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="ct-phone" value="'+(c?esc(c.phone||''):esc(pre.phone||''))+'"></div>'
+    +'<div><label class="label">Email</label><input class="input" type="email" id="ct-email" value="'+(c?esc(c.email||''):'')+'"></div></div>'
+    +'<label class="label">Address</label><input class="input" id="ct-addr" value="'+(c?esc(c.address||''):'')+'" placeholder="123 Main St, City, ST 00000">'
+    +'<label class="label">Website</label><input class="input" type="url" id="ct-web" value="'+(c?esc(c.website||''):'')+'" placeholder="https://">'
+    +'<label class="label">Notes</label><input class="input" id="ct-notes" value="'+(c?esc(c.notes||''):'')+'">'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveContact('+(c?"'"+c.id+"'":'null')+')">Save</button>'
+    +(c?'<button class="btn btn-danger" onclick="data.contacts=data.contacts.filter(x=>x.id!==\''+c.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveContact(id){
+  const f = { role:fv('ct-role'), name:fv('ct-name'), org:fv('ct-org'), phone:fv('ct-phone'), email:fv('ct-email'), address:fv('ct-addr'), website:fv('ct-web'), notes:fv('ct-notes') };
+  if(!f.name && !f.org){ showToast('⚠️ Enter a name or business'); return; }
+  if(id) data.contacts = data.contacts.map(c=>c.id===id?{...c,...f}:c);
+  else data.contacts.unshift({ id:genId(), ...f });
+  closeModal(); save(); showToast('📇 Contact saved');
+}
+function vcEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
+function safeName(s){ return String(s||'contact').replace(/[^a-z0-9]+/gi,'-').replace(/^-+|-+$/g,'').toLowerCase() || 'contact'; }
+function vCardFor(c){
+  const fn = c.name || c.org || 'Contact';
+  const dog = activePet() ? activePet().name : '';
+  const lines = ['BEGIN:VCARD','VERSION:3.0','FN:'+vcEsc(fn)];
+  if(c.org) lines.push('ORG:'+vcEsc(c.org));
+  if(c.role) lines.push('TITLE:'+vcEsc(c.role+(dog?' — '+dog:'')));
+  if(c.phone) lines.push('TEL;TYPE=WORK,VOICE:'+vcEsc(c.phone));
+  if(c.email) lines.push('EMAIL;TYPE=WORK:'+vcEsc(c.email));
+  if(c.address) lines.push('ADR;TYPE=WORK:;;'+vcEsc(c.address)+';;;;');
+  if(c.website) lines.push('URL:'+vcEsc(c.website));
+  const note = [c.notes, (c.role&&dog)?(c.role+' for '+dog):''].filter(Boolean).join(' · ');
+  if(note) lines.push('NOTE:'+vcEsc(note));
+  lines.push('END:VCARD');
+  return lines.join('\r\n');
+}
+function downloadVCard(id){ const c=data.contacts.find(x=>x.id===id); if(!c) return; dl(new Blob([vCardFor(c)],{type:'text/vcard'}), safeName(c.name||c.org)+'.vcf'); showToast('⬇️ vCard saved'); }
+async function shareVCardText(text, fname, title){
+  try {
+    if(navigator.canShare && typeof File !== 'undefined'){
+      const file = new File([text], fname, {type:'text/vcard'});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file], title}); return true; }
+    }
+  } catch(e){ if(e && e.name==='AbortError') return true; }
+  return false;
+}
+async function shareVCard(id){
+  const c = data.contacts.find(x=>x.id===id); if(!c) return;
+  const fname = safeName(c.name||c.org)+'.vcf';
+  if(await shareVCardText(vCardFor(c), fname, c.name||c.org)) return;
+  dl(new Blob([vCardFor(c)],{type:'text/vcard'}), fname); showToast('⬇️ vCard saved (share not supported here)');
+}
+// Share the dog's own info as a contact card — handy for a sitter / boarding
+async function shareDogCard(){
+  const p = activePet(); if(!p) return;
+  const w = latestWeight();
+  const vet = (data.contacts.find(c=>c.role==='Vet')) || (p.vetName?{org:p.vetName,phone:p.vetPhone}:null);
+  const note = [p.breed, ageStr(p.birthday), w?('Weight '+w.value+' '+(w.unit||'lb')):'', p.color, p.microchip?'Microchip '+p.microchip:'', p.license?'License '+p.license:'', vet?('Vet: '+(vet.org||vet.name||'')+(vet.phone?' '+vet.phone:'')):'', p.notes].filter(Boolean).join(' · ');
+  const lines = ['BEGIN:VCARD','VERSION:3.0','FN:'+vcEsc(p.name+' (dog)'),'ORG:'+vcEsc('Dog'+(p.breed?' — '+p.breed:'')),'TITLE:Dog'];
+  if(vet && vet.phone) lines.push('TEL;TYPE=WORK,VOICE:'+vcEsc(vet.phone));
+  if(note) lines.push('NOTE:'+vcEsc(note));
+  lines.push('END:VCARD');
+  const fname = safeName(p.name)+'-info.vcf';
+  if(await shareVCardText(lines.join('\r\n'), fname, p.name)) return;
+  dl(new Blob([lines.join('\r\n')],{type:'text/vcard'}), fname); showToast('⬇️ '+p.name+'’s card saved');
+}
+
+// ═══════════════════════════════════════════════
+// CALENDAR — dated events + Google Calendar sync
+// ═══════════════════════════════════════════════
+// Collect every dated item for the active dog into one list.
+// key is stable so Google events can be created/updated without duplicating.
+function calendarEvents(){
+  const p = activePet(); if(!p) return [];
+  const dn = p.name, ev = [];
+  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, icon:'🏥', type:'Vet', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
+    if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
+  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, icon:'✂️', type:'Grooming', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
+    if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
+  petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
+  petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
+  // birthday + gotcha day (recurring annual, shown for current year)
+  return ev.sort((a,b)=> new Date(dateSafe(a.date)) - new Date(dateSafe(b.date)));
+}
+
+// Google Calendar
+function gcalConnected(){ return !!gcalAccessToken; }
+function connectGoogleCalendar(){
+  if(!currentUser){ signIn(true); return; }
+  // already signed in but no calendar token → re-auth with scopes
+  signIn(true);
+}
+async function gcalFetch(url, opts){
+  const r = await fetch(url, Object.assign({ headers:{ 'Authorization':'Bearer '+gcalAccessToken, 'Content-Type':'application/json' } }, opts||{}));
+  if(r.status === 401){ gcalAccessToken = null; throw new Error('auth-expired'); }
+  return r;
+}
+async function loadCalendarList(){
+  if(!gcalAccessToken) return;
+  try {
+    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer');
+    const j = await r.json();
+    if(j.items){ window._gcalCalendars = j.items.map(c=>({id:c.id, name:c.summary, primary:c.primary})); if(!data.settings.gcalCalendarId){ const prim = j.items.find(c=>c.primary); if(prim){ data.settings.gcalCalendarId = prim.id; saveLocal(); } } render(); }
+  } catch(e){ if(e.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); render(); } }
+}
+function setTargetCalendar(id){ data.settings.gcalCalendarId = id; save(); }
+async function syncToGoogleCalendar(){
+  if(!gcalAccessToken){ connectGoogleCalendar(); return; }
+  const calId = data.settings.gcalCalendarId || 'primary';
+  const events = calendarEvents();
+  if(!events.length){ showToast('No dated events to sync yet'); return; }
+  showToast('⏳ Syncing to Google Calendar…');
+  let ok = 0, fail = 0;
+  data.gcalEvents = data.gcalEvents || {};
+  for(const e of events){
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const body = { summary:e.title, description:(e.desc||'')+'\n\n— via PawPrints', start:{ date:e.date }, end:{ date:e.date }, transparency:'transparent' };
+    const existing = data.gcalEvents[e.key];
+    try {
+      let r;
+      if(existing){ r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calId)+'/events/'+encodeURIComponent(existing), { method:'PATCH', body:JSON.stringify(body) }); if(r.status===404){ r = null; } }
+      if(!existing || (existing && !r)){ r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calId)+'/events', { method:'POST', body:JSON.stringify(body) }); }
+      if(r && r.ok){ const j = await r.json(); data.gcalEvents[e.key] = j.id; ok++; } else fail++;
+    } catch(err){ if(err.message==='auth-expired'){ showToast('⚠️ Session expired — reconnect Google Calendar'); render(); return; } fail++; }
+    await new Promise(r=>setTimeout(r,150));
+  }
+  save();
+  showToast('✅ Synced '+ok+' event'+(ok===1?'':'s')+' to Google Calendar'+(fail?' ('+fail+' failed)':''));
+}
+// .ics export fallback (no Google account needed)
+function exportICS(){
+  const events = calendarEvents();
+  if(!events.length){ showToast('No dated events to export'); return; }
+  const stamp = (s)=> (s||todayISO()).replace(/-/g,'');
+  const body = events.map(e => 'BEGIN:VEVENT\r\nUID:'+e.key.replace(/[^a-z0-9]/gi,'')+'@pawprints\r\nDTSTART;VALUE=DATE:'+stamp(e.date)+'\r\nSUMMARY:'+(e.title.replace(/[\n,;]/g,' '))+'\r\nDESCRIPTION:'+((e.desc||'').replace(/\r?\n/g,'\\n'))+'\r\nEND:VEVENT').join('\r\n');
+  dl(new Blob(['BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PawPrints//EN\r\nCALSCALE:GREGORIAN\r\n'+body+'\r\nEND:VCALENDAR'],{type:'text/calendar'}), safeName(activePet()?activePet().name:'pawprints')+'-schedule.ics');
+  showToast('📅 .ics downloaded');
+}
+
+// ═══════════════════════════════════════════════
 // REMINDERS
 // ═══════════════════════════════════════════════
 function getReminders(){
@@ -657,7 +819,7 @@ function getReminders(){
 // ═══════════════════════════════════════════════
 // VIEW SWITCHING + RENDER
 // ═══════════════════════════════════════════════
-const VIEWS = ['today','log','profile','care','supplies','insights'];
+const VIEWS = ['today','log','profile','care','calendar','supplies','insights'];
 function switchView(v){
   currentView = v;
   VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
@@ -691,9 +853,11 @@ function render(){
   document.getElementById('view-log').innerHTML = renderLog();
   document.getElementById('view-profile').innerHTML = renderProfile();
   document.getElementById('view-care').innerHTML = renderCare();
+  document.getElementById('view-calendar').innerHTML = renderCalendar();
   document.getElementById('view-supplies').innerHTML = renderSupplies();
   document.getElementById('view-insights').innerHTML = renderInsights();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
+  if(currentView === 'calendar' && gcalAccessToken && !window._gcalCalendars) loadCalendarList();
 }
 
 // intercept "Add a dog" in selector
@@ -812,7 +976,7 @@ function renderProfile(){
   if(p.vetName) facts.push(['Vet', esc(p.vetName)+(p.vetPhone?' · '+esc(p.vetPhone):'')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
-  html += '<div style="margin-top:14px"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button></div>';
+  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button><button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
   html += '</div>';
   // weight chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
@@ -823,6 +987,8 @@ function renderProfile(){
   }
   // health timeline
   html += '<div class="card"><h3 class="section-title">🩺 Health timeline</h3>'+renderHealthTimeline()+'</div>';
+  // contacts / care team
+  html += renderContacts();
   // multi-dog management
   html += '<div class="card"><h3 class="section-title">🐕 Your dogs</h3>'
     + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div><button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button></div>').join('')
@@ -839,6 +1005,92 @@ function renderHealthTimeline(){
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, and meds will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
   return items.slice(0,40).map(it => '<div class="timeline-item"><div class="tl-icon">'+it.icon+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
+}
+function renderContacts(){
+  const cs = data.contacts || [];
+  let html = '<div class="card"><h3 class="section-title">📇 Contacts — vet, groomer &amp; care team</h3>';
+  if(!cs.length) html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:10px">Save your vet, emergency vet, groomer, sitter and more — each downloads or shares as a phone contact card (.vcf).</p>';
+  else html += cs.map(c=>{
+    const title = c.name || c.org || 'Contact';
+    const sub = [c.org && c.org!==title ? c.org : '', c.phone, c.email].filter(Boolean).join(' · ');
+    const tel = (c.phone||'').replace(/[^0-9+]/g,'');
+    return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(title)+' <span class="chip-2" style="font-size:10px">'+esc(c.role||'')+'</span></div>'
+      +(sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(sub)+'</div>':'')
+      +(c.address?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(c.address)+'</div>':'')+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'
+      +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">Call</a>':'')
+      +'<button class="btn btn-sm" onclick="downloadVCard(\''+c.id+'\')" title="Download contact card">⬇️ vCard</button>'
+      +'<button class="btn btn-sm" onclick="shareVCard(\''+c.id+'\')" title="Share">Share</button>'
+      +'<button class="btn btn-sm" onclick="contactModal(\''+c.id+'\')">Edit</button>'
+      +'</div></div>';
+  }).join('');
+  html += '<button class="btn" style="border-style:dashed;margin-top:6px" onclick="contactModal()">+ Add contact</button></div>';
+  return html;
+}
+
+// ── CALENDAR ──
+function navCalMonth(delta){
+  const base = calMonth || (function(){ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
+  let m = base.m + delta, y = base.y;
+  if(m < 0){ m = 11; y--; } if(m > 11){ m = 0; y++; }
+  calMonth = {y, m};
+  document.getElementById('view-calendar').innerHTML = renderCalendar();
+}
+function renderCalendar(){
+  if(!activePet()) return emptyState();
+  const events = calendarEvents();
+  const view = calMonth || (function(){ const d=new Date(); return {y:d.getFullYear(), m:d.getMonth()}; })();
+  const monthName = new Date(view.y, view.m, 1).toLocaleDateString('en-US',{month:'long',year:'numeric'});
+  // group events by yyyy-mm-dd
+  const byDay = {};
+  events.forEach(e => { const k = (e.date||'').slice(0,10); (byDay[k] = byDay[k]||[]).push(e); });
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Calendar</h2>';
+  // Google Calendar control card
+  html += '<div class="card"><h3 class="section-title">📅 Google Calendar</h3>';
+  if(!currentUser){
+    html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Sign in with Google to push vet, grooming and med dates straight to your calendar.</p>'
+      + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">Sign in &amp; connect Google Calendar</button>';
+  } else if(!gcalAccessToken){
+    html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Connect Google Calendar to sync '+activePet().name+'’s schedule into a calendar of your choice.</p>'
+      + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">🔗 Connect Google Calendar</button>';
+  } else {
+    const cals = window._gcalCalendars || [];
+    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
+    if(cals.length){
+      html += '<div style="flex:1;min-width:200px"><label class="label">Write to calendar</label><select class="select" style="margin-bottom:0" onchange="setTargetCalendar(this.value)">'
+        + cals.map(c=>'<option value="'+esc(c.id)+'"'+(data.settings.gcalCalendarId===c.id?' selected':'')+'>'+esc(c.name)+(c.primary?' (primary)':'')+'</option>').join('')
+        + '</select></div>';
+    } else html += '<div style="flex:1;color:var(--text-secondary);font-size:13px">Loading your calendars…</div>';
+    html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
+    html += '</div><p style="font-size:12px;color:var(--text-secondary);margin-top:10px">Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates. Re-syncing updates the same events, no duplicates.</p>';
+  }
+  html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">📅 Download .ics</button></div>';
+  html += '</div>';
+  // Month grid
+  const first = new Date(view.y, view.m, 1), startDow = first.getDay(), daysIn = new Date(view.y, view.m+1, 0).getDate();
+  const todayK = todayISO();
+  html += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><button class="btn btn-sm" onclick="navCalMonth(-1)">‹</button><div style="font-weight:700;font-size:16px">'+monthName+'</div><button class="btn btn-sm" onclick="navCalMonth(1)">›</button></div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px">';
+  ['S','M','T','W','T','F','S'].forEach(d => html += '<div style="text-align:center;font-size:11px;color:var(--text-secondary);font-weight:600;padding:4px 0">'+d+'</div>');
+  for(let i=0;i<startDow;i++) html += '<div></div>';
+  for(let day=1; day<=daysIn; day++){
+    const k = view.y+'-'+pad(view.m+1)+'-'+pad(day);
+    const evs = byDay[k] || [];
+    const isToday = k === todayK;
+    html += '<div style="min-height:62px;border-radius:8px;border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';background:'+(isToday?'rgba(244,162,97,.08)':'var(--bg-tertiary)')+';padding:4px 5px;overflow:hidden">'
+      + '<div style="font-size:11px;color:'+(isToday?'var(--accent)':'var(--text-secondary)')+';font-weight:'+(isToday?'700':'400')+'">'+day+'</div>'
+      + evs.slice(0,3).map(e=>'<div onclick="'+e.open+'" title="'+esc(e.title)+'" style="cursor:pointer;font-size:10px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px">'+e.icon+' <span style="color:var(--text-secondary)">'+esc(e.type)+'</span></div>').join('')
+      + (evs.length>3?'<div style="font-size:9px;color:var(--text-secondary)">+'+(evs.length-3)+' more</div>':'')
+      + '</div>';
+  }
+  html += '</div></div>';
+  // Upcoming list
+  const upcoming = events.filter(e => (e.date||'').slice(0,10) >= todayK).slice(0,12);
+  html += '<div class="card"><h3 class="section-title">Upcoming</h3>';
+  if(!upcoming.length) html += '<p style="color:var(--text-secondary);font-size:14px">Nothing scheduled. Add a vet visit, grooming, or med to populate the calendar.</p>';
+  else html += upcoming.map(e=>'<div class="entry-row clickable" onclick="'+e.open+'"><div><div style="font-weight:600;font-size:14px">'+e.icon+' '+esc(e.title.replace(/^.\s/,''))+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(e.type)+'</div></div><div class="tl-time">'+fmtDate(e.date)+'</div></div>').join('');
+  html += '</div>';
+  return html;
 }
 
 // ── CARE ──
@@ -1023,7 +1275,13 @@ function enterDemo(){
       { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), runningLow:false, notes:'' },
       { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
-    ]
+    ],
+    contacts: [
+      { id:'c1', role:'Vet', name:'Dr. Patel', org:'Riverside Animal Hospital', phone:'(555) 012-3456', email:'care@riversideah.example', address:'420 River Rd, Springfield, IL 62704', website:'https://riversideah.example', notes:'Ask for the established-patient line' },
+      { id:'c2', role:'Emergency Vet', name:'', org:'Springfield Animal ER (24/7)', phone:'(555) 911-7387', email:'', address:'9 Hospital Dr, Springfield, IL 62701', website:'', notes:'Open nights & weekends' },
+      { id:'c3', role:'Groomer', name:'', org:'Soapy Paws', phone:'(555) 778-2200', email:'hello@soapypaws.example', address:'88 Maple Ave, Springfield, IL 62704', website:'', notes:'Biscuit likes the blueberry shampoo' },
+    ],
+    gcalEvents: {}, settings: {}
   };
   if(history.replaceState && !location.search.includes('demo=1')) history.replaceState(null,'','?demo=1');
   document.getElementById('demo-banner').classList.remove('hidden');
