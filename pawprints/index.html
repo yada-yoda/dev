@@ -101,8 +101,8 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .subtab{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
 .subtab button{padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;font-family:inherit;cursor:pointer}
 .subtab button.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);animation:fadeIn .3s ease}
-@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:300;box-shadow:0 8px 32px var(--shadow);animation:fadeIn .3s ease;max-width:calc(100% - 32px);text-align:center}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .hidden{display:none !important}
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
@@ -178,7 +178,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.4.0';
+const APP_VERSION = 'v0.4.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -466,7 +466,7 @@ function deletePet(id){
 // QUICK LOG + LOG ENTRIES
 // ═══════════════════════════════════════════════
 function addLog(entry){
-  if(!data.activePetId){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  if(!data.activePetId){ promptAddDog(); return; }
   data.logs.unshift({ id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry });
   save();
 }
@@ -475,7 +475,7 @@ function delLog(id){ data.logs = data.logs.filter(l=>l.id!==id); save(); }
 // Quick buttons
 function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
 function quickFeed(){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const last = lastLog('feed');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🍖 Log feeding</h3>'
@@ -487,7 +487,7 @@ function quickFeed(){
     +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
 }
 function quickPotty(){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🚪 Potty break</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
@@ -503,7 +503,7 @@ function savePotty(){
   closeModal(); showToast('🚪 Potty logged');
 }
 function quickWalk(){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  if(!activePet()){ promptAddDog(); return; }
   openModal('<h3>🦮 Log a walk</h3>'
     +'<label class="label">When (start)</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="q-dur" placeholder="30"></div>'
@@ -512,7 +512,7 @@ function quickWalk(){
     +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
 }
 function quickWeight(){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const unit = activePet().weightUnit || 'lb';
   openModal('<h3>⚖️ Log weight</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
@@ -541,7 +541,7 @@ function vetModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveVet(id){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const f = { date:fv('vt-date'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), notes:fv('vt-notes') };
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
@@ -568,7 +568,7 @@ function groomModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveGroom(id){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
   const f = { date:fv('gr-date'), cost:fv('gr-cost'), groomer:fv('gr-by'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes') };
   if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
@@ -595,7 +595,7 @@ function medNextDue(m){
   return '';
 }
 function saveMed(id){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const f = { name:fv('md-name'), kind:fv('md-kind'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), nextDue:fv('md-next'), notes:fv('md-notes') };
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
   if(id) data.meds = data.meds.map(m => m.id===id ? {...m, ...f} : m);
@@ -627,7 +627,7 @@ function illnessModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveIllness(id){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const symptoms = [...document.querySelectorAll('#il-symptoms .tag.active')].map(t=>t.dataset.s);
   const f = { start:fv('il-start'), recovery:fv('il-recovery'), symptoms, severity:fv('il-sev'), diagnosis:fv('il-dx'), treatment:fv('il-treat'), notes:fv('il-notes') };
   if(id) data.illnesses = data.illnesses.map(e => e.id===id ? {...e, ...f} : e);
@@ -656,7 +656,7 @@ function invModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveInv(id){
-  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  if(!activePet()){ promptAddDog(); return; }
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'),
     cost:fv('iv-cost'), purchaseDate:fv('iv-date'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
@@ -888,6 +888,15 @@ function switchView(v){
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view===v));
   render();
   window.scrollTo({top:0,behavior:'smooth'});
+  // No dog yet → a feature tab can't do anything useful. Prompt to add one.
+  if(!activePet() && v !== 'today') promptAddDog();
+}
+// Modal shown when an action needs a dog but none exists yet.
+function promptAddDog(){
+  openModal('<h3>🐾 Add your dog first</h3>'
+    + '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:18px;line-height:1.5">PawPrints needs a dog before you can use this. Add your pup to start tracking feeding, walks, potty breaks, vet visits, grooming and more — or take a quick tour with the demo.</p>'
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" style="width:auto" onclick="closeModal();petModal()">🐶 Add your dog</button>'
+    + '<button class="btn" onclick="closeModal();enterDemo()">🎭 Try the demo</button></div>');
 }
 function setLogSubtab(t){ logSubtab = t; render(); }
 function setCareSubtab(t){ careSubtab = t; render(); }

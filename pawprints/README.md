@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.4.0**
+**Current Version: v0.4.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,11 @@ covers both.
 
 ## Version History
 
+- **v0.4.1** — Onboarding + toast polish. With no dog added yet, tapping a feature tab
+  (Calendar, Care, etc.) previously just showed a generic card that looked identical on every
+  tab — now it pops a clear **"Add your dog first"** modal that starts the add-dog flow (or
+  offers the demo). The same modal replaces the old "add a dog first" toast on quick-log
+  actions. Toast notifications now appear **top-center** instead of bottom.
 - **v0.4.0** — Light / dark mode + mobile polish. A theme toggle (🌙/☀️) in the header
   switches between the dark default and a clean light palette, remembered per-device
   (localStorage) and synced across devices (Firestore); first-load respects your system
