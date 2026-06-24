@@ -171,7 +171,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.2.0';
+const APP_VERSION = 'v0.3.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -304,7 +304,8 @@ function initFirebase(){
     firebaseReady = true;
     firebase.auth().onAuthStateChanged(user => {
       currentUser = user; updateAuthUI();
-      if(user) ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e));
+      if(user){ ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection(); }
+      else { gcalAccessToken = null; gcalPersistent = false; }
     });
   } catch(e){ console.warn('Firebase init failed:', e); }
 }
@@ -316,14 +317,15 @@ function updateAuthUI(){
   document.getElementById('btn-signout').classList.toggle('hidden', !cu);
   if(cu){ document.getElementById('user-avatar').src = cu.photoURL||''; document.getElementById('user-name').textContent = cu.displayName||cu.email; }
 }
-function signIn(withCalendar){
+function signIn(withCalendar, after){
   if(!firebaseReady){ showToast('⚠️ Firebase not ready'); return; }
   const p = new firebase.auth.GoogleAuthProvider();
-  if(withCalendar) GCAL_SCOPES.split(' ').forEach(s => p.addScope(s));
+  if(withCalendar){ GCAL_SCOPES.split(' ').forEach(s => p.addScope(s)); gcalPersistent = false; }
   firebase.auth().signInWithPopup(p).then(r => {
-    if(r.credential && r.credential.accessToken){ gcalAccessToken = r.credential.accessToken; }
-    showToast('✅ Signed in'+(withCalendar?' — Calendar connected':''));
+    if(withCalendar && r.credential && r.credential.accessToken){ gcalAccessToken = r.credential.accessToken; }
+    showToast('✅ Signed in'+(withCalendar?' — Calendar connected for this session':''));
     render();
+    if(typeof after === 'function') after();
   }).catch(e => showToast('⚠️ Sign-in failed: ' + e.message));
 }
 function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAccessToken = null; showToast('Signed out'); }
@@ -750,16 +752,68 @@ function calendarEvents(){
   return ev.sort((a,b)=> new Date(dateSafe(a.date)) - new Date(dateSafe(b.date)));
 }
 
-// Google Calendar
+// Google Calendar — backed by pawprints-worker for "connect once, forever".
+// If the worker isn't reachable/configured, falls back to a per-session popup.
+const PAWPRINTS_WORKER = 'https://pawprints-worker.sevendwarfs.workers.dev';
+let gcalPersistent = false; // true when connected via the worker (refresh token stored server-side)
+
+async function workerFetch(path, opts){
+  if(!currentUser) throw new Error('not-signed-in');
+  const idToken = await currentUser.getIdToken();
+  return fetch(PAWPRINTS_WORKER + path, Object.assign({ headers:{ 'Authorization':'Bearer '+idToken, 'Content-Type':'application/json' } }, opts||{}));
+}
+// Pull a fresh access token from the worker (uses the server-stored refresh token).
+async function refreshGcalToken(){
+  try {
+    const r = await workerFetch('/token', { method:'POST' });
+    const j = await r.json();
+    if(j.connected && j.access_token){ gcalAccessToken = j.access_token; gcalPersistent = true; return true; }
+    gcalPersistent = false; return false;
+  } catch(e){ return false; }
+}
+// On sign-in: silently reconnect Calendar if the worker already has a refresh token.
+async function checkGcalConnection(){
+  if(!currentUser) return;
+  const got = await refreshGcalToken();
+  if(got){ if(currentView==='calendar') loadCalendarList(); render(); }
+}
 function gcalConnected(){ return !!gcalAccessToken; }
 function connectGoogleCalendar(){
-  if(!currentUser){ signIn(true); return; }
-  // already signed in but no calendar token → re-auth with scopes
-  signIn(true);
+  if(!currentUser){ signIn(false, connectGoogleCalendar); return; }
+  // Prefer the worker's one-time OAuth. Open the consent popup it hands back.
+  workerFetch('/auth/start', { method:'POST' }).then(async r => {
+    if(!r.ok) throw new Error('worker-unconfigured');
+    const j = await r.json();
+    if(!j.url) throw new Error('no-url');
+    const popup = window.open(j.url, 'pawprints-gcal', 'width=520,height=640');
+    const onMsg = (ev) => {
+      if(ev.data && ev.data.type === 'pawprints-gcal'){
+        window.removeEventListener('message', onMsg);
+        if(ev.data.ok){ showToast('✅ Google Calendar connected'); checkGcalConnection(); }
+        else showToast('⚠️ Connection cancelled');
+      }
+    };
+    window.addEventListener('message', onMsg);
+    showToast('Opening Google sign-in…');
+  }).catch(() => {
+    // Worker not deployed/configured yet → fall back to the per-session popup flow.
+    showToast('Connecting for this session…');
+    signIn(true);
+  });
 }
-async function gcalFetch(url, opts){
+async function disconnectGoogleCalendar(){
+  gcalAccessToken = null; gcalPersistent = false; window._gcalCalendars = null;
+  try { await workerFetch('/disconnect', { method:'POST' }); } catch(e){}
+  showToast('Google Calendar disconnected'); render();
+}
+async function gcalFetch(url, opts, _retry){
+  if(!gcalAccessToken && gcalPersistent && !_retry) await refreshGcalToken();
   const r = await fetch(url, Object.assign({ headers:{ 'Authorization':'Bearer '+gcalAccessToken, 'Content-Type':'application/json' } }, opts||{}));
-  if(r.status === 401){ gcalAccessToken = null; throw new Error('auth-expired'); }
+  if(r.status === 401){
+    gcalAccessToken = null;
+    if(gcalPersistent && !_retry){ if(await refreshGcalToken()) return gcalFetch(url, opts, true); }
+    throw new Error('auth-expired');
+  }
   return r;
 }
 async function loadCalendarList(){
@@ -1062,7 +1116,11 @@ function renderCalendar(){
         + '</select></div>';
     } else html += '<div style="flex:1;color:var(--text-secondary);font-size:13px">Loading your calendars…</div>';
     html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
-    html += '</div><p style="font-size:12px;color:var(--text-secondary);margin-top:10px">Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates. Re-syncing updates the same events, no duplicates.</p>';
+    html += '</div>';
+    html += '<p style="font-size:12px;color:'+(gcalPersistent?'var(--success)':'var(--text-secondary)')+';margin-top:10px">'
+      + (gcalPersistent ? '✓ Connected — reconnects automatically on every device. ' : '⏱ Connected for this session only (set up pawprints-worker for permanent connect). ')
+      + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates. Re-syncing updates the same events, no duplicates.</p>';
+    if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:4px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
   }
   html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">📅 Download .ics</button></div>';
   html += '</div>';

@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.2.0**
+**Current Version: v0.3.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,11 @@ covers both.
 
 ## Version History
 
+- **v0.3.0** — "Connect Google Calendar once, forever." When the companion
+  `pawprints-worker` is deployed, the Calendar tab connects through a proper
+  server-side OAuth flow (refresh token stored server-side), so signing in on any
+  device silently reconnects — no re-consent each session — with a Disconnect button.
+  If the worker isn't configured, it gracefully falls back to the per-session popup.
 - **v0.2.0** — Contacts + Calendar. New **Contacts** section on the Profile tab for the care
   team (vet, emergency vet, groomer, sitter, boarding, trainer, pharmacy, walker), each with a
   one-tap Call link and **downloadable / shareable vCard (.vcf)** so they drop straight into a
