@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PawPrints — Feed · Walk · Care</title>
+<meta name="description" content="A private dog care tracker. Log feeding, water, potty trips, walks, vet visits, grooming, meds, weight, and supplies. Keep your pup's routine on track.">
+<meta name="theme-color" content="#0d1117">
+<link rel="canonical" href="https://dev.rizzo.cc/pawprints/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PawPrints">
+<meta property="og:title" content="PawPrints — Feed · Walk · Care">
+<meta property="og:description" content="A private dog care tracker. Log feeding, water, potty trips, walks, vet visits, grooming, meds, weight, and supplies.">
+<meta property="og:url" content="https://dev.rizzo.cc/pawprints/">
+<meta property="og:image" content="https://dev.rizzo.cc/pawprints/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="PawPrints dashboard preview with a dog profile, feeding and walk status, and reminders">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PawPrints — Feed · Walk · Care">
+<meta name="twitter:description" content="A private dog care tracker. Log feeding, water, potty trips, walks, vet visits, grooming, meds, weight, and supplies.">
+<meta name="twitter:image" content="https://dev.rizzo.cc/pawprints/og-image.png">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="shortcut icon" href="favicon.ico">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.gstatic.com">
+<link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"></noscript>
+<!-- html2canvas (PNG card) and Chart.js (trends) are lazy-loaded on first use -->
+<style>
+:root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-tertiary:#21262d;--bg-input:#0d1117;--text-primary:#e6edf3;--text-secondary:#8b949e;
+--accent:#f4a261;--accent-2:#2dd4bf;--accent-purple:#a371f7;--border:#30363d;--danger:#f85149;--success:#3fb950;--warning:#d29922;--blue:#58a6ff}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+.header{background:linear-gradient(135deg,#161b22,#0d1117);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header-left{display:flex;align-items:center;gap:12px;cursor:pointer}
+.logo{width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#f4a261,#2dd4bf);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.pet-photo{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-tertiary)}
+.header h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}.header .sub{font-size:12px;color:var(--text-secondary)}
+.header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pet-select{appearance:none;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-family:inherit;padding:8px 30px 8px 12px;border-radius:10px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+.nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto}
+.nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.nav button.active{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}.nav button .nav-icon{font-size:17px}
+.content{padding:20px;max-width:860px;margin:0 auto}
+.card{background:var(--bg-card);border-radius:16px;padding:22px;border:1px solid var(--border);margin-bottom:12px}
+.btn{padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}
+.btn:disabled{opacity:.4;cursor:default}.btn-outline{background:transparent;border-color:var(--accent);color:var(--accent)}
+.btn-primary{background:linear-gradient(135deg,#f4a261,#2dd4bf);border:none;color:#08231f;font-weight:700;font-size:16px;padding:14px 28px;border-radius:12px;width:100%;cursor:pointer;font-family:inherit}
+.btn-google{background:#fff;color:#333;border:1px solid #ddd;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit}
+.btn-sm{padding:6px 14px;border-radius:8px;font-size:12px}.btn-danger{color:var(--danger)}.btn-accent{color:var(--accent)}
+.label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
+.input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
+.input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
+.select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
+.textarea{resize:vertical}
+.section-title{margin:0 0 14px;font-size:15px;font-weight:600;color:var(--accent)}
+.tag-grid{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.tag{padding:7px 15px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;cursor:pointer;transition:all .2s;font-family:inherit}
+.tag.active{border-color:var(--accent);background:var(--accent);color:#08231f;font-weight:600}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px}
+.stat-card{text-align:center;padding:16px}.stat-value{font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace}.stat-label{font-size:12px;color:var(--text-secondary);margin-top:4px}
+.chip{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(244,162,97,.13);color:var(--accent);display:inline-block}
+.chip-2{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(45,212,191,.13);color:var(--accent-2);display:inline-block}
+.chip-p{padding:4px 12px;border-radius:12px;font-size:12px;background:rgba(163,113,247,.13);color:var(--accent-purple);display:inline-block}
+.entry-row{padding:13px;border-radius:12px;background:var(--bg-tertiary);margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.entry-row.clickable{cursor:pointer;transition:border-color .2s;border:1px solid transparent}.entry-row.clickable:hover{border-color:var(--accent)}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid-auto{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
+.auth-banner{padding:11px 20px;background:var(--bg-tertiary);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;font-size:13px}
+.auth-banner .user-info{display:flex;align-items:center;gap:10px}.auth-banner .user-avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
+/* Quick-log buttons */
+.quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+.quick-btn{padding:16px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:transform .15s,border-color .2s}
+.quick-btn:hover{transform:translateY(-2px);border-color:var(--accent)}
+.quick-btn .qi{font-size:26px}
+/* Status cards */
+.status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
+.status-card{padding:14px;border-radius:13px;background:var(--bg-tertiary);border:1px solid var(--border)}
+.status-card .sc-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+.status-card .sc-val{font-size:18px;font-weight:700;margin-top:5px;font-family:'JetBrains Mono',monospace}
+.status-card.overdue{border-color:rgba(248,81,73,.4);background:rgba(248,81,73,.07)}
+.timeline-item{display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)}
+.timeline-item:last-child{border-bottom:none}
+.tl-icon{width:34px;height:34px;border-radius:9px;background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.tl-time{font-size:11px;color:var(--text-secondary);font-family:'JetBrains Mono',monospace}
+.reminder{padding:11px 14px;border-radius:11px;margin-bottom:8px;display:flex;align-items:center;gap:10px;font-size:13px;border:1px solid var(--border);background:var(--bg-tertiary)}
+.reminder.due{border-color:rgba(210,153,34,.35);background:rgba(210,153,34,.08)}
+.reminder.over{border-color:rgba(248,81,73,.35);background:rgba(248,81,73,.08)}
+.subtab{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.subtab button{padding:8px 16px;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--text-secondary);font-size:13px;font-family:inherit;cursor:pointer}
+.subtab button.active{background:var(--accent);border-color:var(--accent);color:#08231f;font-weight:600}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:200;box-shadow:0 8px 32px rgba(0,0,0,.4);animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.hidden{display:none !important}
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
+.modal{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.profile-photo-lg{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:40px}
+.kv{font-size:13px;color:var(--text-secondary)}.kv strong{color:var(--text-primary)}
+.png-card{position:absolute;left:-9999px;top:0;width:600px;background:#161b22;color:#e6edf3;font-family:'DM Sans','Segoe UI',sans-serif;padding:28px;border-radius:16px;border:2px solid #30363d}
+.empty{text-align:center;padding:42px 20px}
+.empty .ico{font-size:46px;margin-bottom:14px}
+@media(max-width:600px){.grid-2{grid-template-columns:1fr}.quick-grid{grid-template-columns:repeat(2,1fr)}.header{padding:12px 14px}.content{padding:14px}.header-actions{width:100%}}
+</style>
+</head>
+<body>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<!-- firebase-firestore-compat.js is lazy-loaded by ensureFirestore() on first use -->
+
+<div id="demo-banner" class="hidden" style="background:linear-gradient(90deg,#f4a261 0%,#2dd4bf 100%);color:#08231f;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:600;flex-wrap:wrap"><span>🎭 <strong>Demo Mode</strong> — sample dog, nothing is saved</span><button onclick="exitDemo()" style="background:rgba(8,35,31,.18);border:1px solid rgba(8,35,31,.3);color:#08231f;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Exit Demo</button></div>
+
+<div id="auth-banner" class="auth-banner">
+  <div id="auth-signed-out"><span style="color:var(--text-secondary)">Sign in to sync across devices · same login as your Illness Tracker</span></div>
+  <div id="auth-signed-in" class="user-info hidden"><img id="user-avatar" class="user-avatar" src="" alt=""><span id="user-name" style="font-weight:600"></span></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+    <button id="btn-signin" class="btn-google" onclick="signIn()"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59A14.5 14.5 0 019.5 24c0-1.59.28-3.14.76-4.59l-7.98-6.19A23.99 23.99 0 000 24c0 3.77.87 7.34 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>Sign in with Google</button>
+    <button id="btn-signout" class="btn btn-sm hidden" onclick="signOut()">Sign Out</button>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-left" onclick="switchView('profile')" title="View profile">
+    <div id="header-logo" class="logo">🐾</div>
+    <div><h1 id="header-title">PawPrints</h1><div class="sub" id="header-sub">Feed · Walk · Care <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500" id="app-version"></span></div></div>
+  </div>
+  <div class="header-actions">
+    <select id="pet-select" class="pet-select hidden" onchange="selectPet(this.value)"></select>
+    <button class="btn" onclick="exportJSON()" id="btn-export-json">💾 Export</button>
+    <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📂 Import</button>
+    <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
+  </div>
+</div>
+
+<div class="nav" id="nav">
+  <button class="active" data-view="today" onclick="switchView('today')"><span class="nav-icon">☀️</span> Today</button>
+  <button data-view="log" onclick="switchView('log')"><span class="nav-icon">✚</span> Log</button>
+  <button data-view="profile" onclick="switchView('profile')"><span class="nav-icon">🐶</span> Profile</button>
+  <button data-view="care" onclick="switchView('care')"><span class="nav-icon">🩺</span> Care</button>
+  <button data-view="supplies" onclick="switchView('supplies')"><span class="nav-icon">🛒</span> Supplies</button>
+  <button data-view="insights" onclick="switchView('insights')"><span class="nav-icon">📊</span> Insights</button>
+</div>
+
+<div class="content">
+  <div id="view-today"></div>
+  <div id="view-log" class="hidden"></div>
+  <div id="view-profile" class="hidden"></div>
+  <div id="view-care" class="hidden"></div>
+  <div id="view-supplies" class="hidden"></div>
+  <div id="view-insights" class="hidden"></div>
+</div>
+<footer style="text-align:center;padding:24px 16px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px">
+  <a href="?demo=1" style="color:var(--accent-2);text-decoration:none;font-weight:500">🎭 Try the demo</a>
+  <span style="margin:0 10px;opacity:.4">·</span>
+  <span>PawPrints <span id="app-version-footer" style="font-family:'JetBrains Mono',monospace"></span></span>
+</footer>
+<div id="png-render-area"></div>
+<div id="modal-root"></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// VERSION
+// ═══════════════════════════════════════════════
+const APP_VERSION = 'v0.1.0';
+
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let data = { pets: [], activePetId: null, logs: [], vetVisits: [], grooming: [], illnesses: [], meds: [], inventory: [] };
+let currentView = 'today';
+let logSubtab = 'feed';
+let careSubtab = 'vet';
+let suppliesCat = 'all';
+let firebaseReady = false;
+let currentUser = null;
+let db = null;
+let demoMode = false;
+let demoBackup = null;
+
+// ═══════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════
+const FOOD_TYPES = ['Dry kibble','Wet food','Raw','Home-cooked','Mixed','Treat','Dental chew','Other'];
+const AMOUNT_UNITS = ['cups','grams','oz','cans','scoops','pieces'];
+const POTTY_RESULTS = ['Pee','Poop','Both','Nothing'];
+const POTTY_PLACES = ['Backyard','On a walk','Pee pad','Other'];
+const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus'];
+const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
+const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
+const INV_CATEGORIES = ['Food','Treats','Supplies','Meds'];
+const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
+const SEVERITY = ['Mild','Moderate','Severe'];
+const SEXES = ['Male','Female','Male (neutered)','Female (spayed)'];
+
+// ═══════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════
+const genId = () => Math.random().toString(36).slice(2, 11);
+const esc = (s) => { if (s === 0) return '0'; if (!s && s !== 0) return ''; if (typeof s !== 'string') s = String(s); const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+const fmtDate = (d) => d ? new Date(dateSafe(d)).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
+const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '—';
+const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '—';
+const money = (n) => { const v = parseFloat(n); return isNaN(v) ? '' : '$' + v.toFixed(2); };
+const num = (n) => { const v = parseFloat(n); return isNaN(v) ? null : v; };
+// Treat a bare YYYY-MM-DD as local noon so it doesn't shift a day across timezones
+function dateSafe(d){ return (typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)) ? d + 'T12:00:00' : d; }
+const pad = n => String(n).padStart(2,'0');
+function nowLocalISO(){ const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function todayISO(){ const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+
+function timeAgo(dt){
+  if(!dt) return null;
+  const diff = Date.now() - new Date(dt).getTime();
+  if(diff < 0) return 'just now';
+  const m = Math.floor(diff/60000), h = Math.floor(m/60), d = Math.floor(h/24);
+  if(d > 0) return d + 'd ' + (h%24) + 'h ago';
+  if(h > 0) return h + 'h ' + (m%60) + 'm ago';
+  if(m > 0) return m + 'm ago';
+  return 'just now';
+}
+function untilStr(dt){
+  if(!dt) return null;
+  const diff = new Date(dateSafe(dt)).getTime() - Date.now();
+  const past = diff < 0, a = Math.abs(diff);
+  const d = Math.floor(a/86400000), h = Math.floor((a%86400000)/3600000);
+  let s = d > 0 ? d + 'd' : h + 'h';
+  return { past, text: past ? s + ' ago' : 'in ' + s, days: Math.round(diff/86400000) };
+}
+function ageStr(birthday){
+  if(!birthday) return null;
+  const b = new Date(dateSafe(birthday)), now = new Date();
+  let months = (now.getFullYear()-b.getFullYear())*12 + (now.getMonth()-b.getMonth());
+  if(now.getDate() < b.getDate()) months--;
+  if(months < 0) return null;
+  const y = Math.floor(months/12), m = months%12;
+  if(y === 0) return m + (m===1?' month':' months');
+  if(m === 0) return y + (y===1?' year':' years');
+  return y + 'y ' + m + 'mo';
+}
+function showToast(msg){
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.remove('hidden');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.add('hidden'), 3000);
+}
+
+// active pet helpers
+function activePet(){ return data.pets.find(p => p.id === data.activePetId) || data.pets[0] || null; }
+function petLogs(type){ const pid = data.activePetId; return data.logs.filter(l => l.petId === pid && (!type || l.type === type)); }
+function lastLog(type){ const ls = petLogs(type).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
+function latestWeight(){ const ws = petLogs('weight').filter(l=>num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ws[0] || null; }
+function petArr(key){ const pid = data.activePetId; return (data[key]||[]).filter(r => r.petId === pid); }
+
+// ═══════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════
+function openModal(html){
+  document.getElementById('modal-root').innerHTML =
+    '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+html+'</div></div>';
+}
+function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+function fv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
+
+// ═══════════════════════════════════════════════
+// FIREBASE (shared login with Illness Tracker — same project)
+// ═══════════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCR7AHHq8nIu_k7usHiItQCJIu_6Lo-p6A",authDomain:"illnesstracker-8d888.firebaseapp.com",
+  projectId:"illnesstracker-8d888",storageBucket:"illnesstracker-8d888.firebasestorage.app",
+  messagingSenderId:"660525580864",appId:"1:660525580864:web:ba78d04b13147a2b34d5a5"
+};
+let _firestoreLoading = null;
+function ensureFirestore(){
+  if(db) return Promise.resolve(db);
+  if(_firestoreLoading) return _firestoreLoading;
+  _firestoreLoading = new Promise((resolve, reject) => {
+    if(typeof firebase === 'undefined'){ _firestoreLoading = null; return reject(new Error('firebase not loaded')); }
+    const init = () => { try { db = firebase.firestore(); resolve(db); } catch(e){ _firestoreLoading = null; reject(e); } };
+    if(firebase.firestore) return init();
+    const s = document.createElement('script');
+    s.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
+    s.onload = init; s.onerror = () => { _firestoreLoading = null; reject(new Error('firestore load failed')); };
+    document.head.appendChild(s);
+  });
+  return _firestoreLoading;
+}
+function initFirebase(){
+  try {
+    if(!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    firebaseReady = true;
+    firebase.auth().onAuthStateChanged(user => {
+      currentUser = user; updateAuthUI();
+      if(user) ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e));
+    });
+  } catch(e){ console.warn('Firebase init failed:', e); }
+}
+function updateAuthUI(){
+  const cu = currentUser;
+  document.getElementById('auth-signed-out').classList.toggle('hidden', !!cu);
+  document.getElementById('auth-signed-in').classList.toggle('hidden', !cu);
+  document.getElementById('btn-signin').classList.toggle('hidden', !!cu || demoMode);
+  document.getElementById('btn-signout').classList.toggle('hidden', !cu);
+  if(cu){ document.getElementById('user-avatar').src = cu.photoURL||''; document.getElementById('user-name').textContent = cu.displayName||cu.email; }
+}
+function signIn(){
+  if(!firebaseReady){ showToast('⚠️ Firebase not ready'); return; }
+  const p = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(p).then(() => showToast('✅ Signed in')).catch(e => showToast('⚠️ Sign-in failed: ' + e.message));
+}
+function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); showToast('Signed out'); }
+
+async function loadFromFirestore(){
+  if(demoMode || !firebaseReady || !currentUser) return;
+  try {
+    await ensureFirestore();
+    const doc = await db.collection('pawprints').doc(currentUser.uid).get();
+    if(doc.exists){
+      const d = doc.data();
+      // Merge remote into local by id across each collection
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory'].forEach(k => {
+        const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
+        data[k] = [...remote, ...localOnly];
+      });
+      if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
+      if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
+      saveLocal(); render();
+      showToast('✅ Synced from cloud');
+    } else if(data.pets.length) saveToFirestore();
+  } catch(e){ console.error('Firestore load error:', e); }
+}
+async function saveToFirestore(){
+  if(demoMode || !firebaseReady || !currentUser) return;
+  try {
+    await ensureFirestore();
+    await db.collection('pawprints').doc(currentUser.uid).set({
+      ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch(e){ console.error('Firestore save error:', e); /* graceful: localStorage still holds data */ }
+}
+
+// ═══════════════════════════════════════════════
+// PERSISTENCE
+// ═══════════════════════════════════════════════
+function saveLocal(){ if(demoMode) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
+function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign({ pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] }, d); } } catch(e){} }
+function persist(){ saveLocal(); saveToFirestore(); }
+function save(rerender){ persist(); if(rerender !== false) render(); }
+
+function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-' + APP_VERSION + '.json'); }
+function dl(blob,name){ const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u); }
+function importJSON(evt){
+  const f = evt.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = (e) => { try {
+    const d = JSON.parse(e.target.result);
+    if(d && d.pets){ data = Object.assign({ pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] }, d); persist(); render(); showToast('✅ Imported'); }
+    else showToast('⚠️ Not a PawPrints export');
+  } catch { showToast('⚠️ Invalid JSON'); } };
+  r.readAsText(f); evt.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// PET MANAGEMENT
+// ═══════════════════════════════════════════════
+function selectPet(id){ data.activePetId = id; save(); }
+function petModal(id){
+  const p = id ? data.pets.find(x=>x.id===id) : null;
+  const sel = (arr,v) => arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal(
+    '<h3>'+(p?'🐶 Edit '+esc(p.name):'🐶 Add a dog')+'</h3>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;margin-bottom:16px">'
+      +'<div id="photo-preview" class="profile-photo-lg">'+(p&&p.photo?'<img src="'+p.photo+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover">':'🐾')+'</div>'
+      +'<input type="file" id="photo-input" accept="image/*" style="display:none" onchange="handlePhoto(event)">'
+      +'<button class="btn btn-sm" style="margin-top:10px" onclick="document.getElementById(\'photo-input\').click()">📷 '+(p&&p.photo?'Change':'Add')+' photo</button>'
+      +'<input type="hidden" id="p-photo" value="'+(p?esc(p.photo||''):'')+'">'
+    +'</div>'
+    +'<label class="label">Name *</label><input class="input" id="p-name" value="'+(p?esc(p.name):'')+'" placeholder="Biscuit">'
+    +'<div class="grid-2"><div><label class="label">Breed</label><input class="input" id="p-breed" value="'+(p?esc(p.breed||''):'')+'" placeholder="Labrador mix"></div>'
+    +'<div><label class="label">Sex</label><select class="select" id="p-sex"><option value="">—</option>'+sel(SEXES, p?p.sex:'')+'</select></div></div>'
+    +'<div class="grid-2"><div><label class="label">Birthday</label><input class="input" type="date" id="p-birthday" value="'+(p?esc(p.birthday||''):'')+'"></div>'
+    +'<div><label class="label">Adoption / Gotcha Day</label><input class="input" type="date" id="p-gotcha" value="'+(p?esc(p.gotchaDay||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="Black & tan"></div>'
+    +'<div><label class="label">Weight unit</label><select class="select" id="p-wunit"><option value="lb"'+(p&&p.weightUnit==='lb'?' selected':'')+'>lb</option><option value="kg"'+(p&&p.weightUnit==='kg'?' selected':'')+'>kg</option></select></div></div>'
+    +'<div class="grid-2"><div><label class="label">Microchip #</label><input class="input" id="p-chip" value="'+(p?esc(p.microchip||''):'')+'"></div>'
+    +'<div><label class="label">License #</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Vet / Clinic</label><input class="input" id="p-vetname" value="'+(p?esc(p.vetName||''):'')+'" placeholder="Riverside Animal Hospital"></div>'
+    +'<div><label class="label">Vet phone</label><input class="input" id="p-vetphone" value="'+(p?esc(p.vetPhone||''):'')+'"></div></div>'
+    +'<label class="label">Notes</label><textarea class="textarea" id="p-notes" rows="2" placeholder="Personality, allergies, anything to remember">'+(p?esc(p.notes||''):'')+'</textarea>'
+    +'<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="savePet('+(p?"'"+p.id+"'":'null')+')">'+(p?'Save':'Add dog')+'</button>'
+    +(p?'<button class="btn btn-danger" style="white-space:nowrap" onclick="deletePet(\''+p.id+'\')">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>'
+  );
+}
+function handlePhoto(evt){
+  const f = evt.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 256, canvas = document.createElement('canvas');
+      const scale = Math.min(size/img.width, size/img.height, 1);
+      // cover-crop to square
+      const sq = Math.min(img.width, img.height);
+      canvas.width = size; canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, (img.width-sq)/2, (img.height-sq)/2, sq, sq, 0, 0, size, size);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      document.getElementById('p-photo').value = dataUrl;
+      document.getElementById('photo-preview').innerHTML = '<img src="'+dataUrl+'" style="width:100%;height:100%;border-radius:50%;object-fit:cover">';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(f);
+}
+function savePet(id){
+  const name = fv('p-name').trim();
+  if(!name){ showToast('⚠️ Enter a name'); return; }
+  const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), birthday:fv('p-birthday'),
+    gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
+    license:fv('p-license'), vetName:fv('p-vetname'), vetPhone:fv('p-vetphone'), notes:fv('p-notes') };
+  if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); showToast('✅ Saved'); }
+  else { const np = { id:genId(), ...fields }; data.pets.push(np); data.activePetId = np.id; showToast('🐾 '+name+' added'); }
+  closeModal(); save();
+}
+function deletePet(id){
+  const p = data.pets.find(x=>x.id===id); if(!p) return;
+  if(!confirm('Delete '+p.name+' and all their logs? This cannot be undone.')) return;
+  data.pets = data.pets.filter(x=>x.id!==id);
+  ['logs','vetVisits','grooming','illnesses','meds','inventory'].forEach(k => data[k] = data[k].filter(r => r.petId !== id));
+  if(data.activePetId === id) data.activePetId = data.pets[0]?.id || null;
+  closeModal(); save();
+}
+
+// ═══════════════════════════════════════════════
+// QUICK LOG + LOG ENTRIES
+// ═══════════════════════════════════════════════
+function addLog(entry){
+  if(!data.activePetId){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  data.logs.unshift({ id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry });
+  save();
+}
+function delLog(id){ data.logs = data.logs.filter(l=>l.id!==id); save(); }
+
+// Quick buttons
+function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
+function quickFeed(){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  const last = lastLog('feed');
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>🍖 Log feeding</h3>'
+    +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
+    +'<label class="label">Food</label><select class="select" id="q-food">'+sel(FOOD_TYPES, last?last.foodType:'Dry kibble')+'</select>'
+    +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(last?esc(last.amount||''):'')+'" placeholder="1"></div>'
+    +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, last?last.unit:'cups')+'</select></div></div>'
+    +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
+    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+}
+function quickPotty(){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>🚪 Potty break</h3>'
+    +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
+    +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
+    +'<div class="grid-2"><div><label class="label">Where</label><select class="select" id="q-place">'+sel(POTTY_PLACES,'Backyard')+'</select></div>'
+    +'<div><label class="label">Stool (if any)</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div></div>'
+    +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
+    +'<button class="btn-primary" onclick="savePotty()">Save</button>');
+}
+function savePotty(){
+  const result = document.querySelector('#q-potty-tags .tag.active')?.dataset.pr || 'Pee';
+  addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), notes:fv('q-note') });
+  closeModal(); showToast('🚪 Potty logged');
+}
+function quickWalk(){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  openModal('<h3>🦮 Log a walk</h3>'
+    +'<label class="label">When (start)</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
+    +'<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="q-dur" placeholder="30"></div>'
+    +'<div><label class="label">Distance (mi, optional)</label><input class="input" type="number" step="0.1" id="q-dist" placeholder="1.5"></div></div>'
+    +'<label class="label">Note</label><input class="input" id="q-note" placeholder="How did it go?">'
+    +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
+}
+function quickWeight(){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); petModal(); return; }
+  const unit = activePet().weightUnit || 'lb';
+  openModal('<h3>⚖️ Log weight</h3>'
+    +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
+    +'<label class="label">Weight ('+unit+')</label><input class="input" type="number" step="0.1" id="q-w" placeholder="42.5">'
+    +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
+    +'<button class="btn-primary" onclick="addLog({type:\'weight\',dateTime:fv(\'q-dt\'),value:fv(\'q-w\'),unit:\''+unit+'\',source:\'manual\',notes:fv(\'q-note\')});closeModal();showToast(\'⚖️ Weight logged\')">Save</button>');
+}
+
+// ═══════════════════════════════════════════════
+// CARE: VET / GROOMING / MEDS / ILLNESS
+// ═══════════════════════════════════════════════
+function vetModal(id){
+  const v = id ? data.vetVisits.find(x=>x.id===id) : null;
+  const unit = activePet()?.weightUnit || 'lb';
+  openModal('<h3>🏥 '+(v?'Edit vet visit':'Vet visit')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
+    +'<div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div></div>'
+    +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
+    +'<div class="grid-2"><div><label class="label">Vet</label><input class="input" id="vt-vet" value="'+(v?esc(v.vet||''):'')+'" placeholder="Dr. Lee"></div>'
+    +'<div><label class="label">Clinic</label><input class="input" id="vt-clinic" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div>'
+    +'<div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div></div>'
+    +'<label class="label">Notes / Diagnosis / Meds prescribed</label><textarea class="textarea" id="vt-notes" rows="3">'+(v?esc(v.notes||''):'')+'</textarea>'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
+    +(v?'<button class="btn btn-danger" onclick="data.vetVisits=data.vetVisits.filter(x=>x.id!==\''+v.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveVet(id){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  const f = { date:fv('vt-date'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), notes:fv('vt-notes') };
+  let visitId = id;
+  if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
+  else { visitId = genId(); data.vetVisits.unshift({ id:visitId, petId:data.activePetId, ...f }); }
+  // weight recorded at a visit feeds the weight history
+  data.logs = data.logs.filter(l => !(l.type==='weight' && l.source===visitId));
+  if(num(f.weight) != null){
+    data.logs.unshift({ id:genId(), petId:data.activePetId, type:'weight', dateTime:(f.date||todayISO())+'T12:00', value:f.weight, unit:activePet().weightUnit||'lb', source:visitId, notes:'At vet visit' });
+  }
+  closeModal(); save(); showToast('🏥 Vet visit saved');
+}
+function groomModal(id){
+  const g = id ? data.grooming.find(x=>x.id===id) : null;
+  const chosen = g ? (g.services||[]) : [];
+  openModal('<h3>✂️ '+(g?'Edit grooming':'Grooming')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="gr-date" value="'+(g?esc(g.date):todayISO())+'"></div>'
+    +'<div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div></div>'
+    +'<label class="label">Groomer / Salon</label><input class="input" id="gr-by" value="'+(g?esc(g.groomer||''):'')+'" placeholder="Petco / mobile groomer / at home">'
+    +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+GROOM_SERVICES.map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
+    +'<label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'">'
+    +'<label class="label">Notes</label><textarea class="textarea" id="gr-notes" rows="2">'+(g?esc(g.notes||''):'')+'</textarea>'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveGroom('+(g?"'"+g.id+"'":'null')+')">Save</button>'
+    +(g?'<button class="btn btn-danger" onclick="data.grooming=data.grooming.filter(x=>x.id!==\''+g.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveGroom(id){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
+  const f = { date:fv('gr-date'), cost:fv('gr-cost'), groomer:fv('gr-by'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes') };
+  if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
+  else data.grooming.unshift({ id:genId(), petId:data.activePetId, ...f });
+  closeModal(); save(); showToast('✂️ Grooming saved');
+}
+function medModal(id){
+  const m = id ? data.meds.find(x=>x.id===id) : null;
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>💊 '+(m?'Edit med':'Med / Preventative')+'</h3>'
+    +'<label class="label">Name</label><input class="input" id="md-name" value="'+(m?esc(m.name||''):'')+'" placeholder="Heartgard, NexGard, Rabies…">'
+    +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="md-kind">'+sel(MED_KINDS, m?m.kind:'Heartworm')+'</select></div>'
+    +'<div><label class="label">Repeat every (days)</label><input class="input" type="number" id="md-interval" value="'+(m?esc(m.intervalDays||''):'30')+'" placeholder="30"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Last given</label><input class="input" type="date" id="md-last" value="'+(m?esc(m.lastGiven||''):todayISO())+'"></div>'
+    +'<div><label class="label">Next due (auto if blank)</label><input class="input" type="date" id="md-next" value="'+(m?esc(m.nextDue||''):'')+'"></div></div>'
+    +'<label class="label">Notes</label><input class="input" id="md-notes" value="'+(m?esc(m.notes||''):'')+'">'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveMed('+(m?"'"+m.id+"'":'null')+')">Save</button>'
+    +(m?'<button class="btn btn-danger" onclick="data.meds=data.meds.filter(x=>x.id!==\''+m.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function medNextDue(m){
+  if(m.nextDue) return m.nextDue;
+  if(m.lastGiven && num(m.intervalDays)){ const d = new Date(dateSafe(m.lastGiven)); d.setDate(d.getDate()+parseInt(m.intervalDays)); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+  return '';
+}
+function saveMed(id){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  const f = { name:fv('md-name'), kind:fv('md-kind'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), nextDue:fv('md-next'), notes:fv('md-notes') };
+  if(!f.name){ showToast('⚠️ Enter a name'); return; }
+  if(id) data.meds = data.meds.map(m => m.id===id ? {...m, ...f} : m);
+  else data.meds.unshift({ id:genId(), petId:data.activePetId, ...f });
+  closeModal(); save(); showToast('💊 Saved');
+}
+function giveMedNow(id){
+  const m = data.meds.find(x=>x.id===id); if(!m) return;
+  m.lastGiven = todayISO(); m.nextDue = '';
+  save(); showToast('✅ Marked given today');
+}
+
+// Illness (ported from sick, dog-flavored)
+let formSymptoms = [];
+function illnessModal(id){
+  const e = id ? data.illnesses.find(x=>x.id===id) : null;
+  formSymptoms = e ? [...(e.symptoms||[])] : [];
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>🤒 '+(e?'Edit illness':'Log illness')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Started</label><input class="input" type="date" id="il-start" value="'+(e?esc(e.start):todayISO())+'"></div>'
+    +'<div><label class="label">Recovered (blank = ongoing)</label><input class="input" type="date" id="il-recovery" value="'+(e?esc(e.recovery||''):'')+'"></div></div>'
+    +'<label class="label">Symptoms</label><div class="tag-grid" id="il-symptoms">'+DOG_SYMPTOMS.map(s=>'<button class="tag'+(formSymptoms.includes(s)?' active':'')+'" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
+    +'<div class="grid-2"><div><label class="label">Severity</label><select class="select" id="il-sev">'+sel(SEVERITY, e?e.severity:'Mild')+'</select></div>'
+    +'<div><label class="label">Diagnosis (if known)</label><input class="input" id="il-dx" value="'+(e?esc(e.diagnosis||''):'')+'" placeholder="Kennel cough…"></div></div>'
+    +'<label class="label">Treatment / meds given</label><input class="input" id="il-treat" value="'+(e?esc(e.treatment||''):'')+'">'
+    +'<label class="label">Notes</label><textarea class="textarea" id="il-notes" rows="2">'+(e?esc(e.notes||''):'')+'</textarea>'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveIllness('+(e?"'"+e.id+"'":'null')+')">Save</button>'
+    +(e?'<button class="btn btn-danger" onclick="data.illnesses=data.illnesses.filter(x=>x.id!==\''+e.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveIllness(id){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  const symptoms = [...document.querySelectorAll('#il-symptoms .tag.active')].map(t=>t.dataset.s);
+  const f = { start:fv('il-start'), recovery:fv('il-recovery'), symptoms, severity:fv('il-sev'), diagnosis:fv('il-dx'), treatment:fv('il-treat'), notes:fv('il-notes') };
+  if(id) data.illnesses = data.illnesses.map(e => e.id===id ? {...e, ...f} : e);
+  else data.illnesses.unshift({ id:genId(), petId:data.activePetId, ...f });
+  closeModal(); save(); showToast('🤒 Illness saved');
+}
+
+// ═══════════════════════════════════════════════
+// INVENTORY / SUPPLIES
+// ═══════════════════════════════════════════════
+function invModal(id){
+  const it = id ? data.inventory.find(x=>x.id===id) : null;
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>🛒 '+(it?'Edit item':'Add supply')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(INV_CATEGORIES, it?it.category:'Food')+'</select></div>'
+    +'<div><label class="label">Brand</label><input class="input" id="iv-brand" value="'+(it?esc(it.brand||''):'')+'" placeholder="Blue Buffalo"></div></div>'
+    +'<label class="label">Item name</label><input class="input" id="iv-name" value="'+(it?esc(it.name||''):'')+'" placeholder="Chicken & rice 30lb bag">'
+    +'<div class="grid-2"><div><label class="label">Qty</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
+    +'<div><label class="label">Unit</label><input class="input" id="iv-unit" value="'+(it?esc(it.unit||''):'')+'" placeholder="bag / box / count"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="iv-cost" value="'+(it?esc(it.cost||''):'')+'" placeholder="0.00"></div>'
+    +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
+    +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveInv('+(it?"'"+it.id+"'":'null')+')">Save</button>'
+    +(it?'<button class="btn btn-danger" onclick="data.inventory=data.inventory.filter(x=>x.id!==\''+it.id+'\');closeModal();save()">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveInv(id){
+  if(!activePet()){ showToast('⚠️ Add a dog first'); return; }
+  const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'),
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
+  if(!f.name){ showToast('⚠️ Enter an item name'); return; }
+  if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
+  else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
+  closeModal(); save(); showToast('🛒 Saved');
+}
+function toggleLow(id){ const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; save(); } }
+
+// ═══════════════════════════════════════════════
+// REMINDERS
+// ═══════════════════════════════════════════════
+function getReminders(){
+  const out = [];
+  petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd){ const u = untilStr(nd); if(u && u.days <= 7) out.push({ icon:'💊', text:m.name+' '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
+  petArr('vetVisits').forEach(v => { if(v.followUpDate){ const u = untilStr(v.followUpDate); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet follow-up '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); } });
+  petArr('grooming').forEach(g => { if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
+  petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));
+  return out.sort((a,b)=>a.sort-b.sort);
+}
+
+// ═══════════════════════════════════════════════
+// VIEW SWITCHING + RENDER
+// ═══════════════════════════════════════════════
+const VIEWS = ['today','log','profile','care','supplies','insights'];
+function switchView(v){
+  currentView = v;
+  VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
+  document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view===v));
+  render();
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function setLogSubtab(t){ logSubtab = t; render(); }
+function setCareSubtab(t){ careSubtab = t; render(); }
+function setSuppliesCat(c){ suppliesCat = c; render(); }
+
+function updateHeader(){
+  const p = activePet();
+  const logo = document.getElementById('header-logo');
+  if(p && p.photo){ logo.outerHTML = '<img id="header-logo" class="pet-photo" src="'+p.photo+'" alt="">'; }
+  else { const cur = document.getElementById('header-logo'); if(cur.tagName==='IMG'){ cur.outerHTML = '<div id="header-logo" class="logo">🐾</div>'; } else cur.textContent = p?(p.emoji||'🐾'):'🐾'; }
+  document.getElementById('header-title').textContent = p ? p.name : 'PawPrints';
+  document.getElementById('header-sub').innerHTML = (p ? (ageStr(p.birthday)?esc(ageStr(p.birthday))+' · ':'') + esc(p.breed||'Feed · Walk · Care') : 'Feed · Walk · Care') + ' <span style="color:var(--accent);font-family:\'JetBrains Mono\',monospace;font-weight:500">'+APP_VERSION+'</span>';
+  // pet selector
+  const selEl = document.getElementById('pet-select');
+  if(data.pets.length){
+    selEl.classList.remove('hidden');
+    selEl.innerHTML = data.pets.map(pt => '<option value="'+pt.id+'"'+(pt.id===data.activePetId?' selected':'')+'>🐾 '+esc(pt.name)+'</option>').join('') + '<option value="__add">＋ Add a dog…</option>';
+  } else selEl.classList.add('hidden');
+}
+function onPetSelectChange(){}
+
+function render(){
+  updateHeader();
+  document.getElementById('view-today').innerHTML = renderToday();
+  document.getElementById('view-log').innerHTML = renderLog();
+  document.getElementById('view-profile').innerHTML = renderProfile();
+  document.getElementById('view-care').innerHTML = renderCare();
+  document.getElementById('view-supplies').innerHTML = renderSupplies();
+  document.getElementById('view-insights').innerHTML = renderInsights();
+  if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
+}
+
+// intercept "Add a dog" in selector
+document.addEventListener('change', e => { if(e.target && e.target.id==='pet-select' && e.target.value==='__add'){ petModal(); updateHeader(); } });
+
+// ── TODAY ──
+function statusCard(label, icon, dt, overdueHrs){
+  const ago = timeAgo(dt);
+  const over = dt && overdueHrs && (Date.now()-new Date(dt).getTime()) > overdueHrs*3600000;
+  const none = !dt;
+  return '<div class="status-card'+(over||none?' overdue':'')+'"><div class="sc-label">'+icon+' '+label+'</div><div class="sc-val" style="color:'+(none?'var(--text-secondary)':over?'var(--danger)':'var(--text-primary)')+'">'+(ago||'—')+'</div>'
+    +(dt?'<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+fmtTime(dt)+'</div>':'<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">not logged</div>')+'</div>';
+}
+function renderToday(){
+  if(!activePet()) return emptyState();
+  const p = activePet();
+  const fed = lastLog('feed'), water = lastLog('water'), potty = lastLog('potty'), walk = lastLog('walk');
+  const w = latestWeight();
+  let html = '';
+  // header summary
+  html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
+    + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)">':'<div class="logo" style="width:64px;height:64px;font-size:32px">🐾</div>')
+    + '<div style="flex:1;min-width:140px"><div style="font-size:20px;font-weight:700">'+esc(p.name)+'</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary)">'+[ageStr(p.birthday), p.breed, w?(esc(w.value)+' '+esc(w.unit||'lb')):null].filter(Boolean).map(esc).join(' · ')+'</div></div>'
+    + '<button class="btn btn-sm" onclick="switchView(\'profile\')">Profile</button></div>';
+  // quick log
+  html += '<div class="card"><h3 class="section-title">Quick log</h3><div class="quick-grid">'
+    + '<button class="quick-btn" onclick="quickFeed()"><span class="qi">🍖</span>Fed</button>'
+    + '<button class="quick-btn" onclick="quickWater()"><span class="qi">💧</span>Water</button>'
+    + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">🚪</span>Potty</button>'
+    + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">🦮</span>Walk</button>'
+    + '</div></div>';
+  // status
+  html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
+    + statusCard('Last fed','🍖',fed?fed.dateTime:null,12)
+    + statusCard('Water','💧',water?water.dateTime:null,null)
+    + statusCard('Last potty','🚪',potty?potty.dateTime:null,8)
+    + statusCard('Last walk','🦮',walk?walk.dateTime:null,null)
+    + '</div></div>';
+  // reminders
+  const rem = getReminders();
+  if(rem.length) html += '<div class="card"><h3 class="section-title">⏰ Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px">'+r.icon+'</span><span>'+esc(r.text)+'</span></div>').join('')+'</div>';
+  // today timeline
+  const today = todayISO();
+  const todays = petLogs().filter(l => l.dateTime && l.dateTime.slice(0,10) === today).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+  html += '<div class="card"><h3 class="section-title">Today\'s activity</h3>'
+    + (todays.length ? todays.map(l=>timelineRow(l)).join('') : '<p style="color:var(--text-secondary);font-size:14px">Nothing logged yet today — tap a quick-log button above.</p>')
+    + '</div>';
+  return html;
+}
+const LOG_META = { feed:{i:'🍖',c:'var(--accent)'}, water:{i:'💧',c:'var(--blue)'}, potty:{i:'🚪',c:'var(--accent-2)'}, walk:{i:'🦮',c:'var(--success)'}, weight:{i:'⚖️',c:'var(--accent-purple)'} };
+function logSummary(l){
+  if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food')].filter(Boolean).join(' · ');
+  if(l.type==='water') return 'Water refilled';
+  if(l.type==='potty') return [esc(l.result||'Potty'), l.place?esc(l.place):'', l.stool?'· '+esc(l.stool)+' stool':''].filter(Boolean).join(' ');
+  if(l.type==='walk') return [l.durationMin?esc(l.durationMin)+' min':'', l.distance?esc(l.distance)+' mi':''].filter(Boolean).join(' · ') || 'Walk';
+  if(l.type==='weight') return esc(l.value)+' '+esc(l.unit||'lb');
+  return '';
+}
+function timelineRow(l){
+  const m = LOG_META[l.type] || {i:'•',c:'var(--text-secondary)'};
+  return '<div class="timeline-item"><div class="tl-icon" style="color:'+m.c+'">'+m.i+'</div>'
+    +'<div style="flex:1"><div style="font-weight:600;font-size:14px">'+logSummary(l)+'</div>'
+    +(l.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic">'+esc(l.notes)+'</div>':'')
+    +'<div class="tl-time">'+fmtTime(l.dateTime)+'</div></div>'
+    +'<button class="btn btn-sm btn-danger" style="align-self:center" onclick="delLog(\''+l.id+'\')">×</button></div>';
+}
+function emptyState(){
+  return '<div class="card empty"><div class="ico">🐾</div><h2 style="font-size:21px;font-weight:700;margin-bottom:8px">Welcome to PawPrints</h2>'
+    +'<p style="color:var(--text-secondary);margin-bottom:20px">Add your dog to start tracking feeding, walks, potty breaks, vet visits, and more.</p>'
+    +'<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap"><button class="btn-primary" style="max-width:240px" onclick="petModal()">🐶 Add your dog</button>'
+    +'<button class="btn btn-outline" onclick="enterDemo()">🎭 Try a demo</button></div></div>';
+}
+
+// ── LOG ──
+function renderLog(){
+  if(!activePet()) return emptyState();
+  const tabs = [['feed','🍖 Feed'],['water','💧 Water'],['potty','🚪 Potty'],['walk','🦮 Walk'],['weight','⚖️ Weight']];
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Log activity</h2>';
+  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+  const opener = { feed:'quickFeed', water:'quickWater', potty:'quickPotty', walk:'quickWalk', weight:'quickWeight' }[logSubtab];
+  html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="'+opener+'()">+ Add '+logSubtab+' entry</button></div>';
+  const entries = petLogs(logSubtab).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+  if(!entries.length) return html + '<div class="card empty"><div class="ico">'+(LOG_META[logSubtab].i)+'</div><p style="color:var(--text-secondary)">No '+logSubtab+' entries yet.</p></div>';
+  // group by date
+  let lastDate = '';
+  html += '<div class="card">';
+  entries.forEach(l => {
+    const d = l.dateTime.slice(0,10);
+    if(d !== lastDate){ html += '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin:14px 0 6px;font-weight:600">'+fmtDate(l.dateTime)+'</div>'; lastDate = d; }
+    html += timelineRow(l);
+  });
+  html += '</div>';
+  return html;
+}
+
+// ── PROFILE ──
+function renderProfile(){
+  if(!activePet()) return emptyState();
+  const p = activePet();
+  const w = latestWeight();
+  let html = '';
+  // profile card
+  html += '<div class="card"><div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
+    + (p.photo?'<img src="'+p.photo+'" class="profile-photo-lg">':'<div class="profile-photo-lg">🐾</div>')
+    + '<div style="flex:1;min-width:160px"><div style="font-size:24px;font-weight:700">'+esc(p.name)+'</div>'
+    + '<div style="color:var(--text-secondary);font-size:14px;margin-top:2px">'+[p.breed,p.sex,p.color].filter(Boolean).map(esc).join(' · ')+'</div></div>'
+    + '<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">✏️ Edit</button></div>';
+  // key facts grid
+  const facts = [];
+  if(p.birthday) facts.push(['Age', ageStr(p.birthday)+' (born '+fmtDate(p.birthday)+')']);
+  if(p.gotchaDay){ const u = untilStr(p.gotchaDay); facts.push(['Gotcha Day', fmtDate(p.gotchaDay)+(u&&u.past?' · '+u.text.replace(' ago',' with you'):'')]); }
+  if(w) facts.push(['Current weight', esc(w.value)+' '+esc(w.unit||'lb')+' ('+fmtDate(w.dateTime)+')']);
+  if(p.microchip) facts.push(['Microchip', esc(p.microchip)]);
+  if(p.license) facts.push(['License', esc(p.license)]);
+  if(p.vetName) facts.push(['Vet', esc(p.vetName)+(p.vetPhone?' · '+esc(p.vetPhone):'')]);
+  if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
+  if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
+  html += '<div style="margin-top:14px"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button></div>';
+  html += '</div>';
+  // weight chart
+  const weights = petLogs('weight').filter(l=>num(l.value)!=null);
+  if(weights.length >= 2){
+    html += '<div class="card"><h3 class="section-title">⚖️ Weight trend</h3><div style="height:200px"><canvas id="weight-chart"></canvas></div></div>';
+  } else if(weights.length === 1){
+    html += '<div class="card"><h3 class="section-title">⚖️ Weight</h3><p style="color:var(--text-secondary);font-size:14px">'+esc(weights[0].value)+' '+esc(weights[0].unit||'lb')+' — log another to see a trend.</p></div>';
+  }
+  // health timeline
+  html += '<div class="card"><h3 class="section-title">🩺 Health timeline</h3>'+renderHealthTimeline()+'</div>';
+  // multi-dog management
+  html += '<div class="card"><h3 class="section-title">🐕 Your dogs</h3>'
+    + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div><button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button></div>').join('')
+    + '<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button></div>';
+  return html;
+}
+function renderHealthTimeline(){
+  const items = [];
+  petArr('vetVisits').forEach(v => items.push({ date:v.date, icon:'🏥', title:v.reason||'Vet visit', sub:[v.vet,v.clinic,v.weight?v.weight+(activePet().weightUnit||'lb'):'',money(v.cost)].filter(Boolean).join(' · '), notes:v.notes }));
+  petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes }));
+  petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes }));
+  petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'' }); });
+  petLogs('weight').filter(l=>l.source && l.source!=='manual').forEach(l => {}); // already shown via vet
+  if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, and meds will appear here as a history.</p>';
+  items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
+  return items.slice(0,40).map(it => '<div class="timeline-item"><div class="tl-icon">'+it.icon+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
+}
+
+// ── CARE ──
+function renderCare(){
+  if(!activePet()) return emptyState();
+  const tabs = [['vet','🏥 Vet'],['grooming','✂️ Grooming'],['meds','💊 Meds'],['illness','🤒 Illness']];
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Care</h2>';
+  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(careSubtab===k?'active':'')+'" onclick="setCareSubtab(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+  if(careSubtab==='vet') html += renderVetTab();
+  else if(careSubtab==='grooming') html += renderGroomTab();
+  else if(careSubtab==='meds') html += renderMedsTab();
+  else html += renderIllnessTab();
+  return html;
+}
+function renderVetTab(){
+  const visits = petArr('vetVisits').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
+  const now = todayISO();
+  const upcoming = visits.filter(v=>v.date > now), past = visits.filter(v=>v.date <= now);
+  const followups = visits.filter(v=>v.followUpDate && v.followUpDate >= now);
+  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>';
+  const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
+  if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
+  if(followups.length){ html += '<div class="card"><h3 class="section-title">📌 Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span>🏥</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
+  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):''].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
+  if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
+  if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
+  if(!visits.length) html += '<div class="card empty"><div class="ico">🏥</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
+  return html;
+}
+function renderGroomTab(){
+  const items = petArr('grooming').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
+  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="groomModal()">+ Add grooming</button></div>';
+  if(items.length){
+    const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
+    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(items[0].date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
+    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.groomer?' · '+esc(g.groomer):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
+  } else html += '<div class="card empty"><div class="ico">✂️</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
+  return html;
+}
+function renderMedsTab(){
+  const meds = petArr('meds');
+  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="medModal()">+ Add med / preventative</button></div>';
+  if(meds.length){
+    html += '<div class="card">'+meds.slice().sort((a,b)=>{const x=untilStr(medNextDue(a)),y=untilStr(medNextDue(b));return (x?x.days:999)-(y?y.days:999);}).map(m=>{
+      const nd = medNextDue(m), u = nd?untilStr(nd):null;
+      const status = u ? (u.past?'<span style="color:var(--danger);font-weight:600">overdue '+u.text+'</span>':'<span style="color:'+(u.days<=7?'var(--warning)':'var(--success)')+'">due '+u.text+'</span>') : '<span style="color:var(--text-secondary)">no schedule</span>';
+      return '<div class="entry-row"><div style="flex:1"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span></div><div style="font-size:12px;color:var(--text-secondary)">'+(m.lastGiven?'Last: '+fmtDate(m.lastGiven):'')+(m.intervalDays?' · every '+esc(m.intervalDays)+'d':'')+' · '+(nd?'Next: '+fmtDate(nd):'')+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
+    }).join('')+'</div>';
+  } else html += '<div class="card empty"><div class="ico">💊</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders.</p></div>';
+  return html;
+}
+function renderIllnessTab(){
+  const items = petArr('illnesses').slice().sort((a,b)=>new Date(dateSafe(b.start))-new Date(dateSafe(a.start)));
+  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>';
+  if(items.length){
+    html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
+  } else html += '<div class="card empty"><div class="ico">🤒</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
+  return html;
+}
+
+// ── SUPPLIES ──
+function renderSupplies(){
+  if(!activePet()) return emptyState();
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Supplies</h2>';
+  html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="invModal()">+ Add supply purchase</button></div>';
+  const all = petArr('inventory');
+  const yearStart = new Date().getFullYear()+'-01-01';
+  const ytd = all.filter(i=>i.purchaseDate && i.purchaseDate >= yearStart).reduce((s,i)=>s+(num(i.cost)||0),0);
+  const low = all.filter(i=>i.runningLow);
+  html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+all.length+'</div><div class="stat-label">Items tracked</div></div>'
+    + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(ytd)+'</div><div class="stat-label">Spent this year</div></div>'
+    + '<div class="card stat-card"><div class="stat-value" style="color:'+(low.length?'var(--warning)':'var(--text-secondary)')+'">'+low.length+'</div><div class="stat-label">Running low</div></div></div>';
+  if(low.length) html += '<div class="card"><h3 class="section-title">🔔 Restock list</h3>'+low.map(i=>'<div class="reminder due"><span>🛒</span><span style="flex:1">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span><button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
+  const cats = ['all',...INV_CATEGORIES];
+  html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
+  const shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
+  if(!shown.length) return html + '<div class="card empty"><div class="ico">🛒</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';
+  html += '<div class="card">'+shown.map(i=>'<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+'</div></div>'+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+'</div>').join('')+'</div>';
+  return html;
+}
+
+// ── INSIGHTS ──
+function renderInsights(){
+  if(!activePet()) return emptyState();
+  const feeds = petLogs('feed'), walks = petLogs('walk'), potty = petLogs('potty');
+  const last7 = (logs) => logs.filter(l=>l.dateTime && (Date.now()-new Date(l.dateTime).getTime()) < 7*86400000);
+  const walkMins = last7(walks).reduce((s,w)=>s+(num(w.durationMin)||0),0);
+  const avgWalk = walks.filter(w=>num(w.durationMin)).length ? Math.round(walks.reduce((s,w)=>s+(num(w.durationMin)||0),0)/walks.filter(w=>num(w.durationMin)).length) : null;
+  const today = todayISO();
+  const mealsToday = feeds.filter(f=>f.dateTime && f.dateTime.slice(0,10)===today).length;
+  const yearStart = new Date().getFullYear()+'-01-01';
+  const spendVet = petArr('vetVisits').filter(v=>v.date>=yearStart).reduce((s,v)=>s+(num(v.cost)||0),0);
+  const spendGroom = petArr('grooming').filter(g=>g.date>=yearStart).reduce((s,g)=>s+(num(g.cost)||0),0);
+  const spendSupplies = petArr('inventory').filter(i=>i.purchaseDate>=yearStart).reduce((s,i)=>s+(num(i.cost)||0),0);
+  const spendTotal = spendVet+spendGroom+spendSupplies;
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Insights</h2>';
+  html += '<div class="stats-grid">'
+    + '<div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+mealsToday+'</div><div class="stat-label">Meals today</div></div>'
+    + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+last7(walks).length+'</div><div class="stat-label">Walks (7d)</div></div>'
+    + '<div class="card stat-card"><div class="stat-value" style="color:var(--accent-2)">'+walkMins+'<span style="font-size:14px">m</span></div><div class="stat-label">Walk time (7d)</div></div>'
+    + '<div class="card stat-card"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk</div></div>'
+    + '</div>';
+  // weight trend
+  const weights = petLogs('weight').filter(l=>num(l.value)!=null);
+  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">⚖️ Weight trend</h3><div style="height:220px"><canvas id="weight-chart"></canvas></div></div>';
+  // spend breakdown
+  if(spendTotal>0){
+    const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
+    html += '<div class="card"><h3 class="section-title">💰 Spending this year — '+money(spendTotal)+'</h3>'
+      + bar('🏥 Vet', spendVet, 'var(--blue)') + bar('✂️ Grooming', spendGroom, 'var(--accent)') + bar('🛒 Food & supplies', spendSupplies, 'var(--success)')
+      + '</div>';
+  }
+  // potty / feeding summary
+  if(potty.length){
+    const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
+    html += '<div class="card"><h3 class="section-title">🚪 Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2">'+esc(k)+': '+v+'</span>').join('')+'</div></div>';
+  }
+  if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">📊</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
+  return html;
+}
+
+// ── CHARTS ──
+let _chartLoading = null, weightChart = null;
+function loadChart(){
+  if(typeof Chart === 'function') return Promise.resolve();
+  if(_chartLoading) return _chartLoading;
+  _chartLoading = new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'; s.onload=resolve; s.onerror=()=>{_chartLoading=null;reject();}; document.head.appendChild(s); });
+  return _chartLoading;
+}
+function maybeDrawWeightChart(){
+  const canvas = document.getElementById('weight-chart');
+  if(!canvas) return;
+  const weights = petLogs('weight').filter(l=>num(l.value)!=null).sort((a,b)=>new Date(a.dateTime)-new Date(b.dateTime));
+  if(weights.length<2) return;
+  loadChart().then(()=>{
+    const c2 = document.getElementById('weight-chart'); if(!c2) return;
+    if(weightChart){ try{weightChart.destroy();}catch(e){} }
+    weightChart = new Chart(c2.getContext('2d'), {
+      type:'line',
+      data:{ labels:weights.map(w=>fmtDate(w.dateTime)), datasets:[{ label:'Weight ('+(weights[0].unit||'lb')+')', data:weights.map(w=>num(w.value)), borderColor:'#a371f7', backgroundColor:'rgba(163,113,247,.12)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:'#a371f7' }] },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:'#8b949e',maxTicksLimit:6},grid:{color:'#30363d'}}, y:{ticks:{color:'#8b949e'},grid:{color:'#30363d'}} } }
+    });
+  }).catch(()=>{});
+}
+
+// ═══════════════════════════════════════════════
+// DEMO MODE
+// ═══════════════════════════════════════════════
+function enterDemo(){
+  if(demoMode) return;
+  demoMode = true;
+  demoBackup = JSON.parse(JSON.stringify(data));
+  const pid = 'demo-dog';
+  const h = (hAgo) => { const d=new Date(Date.now()-hAgo*3600000); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+  const dAgo = (n) => { const d=new Date(Date.now()-n*86400000); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
+  data = {
+    activePetId: pid,
+    pets: [{ id:pid, name:'Biscuit', photo:'', breed:'Golden Retriever mix', sex:'Male (neutered)', birthday:dAgo(420), gotchaDay:dAgo(60), color:'Golden', weightUnit:'lb', microchip:'985•1010•0042', license:'CTY-2291', vetName:'Riverside Animal Hospital', vetPhone:'(555) 012-3456', notes:'Loves tennis balls. Slightly chicken-sensitive.' }],
+    logs: [
+      { id:'l1', petId:pid, type:'feed', dateTime:h(2), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
+      { id:'l2', petId:pid, type:'feed', dateTime:h(11), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
+      { id:'l3', petId:pid, type:'water', dateTime:h(1), refilled:true },
+      { id:'l4', petId:pid, type:'potty', dateTime:h(1.5), result:'Both', place:'Backyard', stool:'Normal', notes:'' },
+      { id:'l5', petId:pid, type:'potty', dateTime:h(6), result:'Pee', place:'On a walk', stool:'', notes:'' },
+      { id:'l6', petId:pid, type:'walk', dateTime:h(6), durationMin:'32', distance:'1.6', notes:'Morning loop around the park' },
+      { id:'l7', petId:pid, type:'walk', dateTime:h(26), durationMin:'25', distance:'1.2', notes:'' },
+      { id:'w1', petId:pid, type:'weight', dateTime:dAgo(90)+'T12:00', value:'58', unit:'lb', source:'manual' },
+      { id:'w2', petId:pid, type:'weight', dateTime:dAgo(40)+'T12:00', value:'61', unit:'lb', source:'manual' },
+      { id:'w3', petId:pid, type:'weight', dateTime:dAgo(5)+'T12:00', value:'62.5', unit:'lb', source:'manual' },
+    ],
+    vetVisits: [
+      { id:'v1', petId:pid, date:dAgo(55), reason:'New-adoption wellness exam', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'185.00', weight:'60', followUpDate:dAgo(-25), notes:'Healthy. Due for booster in ~4 weeks.' },
+      { id:'v2', petId:pid, date:dAgo(-25), reason:'Booster vaccines (upcoming)', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'', weight:'', followUpDate:'', notes:'' },
+    ],
+    grooming: [ { id:'g1', petId:pid, date:dAgo(20), groomer:'Soapy Paws', services:['Bath','Nail trim','De-shedding'], cost:'75.00', nextDueDate:dAgo(-40), notes:'' } ],
+    illnesses: [ { id:'i1', petId:pid, start:dAgo(35), recovery:dAgo(31), symptoms:['Diarrhea','Loss of Appetite'], severity:'Mild', diagnosis:'Diet adjustment', treatment:'Bland diet 3 days', notes:'Settled after switching food.' } ],
+    meds: [
+      { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', intervalDays:'30', lastGiven:dAgo(22), nextDue:'', notes:'' },
+      { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', intervalDays:'30', lastGiven:dAgo(28), nextDue:'', notes:'' },
+    ],
+    inventory: [
+      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), runningLow:false, notes:'' },
+      { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
+      { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
+    ]
+  };
+  if(history.replaceState && !location.search.includes('demo=1')) history.replaceState(null,'','?demo=1');
+  document.getElementById('demo-banner').classList.remove('hidden');
+  document.getElementById('btn-signin').classList.add('hidden');
+  switchView('today');
+  showToast('🎭 Demo mode — meet Biscuit');
+}
+function exitDemo(){
+  if(!demoMode) return;
+  demoMode = false;
+  data = demoBackup || { pets:[],activePetId:null,logs:[],vetVisits:[],grooming:[],illnesses:[],meds:[],inventory:[] };
+  demoBackup = null;
+  if(history.replaceState) history.replaceState(null,'',location.pathname);
+  document.getElementById('demo-banner').classList.add('hidden');
+  updateAuthUI();
+  if(currentUser && firebaseReady) loadFromFirestore(); else switchView('today');
+}
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+document.getElementById('app-version').textContent = APP_VERSION;
+document.getElementById('app-version-footer').textContent = APP_VERSION;
+document.title = 'PawPrints ' + APP_VERSION + ' — Feed · Walk · Care';
+loadLocal();
+if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
+if(new URLSearchParams(location.search).has('demo')) enterDemo();
+else render();
+// Refresh "time ago" status on Today every minute
+setInterval(() => { if(currentView==='today' && !document.getElementById('modal-root').innerHTML){ document.getElementById('view-today').innerHTML = renderToday(); } }, 60000);
+
+function bootFirebase(){ if(typeof firebase==='undefined'){ setTimeout(bootFirebase,200); return; } initFirebase(); }
+if('requestIdleCallback' in window) requestIdleCallback(bootFirebase,{timeout:3000});
+else window.addEventListener('load',()=>setTimeout(bootFirebase,100));
+</script>
+</body>
+</html>
