@@ -140,8 +140,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <div class="header-actions">
     <select id="pet-select" class="pet-select hidden" onchange="onPetSelect(this.value)"></select>
     <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
-    <button class="btn" onclick="exportJSON()" id="btn-export-json">💾 Export</button>
-    <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📂 Import</button>
+    <button class="btn" onclick="settingsModal()" title="Settings, backup &amp; export" aria-label="Settings, backup and export">⚙️</button>
     <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
   </div>
 </div>
@@ -178,7 +177,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.4.1';
+const APP_VERSION = 'v0.5.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -377,17 +376,126 @@ function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if
 function persist(){ saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(rerender !== false) render(); }
 
-function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-' + APP_VERSION + '.json'); }
+function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-backup-' + todayISO() + '.json'); showToast('💾 Backup saved'); }
 function dl(blob,name){ const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u); }
 function importJSON(evt){
   const f = evt.target.files[0]; if(!f) return;
   const r = new FileReader();
   r.onload = (e) => { try {
     const d = JSON.parse(e.target.result);
-    if(d && d.pets){ data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); persist(); render(); showToast('✅ Imported'); }
-    else showToast('⚠️ Not a PawPrints export');
-  } catch { showToast('⚠️ Invalid JSON'); } };
+    if(d && d.pets){
+      if(!confirm('Restore this backup? It replaces everything currently in PawPrints on this device.')){ evt.target.value=''; return; }
+      data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
+      if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
+      persist(); closeModal(); render(); showToast('✅ Backup restored');
+    } else showToast('⚠️ Not a PawPrints backup file');
+  } catch { showToast('⚠️ Invalid file'); } };
   r.readAsText(f); evt.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// SETTINGS / BACKUP / PDF EXPORT
+// ═══════════════════════════════════════════════
+function settingsModal(){
+  const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.inventory.length + data.contacts.length;
+  openModal('<h3>⚙️ Settings &amp; Data</h3>'
+    + '<div style="margin-bottom:18px"><div class="label">Appearance</div><button class="btn" onclick="toggleTheme();settingsModal()">'+(currentTheme()==='light'?'☀️ Light mode — switch to dark':'🌙 Dark mode — switch to light')+'</button></div>'
+    + '<div class="label">Backup &amp; export</div>'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, illness, supplies, contacts) plus photos &amp; settings.</p>'
+    + '<div style="display:flex;flex-direction:column;gap:8px">'
+      + '<button class="btn" onclick="exportJSON()">💾 Export backup (.json)</button>'
+      + '<button class="btn" onclick="document.getElementById(\'import-file\').click()">📂 Import / restore backup (.json)</button>'
+      + '<button class="btn btn-outline" onclick="exportPDF()">📄 Export full report (PDF)</button>'
+    + '</div>'
+    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The PDF is a nicely formatted, printable report of every dog and all their records. The .json backup is the one to keep for restoring later.</p>'
+    + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+
+// Lazy-load jsPDF + autotable on first PDF export
+let _pdfLoading = null;
+function loadScript(src){ return new Promise((res,rej)=>{ const s=document.createElement('script'); s.src=src; s.onload=res; s.onerror=()=>rej(new Error('load failed: '+src)); document.head.appendChild(s); }); }
+function loadPdfLibs(){
+  if(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API && window.jspdf.jsPDF.API.autoTable) return Promise.resolve();
+  if(_pdfLoading) return _pdfLoading;
+  _pdfLoading = loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+    .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js'))
+    .catch(e => { _pdfLoading = null; throw e; });
+  return _pdfLoading;
+}
+function recordsFor(key, pid){ return (data[key]||[]).filter(r => r.petId === pid); }
+function weightsFor(pid){ return data.logs.filter(l => l.petId===pid && l.type==='weight' && num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); }
+
+async function exportPDF(){
+  if(!data.pets.length){ promptAddDog(); return; }
+  showToast('⏳ Building PDF report…');
+  try { await loadPdfLibs(); } catch(e){ showToast('⚠️ PDF library failed to load'); return; }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit:'pt', format:'letter' });
+  const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight(), M = 40;
+  const AMBER=[180,83,9], GRAY=[89,99,110], DARK=[31,35,40], STRIPE=[245,247,249];
+  const need = (y,h) => { if(y + h > pageH - 44){ doc.addPage(); return 54; } return y; };
+  const heading = (text,y) => { y = need(y,40); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...AMBER); doc.text(text, M, y); doc.setDrawColor(...AMBER); doc.setLineWidth(1); doc.line(M, y+5, pageW-M, y+5); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK); return y+20; };
+  const table = (head, body, y) => { if(!body.length) return y; doc.autoTable({ startY:y, head:[head], body, theme:'striped', margin:{left:M,right:M}, headStyles:{fillColor:AMBER,textColor:255,fontSize:9,fontStyle:'bold'}, bodyStyles:{fontSize:8.5,textColor:DARK}, alternateRowStyles:{fillColor:STRIPE}, styles:{cellPadding:4,overflow:'linebreak',lineColor:[224,228,232],lineWidth:.5} }); return doc.lastAutoTable.finalY + 18; };
+  const dash = '—';
+
+  data.pets.forEach((p, idx) => {
+    if(idx > 0) doc.addPage();
+    doc.setFillColor(...AMBER); doc.rect(0,0,pageW,7,'F');
+    let y = 54;
+    if(p.photo){ try { doc.addImage(p.photo,'JPEG', M, y-6, 60, 60); } catch(e){} }
+    const tx = p.photo ? M+74 : M;
+    doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.setTextColor(...DARK); doc.text(String(p.name||'Dog'), tx, y+12);
+    doc.setFont('helvetica','normal'); doc.setFontSize(11); doc.setTextColor(...GRAY);
+    doc.text([p.breed,p.sex,p.color].filter(Boolean).join('  ·  ') || ' ', tx, y+30);
+    doc.setFontSize(9); doc.text('PawPrints care report  ·  generated '+fmtDate(todayISO()), tx, y+45);
+    y = Math.max(y + 64, y + 50) + 14;
+
+    const w = weightsFor(p.id)[0];
+    const facts = [];
+    if(p.birthday) facts.push(['Age', (ageStr(p.birthday)||dash)+' (born '+fmtDate(p.birthday)+')']);
+    if(p.gotchaDay) facts.push(['Adoption / Gotcha day', fmtDate(p.gotchaDay)]);
+    if(w) facts.push(['Current weight', w.value+' '+(w.unit||'lb')+' (as of '+fmtDate(w.dateTime)+')']);
+    if(p.microchip) facts.push(['Microchip', String(p.microchip)]);
+    if(p.license) facts.push(['License', String(p.license)]);
+    if(p.vetName) facts.push(['Vet', p.vetName + (p.vetPhone?'  ·  '+p.vetPhone:'')]);
+    if(p.notes) facts.push(['Notes', String(p.notes)]);
+    if(facts.length){ y = heading('Profile', y); y = table(['Field','Detail'], facts, y); }
+
+    const W = weightsFor(p.id);
+    if(W.length){ y = heading('Weight history', y); y = table(['Date','Weight','Recorded'], W.map(l=>[fmtDate(l.dateTime), l.value+' '+(l.unit||'lb'), (l.source && l.source!=='manual')?'At vet visit':'Manual']), y); }
+
+    const vets = recordsFor('vetVisits', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, v.followUpDate?fmtDate(v.followUpDate):dash, v.notes||'']), y); }
+
+    const grm = recordsFor('grooming', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(grm.length){ y = heading('Grooming', y); y = table(['Date','Services','Groomer','Cost','Next due'], grm.map(g=>[fmtDate(g.date), (g.services||[]).join(', ')||dash, g.groomer||dash, g.cost?money(g.cost):dash, g.nextDueDate?fmtDate(g.nextDueDate):dash]), y); }
+
+    const meds = recordsFor('meds', p.id);
+    if(meds.length){ y = heading('Medications & preventatives', y); y = table(['Name','Type','Last given','Every','Next due'], meds.map(m=>[m.name||dash, m.kind||dash, m.lastGiven?fmtDate(m.lastGiven):dash, m.intervalDays?(m.intervalDays+'d'):dash, medNextDue(m)?fmtDate(medNextDue(m)):dash]), y); }
+
+    const ill = recordsFor('illnesses', p.id).slice().sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+    if(ill.length){ y = heading('Illness history', y); y = table(['Started','Recovered','Symptoms','Severity','Diagnosis','Notes'], ill.map(e=>[fmtDate(e.start), e.recovery?fmtDate(e.recovery):'ongoing', (e.symptoms||[]).join(', ')||dash, e.severity||dash, e.diagnosis||dash, e.notes||'']), y); }
+
+    const inv = recordsFor('inventory', p.id).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
+    if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Low?'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), (i.qty||'')+' '+(i.unit||''), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, i.runningLow?'Yes':'']), y); }
+
+    const allLogs = data.logs.filter(l=>l.petId===p.id && l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+    const acts = allLogs.filter(l=>l.type!=='weight').slice(0,40);
+    if(acts.length){ y = heading('Recent activity (latest 40)', y); y = table(['When','Type','Detail'], acts.map(l=>[fmtDateTime(l.dateTime), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk'})[l.type]||l.type, logSummary(l).replace(/<[^>]+>/g,'')]), y); }
+  });
+
+  if(data.contacts && data.contacts.length){
+    doc.addPage(); let y = 54;
+    doc.setFillColor(...AMBER); doc.rect(0,0,pageW,7,'F');
+    y = heading('Contacts — care team', y);
+    y = table(['Type','Name / Business','Phone','Email','Address'], data.contacts.map(c=>[c.role||dash, c.name||c.org||dash, c.phone||dash, c.email||dash, c.address||'']), y);
+  }
+
+  const n = doc.internal.getNumberOfPages();
+  for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('PawPrints '+APP_VERSION, M, pageH-22); doc.text('Page '+i+' of '+n, pageW-M, pageH-22, {align:'right'}); }
+
+  doc.save('pawprints-report-'+todayISO()+'.pdf');
+  showToast('✅ PDF report saved');
 }
 
 // ═══════════════════════════════════════════════

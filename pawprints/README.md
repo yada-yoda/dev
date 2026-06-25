@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.4.1**
+**Current Version: v0.5.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,13 @@ covers both.
 
 ## Version History
 
+- **v0.5.0** — Backup + PDF report. A new **⚙️ Settings & Data** panel (header gear) consolidates
+  data tools: **Export backup (.json)** — one file with everything (all dogs, logs, care records,
+  contacts, photos, settings); **Import / restore** (with a confirm guard); and a new **Export full
+  report (PDF)** — a nicely formatted, multi-page, printable document covering every dog's profile,
+  weight history, vet visits, grooming, meds, illnesses, supplies, recent activity, and contacts
+  (lazy-loaded jsPDF + autotable, brand-styled tables, page numbers). The header's old Export/Import
+  buttons moved into this panel.
 - **v0.4.1** — Onboarding + toast polish. With no dog added yet, tapping a feature tab
   (Calendar, Care, etc.) previously just showed a generic card that looked identical on every
   tab — now it pops a clear **"Add your dog first"** modal that starts the add-dog flow (or
