@@ -144,8 +144,9 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   </div>
   <div class="header-actions">
     <button class="btn-gcal" onclick="syncAllToGCal()" id="btn-gcal" disabled>📅 Google Cal</button>
+    <button class="btn" onclick="exportPDF()" id="btn-export-pdf" disabled>📄 PDF</button>
     <button class="btn" onclick="exportICS()" id="btn-export-ics" disabled>📅 .ics</button>
-    <button class="btn" onclick="exportJSON()" id="btn-export-json" disabled>💾 JSON</button>
+    <button class="btn" onclick="exportJSON()" id="btn-export-json" disabled>💾 Backup</button>
     <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">📂 Import</button>
     <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
   </div>
@@ -177,7 +178,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.48';
+const APP_VERSION = 'v0.49';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -351,6 +352,7 @@ function updateExportButtons() {
   const has = entries.length > 0;
   document.getElementById('btn-export-ics').disabled = !has;
   document.getElementById('btn-export-json').disabled = !has;
+  document.getElementById('btn-export-pdf').disabled = !has;
   document.getElementById('btn-gcal').disabled = !has || !gcalAccessToken;
 }
 
@@ -546,13 +548,185 @@ function createICSEvent(e){
   return 'BEGIN:VEVENT\r\nDTSTART:'+start+'\r\nDTEND:'+end+'\r\nSUMMARY:🤒 '+(e.diagnosis||'Illness')+'\r\nDESCRIPTION:Symptoms: '+(e.symptoms||[]).join(', ')+(meds?'\\nMedicine: '+meds:'')+'\\nSeverity: '+e.severity+'\r\nLOCATION:'+(e.locationDetail||e.location)+'\r\nUID:'+e.id+'@illnesstracker\r\nEND:VEVENT';
 }
 function exportICS(){dl(new Blob(['BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//IllnessTracker//EN\r\nCALSCALE:GREGORIAN\r\n'+entries.map(createICSEvent).join('\r\n')+'\r\nEND:VCALENDAR'],{type:'text/calendar'}),'illness-log-'+APP_VERSION+'.ics');}
-function exportJSON(){dl(new Blob([JSON.stringify(entries,null,2)],{type:'application/json'}),'illness-data-'+APP_VERSION+'.json');}
+// Full backup: entries + customMeds + dismissedDoses + metadata. Schema-versioned
+// so future shapes can be detected. Legacy bare-array files still importable.
+function exportJSON() {
+  const backup = {
+    schema: 'illness-tracker/v1',
+    appVersion: APP_VERSION,
+    exportedAt: new Date().toISOString(),
+    counts: { entries: entries.length, customMeds: customMeds.length, dismissedDoses: dismissedDoses.size },
+    entries,
+    customMeds,
+    dismissedDoses: [...dismissedDoses],
+  };
+  const ymd = new Date().toISOString().slice(0, 10);
+  dl(new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' }), 'illness-backup-' + APP_VERSION + '-' + ymd + '.json');
+}
 function dl(blob,name){const u=URL.createObjectURL(blob);const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);}
-function importJSON(evt){
-  const f=evt.target.files[0];if(!f)return;
-  const r=new FileReader();
-  r.onload=(e)=>{try{const d=JSON.parse(e.target.result);if(Array.isArray(d)){entries=[...d.filter(x=>!new Set(entries.map(e=>e.id)).has(x.id)),...entries];persist();render();showToast('✅ Imported');}}catch{showToast('⚠️ Invalid JSON');}};
-  r.readAsText(f);evt.target.value='';
+function importJSON(evt) {
+  const f = evt.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = (e) => {
+    try {
+      const d = JSON.parse(e.target.result);
+      let importedEntries, importedCustomMeds, importedDismissed;
+      if (Array.isArray(d)) {
+        // Legacy format: bare entries array (v0.36 and earlier)
+        importedEntries = d;
+      } else if (d && typeof d === 'object' && Array.isArray(d.entries)) {
+        // Full backup (v0.49+)
+        importedEntries = d.entries;
+        importedCustomMeds = Array.isArray(d.customMeds) ? d.customMeds : null;
+        importedDismissed = Array.isArray(d.dismissedDoses) ? d.dismissedDoses : null;
+      } else {
+        throw new Error('unrecognized backup format');
+      }
+      // Merge entries: existing IDs win, so re-imports don't clobber unsaved edits
+      const existingIds = new Set(entries.map(e => e.id));
+      const freshEntries = importedEntries.filter(x => x && x.id && !existingIds.has(x.id));
+      entries = [...freshEntries, ...entries];
+      if (importedCustomMeds) customMeds = [...new Set([...customMeds, ...importedCustomMeds])];
+      if (importedDismissed) importedDismissed.forEach(k => dismissedDoses.add(k));
+      persist();
+      if (importedCustomMeds) saveCustomMeds();
+      if (importedDismissed) saveDismissed();
+      render();
+      const parts = ['✅ Imported ' + freshEntries.length + ' illness' + (freshEntries.length === 1 ? '' : 'es')];
+      if (importedCustomMeds && importedCustomMeds.length) parts.push(importedCustomMeds.length + ' meds');
+      if (importedDismissed && importedDismissed.length) parts.push(importedDismissed.length + ' dismissals');
+      showToast(parts.join(', '));
+    } catch (err) {
+      showToast('⚠️ Invalid backup file: ' + err.message);
+    }
+  };
+  r.readAsText(f); evt.target.value = '';
+}
+
+// ═══════════════════════════════════════════════
+// PDF EXPORT — full report via browser print-to-PDF
+// ═══════════════════════════════════════════════
+function exportPDF() {
+  if (!entries.length) { showToast('⚠️ Nothing to export'); return; }
+  showToast('⏳ Building report...');
+  const html = buildReportHTML();
+  // Hidden iframe → contentWindow.print(). Popup blockers don't fire on iframes.
+  let iframe = document.getElementById('pdf-print-frame');
+  if (iframe) iframe.remove();
+  iframe = document.createElement('iframe');
+  iframe.id = 'pdf-print-frame';
+  iframe.setAttribute('aria-hidden', 'true');
+  iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument;
+  doc.open(); doc.write(html); doc.close();
+  // Let CSS + fonts settle, then trigger print
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+      showToast('📄 Print dialog opened — choose "Save as PDF"');
+    } catch (e) {
+      showToast('⚠️ Print failed: ' + e.message);
+    }
+  }, 350);
+}
+function buildReportHTML() {
+  const a = analyze();
+  const sorted = [...entries].sort((x, y) => new Date(x.symptomStart) - new Date(y.symptomStart));
+  const exportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const rangeFirst = sorted[0] ? fmtDate(sorted[0].symptomStart) : '—';
+  const rangeLast = sorted[sorted.length - 1] ? fmtDate(sorted[sorted.length - 1].symptomStart) : '—';
+  const css = `@page{size:letter;margin:0.6in}
+*{box-sizing:border-box}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#1a1a1a;font-size:11pt;line-height:1.4;margin:0;padding:0}
+.h{border-bottom:3pt solid #58a6ff;padding-bottom:10pt;margin-bottom:16pt}
+h1{font-size:24pt;margin:0;color:#1a1a1a;letter-spacing:-0.02em}
+.subtitle{font-size:10pt;color:#666;margin-top:4pt}
+h2{font-size:15pt;margin:22pt 0 8pt;color:#1a1a1a;border-bottom:1pt solid #58a6ff;padding-bottom:4pt;page-break-after:avoid}
+.summary{display:grid;grid-template-columns:repeat(4,1fr);gap:8pt;margin:12pt 0 20pt}
+.summary-card{background:#f5f7fa;border:1pt solid #e1e5ec;border-radius:6pt;padding:10pt 6pt;text-align:center}
+.summary-value{font-size:22pt;font-weight:700;line-height:1}
+.summary-label{font-size:9pt;color:#666;margin-top:4pt}
+.illness{margin-bottom:14pt;padding:10pt 12pt;border:1pt solid #e1e5ec;border-radius:6pt;page-break-inside:avoid;background:#fdfdfd}
+.illness-head{display:flex;justify-content:space-between;align-items:baseline;gap:8pt;margin-bottom:6pt}
+.illness-title{font-weight:700;font-size:13pt;color:#1a1a1a}
+.illness-date{font-size:9.5pt;color:#666;text-align:right;font-family:'SF Mono',Menlo,Consolas,monospace}
+.severity{display:inline-block;padding:1pt 6pt;border-radius:8pt;font-size:8.5pt;font-weight:600;margin-left:6pt;background:#eef4fc;color:#58a6ff}
+.severity.mild{background:#e8f5e9;color:#388e3c}
+.severity.moderate{background:#fff3e0;color:#e65100}
+.severity.severe{background:#ffebee;color:#c62828}
+.symptoms{margin:6pt 0}
+.chip{display:inline-block;padding:2pt 7pt;background:#eef4fc;color:#3a78c8;border-radius:8pt;font-size:9pt;margin:1pt 2pt 1pt 0}
+.meta-row{display:grid;grid-template-columns:90pt 1fr;gap:8pt;font-size:10pt;margin:2pt 0}
+.meta-key{color:#666;font-weight:600}
+.notes{font-style:italic;color:#444;font-size:10pt;margin:6pt 0 4pt;padding:5pt 8pt;background:#fafafa;border-left:2pt solid #c0c0c0;border-radius:0 4pt 4pt 0}
+.vitals-table{width:100%;border-collapse:collapse;margin-top:6pt;font-size:9.5pt}
+.vitals-table th,.vitals-table td{padding:3pt 5pt;text-align:left;border-bottom:0.5pt solid #e0e0e0}
+.vitals-table th{background:#f5f7fa;font-weight:600;color:#444;font-size:9pt}
+.vitals-table td.med{color:#7c3aed;font-weight:600}
+.risk-row{padding:6pt 10pt;background:#fff8e6;border-left:3pt solid #d29922;margin-bottom:5pt;font-size:10pt;border-radius:0 4pt 4pt 0}
+.risk-row strong{color:#a16207}
+.insight{display:grid;grid-template-columns:1fr 1fr;gap:10pt;margin:6pt 0}
+.insight-card{background:#f5f7fa;border:1pt solid #e1e5ec;border-radius:4pt;padding:6pt 10pt;font-size:10pt}
+.insight-label{color:#666;font-size:9pt}
+.insight-value{font-weight:600;color:#1a1a1a;margin-top:2pt}
+.footer{margin-top:24pt;padding-top:8pt;border-top:1pt solid #e1e5ec;font-size:9pt;color:#888;text-align:center}
+.empty-note{color:#999;font-style:italic;font-size:10pt}
+@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}`;
+  const summary = `<div class="summary">
+    <div class="summary-card"><div class="summary-value" style="color:#58a6ff">${entries.length}</div><div class="summary-label">Total Illnesses</div></div>
+    <div class="summary-card"><div class="summary-value" style="color:#f78166">${a && a.avgDur ? a.avgDur + 'd' : '—'}</div><div class="summary-label">Avg Duration</div></div>
+    <div class="summary-card"><div class="summary-value" style="color:#3fb950">${a && a.avgGap ? a.avgGap + 'd' : '—'}</div><div class="summary-label">Avg Gap</div></div>
+    <div class="summary-card"><div class="summary-value" style="color:#d29922">${a ? a.risks.length : 0}</div><div class="summary-label">Risk Factors</div></div>
+  </div>`;
+  const risksBlock = a && a.risks.length
+    ? '<h2>Risk Factors</h2>' + a.risks.map(r => `<div class="risk-row"><strong>${esc(r.factor)}</strong> — ${esc(r.detail)}</div>`).join('')
+    : '';
+  const insightsBlock = a && (a.peakM || a.peakD || a.avgDur || a.avgGap)
+    ? '<h2>Timing Insights</h2><div class="insight">' +
+      (a.peakM ? `<div class="insight-card"><div class="insight-label">Peak month</div><div class="insight-value">${esc(a.peakM[0])} (${a.peakM[1]}×)</div></div>` : '') +
+      (a.peakD ? `<div class="insight-card"><div class="insight-label">Most common day</div><div class="insight-value">${esc(a.peakD[0])} (${a.peakD[1]}×)</div></div>` : '') +
+      (a.avgGap ? `<div class="insight-card"><div class="insight-label">Avg gap between illnesses</div><div class="insight-value">${a.avgGap} days</div></div>` : '') +
+      (a.avgDur ? `<div class="insight-card"><div class="insight-label">Avg illness duration</div><div class="insight-value">${a.avgDur} days</div></div>` : '') +
+      '</div>'
+    : '';
+  const topMedsBlock = a && a.topMed && a.topMed.length
+    ? '<h2>Most Used Medicines</h2>' + a.topMed.map(([n, c]) => `<div class="meta-row"><span class="meta-key">${esc(n)}</span><span>${c} ${c === 1 ? 'use' : 'uses'}</span></div>`).join('')
+    : '';
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Illness Tracker Report - ' + exportDate + '</title><style>' + css + '</style></head><body>'
+    + '<div class="h"><h1>Illness Tracker Report</h1><div class="subtitle">Generated ' + exportDate + ' · ' + entries.length + ' illness' + (entries.length === 1 ? '' : 'es') + ' logged · ' + rangeFirst + ' → ' + rangeLast + '</div></div>'
+    + summary
+    + risksBlock
+    + '<h2>Illness Log</h2>'
+    + sorted.map(renderEntryForPDF).join('')
+    + insightsBlock
+    + topMedsBlock
+    + '<div class="footer">Illness Tracker ' + APP_VERSION + ' · Track · Analyze · Prevent</div>'
+    + '</body></html>';
+}
+function renderEntryForPDF(e) {
+  const recoveryStr = e.recoveryDate ? ' → ' + fmtDate(e.recoveryDate) + ' (' + daysBetween(e.symptomStart, e.recoveryDate) + 'd)' : ' · ongoing';
+  const sevClass = (e.severity || '').toLowerCase();
+  return '<div class="illness">'
+    + '<div class="illness-head">'
+      + '<div class="illness-title">' + esc(e.diagnosis || 'Undiagnosed Illness')
+        + (e.severity ? '<span class="severity ' + sevClass + '">' + esc(e.severity) + '</span>' : '')
+      + '</div>'
+      + '<div class="illness-date">' + fmtDate(e.symptomStart) + recoveryStr + '</div>'
+    + '</div>'
+    + (e.symptoms && e.symptoms.length ? '<div class="symptoms">' + e.symptoms.map(s => '<span class="chip">' + esc(s) + '</span>').join('') + '</div>' : '')
+    + (e.initialTemp ? '<div class="meta-row"><span class="meta-key">Initial temp</span><span>' + esc(e.initialTemp) + '°F</span></div>' : '')
+    + (e.location ? '<div class="meta-row"><span class="meta-key">Location</span><span>' + esc(e.location) + (e.locationDetails ? ' — ' + esc(e.locationDetails) : '') + '</span></div>' : '')
+    + (e.activity ? '<div class="meta-row"><span class="meta-key">Activity</span><span>' + esc(e.activity) + '</span></div>' : '')
+    + (e.contacts && e.contacts.length ? '<div class="meta-row"><span class="meta-key">Contacts</span><span>' + esc(e.contacts.join(', ')) + '</span></div>' : '')
+    + (e.notes ? '<div class="notes">' + esc(e.notes) + '</div>' : '')
+    + (e.vitals && e.vitals.length
+        ? '<table class="vitals-table"><thead><tr><th>Time</th><th>Medicine</th><th>Dose</th><th>Temp</th><th>SpO2</th><th>Notes</th></tr></thead><tbody>'
+          + e.vitals.map(v => '<tr><td>' + (v.dateTime ? fmtDateTime(v.dateTime) : '—') + '</td><td class="med">' + esc(v.medicine || '—') + '</td><td>' + esc(v.dosage || '—') + (v.doseInterval ? ' · q' + esc(v.doseInterval) + 'h' : '') + '</td><td>' + (v.temperature ? esc(v.temperature) + '°F' : '—') + '</td><td>' + (v.spo2 ? esc(v.spo2) + '%' : '—') + '</td><td>' + esc(v.notes || '') + '</td></tr>').join('')
+          + '</tbody></table>'
+        : '')
+    + '</div>';
 }
 
 // ═══════════════════════════════════════════════
