@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>Spyglass — watch any web page for changes</title>
+<meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
+
+<!-- Open Graph / Twitter -->
+<meta property="og:title" content="Spyglass — watch any web page for changes" />
+<meta property="og:description" content="Watch any web page for changes and get an email when it updates." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://dev.rizzo.cc/spyglass/" />
+<meta name="twitter:card" content="summary" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%234f46e5'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23fff'/%3E%3C/svg%3E" />
+
+<style>
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f0f2f8; --border:#e3e6ef;
+    --text:#1d2333; --muted:#6b7280; --primary:#4f46e5; --primary-d:#4338ca;
+    --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
+    --amber:#d97706; --amber-bg:#fef3c7; --shadow:0 6px 24px rgba(20,24,40,.08);
+    --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1220; --surface:#171a2b; --surface-2:#1e2236; --border:#2a2f48;
+      --text:#e7e9f3; --muted:#9aa0b4; --primary:#7c75f5; --primary-d:#6660e8;
+      --green:#34d399; --green-bg:#0f3d2e; --red:#f87171; --red-bg:#3d1717;
+      --amber:#fbbf24; --amber-bg:#3d2f0f; --shadow:0 8px 30px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--primary)}
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:30; background:var(--surface);
+    border-bottom:1px solid var(--border); padding:.7rem 1rem;
+    display:flex; align-items:center; gap:.75rem;
+  }
+  .brand{display:flex;align-items:center;gap:.55rem;font-weight:700;font-size:1.15rem}
+  .brand .dot{
+    width:26px;height:26px;border-radius:50%;background:var(--primary);
+    position:relative;flex:none;
+  }
+  .brand .dot::after{
+    content:"";position:absolute;inset:0;margin:auto;width:9px;height:9px;
+    border-radius:50%;background:#fff;
+  }
+  .verchip{
+    font-size:.7rem;font-weight:600;color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:999px;padding:.1rem .5rem;cursor:pointer;
+    position:relative;
+  }
+  .verchip .unread{
+    position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;
+    background:var(--red);display:none;
+  }
+  .verchip.has-unread .unread{display:block}
+  .spacer{flex:1}
+  .avatar{width:32px;height:32px;border-radius:50%;border:1px solid var(--border)}
+
+  /* ---------- buttons ---------- */
+  .btn{
+    border:1px solid var(--border);background:var(--surface);color:var(--text);
+    border-radius:10px;padding:.5rem .9rem;font-weight:600;font-size:.9rem;
+    display:inline-flex;align-items:center;gap:.4rem;transition:.15s;
+  }
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+  .btn.primary:hover{background:var(--primary-d);border-color:var(--primary-d)}
+  .btn.danger{color:var(--red);border-color:var(--red)}
+  .btn.sm{padding:.3rem .6rem;font-size:.8rem;border-radius:8px}
+  .btn.ghost{background:transparent;border-color:transparent}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ---------- layout ---------- */
+  main{max-width:880px;margin:0 auto;padding:1.25rem 1rem 4rem}
+  .toolbar{display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap}
+  .toolbar h1{font-size:1.3rem;margin:0}
+  .filters{display:flex;gap:.35rem;margin-left:.25rem}
+  .filters button{
+    background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:.25rem .6rem;border-radius:999px;font-size:.82rem;font-weight:600;
+  }
+  .filters button.active{background:var(--surface);border-color:var(--border);color:var(--text)}
+
+  /* ---------- monitor card ---------- */
+  .grid{display:flex;flex-direction:column;gap:.7rem}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:.9rem 1rem;display:flex;align-items:center;gap:.85rem;box-shadow:var(--shadow);
+    transition:.15s;
+  }
+  .card:hover{border-color:var(--primary)}
+  .card .fav{width:34px;height:34px;border-radius:8px;background:var(--surface-2);flex:none;
+    display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .card .fav img{width:22px;height:22px}
+  .card .meta{flex:1;min-width:0}
+  .card .meta .name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .meta .url{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .meta .sub{font-size:.76rem;color:var(--muted);margin-top:.15rem}
+  .pill{font-size:.72rem;font-weight:700;padding:.18rem .5rem;border-radius:999px;white-space:nowrap}
+  .pill.changed{background:var(--green-bg);color:var(--green)}
+  .pill.unchanged{background:var(--surface-2);color:var(--muted)}
+  .pill.error{background:var(--red-bg);color:var(--red)}
+  .pill.paused{background:var(--amber-bg);color:var(--amber)}
+  .card .actions{display:flex;gap:.3rem;align-items:center}
+
+  /* ---------- empty / loading ---------- */
+  .empty{text-align:center;padding:4rem 1rem;color:var(--muted)}
+  .empty .big{font-size:3rem;margin-bottom:.5rem}
+  .empty h2{color:var(--text);margin:.2rem 0}
+  .signin-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem;padding:5rem 1rem;text-align:center}
+  .skeleton{height:64px;border-radius:var(--radius);background:linear-gradient(90deg,var(--surface-2),var(--surface),var(--surface-2));
+    background-size:200% 100%;animation:sk 1.3s infinite}
+  @keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(10,12,22,.55);z-index:50;
+    display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow:auto;
+  }
+  .overlay.open{display:flex}
+  .modal{
+    background:var(--surface);border:1px solid var(--border);border-radius:18px;
+    width:100%;max-width:560px;box-shadow:var(--shadow);overflow:hidden;
+  }
+  .modal header{position:static;border:none;border-bottom:1px solid var(--border);
+    justify-content:space-between;padding:1rem 1.25rem}
+  .modal header h3{margin:0;font-size:1.1rem}
+  .modal .body{padding:1.25rem}
+  .modal .foot{padding:1rem 1.25rem;border-top:1px solid var(--border);display:flex;
+    justify-content:flex-end;gap:.6rem;background:var(--surface-2)}
+  label.field{display:block;margin-bottom:1rem}
+  label.field .lab{font-size:.82rem;font-weight:600;margin-bottom:.3rem;display:block}
+  label.field .hint{font-size:.74rem;color:var(--muted);font-weight:400}
+  input,select,textarea{
+    width:100%;padding:.55rem .7rem;border:1px solid var(--border);border-radius:10px;
+    background:var(--bg);color:var(--text);font-size:.92rem;font-family:inherit;
+  }
+  input:focus,select:focus,textarea:focus{outline:2px solid var(--primary);outline-offset:-1px}
+  .row2{display:flex;gap:.8rem}
+  .row2>*{flex:1}
+  .toggle{display:flex;align-items:center;gap:.5rem;cursor:pointer;font-size:.9rem;font-weight:600}
+
+  /* ---------- detail / diff ---------- */
+  .timeline{display:flex;flex-direction:column;gap:.5rem;margin-top:.5rem}
+  .snap{border:1px solid var(--border);border-radius:10px;padding:.7rem .85rem;background:var(--bg);cursor:pointer}
+  .snap:hover{border-color:var(--primary)}
+  .snap .when{font-weight:600;font-size:.86rem}
+  .snap .sum{font-size:.78rem;color:var(--muted)}
+  .diff{font-size:.88rem;white-space:pre-wrap;word-break:break-word;background:var(--bg);
+    border:1px solid var(--border);border-radius:10px;padding:.85rem;max-height:340px;overflow:auto}
+  .diff ins{background:var(--green-bg);color:var(--green);text-decoration:none;border-radius:3px;padding:0 1px}
+  .diff del{background:var(--red-bg);color:var(--red);border-radius:3px;padding:0 1px}
+
+  /* ---------- toast ---------- */
+  #toasts{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:100;
+    display:flex;flex-direction:column;gap:.5rem;align-items:center;pointer-events:none}
+  .toast{
+    background:var(--text);color:var(--bg);padding:.6rem 1rem;border-radius:10px;
+    font-size:.88rem;font-weight:600;box-shadow:var(--shadow);
+    animation:drop .25s ease;max-width:90vw;
+  }
+  .toast.err{background:var(--red);color:#fff}
+  .toast.ok{background:var(--green);color:#fff}
+  @keyframes drop{from{transform:translateY(-12px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+  .demo-banner{
+    background:var(--amber-bg);color:var(--amber);text-align:center;font-size:.82rem;
+    font-weight:600;padding:.4rem;border-bottom:1px solid var(--border)
+  }
+  .muted{color:var(--muted)}
+  .changelog li{margin-bottom:.6rem}
+  .hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="demoBanner" class="demo-banner hidden">Demo mode — sample data, nothing is saved. <a href="./">Exit demo</a></div>
+
+<header>
+  <div class="brand"><span class="dot"></span> Spyglass</div>
+  <span id="verChip" class="verchip" title="What's new">v0.1.0<span class="unread"></span></span>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</header>
+
+<main>
+  <div id="signedOut" class="signin-wrap hidden">
+    <div class="brand" style="font-size:1.8rem"><span class="dot" style="width:38px;height:38px"></span> Spyglass</div>
+    <p class="muted" style="max-width:420px">Watch any web page for changes and get an email the moment it updates. Sign in to create your first monitor.</p>
+    <button class="btn primary" id="btnSignInBig">Sign in with Google</button>
+    <a href="?demo=1" class="muted" style="font-size:.85rem">or explore a live demo &rarr;</a>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="toolbar">
+      <h1>Monitors</h1>
+      <div class="filters" id="filters">
+        <button data-f="all" class="active">All</button>
+        <button data-f="changed">Changed</button>
+        <button data-f="paused">Paused</button>
+        <button data-f="error">Errors</button>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn primary" id="btnAdd">+ Add monitor</button>
+    </div>
+    <div id="list" class="grid"></div>
+  </div>
+</main>
+
+<!-- Add/Edit modal -->
+<div class="overlay" id="editOverlay">
+  <div class="modal">
+    <header><h3 id="editTitle">Add monitor</h3><button class="btn ghost" data-close>&times;</button></header>
+    <div class="body">
+      <input type="hidden" id="mId" />
+      <label class="field">
+        <span class="lab">Page URL</span>
+        <input id="mUrl" type="url" placeholder="https://example.com/page" />
+      </label>
+      <label class="field">
+        <span class="lab">Name <span class="hint">— optional, defaults to the domain</span></span>
+        <input id="mName" type="text" placeholder="My monitor" />
+      </label>
+      <div class="row2">
+        <label class="field">
+          <span class="lab">What to watch</span>
+          <select id="mType">
+            <option value="text">Whole page text</option>
+            <option value="element">A specific element (CSS selector)</option>
+            <option value="keyword">Keyword present / absent</option>
+          </select>
+        </label>
+        <label class="field">
+          <span class="lab">Check every</span>
+          <select id="mFreq">
+            <option value="5">5 minutes</option>
+            <option value="15">15 minutes</option>
+            <option value="30">30 minutes</option>
+            <option value="60" selected>1 hour</option>
+            <option value="360">6 hours</option>
+            <option value="720">12 hours</option>
+            <option value="1440">1 day</option>
+          </select>
+        </label>
+      </div>
+      <label class="field hidden" id="selField">
+        <span class="lab">CSS selector <span class="hint">— e.g. <code>#price</code> or <code>.status</code></span></span>
+        <input id="mSelector" type="text" placeholder="#price" />
+      </label>
+      <label class="field hidden" id="kwField">
+        <span class="lab">Keyword <span class="hint">— alert when this text appears or disappears</span></span>
+        <input id="mKeyword" type="text" placeholder="In stock" />
+      </label>
+      <label class="toggle"><input type="checkbox" id="mEnabled" checked style="width:auto"> Active</label>
+    </div>
+    <div class="foot">
+      <button class="btn" data-close>Cancel</button>
+      <button class="btn primary" id="btnSave">Save monitor</button>
+    </div>
+  </div>
+</div>
+
+<!-- Detail modal -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal" style="max-width:620px">
+    <header><h3 id="detailTitle">Monitor</h3><button class="btn ghost" data-close>&times;</button></header>
+    <div class="body" id="detailBody"></div>
+  </div>
+</div>
+
+<!-- What's new modal -->
+<div class="overlay" id="whatsnewOverlay">
+  <div class="modal">
+    <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
+    <div class="body">
+      <ul class="changelog">
+        <li><strong>v0.1.0</strong> — First release: create page monitors, Google sign-in, and a dashboard. Server-side checking + email alerts arrive with the worker.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<!-- ============================ CONFIG ============================ -->
+<!-- Firebase: fill these in after you create the Firebase project (Console > Project settings > Web app). -->
+<!-- These values are PUBLIC and safe to commit. -->
+<script>
+  const FIREBASE_CONFIG = {
+    apiKey: "REPLACE_ME",
+    authDomain: "REPLACE_ME.firebaseapp.com",
+    projectId: "REPLACE_ME",
+    storageBucket: "REPLACE_ME.appspot.com",
+    messagingSenderId: "REPLACE_ME",
+    appId: "REPLACE_ME"
+  };
+  const APP_VERSION = "0.1.0";
+</script>
+
+<!-- Firebase SDK (compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script>
+/* ============================ helpers ============================ */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const DEMO = new URLSearchParams(location.search).get("demo") === "1";
+
+function toast(msg, kind){
+  const t = document.createElement("div");
+  t.className = "toast" + (kind ? " " + kind : "");
+  t.textContent = msg;
+  $("#toasts").appendChild(t);
+  setTimeout(() => { t.style.opacity = "0"; t.style.transition = ".3s"; setTimeout(() => t.remove(), 300); }, 2600);
+}
+function fmtAgo(ts){
+  if(!ts) return "never";
+  const d = (typeof ts === "number") ? ts : (ts.toMillis ? ts.toMillis() : Date.parse(ts));
+  const s = Math.floor((Date.now() - d) / 1000);
+  if(s < 60) return "just now";
+  if(s < 3600) return Math.floor(s/60) + "m ago";
+  if(s < 86400) return Math.floor(s/3600) + "h ago";
+  return Math.floor(s/86400) + "d ago";
+}
+function domainOf(u){ try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return u; } }
+function favOf(u){ try{ return "https://www.google.com/s2/favicons?sz=64&domain=" + new URL(u).hostname; }catch(e){ return ""; } }
+function freqLabel(m){
+  if(m>=1440) return "daily"; if(m>=60) return (m/60)+"h"; return m+"m";
+}
+function escapeHtml(s){ return (s||"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+/* word-level diff (shared shape with the worker) */
+const MAX_DIFF_TOKENS = 1500;   // bound the DP matrix so a huge page can't hang the tab
+function wordDiff(oldStr, newStr){
+  let a = (oldStr||"").split(/(\s+)/), b = (newStr||"").split(/(\s+)/);
+  if(a.length > MAX_DIFF_TOKENS) a = a.slice(0, MAX_DIFF_TOKENS);
+  if(b.length > MAX_DIFF_TOKENS) b = b.slice(0, MAX_DIFF_TOKENS);
+  const n = a.length, m = b.length;
+  const dp = Array.from({length:n+1}, () => new Uint32Array(m+1));
+  for(let i=n-1;i>=0;i--) for(let j=m-1;j>=0;j--)
+    dp[i][j] = a[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+  let i=0,j=0,out="";
+  while(i<n && j<m){
+    if(a[i]===b[j]){ out+=escapeHtml(a[i]); i++; j++; }
+    else if(dp[i+1][j] >= dp[i][j+1]){ out+="<del>"+escapeHtml(a[i])+"</del>"; i++; }
+    else { out+="<ins>"+escapeHtml(b[j])+"</ins>"; j++; }
+  }
+  while(i<n){ out+="<del>"+escapeHtml(a[i++])+"</del>"; }
+  while(j<m){ out+="<ins>"+escapeHtml(b[j++])+"</ins>"; }
+  return out;
+}
+
+/* ============================ data layer ============================ */
+let db=null, auth=null, uid=null;
+let monitors=[];        // [{id, ...data}]
+let snapsCache={};      // monitorId -> [snapshots]
+let activeFilter="all";
+
+/* ---- demo data ---- */
+function demoData(){
+  const now = Date.now();
+  return [
+    {id:"d1", name:"GPU restock page", url:"https://example.com/gpu", type:"keyword", keyword:"In stock",
+     frequencyMinutes:15, enabled:true, lastStatus:"changed", changeCount:3, lastCheckedAt:now-1000*60*4},
+    {id:"d2", name:"Apartment listing", url:"https://example.com/rentals/123", type:"element", selector:".price",
+     frequencyMinutes:60, enabled:true, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*40},
+    {id:"d3", name:"Company careers", url:"https://example.com/careers", type:"text",
+     frequencyMinutes:1440, enabled:true, lastStatus:"changed", changeCount:1, lastCheckedAt:now-1000*60*60*6},
+    {id:"d4", name:"Terms of service", url:"https://example.com/tos", type:"text",
+     frequencyMinutes:1440, enabled:false, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*60*30},
+    {id:"d5", name:"Status page", url:"https://example.com/status", type:"keyword", keyword:"operational",
+     frequencyMinutes:5, enabled:true, lastStatus:"error", changeCount:0, lastCheckedAt:now-1000*60*9},
+  ];
+}
+const DEMO_SNAPS = {
+  d1:[{takenAt:Date.now()-1000*60*4, content:"Price: $499 — In stock", diffSummary:"+2 / -2"},
+      {takenAt:Date.now()-1000*60*60*3, content:"Price: $499 — Out of stock", diffSummary:"first snapshot"}],
+  d3:[{takenAt:Date.now()-1000*60*60*6, content:"Open roles: Engineer, Designer, PM", diffSummary:"+1 / -0"}],
+};
+
+/* ---- load / subscribe ---- */
+function startData(){
+  if(DEMO){ monitors = demoData(); renderList(); return; }
+  db.collection("users").doc(uid).collection("monitors").orderBy("createdAt","desc")
+    .onSnapshot(snap => {
+      monitors = snap.docs.map(d => ({id:d.id, ...d.data()}));
+      renderList();
+    }, err => { console.error(err); toast("Couldn't load monitors", "err"); });
+}
+
+async function saveMonitor(data, id){
+  if(DEMO){ toast("Demo mode — not saved"); closeOverlay("#editOverlay"); return; }
+  const col = db.collection("users").doc(uid).collection("monitors");
+  if(id){
+    await col.doc(id).update({...data, updatedAt: Date.now()});
+    toast("Monitor updated", "ok");
+  }else{
+    await col.add({...data, lastStatus:"unchanged", changeCount:0, lastContentHash:null,
+      lastCheckedAt:null, nextCheckAt: Date.now(), createdAt: Date.now()});
+    toast("Monitor created — first check is queued", "ok");
+  }
+  closeOverlay("#editOverlay");
+}
+async function deleteMonitor(id){
+  if(DEMO){ toast("Demo mode — not saved"); return; }
+  if(!confirm("Delete this monitor and its history?")) return;
+  await db.collection("users").doc(uid).collection("monitors").doc(id).delete();
+  toast("Monitor deleted");
+}
+async function toggleMonitor(m){
+  if(DEMO){ toast("Demo mode — not saved"); return; }
+  await db.collection("users").doc(uid).collection("monitors").doc(m.id)
+    .update({enabled: !m.enabled, nextCheckAt: Date.now()});
+}
+async function loadSnaps(id){
+  if(DEMO) return DEMO_SNAPS[id] || [];
+  const snap = await db.collection("users").doc(uid).collection("monitors").doc(id)
+    .collection("snapshots").orderBy("takenAt","desc").limit(25).get();
+  return snap.docs.map(d => d.data());
+}
+
+/* ============================ rendering ============================ */
+function statusPill(m){
+  if(!m.enabled) return '<span class="pill paused">Paused</span>';
+  if(m.lastStatus==="changed") return '<span class="pill changed">Changed</span>';
+  if(m.lastStatus==="error") return '<span class="pill error">Error</span>';
+  return '<span class="pill unchanged">Unchanged</span>';
+}
+function matchesFilter(m){
+  if(activeFilter==="all") return true;
+  if(activeFilter==="paused") return !m.enabled;
+  if(activeFilter==="changed") return m.enabled && m.lastStatus==="changed";
+  if(activeFilter==="error") return m.lastStatus==="error";
+  return true;
+}
+function renderList(){
+  const list = $("#list");
+  const items = monitors.filter(matchesFilter);
+  if(monitors.length===0){
+    list.innerHTML = `<div class="empty"><div class="big">&#128064;</div>
+      <h2>No monitors yet</h2><p>Add a page and Spyglass will email you when it changes.</p>
+      <button class="btn primary" onclick="openEdit()">+ Add your first monitor</button></div>`;
+    return;
+  }
+  if(items.length===0){ list.innerHTML = `<div class="empty"><p>No monitors match this filter.</p></div>`; return; }
+  list.innerHTML = items.map(m => `
+    <div class="card">
+      <div class="fav">${favOf(m.url) ? `<img src="${favOf(m.url)}" onerror="this.style.display='none'">` : "&#128279;"}</div>
+      <div class="meta" onclick="openDetail('${m.id}')" style="cursor:pointer">
+        <div class="name">${escapeHtml(m.name || domainOf(m.url))}</div>
+        <div class="url">${escapeHtml(m.url)}</div>
+        <div class="sub">Checks ${freqLabel(m.frequencyMinutes)} &middot; last ${fmtAgo(m.lastCheckedAt)} &middot; ${m.changeCount||0} change${(m.changeCount||0)===1?"":"s"}</div>
+      </div>
+      ${statusPill(m)}
+      <div class="actions">
+        <button class="btn sm ghost" title="${m.enabled?'Pause':'Resume'}" onclick="toggleMonitor(monitorById('${m.id}'))">${m.enabled?'&#10073;&#10073;':'&#9658;'}</button>
+        <button class="btn sm ghost" title="Edit" onclick="openEdit('${m.id}')">&#9998;</button>
+        <button class="btn sm ghost" title="Delete" onclick="deleteMonitor('${m.id}')">&#128465;</button>
+      </div>
+    </div>`).join("");
+}
+function monitorById(id){ return monitors.find(m => m.id===id); }
+
+/* ---- add/edit modal ---- */
+function openEdit(id){
+  const m = id ? monitorById(id) : null;
+  $("#editTitle").textContent = m ? "Edit monitor" : "Add monitor";
+  $("#mId").value = m ? m.id : "";
+  $("#mUrl").value = m ? m.url : "";
+  $("#mName").value = m ? (m.name||"") : "";
+  $("#mType").value = m ? m.type : "text";
+  $("#mFreq").value = m ? String(m.frequencyMinutes) : "60";
+  $("#mSelector").value = m ? (m.selector||"") : "";
+  $("#mKeyword").value = m ? (m.keyword||"") : "";
+  $("#mEnabled").checked = m ? !!m.enabled : true;
+  syncTypeFields();
+  openOverlay("#editOverlay");
+}
+function syncTypeFields(){
+  const t = $("#mType").value;
+  $("#selField").classList.toggle("hidden", t!=="element");
+  $("#kwField").classList.toggle("hidden", t!=="keyword");
+}
+function collectForm(){
+  const url = $("#mUrl").value.trim();
+  if(!/^https?:\/\//i.test(url)){ toast("Enter a valid http(s) URL","err"); return null; }
+  const type = $("#mType").value;
+  const data = {
+    url, name: $("#mName").value.trim() || domainOf(url),
+    type, frequencyMinutes: parseInt($("#mFreq").value,10),
+    enabled: $("#mEnabled").checked,
+    selector: type==="element" ? $("#mSelector").value.trim() : null,
+    keyword: type==="keyword" ? $("#mKeyword").value.trim() : null,
+  };
+  if(type==="element" && !data.selector){ toast("Enter a CSS selector","err"); return null; }
+  if(type==="keyword" && !data.keyword){ toast("Enter a keyword","err"); return null; }
+  return data;
+}
+
+/* ---- detail modal ---- */
+async function openDetail(id){
+  const m = monitorById(id);
+  $("#detailTitle").textContent = m.name || domainOf(m.url);
+  $("#detailBody").innerHTML = `<p class="muted">Loading history&hellip;</p>`;
+  openOverlay("#detailOverlay");
+  const snaps = await loadSnaps(id);
+  let html = `
+    <p style="margin-top:0"><a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.url)}</a></p>
+    <p class="muted" style="font-size:.85rem">
+      ${statusPill(m)} &middot; watching ${m.type==='element'?'element <code>'+escapeHtml(m.selector||'')+'</code>':m.type==='keyword'?'keyword &ldquo;'+escapeHtml(m.keyword||'')+'&rdquo;':'whole page'} &middot;
+      every ${freqLabel(m.frequencyMinutes)} &middot; last checked ${fmtAgo(m.lastCheckedAt)}
+    </p>`;
+  if(snaps.length===0){
+    html += `<p class="muted">No changes recorded yet. When the page changes, snapshots show up here with a before/after diff.</p>`;
+  }else{
+    html += `<h4 style="margin:.5rem 0">Change history</h4><div class="timeline">`;
+    snaps.forEach((s,i) => {
+      const prev = snaps[i+1];
+      html += `<div class="snap" onclick="this.querySelector('.diffbox').classList.toggle('hidden')">
+        <div class="when">${new Date(s.takenAt && s.takenAt.toMillis ? s.takenAt.toMillis() : s.takenAt).toLocaleString()}</div>
+        <div class="sum">${escapeHtml(s.diffSummary||'change detected')}</div>
+        <div class="diffbox hidden" style="margin-top:.5rem">
+          <div class="diff">${prev ? wordDiff(prev.content, s.content) : escapeHtml(s.content||'(first snapshot)')}</div>
+        </div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  $("#detailBody").innerHTML = html;
+}
+
+/* ---- overlay utils ---- */
+function openOverlay(sel){ $(sel).classList.add("open"); }
+function closeOverlay(sel){ $(sel).classList.remove("open"); }
+
+/* ============================ auth ============================ */
+function renderAuth(user){
+  const area = $("#authArea");
+  if(DEMO){
+    area.innerHTML = `<a class="btn sm" href="./">Sign in</a>`;
+    $("#demoBanner").classList.remove("hidden");
+    $("#signedOut").classList.add("hidden"); $("#app").classList.remove("hidden");
+    return;
+  }
+  if(user){
+    area.innerHTML = `<img class="avatar" src="${user.photoURL||''}" title="${user.email}" alt=""> <button class="btn sm ghost" id="btnOut">Sign out</button>`;
+    $("#btnOut").onclick = () => auth.signOut();
+    $("#signedOut").classList.add("hidden"); $("#app").classList.remove("hidden");
+  }else{
+    area.innerHTML = `<button class="btn primary sm" id="btnIn">Sign in</button>`;
+    $("#btnIn").onclick = signIn;
+    $("#signedOut").classList.remove("hidden"); $("#app").classList.add("hidden");
+  }
+}
+function signIn(){
+  const p = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(p).catch(e => toast(e.message,"err"));
+}
+
+/* ============================ init ============================ */
+function wireUi(){
+  $("#btnAdd").onclick = () => openEdit();
+  $("#btnSignInBig").onclick = signIn;
+  $("#mType").onchange = syncTypeFields;
+  $("#btnSave").onclick = () => { const d = collectForm(); if(d) saveMonitor(d, $("#mId").value || null); };
+  $$("[data-close]").forEach(b => b.onclick = e => e.target.closest(".overlay").classList.remove("open"));
+  $$(".overlay").forEach(o => o.onclick = e => { if(e.target===o) o.classList.remove("open"); });
+  $("#filters").onclick = e => {
+    if(e.target.tagName!=="BUTTON") return;
+    $$("#filters button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active"); activeFilter = e.target.dataset.f; renderList();
+  };
+  $("#verChip").onclick = () => {
+    openOverlay("#whatsnewOverlay");
+    localStorage.setItem("spyglass:seenVer", APP_VERSION);
+    $("#verChip").classList.remove("has-unread");
+  };
+  if(localStorage.getItem("spyglass:seenVer") !== APP_VERSION)
+    $("#verChip").classList.add("has-unread");
+  document.addEventListener("keydown", e => { if(e.key==="Escape") $$(".overlay.open").forEach(o=>o.classList.remove("open")); });
+}
+
+function boot(){
+  wireUi();
+  if(DEMO){ renderAuth(null); startData(); return; }
+  if(FIREBASE_CONFIG.apiKey === "REPLACE_ME"){
+    $("#app").classList.add("hidden"); $("#signedOut").classList.remove("hidden");
+    toast("Add your Firebase config to index.html", "err");
+    return;
+  }
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth(); db = firebase.firestore();
+  auth.onAuthStateChanged(user => {
+    renderAuth(user);
+    if(user){ uid = user.uid; startData(); }
+  });
+}
+boot();
+</script>
+</body>
+</html>

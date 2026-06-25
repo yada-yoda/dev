@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A signed-in user owns everything under their own /users/{uid} subtree.
+    // The Cloudflare Worker uses the Admin service account, which bypasses
+    // these rules entirely, so it can read every user's monitors and write
+    // snapshots regardless of what's below.
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      match /{document=**} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+  }
+}
