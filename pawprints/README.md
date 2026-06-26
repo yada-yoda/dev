@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.5.0**
+**Current Version: v0.5.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,8 @@ covers both.
 
 ## Version History
 
+- **v0.5.1** — Changed the PDF report's accent color from amber to **teal** (`#0d9488`, matching
+  the app's brand) for the section headers, table headers, and top band.
 - **v0.5.0** — Backup + PDF report. A new **⚙️ Settings & Data** panel (header gear) consolidates
   data tools: **Export backup (.json)** — one file with everything (all dogs, logs, care records,
   contacts, photos, settings); **Import / restore** (with a confirm guard); and a new **Export full

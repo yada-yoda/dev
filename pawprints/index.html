@@ -177,7 +177,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.5.0';
+const APP_VERSION = 'v0.5.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -432,15 +432,15 @@ async function exportPDF(){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit:'pt', format:'letter' });
   const pageW = doc.internal.pageSize.getWidth(), pageH = doc.internal.pageSize.getHeight(), M = 40;
-  const AMBER=[180,83,9], GRAY=[89,99,110], DARK=[31,35,40], STRIPE=[245,247,249];
+  const ACCENT=[13,148,136], GRAY=[89,99,110], DARK=[31,35,40], STRIPE=[240,250,248];
   const need = (y,h) => { if(y + h > pageH - 44){ doc.addPage(); return 54; } return y; };
-  const heading = (text,y) => { y = need(y,40); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...AMBER); doc.text(text, M, y); doc.setDrawColor(...AMBER); doc.setLineWidth(1); doc.line(M, y+5, pageW-M, y+5); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK); return y+20; };
-  const table = (head, body, y) => { if(!body.length) return y; doc.autoTable({ startY:y, head:[head], body, theme:'striped', margin:{left:M,right:M}, headStyles:{fillColor:AMBER,textColor:255,fontSize:9,fontStyle:'bold'}, bodyStyles:{fontSize:8.5,textColor:DARK}, alternateRowStyles:{fillColor:STRIPE}, styles:{cellPadding:4,overflow:'linebreak',lineColor:[224,228,232],lineWidth:.5} }); return doc.lastAutoTable.finalY + 18; };
+  const heading = (text,y) => { y = need(y,40); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...ACCENT); doc.text(text, M, y); doc.setDrawColor(...ACCENT); doc.setLineWidth(1); doc.line(M, y+5, pageW-M, y+5); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK); return y+20; };
+  const table = (head, body, y) => { if(!body.length) return y; doc.autoTable({ startY:y, head:[head], body, theme:'striped', margin:{left:M,right:M}, headStyles:{fillColor:ACCENT,textColor:255,fontSize:9,fontStyle:'bold'}, bodyStyles:{fontSize:8.5,textColor:DARK}, alternateRowStyles:{fillColor:STRIPE}, styles:{cellPadding:4,overflow:'linebreak',lineColor:[224,228,232],lineWidth:.5} }); return doc.lastAutoTable.finalY + 18; };
   const dash = '—';
 
   data.pets.forEach((p, idx) => {
     if(idx > 0) doc.addPage();
-    doc.setFillColor(...AMBER); doc.rect(0,0,pageW,7,'F');
+    doc.setFillColor(...ACCENT); doc.rect(0,0,pageW,7,'F');
     let y = 54;
     if(p.photo){ try { doc.addImage(p.photo,'JPEG', M, y-6, 60, 60); } catch(e){} }
     const tx = p.photo ? M+74 : M;
@@ -486,7 +486,7 @@ async function exportPDF(){
 
   if(data.contacts && data.contacts.length){
     doc.addPage(); let y = 54;
-    doc.setFillColor(...AMBER); doc.rect(0,0,pageW,7,'F');
+    doc.setFillColor(...ACCENT); doc.rect(0,0,pageW,7,'F');
     y = heading('Contacts — care team', y);
     y = table(['Type','Name / Business','Phone','Email','Address'], data.contacts.map(c=>[c.role||dash, c.name||c.org||dash, c.phone||dash, c.email||dash, c.address||'']), y);
   }
