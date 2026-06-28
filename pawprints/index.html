@@ -184,7 +184,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.10.0';
+const APP_VERSION = 'v0.11.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -212,7 +212,7 @@ function activeUid(){ return sharedOwnerUid || (currentUser ? currentUser.uid : 
 const FOOD_TYPES = ['Dry kibble','Wet food','Raw','Home-cooked','Mixed','Treat','Dental chew','Other'];
 const AMOUNT_UNITS = ['cups','grams','oz','cans','scoops','pieces'];
 const POTTY_RESULTS = ['Pee','Poop','Both','Nothing'];
-const POTTY_PLACES = ['Backyard','On a walk','Pee pad','Other'];
+const POTTY_PLACES = ['Backyard','Front yard','On a walk','Pee pad','Other'];
 const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus'];
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
@@ -793,7 +793,22 @@ function savePet(id){
       logChange('logged','weight', wVal+' '+fields.weightUnit);
     }
   }
+  syncVetContacts(pid);
   closeModal(); save();
+}
+// Keep the profile's vet(s) mirrored into Contacts so they show up in the address book / vCards.
+// Linked by _vetLink so editing the profile updates the same contact instead of duplicating.
+function syncVetContacts(pid){
+  const p = data.pets.find(x=>x.id===pid); if(!p) return;
+  data.contacts = data.contacts || [];
+  const upsert = (linkKey, name, org, phone, email) => {
+    if(!name && !org && !phone && !email) return; // nothing to record
+    let c = data.contacts.find(x => x._vetLink === linkKey);
+    if(c){ c.name = name||''; c.org = org||''; c.phone = phone||''; c.email = email||''; }
+    else { data.contacts.unshift({ id:genId(), _vetLink:linkKey, role:'Vet', name:name||'', org:org||'', phone:phone||'', email:email||'', address:'', website:'', notes:'From '+p.name+'’s profile' }); }
+  };
+  upsert(pid+':vet1', p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail);
+  upsert(pid+':vet2', p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email);
 }
 function deletePet(id){
   const p = data.pets.find(x=>x.id===id); if(!p) return;
@@ -820,13 +835,19 @@ function delLog(id){ const l = data.logs.find(x=>x.id===id); data.logs = data.lo
 
 // Quick buttons
 function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
+// Food choices for the feed form = your Food/Treats from inventory (specific brands first) + the generic types.
+function feedFoodOptions(){
+  const inv = petArr('inventory').filter(i => i.category==='Food' || i.category==='Treats').map(i => ((i.brand?i.brand+' ':'')+(i.name||'')).trim()).filter(Boolean);
+  return [...new Set([...inv, ...FOOD_TYPES])];
+}
 function quickFeed(){
   if(!activePet()){ promptAddDog(); return; }
   const last = lastLog('feed');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  const foods = feedFoodOptions();
   openModal('<h3>🍖 Log feeding</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">Food</label><select class="select" id="q-food">'+sel(FOOD_TYPES, last?last.foodType:'Dry kibble')+'</select>'
+    +'<label class="label">Food'+tip('Your Food & Treats from the Supplies tab show up here automatically, plus the generic types.')+'</label><select class="select" id="q-food">'+sel(foods, last?last.foodType:(foods.includes('Dry kibble')?'Dry kibble':foods[0]))+'</select>'
     +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(last?esc(last.amount||''):'')+'" placeholder="1"></div>'
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, last?last.unit:'cups')+'</select></div></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
@@ -1374,7 +1395,7 @@ function renderToday(){
     + '<button class="quick-btn" onclick="quickWater()"><span class="qi">💧</span>Water</button>'
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">🚪</span>Potty</button>'
     + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">🦮</span>Walk</button>'
-    + '</div></div>';
+    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> logs instantly with one tap — no form. The others open a quick form.</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed','🍖',fed?fed.dateTime:null,12)
@@ -1621,12 +1642,29 @@ function renderCare(){
   else html += renderIllnessTab();
   return html;
 }
+// Quick-reference panel of the dog's vet(s) from their profile, shown atop the Vet tab.
+function vetPanel(){
+  const p = activePet(); if(!p) return '';
+  const blk = (title, doctor, clinic, phone, email) => {
+    if(!doctor && !clinic && !phone && !email) return '';
+    const tel = (phone||'').replace(/[^0-9+]/g,'');
+    return '<div style="padding:10px 0;border-top:1px solid var(--border)"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:3px">'+title+'</div>'
+      + '<div style="font-weight:600">'+esc([doctor,clinic].filter(Boolean).join(' · ')||'Vet')+'</div>'
+      + ((phone||email)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">📞 '+esc(phone)+'</a>':'')+(email?'<a class="btn btn-sm" href="mailto:'+esc(email)+'">✉️ Email</a>':'')+'</div>':'')
+      + '</div>';
+  };
+  const primary = blk('Primary vet', p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail);
+  const secondary = blk('Secondary vet', p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email);
+  const hasTwo = !!(p.vet2Name || p.vet2Doctor);
+  if(!primary && !secondary) return '<div class="card"><h3 class="section-title" style="margin:0 0 8px">🩺 '+esc(p.name)+'’s vet</h3><p style="color:var(--text-secondary);font-size:14px;margin:0">No vet saved yet — <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="petModal(\''+p.id+'\')">add your vet</a> in the profile and it shows here.</p></div>';
+  return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="section-title" style="margin:0">🩺 '+esc(p.name)+'’s vet'+(hasTwo?'s':'')+'</h3><button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">Edit</button></div>'+primary+secondary+'</div>';
+}
 function renderVetTab(){
   const visits = petArr('vetVisits').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
   const now = todayISO();
   const upcoming = visits.filter(v=>v.date > now), past = visits.filter(v=>v.date <= now);
   const followups = visits.filter(v=>v.followUpDate && v.followUpDate >= now);
-  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>';
+  let html = vetPanel() + '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>';
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">📌 Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span>🏥</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }

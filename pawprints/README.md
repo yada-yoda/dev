@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.10.0**
+**Current Version: v0.11.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -75,6 +75,12 @@ covers both.
 
 ## Version History
 
+- **v0.11.0** — Profile/log polish. Profile vet(s) now auto-mirror into **Contacts** (kept in sync,
+  no duplicates) and show as a quick-reference **panel on the Care › Vet tab** with call/email links.
+  The feed form's Food dropdown now includes your **Food & Treats from Supplies** (your actual brands
+  first). Added **"Front yard"** to potty places, a note that the **Water** quick button logs
+  instantly (no form), and confirmed owners can **remove** a shared collaborator anytime
+  (Settings → Sharing → Remove).
 - **v0.10.0** — Sharing with sitters / family. Settings → **Sharing & access** lets an owner invite
   helpers by **email**; each helper signs in with **their own** Google account and, using the owner's
   **share code**, opens the owner's dogs to **view and add** entries (a banner shows whose dogs you're
