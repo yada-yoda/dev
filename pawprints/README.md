@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.6.0**
+**Current Version: v0.6.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,13 @@ covers both.
 
 ## Version History
 
+- **v0.6.1** — Add/Edit-dog form improvements. Added a **Current weight** field (it asked for the
+  unit but never the weight) that seeds the weight history — and adds a new weigh-in if you change it
+  on edit. Added an optional **Vet (doctor)** field separate from the clinic, shown on the profile and
+  pre-filled into the first Vet contact. Added **info tooltips** (tap/hover the ⓘ) on confusing fields
+  (Microchip #, License #, weight, etc.). Modals now **only close via the X (top-right), Cancel, or the
+  confirming action** — a stray outside click or paste can no longer discard a half-filled form; every
+  modal got a top-right ✕.
 - **v0.6.0** — Activity & change history. **⚙️ Settings & Data → Activity & change history** opens a
   full audit log of every change — adding/editing/deleting a dog, logging feeding/water/potty/walks/
   weight, and every vet/grooming/med/illness/supply/contact create-edit-delete — each stamped with

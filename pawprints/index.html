@@ -106,8 +106,13 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .hidden{display:none !important}
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
-.modal{background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto}
-.modal h3{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:22px;max-width:480px;width:100%;max-height:90vh;overflow-y:auto}
+.modal h3{font-size:17px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px;padding-right:28px}
+.modal-x{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2}
+.modal-x:hover{color:var(--text-primary);border-color:var(--accent)}
+.tip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--border);color:var(--text-secondary);font-size:9px;font-weight:700;font-style:normal;text-transform:none;letter-spacing:0;margin-left:5px;cursor:help;position:relative;vertical-align:middle}
+.tip::after{content:attr(data-tip);position:absolute;bottom:150%;left:50%;transform:translateX(-50%);background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);padding:7px 10px;border-radius:8px;font-size:11px;font-weight:400;width:max-content;max-width:200px;white-space:normal;line-height:1.45;text-transform:none;letter-spacing:0;box-shadow:0 4px 16px var(--shadow);opacity:0;visibility:hidden;transition:opacity .15s;z-index:400;pointer-events:none}
+.tip:hover::after,.tip:focus::after{opacity:1;visibility:visible}
 .profile-photo-lg{width:90px;height:90px;border-radius:50%;object-fit:cover;border:3px solid var(--accent);background:var(--bg-tertiary);display:flex;align-items:center;justify-content:center;font-size:40px}
 .kv{font-size:13px;color:var(--text-secondary)}.kv strong{color:var(--text-primary)}
 .png-card{position:absolute;left:-9999px;top:0;width:600px;background:#161b22;color:#e6edf3;font-family:'DM Sans','Segoe UI',sans-serif;padding:28px;border-radius:16px;border:2px solid #30363d}
@@ -177,7 +182,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.6.0';
+const APP_VERSION = 'v0.6.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -274,12 +279,16 @@ function petArr(key){ const pid = data.activePetId; return (data[key]||[]).filte
 // ═══════════════════════════════════════════════
 // MODAL
 // ═══════════════════════════════════════════════
+// Modals close ONLY via the X, Cancel, or the confirming action — never on an
+// outside/backdrop click — so a stray click or paste can't lose a half-filled form.
 function openModal(html){
   document.getElementById('modal-root').innerHTML =
-    '<div class="modal-overlay" onclick="if(event.target===this)closeModal()"><div class="modal">'+html+'</div></div>';
+    '<div class="modal-overlay"><div class="modal"><button class="modal-x" type="button" onclick="closeModal()" aria-label="Close" title="Close">×</button>'+html+'</div></div>';
 }
 function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
 function fv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
+// Small info tooltip for confusing fields: tip('explanation') → appended after a label.
+function tip(t){ return t ? ' <span class="tip" tabindex="0" role="img" aria-label="Help: '+esc(t)+'" data-tip="'+esc(t)+'">i</span>' : ''; }
 
 // ═══════════════════════════════════════════════
 // FIREBASE (shared login with Illness Tracker — same project)
@@ -501,7 +510,7 @@ async function exportPDF(){
     if(w) facts.push(['Current weight', w.value+' '+(w.unit||'lb')+' (as of '+fmtDate(w.dateTime)+')']);
     if(p.microchip) facts.push(['Microchip', String(p.microchip)]);
     if(p.license) facts.push(['License', String(p.license)]);
-    if(p.vetName) facts.push(['Vet', p.vetName + (p.vetPhone?'  ·  '+p.vetPhone:'')]);
+    if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor, p.vetName, p.vetPhone].filter(Boolean).join('  ·  ')]);
     if(p.notes) facts.push(['Notes', String(p.notes)]);
     if(facts.length){ y = heading('Profile', y); y = table(['Field','Detail'], facts, y); }
 
@@ -562,12 +571,14 @@ function petModal(id){
     +'<div><label class="label">Sex</label><select class="select" id="p-sex"><option value="">—</option>'+sel(SEXES, p?p.sex:'')+'</select></div></div>'
     +'<div class="grid-2"><div><label class="label">Birthday</label><input class="input" type="date" id="p-birthday" value="'+(p?esc(p.birthday||''):'')+'"></div>'
     +'<div><label class="label">Adoption / Gotcha Day</label><input class="input" type="date" id="p-gotcha" value="'+(p?esc(p.gotchaDay||''):'')+'"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="Black & tan"></div>'
-    +'<div><label class="label">Weight unit</label><select class="select" id="p-wunit"><option value="lb"'+(p&&p.weightUnit==='lb'?' selected':'')+'>lb</option><option value="kg"'+(p&&p.weightUnit==='kg'?' selected':'')+'>kg</option></select></div></div>'
-    +'<div class="grid-2"><div><label class="label">Microchip #</label><input class="input" id="p-chip" value="'+(p?esc(p.microchip||''):'')+'"></div>'
-    +'<div><label class="label">License #</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Vet / Clinic</label><input class="input" id="p-vetname" value="'+(p?esc(p.vetName||''):'')+'" placeholder="Riverside Animal Hospital"></div>'
-    +'<div><label class="label">Vet phone</label><input class="input" id="p-vetphone" value="'+(p?esc(p.vetPhone||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Current weight'+tip('The dog’s weight today (or most recent). Saving this starts the weight history — update it any time to track changes.')+'</label><input class="input" type="number" step="0.1" id="p-weight" value="'+(p?esc((weightsFor(p.id)[0]||{}).value||''):'')+'" placeholder="e.g. 42.5"></div>'
+    +'<div><label class="label">Weight unit'+tip('Pounds (lb) or kilograms (kg) — used everywhere weight is shown.')+'</label><select class="select" id="p-wunit"><option value="lb"'+(p&&p.weightUnit==='lb'?' selected':'')+'>lb</option><option value="kg"'+(p&&p.weightUnit==='kg'?' selected':'')+'>kg</option></select></div></div>'
+    +'<label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="e.g. Black & grey with white chest">'
+    +'<div class="grid-2"><div><label class="label">Microchip #'+tip('The ID number on your dog’s implanted microchip — from the vet or the registry paperwork. Optional.')+'</label><input class="input" id="p-chip" value="'+(p?esc(p.microchip||''):'')+'"></div>'
+    +'<div><label class="label">License #'+tip('Your city or county pet license / registration number, usually on the dog’s tag or licensing paperwork. Optional.')+'</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Vet / Clinic'+tip('The animal hospital or clinic your dog goes to.')+'</label><input class="input" id="p-vetname" value="'+(p?esc(p.vetName||''):'')+'" placeholder="Riverside Animal Hospital"></div>'
+    +'<div><label class="label">Vet (doctor)'+tip('The specific veterinarian your dog usually sees, if you have one. Optional.')+'</label><input class="input" id="p-vetdoctor" value="'+(p?esc(p.vetDoctor||''):'')+'" placeholder="Dr. Patel"></div></div>'
+    +'<label class="label">Vet phone</label><input class="input" type="tel" id="p-vetphone" value="'+(p?esc(p.vetPhone||''):'')+'" placeholder="(555) 012-3456">'
     +'<label class="label">Notes</label><textarea class="textarea" id="p-notes" rows="2" placeholder="Personality, allergies, anything to remember">'+(p?esc(p.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="savePet('+(p?"'"+p.id+"'":'null')+')">'+(p?'Save':'Add dog')+'</button>'
     +(p?'<button class="btn btn-danger" style="white-space:nowrap" onclick="deletePet(\''+p.id+'\')">Delete</button>':'')
@@ -600,9 +611,19 @@ function savePet(id){
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), birthday:fv('p-birthday'),
     gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
-    license:fv('p-license'), vetName:fv('p-vetname'), vetPhone:fv('p-vetphone'), notes:fv('p-notes') };
+    license:fv('p-license'), vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), notes:fv('p-notes') };
+  let pid = id;
   if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); logChange('edited','dog profile', name); showToast('✅ Saved'); }
-  else { const np = { id:genId(), ...fields }; data.pets.push(np); data.activePetId = np.id; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
+  else { pid = genId(); data.pets.push({ id:pid, ...fields }); data.activePetId = pid; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
+  // Current weight → a weight-history entry. Adds one on creation, or a new weigh-in on edit if it changed.
+  const wVal = fv('p-weight');
+  if(num(wVal) != null){
+    const latest = weightsFor(pid)[0];
+    if(!latest || String(latest.value) !== String(wVal)){
+      data.logs.unshift({ id:genId(), petId:pid, type:'weight', dateTime:nowLocalISO(), value:wVal, unit:fields.weightUnit, source:'manual', notes:'' });
+      logChange('logged','weight', wVal+' '+fields.weightUnit);
+    }
+  }
   closeModal(); save();
 }
 function deletePet(id){
@@ -835,10 +856,10 @@ function contactModal(id){
   const c = id ? data.contacts.find(x=>x.id===id) : null;
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   // First add: prefill a Vet from the active dog's saved vet info
-  const pre = (!c && activePet()) ? { role:'Vet', org:activePet().vetName||'', phone:activePet().vetPhone||'' } : {};
+  const pre = (!c && activePet()) ? { role:'Vet', name:activePet().vetDoctor||'', org:activePet().vetName||'', phone:activePet().vetPhone||'' } : {};
   openModal('<h3>📇 '+(c?'Edit contact':'Add contact')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="ct-role">'+sel(CONTACT_ROLES, c?c.role:(pre.role||'Vet'))+'</select></div>'
-    +'<div><label class="label">Name (person)</label><input class="input" id="ct-name" value="'+(c?esc(c.name||''):'')+'" placeholder="Dr. Patel"></div></div>'
+    +'<div><label class="label">Name (person)</label><input class="input" id="ct-name" value="'+(c?esc(c.name||''):esc(pre.name||''))+'" placeholder="Dr. Patel"></div></div>'
     +'<label class="label">Clinic / Business</label><input class="input" id="ct-org" value="'+(c?esc(c.org||''):esc(pre.org||''))+'" placeholder="Riverside Animal Hospital">'
     +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="ct-phone" value="'+(c?esc(c.phone||''):esc(pre.phone||''))+'"></div>'
     +'<div><label class="label">Email</label><input class="input" type="email" id="ct-email" value="'+(c?esc(c.email||''):'')+'"></div></div>'
@@ -1221,7 +1242,7 @@ function renderProfile(){
   if(w) facts.push(['Current weight', esc(w.value)+' '+esc(w.unit||'lb')+' ('+fmtDate(w.dateTime)+')']);
   if(p.microchip) facts.push(['Microchip', esc(p.microchip)]);
   if(p.license) facts.push(['License', esc(p.license)]);
-  if(p.vetName) facts.push(['Vet', esc(p.vetName)+(p.vetPhone?' · '+esc(p.vetPhone):'')]);
+  if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor?esc(p.vetDoctor):'', p.vetName?esc(p.vetName):'', p.vetPhone?esc(p.vetPhone):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
   html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button><button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
