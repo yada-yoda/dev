@@ -168,6 +168,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <div id="view-calendar" class="hidden"></div>
   <div id="view-supplies" class="hidden"></div>
   <div id="view-insights" class="hidden"></div>
+  <div id="view-history" class="hidden"></div>
 </div>
 <footer style="text-align:center;padding:24px 16px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px">
   <a href="?demo=1" style="color:var(--accent-2);text-decoration:none;font-weight:500">🎭 Try the demo</a>
@@ -182,7 +183,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.7.0';
+const APP_VERSION = 'v0.8.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -416,28 +417,35 @@ function logChange(action, entity, detail){
   if(data.auditLog.length > 500) data.auditLog = data.auditLog.slice(0, 500);
 }
 const AUDIT_ICON = { added:'➕', edited:'✏️', deleted:'🗑️', logged:'📝', restored:'♻️', cleared:'🧹', marked:'✅' };
-function historyModal(){
+let historyReturnView = 'today';
+function openHistory(){ historyReturnView = (currentView && currentView !== 'history') ? currentView : 'today'; switchView('history'); }
+// Activity & change history as its own full sub-page (not a modal).
+function renderHistoryPage(){
   const log = data.auditLog || [];
-  let body = '';
-  if(!log.length) body = '<p style="color:var(--text-secondary);font-size:14px">No history yet. Every change — adding a dog, logging activity, editing or deleting records — will show up here with a timestamp and who made it.</p>';
-  else {
-    let lastDate = '';
-    log.slice(0,200).forEach(e => {
-      const d = (e.ts||'').slice(0,10);
-      if(d !== lastDate){ body += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin:12px 0 6px;font-weight:600">'+fmtDate(e.ts)+'</div>'; lastDate = d; }
-      body += '<div class="timeline-item"><div class="tl-icon">'+(AUDIT_ICON[e.action]||'•')+'</div><div style="flex:1;min-width:0"><div style="font-size:13px"><strong>'+esc(cap(e.action))+'</strong> '+esc(e.entity)+(e.detail?' — <span style="color:var(--text-secondary)">'+esc(e.detail)+'</span>':'')+'</div><div class="tl-time">'+fmtTime(e.ts)+' · '+esc(e.by||'')+'</div></div></div>';
-    });
-  }
-  openModal('<h3>🕘 Activity &amp; history</h3>'
-    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Every change in PawPrints, newest first'+(log.length>200?' (showing latest 200 of '+log.length+')':'')+'. Synced with your account.</p>'
-    + '<div style="max-height:55vh;overflow-y:auto;margin-bottom:14px;border-top:1px solid var(--border);padding-top:8px">'+body+'</div>'
-    + '<div style="display:flex;gap:10px;justify-content:space-between">'+(log.length?'<button class="btn btn-danger" onclick="clearHistory()">Clear history</button>':'<span></span>')+'<button class="btn" onclick="closeModal();settingsModal()">Back</button></div>');
+  let header = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap"><button class="btn btn-sm" onclick="switchView(historyReturnView)">‹ Back</button><h2 style="font-size:20px;font-weight:700;flex:1;min-width:140px">🕘 Activity &amp; history</h2></div>';
+  header += '<div class="card"><p style="font-size:13px;color:var(--text-secondary);margin-bottom:'+(log.length?'12px':'0')+'">Every change in PawPrints, newest first'+(log.length>500?' (latest 500 of '+log.length+')':'')+'. Synced with your account.</p>'
+    + (log.length?'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="exportHistoryCSV()">📄 Export CSV</button><button class="btn btn-danger" onclick="clearHistory()">Clear history</button></div>':'')
+    + '</div>';
+  if(!log.length) return header + '<div class="card empty"><div class="ico">🕘</div><p style="color:var(--text-secondary)">No history yet. Every change — adding a dog, logging activity, editing or deleting records — will show up here with a timestamp and who made it.</p></div>';
+  let rows = '', lastDate = '';
+  log.slice(0,500).forEach(e => {
+    const d = (e.ts||'').slice(0,10);
+    if(d !== lastDate){ rows += '<div style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin:14px 0 6px;font-weight:600">'+fmtDate(e.ts)+'</div>'; lastDate = d; }
+    rows += '<div class="timeline-item"><div class="tl-icon">'+(AUDIT_ICON[e.action]||'•')+'</div><div style="flex:1;min-width:0"><div style="font-size:13px"><strong>'+esc(cap(e.action))+'</strong> '+esc(e.entity)+(e.detail?' — <span style="color:var(--text-secondary)">'+esc(e.detail)+'</span>':'')+'</div><div class="tl-time">'+fmtTime(e.ts)+' · '+esc(e.by||'')+'</div></div></div>';
+  });
+  return header + '<div class="card">'+rows+'</div>';
 }
 function clearHistory(){
   if(!confirm('Clear all activity history? The records themselves are kept — only the change log is erased. This cannot be undone.')) return;
   data.auditLog = [];
   logChange('cleared','activity history','');
-  save(); historyModal();
+  save(); // re-renders the history page
+}
+function exportHistoryCSV(){
+  const log = data.auditLog || [];
+  const rows = [['Time','Action','Entity','Detail','By']].concat(log.map(e => [fmtDateTime(e.ts), cap(e.action), e.entity, e.detail, e.by]));
+  dl(new Blob([toCSV(rows)], { type:'text/csv' }), 'pawprints-history-'+todayISO()+'.csv');
+  showToast('📄 History CSV saved');
 }
 // Entity deletes (with audit logging) — used by the edit modals.
 function deleteVet(id){ const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
@@ -456,11 +464,12 @@ function settingsModal(){
     + '<div style="display:flex;flex-direction:column;gap:8px">'
       + '<button class="btn" onclick="exportJSON()">💾 Export backup (.json)</button>'
       + '<button class="btn" onclick="document.getElementById(\'import-file\').click()">📂 Import / restore backup (.json)</button>'
+      + '<button class="btn" onclick="exportXLSX()">📊 Export spreadsheet (.xlsx)</button>'
       + '<button class="btn btn-outline" onclick="exportPDF()">📄 Export full report (PDF)</button>'
     + '</div>'
-    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The PDF is a nicely formatted, printable report of every dog and all their records. The .json backup is the one to keep for restoring later.</p>'
+    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p>'
     + '<div class="label" style="margin-top:18px">History</div>'
-    + '<button class="btn" onclick="closeModal();historyModal()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
+    + '<button class="btn" onclick="closeModal();openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
     + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
 }
 
@@ -477,6 +486,44 @@ function loadPdfLibs(){
 }
 function recordsFor(key, pid){ return (data[key]||[]).filter(r => r.petId === pid); }
 function weightsFor(pid){ return data.logs.filter(l => l.petId===pid && l.type==='weight' && num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); }
+
+// CSV (RFC-4180 quoting) — used by the history export
+function toCSV(rows){
+  return rows.map(r => r.map(c => {
+    let s = (c == null) ? '' : String(c);
+    if(/[",\n\r]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }).join(',')).join('\r\n');
+}
+// Lazy-load SheetJS for the spreadsheet (.xlsx) export
+let _xlsxLoading = null;
+function loadXlsx(){
+  if(window.XLSX) return Promise.resolve();
+  if(_xlsxLoading) return _xlsxLoading;
+  _xlsxLoading = loadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js').catch(e => { _xlsxLoading = null; throw e; });
+  return _xlsxLoading;
+}
+async function exportXLSX(){
+  if(!data.pets.length){ promptAddDog(); return; }
+  showToast('⏳ Building spreadsheet…');
+  try { await loadXlsx(); } catch(e){ showToast('⚠️ Spreadsheet library failed to load'); return; }
+  const XLSX = window.XLSX, wb = XLSX.utils.book_new();
+  const nm = (pid) => { const p = data.pets.find(x=>x.id===pid); return p ? p.name : ''; };
+  const clean = (v) => v == null ? '' : v;
+  const add = (title, header, rows) => { const ws = XLSX.utils.aoa_to_sheet([header, ...rows]); XLSX.utils.book_append_sheet(wb, ws, title.slice(0,31)); };
+  add('Dogs', ['Name','Breed','Sex','Birthday','Gotcha day','Color','Weight unit','Microchip','License','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
+    data.pets.map(p => [p.name,p.breed,p.sex,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
+  add('Activity', ['Dog','Type','When','Detail','Notes'],
+    data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
+  add('Vet Visits', ['Dog','Date','Reason','Vet','Clinic','Weight','Cost','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,v.reason,v.vet,v.clinic,v.weight,v.cost,v.followUpDate,v.notes].map(clean)));
+  add('Grooming', ['Dog','Date','Services','Groomer','Cost','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.services||[]).join(', '),g.groomer,g.cost,g.nextDueDate,g.notes].map(clean)));
+  add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
+  add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Cost','Purchased','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.cost,i.purchaseDate,i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,c.address,c.website,c.notes].map(clean)));
+  add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
+  try { XLSX.writeFile(wb, 'pawprints-'+todayISO()+'.xlsx'); showToast('✅ Spreadsheet saved'); } catch(e){ showToast('⚠️ Could not save spreadsheet'); }
+}
 
 async function exportPDF(){
   if(!data.pets.length){ promptAddDog(); return; }
@@ -1023,10 +1070,26 @@ async function gcalFetch(url, opts, _retry){
 async function loadCalendarList(){
   if(!gcalAccessToken) return;
   try {
-    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer');
+    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=writer&maxResults=250');
     const j = await r.json();
-    if(j.items){ window._gcalCalendars = j.items.map(c=>({id:c.id, name:c.summary, primary:c.primary})); if(!data.settings.gcalCalendarId){ const prim = j.items.find(c=>c.primary); if(prim){ data.settings.gcalCalendarId = prim.id; saveLocal(); } } render(); }
-  } catch(e){ if(e.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); render(); } }
+    if(j.items){ window._gcalCalendars = j.items.map(c=>({id:c.id, name:c.summary, primary:c.primary})); if(!data.settings.gcalCalendarId){ const prim = j.items.find(c=>c.primary); if(prim){ data.settings.gcalCalendarId = prim.id; saveLocal(); } } if(currentView==='calendar') render(); }
+    else { console.warn('calendarList:', j); window._gcalCalendars = []; if(currentView==='calendar') render(); showToast('⚠️ Could not list calendars — using Primary. Reconnect to grant full access.'); }
+  } catch(e){
+    if(e.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); }
+    else { window._gcalCalendars = []; showToast('⚠️ Could not load calendars — using Primary'); }
+    if(currentView==='calendar') render();
+  }
+}
+// Create a dedicated Google calendar named after the active dog (needs full Calendar scope).
+async function createDogCalendar(){
+  if(!gcalAccessToken){ connectGoogleCalendar(); return; }
+  const p = activePet(); if(!p) return;
+  showToast('⏳ Creating calendar…');
+  try {
+    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars', { method:'POST', body:JSON.stringify({ summary:'🐾 '+p.name+' — PawPrints', description:'Care schedule for '+p.name+', synced from PawPrints (dev.rizzo.cc/pawprints).' }) });
+    if(r.ok){ const j = await r.json(); data.settings.gcalCalendarId = j.id; window._gcalCalendars = null; save(); loadCalendarList(); showToast('✅ Created "'+j.summary+'" — now syncing here'); }
+    else { const e = await r.json().catch(()=>({})); const msg = (e.error && e.error.message) || ''; showToast('⚠️ '+(/insufficient|scope|permission/i.test(msg) ? 'Need full Calendar access — tap Disconnect then Connect again' : (msg || 'Could not create calendar'))); }
+  } catch(err){ if(err.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); render(); } else showToast('⚠️ Could not create calendar'); }
 }
 function setTargetCalendar(id){ data.settings.gcalCalendarId = id; save(); }
 async function syncToGoogleCalendar(){
@@ -1077,7 +1140,7 @@ function getReminders(){
 // ═══════════════════════════════════════════════
 // VIEW SWITCHING + RENDER
 // ═══════════════════════════════════════════════
-const VIEWS = ['today','log','profile','care','calendar','supplies','insights'];
+const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history'];
 function switchView(v){
   currentView = v;
   VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
@@ -1085,7 +1148,7 @@ function switchView(v){
   render();
   window.scrollTo({top:0,behavior:'smooth'});
   // No dog yet → a feature tab can't do anything useful. Prompt to add one.
-  if(!activePet() && v !== 'today') promptAddDog();
+  if(!activePet() && v !== 'today' && v !== 'history') promptAddDog();
 }
 // Modal shown when an action needs a dog but none exists yet.
 function promptAddDog(){
@@ -1139,6 +1202,7 @@ function render(){
   document.getElementById('view-calendar').innerHTML = renderCalendar();
   document.getElementById('view-supplies').innerHTML = renderSupplies();
   document.getElementById('view-insights').innerHTML = renderInsights();
+  document.getElementById('view-history').innerHTML = renderHistoryPage();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
   if(currentView === 'calendar' && gcalAccessToken && !window._gcalCalendars) loadCalendarList();
 }
@@ -1341,18 +1405,23 @@ function renderCalendar(){
     html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Connect Google Calendar to sync '+activePet().name+'’s schedule into a calendar of your choice.</p>'
       + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">🔗 Connect Google Calendar</button>';
   } else {
-    const cals = window._gcalCalendars || [];
+    // Build the target list: always offer Primary, then any calendars we loaded.
+    const target = data.settings.gcalCalendarId || 'primary';
+    const cals = (window._gcalCalendars && window._gcalCalendars.length) ? window._gcalCalendars.slice() : [{ id:'primary', name:'Primary calendar', primary:true }];
+    if(!cals.find(c=>c.id===target)) cals.unshift({ id:target, name:target });
     html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
-    if(cals.length){
-      html += '<div style="flex:1;min-width:200px"><label class="label">Write to calendar</label><select class="select" style="margin-bottom:0" onchange="setTargetCalendar(this.value)">'
-        + cals.map(c=>'<option value="'+esc(c.id)+'"'+(data.settings.gcalCalendarId===c.id?' selected':'')+'>'+esc(c.name)+(c.primary?' (primary)':'')+'</option>').join('')
-        + '</select></div>';
-    } else html += '<div style="flex:1;color:var(--text-secondary);font-size:13px">Loading your calendars…</div>';
+    html += '<div style="flex:1;min-width:200px"><label class="label">Write to calendar</label><select class="select" style="margin-bottom:0" onchange="setTargetCalendar(this.value)">'
+      + cals.map(c=>'<option value="'+esc(c.id)+'"'+(target===c.id?' selected':'')+'>'+esc(c.name)+(c.primary?' (primary)':'')+'</option>').join('')
+      + '</select></div>';
     html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
     html += '</div>';
+    html += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+      + '<button class="btn btn-sm" onclick="createDogCalendar()">➕ Create a calendar for '+esc(activePet().name)+'</button>'
+      + (window._gcalCalendars ? '' : '<button class="btn btn-sm" onclick="window._gcalCalendars=null;loadCalendarList()">↻ Load my calendars</button>')
+      + '</div>';
     html += '<p style="font-size:12px;color:'+(gcalPersistent?'var(--success)':'var(--text-secondary)')+';margin-top:10px">'
       + (gcalPersistent ? '✓ Connected — reconnects automatically on every device. ' : '⏱ Connected for this session only (set up pawprints-worker for permanent connect). ')
-      + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates. Re-syncing updates the same events, no duplicates.</p>';
+      + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates to the calendar above. Re-syncing updates the same events, no duplicates. (You can share the calendar with others from Google Calendar.)</p>';
     if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:4px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
   }
   html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">📅 Download .ics</button></div>';

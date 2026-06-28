@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.7.0**
+**Current Version: v0.8.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,14 @@ covers both.
 
 ## Version History
 
+- **v0.8.0** — Spreadsheet export, history page, calendar picker fix. Added **Export spreadsheet
+  (.xlsx)** in Settings (SheetJS, one tab per category) plus a **CSV export** on the history view.
+  **Activity & history** is now its own full sub-page (with Back) instead of a modal. Fixed the
+  Google Calendar **"Loading your calendars…" hang** — the picker now defaults to your **Primary
+  calendar** so sync works immediately, populates the full list when it loads (with a retry link),
+  and adds **➕ Create a calendar for [dog]** (a dedicated Google calendar named after the dog, which
+  you can then share from Google Calendar). The worker OAuth scope was widened to full Calendar to
+  allow listing + creating calendars — **existing users must Disconnect then Connect once** to grant it.
 - **v0.7.0** — Secondary vet + walk routes. The dog profile now has a **vet email** for the primary
   vet and a full **Secondary vet** section (clinic, doctor, phone, email) — both shown on the profile
   and in the PDF; the primary vet's email also pre-fills into the first Vet contact. Walk logging
