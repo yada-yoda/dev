@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.12.0**
+**Current Version: v0.12.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -75,6 +75,9 @@ covers both.
 
 ## Version History
 
+- **v0.12.1** — Edit activity entries. Each row in Today's timeline and the Log tab now has an **Edit**
+  button (next to the delete ×) that opens a pre-filled form for that entry — feed/water/potty/walk/
+  weight — so you can fix the time, amount, result, etc. without deleting and re-adding.
 - **v0.12.0** — Spayed / Neutered. Added a dedicated **Spayed / Neutered** field (+ optional date) to
   the dog profile — one field covers both (spayed = female, neutered = male). Sex options simplified to
   Male / Female / Unknown, and any existing "Male (neutered)" / "Female (spayed)" dogs are migrated

@@ -184,7 +184,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.12.0';
+const APP_VERSION = 'v0.12.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1451,7 +1451,53 @@ function timelineRow(l){
     +'<div style="flex:1"><div style="font-weight:600;font-size:14px">'+logSummary(l)+'</div>'
     +(l.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic">'+esc(l.notes)+'</div>':'')
     +'<div class="tl-time">'+fmtTime(l.dateTime)+'</div></div>'
-    +'<button class="btn btn-sm btn-danger" style="align-self:center" onclick="delLog(\''+l.id+'\')">×</button></div>';
+    +'<div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="editLogModal(\''+l.id+'\')">Edit</button><button class="btn btn-sm btn-danger" onclick="delLog(\''+l.id+'\')" title="Delete">×</button></div></div>';
+}
+// Edit an existing activity log entry (feed / water / potty / walk / weight), pre-filled.
+function editLogModal(id){
+  const l = data.logs.find(x => x.id === id); if(!l) return;
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  const dt = l.dateTime || nowLocalISO();
+  let title = '', body = '<label class="label">When</label><input class="input" type="datetime-local" id="e-dt" value="'+esc(dt)+'">';
+  if(l.type === 'feed'){
+    title = '🍖 Edit feeding';
+    body += '<label class="label">Food</label><select class="select" id="e-food">'+sel(feedFoodOptions(), l.foodType||'')+'</select>'
+      + '<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="e-amt" value="'+esc(l.amount||'')+'"></div>'
+      + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>';
+  } else if(l.type === 'water'){
+    title = '💧 Edit water';
+  } else if(l.type === 'potty'){
+    title = '🚪 Edit potty break';
+    body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
+      + '<div class="grid-2"><div><label class="label">Where</label><select class="select" id="e-place">'+sel(POTTY_PLACES, l.place||'Backyard')+'</select></div>'
+      + '<div><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div></div>';
+  } else if(l.type === 'walk'){
+    title = '🦮 Edit walk';
+    body += '<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="e-dur" value="'+esc(l.durationMin||'')+'"></div>'
+      + '<div><label class="label">Distance (mi)</label><input class="input" type="number" step="0.1" id="e-dist" value="'+esc(l.distance||'')+'"></div></div>'
+      + '<div class="grid-2"><div><label class="label">From</label><input class="input" id="e-from" value="'+esc(l.from||'')+'"></div>'
+      + '<div><label class="label">To</label><input class="input" id="e-to" value="'+esc(l.to||'')+'"></div></div>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="e-round" '+(l.roundTrip?'checked':'')+'> Round trip</label>';
+  } else if(l.type === 'weight'){
+    const unit = l.unit || (activePet() && activePet().weightUnit) || 'lb';
+    title = '⚖️ Edit weight';
+    body += '<label class="label">Weight ('+esc(unit)+')</label><input class="input" type="number" step="0.1" id="e-w" value="'+esc(l.value||'')+'">';
+  } else { return; }
+  body += '<label class="label">Note</label><input class="input" id="e-note" value="'+esc(l.notes||'')+'">';
+  openModal('<h3>'+title+'</h3>'+body
+    + '<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="saveEditLog(\''+id+'\')">Save</button>'
+    + '<button class="btn btn-danger" onclick="closeModal();delLog(\''+id+'\')">Delete</button>'
+    + '<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveEditLog(id){
+  const l = data.logs.find(x => x.id === id); if(!l) return;
+  l.dateTime = fv('e-dt'); l.notes = fv('e-note');
+  if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); }
+  else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); }
+  else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
+  else if(l.type === 'weight'){ l.value = fv('e-w'); }
+  logChange('edited', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,''));
+  closeModal(); save(); showToast('✅ Updated');
 }
 function emptyState(){
   return '<div class="card empty"><div class="ico">🐾</div><h2 style="font-size:21px;font-weight:700;margin-bottom:8px">Welcome to PawPrints</h2>'
