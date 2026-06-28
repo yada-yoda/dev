@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.5.1**
+**Current Version: v0.6.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,12 @@ covers both.
 
 ## Version History
 
+- **v0.6.0** — Activity & change history. **⚙️ Settings & Data → Activity & change history** opens a
+  full audit log of every change — adding/editing/deleting a dog, logging feeding/water/potty/walks/
+  weight, and every vet/grooming/med/illness/supply/contact create-edit-delete — each stamped with
+  the time and **who made it** (the signed-in account, or "Local" when offline). The log syncs with
+  your account and is capped at the most recent 500 entries, with a Clear option. (Editing a dog's
+  info was already available via Profile → Edit; this adds the history of those edits.)
 - **v0.5.1** — Changed the PDF report's accent color from amber to **teal** (`#0d9488`, matching
   the app's brand) for the section headers, table headers, and top band.
 - **v0.5.0** — Backup + PDF report. A new **⚙️ Settings & Data** panel (header gear) consolidates

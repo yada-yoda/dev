@@ -177,12 +177,12 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.5.1';
+const APP_VERSION = 'v0.6.0';
 
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{} };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[] };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -344,7 +344,7 @@ async function loadFromFirestore(){
     if(doc.exists){
       const d = doc.data();
       // Merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
@@ -387,6 +387,7 @@ function importJSON(evt){
       if(!confirm('Restore this backup? It replaces everything currently in PawPrints on this device.')){ evt.target.value=''; return; }
       data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
+      logChange('restored','backup', data.pets.length+' dog'+(data.pets.length===1?'':'s')+' from file');
       persist(); closeModal(); render(); showToast('✅ Backup restored');
     } else showToast('⚠️ Not a PawPrints backup file');
   } catch { showToast('⚠️ Invalid file'); } };
@@ -396,6 +397,47 @@ function importJSON(evt){
 // ═══════════════════════════════════════════════
 // SETTINGS / BACKUP / PDF EXPORT
 // ═══════════════════════════════════════════════
+// ── AUDIT / CHANGE LOG ──
+function actor(){ return currentUser ? (currentUser.displayName || currentUser.email || 'Account') : 'Local (signed out)'; }
+function cap(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+// Record a change. Caller persists via save() afterwards.
+function logChange(action, entity, detail){
+  data.auditLog = data.auditLog || [];
+  data.auditLog.unshift({ id:genId(), ts:new Date().toISOString(), action, entity, detail:detail||'', by:actor(), uid: currentUser ? currentUser.uid : null });
+  if(data.auditLog.length > 500) data.auditLog = data.auditLog.slice(0, 500);
+}
+const AUDIT_ICON = { added:'➕', edited:'✏️', deleted:'🗑️', logged:'📝', restored:'♻️', cleared:'🧹', marked:'✅' };
+function historyModal(){
+  const log = data.auditLog || [];
+  let body = '';
+  if(!log.length) body = '<p style="color:var(--text-secondary);font-size:14px">No history yet. Every change — adding a dog, logging activity, editing or deleting records — will show up here with a timestamp and who made it.</p>';
+  else {
+    let lastDate = '';
+    log.slice(0,200).forEach(e => {
+      const d = (e.ts||'').slice(0,10);
+      if(d !== lastDate){ body += '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin:12px 0 6px;font-weight:600">'+fmtDate(e.ts)+'</div>'; lastDate = d; }
+      body += '<div class="timeline-item"><div class="tl-icon">'+(AUDIT_ICON[e.action]||'•')+'</div><div style="flex:1;min-width:0"><div style="font-size:13px"><strong>'+esc(cap(e.action))+'</strong> '+esc(e.entity)+(e.detail?' — <span style="color:var(--text-secondary)">'+esc(e.detail)+'</span>':'')+'</div><div class="tl-time">'+fmtTime(e.ts)+' · '+esc(e.by||'')+'</div></div></div>';
+    });
+  }
+  openModal('<h3>🕘 Activity &amp; history</h3>'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Every change in PawPrints, newest first'+(log.length>200?' (showing latest 200 of '+log.length+')':'')+'. Synced with your account.</p>'
+    + '<div style="max-height:55vh;overflow-y:auto;margin-bottom:14px;border-top:1px solid var(--border);padding-top:8px">'+body+'</div>'
+    + '<div style="display:flex;gap:10px;justify-content:space-between">'+(log.length?'<button class="btn btn-danger" onclick="clearHistory()">Clear history</button>':'<span></span>')+'<button class="btn" onclick="closeModal();settingsModal()">Back</button></div>');
+}
+function clearHistory(){
+  if(!confirm('Clear all activity history? The records themselves are kept — only the change log is erased. This cannot be undone.')) return;
+  data.auditLog = [];
+  logChange('cleared','activity history','');
+  save(); historyModal();
+}
+// Entity deletes (with audit logging) — used by the edit modals.
+function deleteVet(id){ const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteGroom(id){ const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteMed(id){ const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteIllness(id){ const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteInv(id){ const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteContact(id){ const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+
 function settingsModal(){
   const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.inventory.length + data.contacts.length;
   openModal('<h3>⚙️ Settings &amp; Data</h3>'
@@ -408,6 +450,8 @@ function settingsModal(){
       + '<button class="btn btn-outline" onclick="exportPDF()">📄 Export full report (PDF)</button>'
     + '</div>'
     + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The PDF is a nicely formatted, printable report of every dog and all their records. The .json backup is the one to keep for restoring later.</p>'
+    + '<div class="label" style="margin-top:18px">History</div>'
+    + '<button class="btn" onclick="closeModal();historyModal()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
     + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
 }
 
@@ -557,8 +601,8 @@ function savePet(id){
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), birthday:fv('p-birthday'),
     gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
     license:fv('p-license'), vetName:fv('p-vetname'), vetPhone:fv('p-vetphone'), notes:fv('p-notes') };
-  if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); showToast('✅ Saved'); }
-  else { const np = { id:genId(), ...fields }; data.pets.push(np); data.activePetId = np.id; showToast('🐾 '+name+' added'); }
+  if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); logChange('edited','dog profile', name); showToast('✅ Saved'); }
+  else { const np = { id:genId(), ...fields }; data.pets.push(np); data.activePetId = np.id; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
   closeModal(); save();
 }
 function deletePet(id){
@@ -567,18 +611,22 @@ function deletePet(id){
   data.pets = data.pets.filter(x=>x.id!==id);
   ['logs','vetVisits','grooming','illnesses','meds','inventory'].forEach(k => data[k] = data[k].filter(r => r.petId !== id));
   if(data.activePetId === id) data.activePetId = data.pets[0]?.id || null;
+  logChange('deleted','dog', p.name + ' (and all their records)');
   closeModal(); save();
 }
 
 // ═══════════════════════════════════════════════
 // QUICK LOG + LOG ENTRIES
 // ═══════════════════════════════════════════════
+const LOG_ENTITY = { feed:'feeding', water:'water', potty:'potty break', walk:'walk', weight:'weight' };
 function addLog(entry){
   if(!data.activePetId){ promptAddDog(); return; }
-  data.logs.unshift({ id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry });
+  const rec = { id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry };
+  data.logs.unshift(rec);
+  logChange('logged', LOG_ENTITY[rec.type]||'activity', (logSummary(rec)||'').replace(/<[^>]+>/g,''));
   save();
 }
-function delLog(id){ data.logs = data.logs.filter(l=>l.id!==id); save(); }
+function delLog(id){ const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
 // Quick buttons
 function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
@@ -645,7 +693,7 @@ function vetModal(id){
     +'<div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div></div>'
     +'<label class="label">Notes / Diagnosis / Meds prescribed</label><textarea class="textarea" id="vt-notes" rows="3">'+(v?esc(v.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
-    +(v?'<button class="btn btn-danger" onclick="data.vetVisits=data.vetVisits.filter(x=>x.id!==\''+v.id+'\');closeModal();save()">Delete</button>':'')
+    +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveVet(id){
@@ -659,6 +707,7 @@ function saveVet(id){
   if(num(f.weight) != null){
     data.logs.unshift({ id:genId(), petId:data.activePetId, type:'weight', dateTime:(f.date||todayISO())+'T12:00', value:f.weight, unit:activePet().weightUnit||'lb', source:visitId, notes:'At vet visit' });
   }
+  logChange(id?'edited':'added','vet visit', (f.reason||'visit')+' · '+fmtDate(f.date));
   closeModal(); save(); showToast('🏥 Vet visit saved');
 }
 function groomModal(id){
@@ -672,7 +721,7 @@ function groomModal(id){
     +'<label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'">'
     +'<label class="label">Notes</label><textarea class="textarea" id="gr-notes" rows="2">'+(g?esc(g.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveGroom('+(g?"'"+g.id+"'":'null')+')">Save</button>'
-    +(g?'<button class="btn btn-danger" onclick="data.grooming=data.grooming.filter(x=>x.id!==\''+g.id+'\');closeModal();save()">Delete</button>':'')
+    +(g?'<button class="btn btn-danger" onclick="deleteGroom(\''+g.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveGroom(id){
@@ -681,6 +730,7 @@ function saveGroom(id){
   const f = { date:fv('gr-date'), cost:fv('gr-cost'), groomer:fv('gr-by'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes') };
   if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
   else data.grooming.unshift({ id:genId(), petId:data.activePetId, ...f });
+  logChange(id?'edited':'added','grooming', [services.join(', '), fmtDate(f.date)].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('✂️ Grooming saved');
 }
 function medModal(id){
@@ -694,7 +744,7 @@ function medModal(id){
     +'<div><label class="label">Next due (auto if blank)</label><input class="input" type="date" id="md-next" value="'+(m?esc(m.nextDue||''):'')+'"></div></div>'
     +'<label class="label">Notes</label><input class="input" id="md-notes" value="'+(m?esc(m.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveMed('+(m?"'"+m.id+"'":'null')+')">Save</button>'
-    +(m?'<button class="btn btn-danger" onclick="data.meds=data.meds.filter(x=>x.id!==\''+m.id+'\');closeModal();save()">Delete</button>':'')
+    +(m?'<button class="btn btn-danger" onclick="deleteMed(\''+m.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function medNextDue(m){
@@ -708,11 +758,13 @@ function saveMed(id){
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
   if(id) data.meds = data.meds.map(m => m.id===id ? {...m, ...f} : m);
   else data.meds.unshift({ id:genId(), petId:data.activePetId, ...f });
+  logChange(id?'edited':'added','medication', [f.name, f.kind].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('💊 Saved');
 }
 function giveMedNow(id){
   const m = data.meds.find(x=>x.id===id); if(!m) return;
   m.lastGiven = todayISO(); m.nextDue = '';
+  logChange('marked','medication given', m.name||'');
   save(); showToast('✅ Marked given today');
 }
 
@@ -731,7 +783,7 @@ function illnessModal(id){
     +'<label class="label">Treatment / meds given</label><input class="input" id="il-treat" value="'+(e?esc(e.treatment||''):'')+'">'
     +'<label class="label">Notes</label><textarea class="textarea" id="il-notes" rows="2">'+(e?esc(e.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveIllness('+(e?"'"+e.id+"'":'null')+')">Save</button>'
-    +(e?'<button class="btn btn-danger" onclick="data.illnesses=data.illnesses.filter(x=>x.id!==\''+e.id+'\');closeModal();save()">Delete</button>':'')
+    +(e?'<button class="btn btn-danger" onclick="deleteIllness(\''+e.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveIllness(id){
@@ -740,6 +792,7 @@ function saveIllness(id){
   const f = { start:fv('il-start'), recovery:fv('il-recovery'), symptoms, severity:fv('il-sev'), diagnosis:fv('il-dx'), treatment:fv('il-treat'), notes:fv('il-notes') };
   if(id) data.illnesses = data.illnesses.map(e => e.id===id ? {...e, ...f} : e);
   else data.illnesses.unshift({ id:genId(), petId:data.activePetId, ...f });
+  logChange(id?'edited':'added','illness', f.diagnosis || symptoms.slice(0,3).join(', ') || fmtDate(f.start));
   closeModal(); save(); showToast('🤒 Illness saved');
 }
 
@@ -760,7 +813,7 @@ function invModal(id){
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveInv('+(it?"'"+it.id+"'":'null')+')">Save</button>'
-    +(it?'<button class="btn btn-danger" onclick="data.inventory=data.inventory.filter(x=>x.id!==\''+it.id+'\');closeModal();save()">Delete</button>':'')
+    +(it?'<button class="btn btn-danger" onclick="deleteInv(\''+it.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveInv(id){
@@ -770,9 +823,10 @@ function saveInv(id){
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
+  logChange(id?'edited':'added','supply', [f.category, (f.brand?f.brand+' ':'')+f.name].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('🛒 Saved');
 }
-function toggleLow(id){ const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; save(); } }
+function toggleLow(id){ const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+(it.runningLow?' — marked low':' — restocked')); save(); } }
 
 // ═══════════════════════════════════════════════
 // CONTACTS + vCARDS
@@ -792,7 +846,7 @@ function contactModal(id){
     +'<label class="label">Website</label><input class="input" type="url" id="ct-web" value="'+(c?esc(c.website||''):'')+'" placeholder="https://">'
     +'<label class="label">Notes</label><input class="input" id="ct-notes" value="'+(c?esc(c.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveContact('+(c?"'"+c.id+"'":'null')+')">Save</button>'
-    +(c?'<button class="btn btn-danger" onclick="data.contacts=data.contacts.filter(x=>x.id!==\''+c.id+'\');closeModal();save()">Delete</button>':'')
+    +(c?'<button class="btn btn-danger" onclick="deleteContact(\''+c.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveContact(id){
@@ -800,6 +854,7 @@ function saveContact(id){
   if(!f.name && !f.org){ showToast('⚠️ Enter a name or business'); return; }
   if(id) data.contacts = data.contacts.map(c=>c.id===id?{...c,...f}:c);
   else data.contacts.unshift({ id:genId(), ...f });
+  logChange(id?'edited':'added','contact', [f.role, f.name||f.org].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('📇 Contact saved');
 }
 function vcEsc(s){ return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;'); }
