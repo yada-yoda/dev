@@ -127,6 +127,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 <!-- firebase-firestore-compat.js is lazy-loaded by ensureFirestore() on first use -->
 
 <div id="demo-banner" class="hidden" style="background:linear-gradient(90deg,#f4a261 0%,#2dd4bf 100%);color:#08231f;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:600;flex-wrap:wrap"><span>🎭 <strong>Demo Mode</strong> — sample dog, nothing is saved</span><button onclick="exitDemo()" style="background:rgba(8,35,31,.18);border:1px solid rgba(8,35,31,.3);color:#08231f;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Exit Demo</button></div>
+<div id="shared-banner" class="hidden" style="background:linear-gradient(90deg,#2dd4bf 0%,#58a6ff 100%);color:#08231f;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:600;flex-wrap:wrap"><span id="shared-banner-text">👋 Viewing shared dogs</span><button onclick="exitSharedProfile()" style="background:rgba(8,35,31,.18);border:1px solid rgba(8,35,31,.3);color:#08231f;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">Exit</button></div>
 
 <div id="auth-banner" class="auth-banner">
   <div id="auth-signed-out"><span style="color:var(--text-secondary)">Sign in to sync across devices · same login as your Illness Tracker</span></div>
@@ -183,12 +184,12 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.9.0';
+const APP_VERSION = 'v0.10.0';
 
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[] };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[], sharedWith:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -201,6 +202,9 @@ let db = null;
 let demoMode = false;
 let demoBackup = null;
 let gcalAccessToken = null;
+let sharedOwnerUid = null;   // when set, the app is viewing/editing another owner's dogs (shared access)
+let sharedOwnerName = '';
+function activeUid(){ return sharedOwnerUid || (currentUser ? currentUser.uid : null); }
 
 // ═══════════════════════════════════════════════
 // CONSTANTS
@@ -321,8 +325,11 @@ function initFirebase(){
     firebaseReady = true;
     firebase.auth().onAuthStateChanged(user => {
       currentUser = user; updateAuthUI();
-      if(user){ ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection(); }
-      else { gcalAccessToken = null; gcalPersistent = false; }
+      if(user){
+        try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
+        ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
+      }
+      else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; }
     });
   } catch(e){ console.warn('Firebase init failed:', e); }
 }
@@ -349,40 +356,112 @@ function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAc
 
 async function loadFromFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
+  const shared = !!sharedOwnerUid, uid = activeUid();
   try {
     await ensureFirestore();
-    const doc = await db.collection('pawprints').doc(currentUser.uid).get();
+    const doc = await db.collection('pawprints').doc(uid).get();
     if(doc.exists){
       const d = doc.data();
-      // Merge remote into local by id across each collection
+      if(shared){
+        // Viewing someone else's dogs — replace the in-memory view entirely; never touch own localStorage.
+        data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
+        sharedOwnerName = d.ownerName || '';
+        if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
+        render();
+        showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs');
+        return;
+      }
+      // Own data — merge remote into local by id across each collection
       ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
       data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
       data.settings = Object.assign({}, d.settings||{}, data.settings||{});
+      if(d.sharedWith) data.sharedWith = d.sharedWith;
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       saveLocal(); render();
       showToast('✅ Synced from cloud');
+    } else if(shared){
+      showToast('⚠️ Couldn’t open that shared profile — check the code and that they added your email');
+      exitSharedProfile(true);
     } else if(data.pets.length) saveToFirestore();
-  } catch(e){ console.error('Firestore load error:', e); }
+  } catch(e){
+    console.error('Firestore load error:', e);
+    if(shared){ showToast('⚠️ No access to that profile — ask the owner to add your email under Sharing'); exitSharedProfile(true); }
+  }
 }
 async function saveToFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
+  const uid = activeUid(); if(!uid) return;
   try {
     await ensureFirestore();
-    await db.collection('pawprints').doc(currentUser.uid).set({
-      ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-    });
+    const payload = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if(!sharedOwnerUid) payload.ownerName = currentUser.displayName || currentUser.email || '';
+    await db.collection('pawprints').doc(uid).set(payload);
   } catch(e){ console.error('Firestore save error:', e); /* graceful: localStorage still holds data */ }
+}
+
+// ═══════════════════════════════════════════════
+// SHARING — invite collaborators (sitter / family) by email
+// ═══════════════════════════════════════════════
+// Owner side: maintain data.sharedWith (lowercased emails). The Firestore rule grants
+// read+write on pawprints/{ownerUid} to any signed-in user whose email is in that list.
+function addCollaborator(){
+  const inp = document.getElementById('share-email'); if(!inp) return;
+  const email = (inp.value||'').trim().toLowerCase();
+  if(!email || email.indexOf('@') < 1 || email.indexOf('.') < 0){ showToast('⚠️ Enter a valid email'); return; }
+  data.sharedWith = data.sharedWith || [];
+  if(data.sharedWith.includes(email)){ showToast('Already added'); return; }
+  data.sharedWith.push(email);
+  logChange('added','shared access', email);
+  save(); settingsModal();
+}
+function removeCollaborator(email){
+  data.sharedWith = (data.sharedWith||[]).filter(e => e !== email);
+  logChange('deleted','shared access', email);
+  save(); settingsModal();
+}
+function copyShareCode(){
+  const code = currentUser ? currentUser.uid : '';
+  if(navigator.clipboard && code){ navigator.clipboard.writeText(code).then(()=>showToast('📋 Share code copied')).catch(()=>showToast('Code: '+code)); }
+  else showToast('Code: '+code);
+}
+// Collaborator side: open someone else's dogs with the code they gave you.
+function openShareCodeModal(){
+  openModal('<h3>👋 Open a shared dog</h3>'
+    + '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Helping with someone else’s dog? Make sure they’ve added <strong>your</strong> email under their Sharing settings, then paste the <strong>share code</strong> they gave you. You’ll be able to view and add entries.</p>'
+    + '<label class="label">Share code</label><input class="input" id="share-code" placeholder="paste the code">'
+    + '<div style="display:flex;gap:10px"><button class="btn-primary" onclick="openSharedProfile(document.getElementById(\'share-code\').value)">Open</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function openSharedProfile(code){
+  code = (code||'').trim();
+  if(!code){ showToast('⚠️ Enter a share code'); return; }
+  if(!currentUser){ showToast('⚠️ Sign in first'); return; }
+  if(code === currentUser.uid){ showToast('That’s your own code 🙂'); return; }
+  sharedOwnerUid = code; sharedOwnerName = '';
+  try { localStorage.setItem('pawprints_shared_uid', code); } catch(e){}
+  closeModal();
+  loadFromFirestore();
+}
+function exitSharedProfile(silent){
+  if(!sharedOwnerUid) return;
+  sharedOwnerUid = null; sharedOwnerName = '';
+  try { localStorage.removeItem('pawprints_shared_uid'); } catch(e){}
+  data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
+  loadLocal();
+  if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
+  render();
+  if(currentUser && firebaseReady) loadFromFirestore();
+  if(!silent) showToast('Back to your own dogs');
 }
 
 // ═══════════════════════════════════════════════
 // PERSISTENCE
 // ═══════════════════════════════════════════════
-function saveLocal(){ if(demoMode) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
+function saveLocal(){ if(demoMode || sharedOwnerUid) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
 function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); } } catch(e){} }
 function persist(){ saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(rerender !== false) render(); }
@@ -471,7 +550,25 @@ function settingsModal(){
     + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p>'
     + '<div class="label" style="margin-top:18px">History</div>'
     + '<button class="btn" onclick="closeModal();openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
+    + (currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:18px">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')
     + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+function settingsSharingHTML(){
+  let h = '<div class="label" style="margin-top:18px">Sharing &amp; access</div>';
+  if(sharedOwnerUid){
+    h += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">You’re viewing '+(sharedOwnerName?esc(sharedOwnerName)+'’s':'a shared')+' dogs.</p>'
+      + '<button class="btn" onclick="closeModal();exitSharedProfile()">↩ Back to my own dogs</button>';
+    return h;
+  }
+  h += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5">Let a sitter or family member view &amp; add to your dogs. They sign in with <strong>their own</strong> Google account; you add their email below and give them your share code.</p>';
+  h += '<div style="display:flex;gap:8px;margin-bottom:10px"><input class="input" id="share-email" type="email" placeholder="helper@email.com" style="margin-bottom:0"><button class="btn" onclick="addCollaborator()">Add</button></div>';
+  const sw = data.sharedWith || [];
+  h += sw.length
+    ? sw.map(e => '<div class="entry-row" style="padding:8px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-all">'+esc(e)+'</span><button class="btn btn-sm btn-danger" onclick="removeCollaborator(\''+esc(e)+'\')">Remove</button></div>').join('')
+    : '<p style="font-size:12px;color:var(--text-secondary)">No one added yet.</p>';
+  h += '<div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">Your <strong>share code</strong> (give to people you add): <code style="word-break:break-all;background:var(--bg-tertiary);padding:2px 6px;border-radius:6px">'+esc(currentUser.uid)+'</code> <button class="btn btn-sm" onclick="copyShareCode()">Copy</button></div>';
+  h += '<div style="margin-top:12px"><button class="btn" onclick="closeModal();openShareCodeModal()">👋 Open someone else’s dog (enter a code)</button></div>';
+  return h;
 }
 
 // Lazy-load jsPDF + autotable on first PDF export
@@ -1236,6 +1333,8 @@ function toggleTheme(){
 
 function render(){
   updateHeader();
+  const sb = document.getElementById('shared-banner');
+  if(sb){ sb.classList.toggle('hidden', !sharedOwnerUid); if(sharedOwnerUid){ document.getElementById('shared-banner-text').textContent = '👋 Viewing '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs — changes save to their account'; } }
   document.getElementById('view-today').innerHTML = renderToday();
   document.getElementById('view-log').innerHTML = renderLog();
   document.getElementById('view-profile').innerHTML = renderProfile();

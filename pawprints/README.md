@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.9.0**
+**Current Version: v0.10.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -55,17 +55,32 @@ covers both.
 1. Deploy `index.html` (served under `/pawprints/`).
 2. Firebase: reuses the Illness Tracker project (`illnesstracker-8d888`) so the Google login
    is shared. Dog data lives in a separate `pawprints/{uid}` Firestore doc.
-3. **Add one Firestore security rule** (Firebase console → Firestore → Rules):
+3. **Add a Firestore security rule** (Firebase console → Firestore → Rules). The sharing
+   feature (v0.10.0) needs the rule to also grant access to allow-listed collaborator emails,
+   so replace the simple owner-only `pawprints/{uid}` block with:
    ```
-   match /pawprints/{uid} {
-     allow read, write: if request.auth != null && request.auth.uid == uid;
+   match /pawprints/{ownerUid} {
+     allow read, write: if request.auth != null && (
+       request.auth.uid == ownerUid ||
+       (resource != null && resource.data.sharedWith is list
+         && request.auth.token.email != null
+         && request.auth.token.email.lower() in resource.data.sharedWith)
+     );
    }
    ```
-   Until it's added, the app works locally (localStorage); the rule turns on cross-device sync.
+   The owner always has access; anyone whose email the owner added to `sharedWith` (via
+   Settings → Sharing) can read/write that owner's doc. Until the rule is added, the app works
+   locally (localStorage); the rule turns on cross-device sync + sharing.
 4. `dev.rizzo.cc` is already an authorized Firebase domain, so sign-in works as-is.
 
 ## Version History
 
+- **v0.10.0** — Sharing with sitters / family. Settings → **Sharing & access** lets an owner invite
+  helpers by **email**; each helper signs in with **their own** Google account and, using the owner's
+  **share code**, opens the owner's dogs to **view and add** entries (a banner shows whose dogs you're
+  viewing; the history records who logged what). Owners manage/remove access anytime. Shared data is
+  read/written to the owner's doc and never touches the helper's own local data. **Requires a one-time
+  Firestore rules update** (see Setup) so allow-listed emails can access `pawprints/{ownerUid}`.
 - **v0.9.0** — Origin details. The dog profile now has an **Origin** section: how you got them
   (adopted / breeder / pet store / rehomed / found / gift / bred / other), the source (shelter,
   rescue, breeder, seller), location, adoption fee or purchase price, source contact, previous
