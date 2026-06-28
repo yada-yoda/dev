@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.8.1**
+**Current Version: v0.9.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,11 @@ covers both.
 
 ## Version History
 
+- **v0.9.0** — Origin details. The dog profile now has an **Origin** section: how you got them
+  (adopted / breeder / pet store / rehomed / found / gift / bred / other), the source (shelter,
+  rescue, breeder, seller), location, adoption fee or purchase price, source contact, previous
+  name, and registration # / registered (papered) name. All optional, shown on the profile and in
+  the PDF, and exported in the spreadsheet's Dogs sheet.
 - **v0.8.1** — Calendar default. On first connect, instead of defaulting to your Primary calendar,
   PawPrints now prompts to **create a dedicated calendar named after the dog** (e.g. "🐾 Cartier —
   PawPrints"), with the name **editable before creating** and a **✏️ Rename** button to change it
