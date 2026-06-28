@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.11.1**
+**Current Version: v0.12.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -75,6 +75,11 @@ covers both.
 
 ## Version History
 
+- **v0.12.0** — Spayed / Neutered. Added a dedicated **Spayed / Neutered** field (+ optional date) to
+  the dog profile — one field covers both (spayed = female, neutered = male). Sex options simplified to
+  Male / Female / Unknown, and any existing "Male (neutered)" / "Female (spayed)" dogs are migrated
+  automatically to plain sex + the new fixed status. Shown on the profile, in the PDF, and exported in
+  the spreadsheet.
 - **v0.11.1** — Backfill vet contacts. Dogs added *before* the vet→Contacts sync (v0.11.0) never got
   a contact, since it only ran on save. Now a one-time idempotent backfill runs on load, so existing
   dogs' vet(s) appear in Contacts automatically.
