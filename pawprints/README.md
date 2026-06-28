@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.6.1**
+**Current Version: v0.7.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,11 @@ covers both.
 
 ## Version History
 
+- **v0.7.0** — Secondary vet + walk routes. The dog profile now has a **vet email** for the primary
+  vet and a full **Secondary vet** section (clinic, doctor, phone, email) — both shown on the profile
+  and in the PDF; the primary vet's email also pre-fills into the first Vet contact. Walk logging
+  gained optional **From** / **To** fields and a **Round trip** checkbox, so a walk reads like
+  "Home ↔ the park" (↔ = round trip, → = one-way) in the timeline and reports.
 - **v0.6.1** — Add/Edit-dog form improvements. Added a **Current weight** field (it asked for the
   unit but never the weight) that seeds the weight history — and adds a new weigh-in if you change it
   on edit. Added an optional **Vet (doctor)** field separate from the clinic, shown on the profile and

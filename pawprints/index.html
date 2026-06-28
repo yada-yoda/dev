@@ -182,7 +182,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.6.1';
+const APP_VERSION = 'v0.7.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -510,7 +510,8 @@ async function exportPDF(){
     if(w) facts.push(['Current weight', w.value+' '+(w.unit||'lb')+' (as of '+fmtDate(w.dateTime)+')']);
     if(p.microchip) facts.push(['Microchip', String(p.microchip)]);
     if(p.license) facts.push(['License', String(p.license)]);
-    if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor, p.vetName, p.vetPhone].filter(Boolean).join('  ·  ')]);
+    if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail].filter(Boolean).join('  ·  ')]);
+    if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email].filter(Boolean).join('  ·  ')]);
     if(p.notes) facts.push(['Notes', String(p.notes)]);
     if(facts.length){ y = heading('Profile', y); y = table(['Field','Detail'], facts, y); }
 
@@ -576,9 +577,16 @@ function petModal(id){
     +'<label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="e.g. Black & grey with white chest">'
     +'<div class="grid-2"><div><label class="label">Microchip #'+tip('The ID number on your dog’s implanted microchip — from the vet or the registry paperwork. Optional.')+'</label><input class="input" id="p-chip" value="'+(p?esc(p.microchip||''):'')+'"></div>'
     +'<div><label class="label">License #'+tip('Your city or county pet license / registration number, usually on the dog’s tag or licensing paperwork. Optional.')+'</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'"></div></div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:6px 0 4px;text-transform:uppercase;letter-spacing:.05em">Primary vet</div>'
     +'<div class="grid-2"><div><label class="label">Vet / Clinic'+tip('The animal hospital or clinic your dog goes to.')+'</label><input class="input" id="p-vetname" value="'+(p?esc(p.vetName||''):'')+'" placeholder="Riverside Animal Hospital"></div>'
     +'<div><label class="label">Vet (doctor)'+tip('The specific veterinarian your dog usually sees, if you have one. Optional.')+'</label><input class="input" id="p-vetdoctor" value="'+(p?esc(p.vetDoctor||''):'')+'" placeholder="Dr. Patel"></div></div>'
-    +'<label class="label">Vet phone</label><input class="input" type="tel" id="p-vetphone" value="'+(p?esc(p.vetPhone||''):'')+'" placeholder="(555) 012-3456">'
+    +'<div class="grid-2"><div><label class="label">Vet phone</label><input class="input" type="tel" id="p-vetphone" value="'+(p?esc(p.vetPhone||''):'')+'" placeholder="(555) 012-3456"></div>'
+    +'<div><label class="label">Vet email</label><input class="input" type="email" id="p-vetemail" value="'+(p?esc(p.vetEmail||''):'')+'" placeholder="care@clinic.com"></div></div>'
+    +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em">Secondary vet'+tip('A backup or specialist vet — e.g. an emergency clinic, a second-opinion vet, or a specialist. All optional.')+'</div>'
+    +'<div class="grid-2"><div><label class="label">Clinic</label><input class="input" id="p-vet2name" value="'+(p?esc(p.vet2Name||''):'')+'" placeholder="e.g. Springfield Animal ER"></div>'
+    +'<div><label class="label">Doctor</label><input class="input" id="p-vet2doctor" value="'+(p?esc(p.vet2Doctor||''):'')+'" placeholder="Dr. Lee"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="p-vet2phone" value="'+(p?esc(p.vet2Phone||''):'')+'"></div>'
+    +'<div><label class="label">Email</label><input class="input" type="email" id="p-vet2email" value="'+(p?esc(p.vet2Email||''):'')+'"></div></div>'
     +'<label class="label">Notes</label><textarea class="textarea" id="p-notes" rows="2" placeholder="Personality, allergies, anything to remember">'+(p?esc(p.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="savePet('+(p?"'"+p.id+"'":'null')+')">'+(p?'Save':'Add dog')+'</button>'
     +(p?'<button class="btn btn-danger" style="white-space:nowrap" onclick="deletePet(\''+p.id+'\')">Delete</button>':'')
@@ -611,7 +619,8 @@ function savePet(id){
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), birthday:fv('p-birthday'),
     gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
-    license:fv('p-license'), vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), notes:fv('p-notes') };
+    license:fv('p-license'), vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), vetEmail:fv('p-vetemail'),
+    vet2Name:fv('p-vet2name'), vet2Doctor:fv('p-vet2doctor'), vet2Phone:fv('p-vet2phone'), vet2Email:fv('p-vet2email'), notes:fv('p-notes') };
   let pid = id;
   if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); logChange('edited','dog profile', name); showToast('✅ Saved'); }
   else { pid = genId(); data.pets.push({ id:pid, ...fields }); data.activePetId = pid; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
@@ -685,8 +694,11 @@ function quickWalk(){
     +'<label class="label">When (start)</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="q-dur" placeholder="30"></div>'
     +'<div><label class="label">Distance (mi, optional)</label><input class="input" type="number" step="0.1" id="q-dist" placeholder="1.5"></div></div>'
+    +'<div class="grid-2"><div><label class="label">From'+tip('Where the walk started — optional. e.g. Home.')+'</label><input class="input" id="q-from" placeholder="Home"></div>'
+    +'<div><label class="label">To'+tip('Where the walk went — optional. e.g. the park.')+'</label><input class="input" id="q-to" placeholder="The park"></div></div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="q-round" checked> Round trip (came back to the start)</label>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="How did it go?">'
-    +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),from:fv(\'q-from\'),to:fv(\'q-to\'),roundTrip:document.getElementById(\'q-round\').checked,notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
 }
 function quickWeight(){
   if(!activePet()){ promptAddDog(); return; }
@@ -856,13 +868,13 @@ function contactModal(id){
   const c = id ? data.contacts.find(x=>x.id===id) : null;
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   // First add: prefill a Vet from the active dog's saved vet info
-  const pre = (!c && activePet()) ? { role:'Vet', name:activePet().vetDoctor||'', org:activePet().vetName||'', phone:activePet().vetPhone||'' } : {};
+  const pre = (!c && activePet()) ? { role:'Vet', name:activePet().vetDoctor||'', org:activePet().vetName||'', phone:activePet().vetPhone||'', email:activePet().vetEmail||'' } : {};
   openModal('<h3>📇 '+(c?'Edit contact':'Add contact')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="ct-role">'+sel(CONTACT_ROLES, c?c.role:(pre.role||'Vet'))+'</select></div>'
     +'<div><label class="label">Name (person)</label><input class="input" id="ct-name" value="'+(c?esc(c.name||''):esc(pre.name||''))+'" placeholder="Dr. Patel"></div></div>'
     +'<label class="label">Clinic / Business</label><input class="input" id="ct-org" value="'+(c?esc(c.org||''):esc(pre.org||''))+'" placeholder="Riverside Animal Hospital">'
     +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="ct-phone" value="'+(c?esc(c.phone||''):esc(pre.phone||''))+'"></div>'
-    +'<div><label class="label">Email</label><input class="input" type="email" id="ct-email" value="'+(c?esc(c.email||''):'')+'"></div></div>'
+    +'<div><label class="label">Email</label><input class="input" type="email" id="ct-email" value="'+(c?esc(c.email||''):esc(pre.email||''))+'"></div></div>'
     +'<label class="label">Address</label><input class="input" id="ct-addr" value="'+(c?esc(c.address||''):'')+'" placeholder="123 Main St, City, ST 00000">'
     +'<label class="label">Website</label><input class="input" type="url" id="ct-web" value="'+(c?esc(c.website||''):'')+'" placeholder="https://">'
     +'<label class="label">Notes</label><input class="input" id="ct-notes" value="'+(c?esc(c.notes||''):'')+'">'
@@ -1182,7 +1194,12 @@ function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food')].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Water refilled';
   if(l.type==='potty') return [esc(l.result||'Potty'), l.place?esc(l.place):'', l.stool?'· '+esc(l.stool)+' stool':''].filter(Boolean).join(' ');
-  if(l.type==='walk') return [l.durationMin?esc(l.durationMin)+' min':'', l.distance?esc(l.distance)+' mi':''].filter(Boolean).join(' · ') || 'Walk';
+  if(l.type==='walk'){
+    let route = '';
+    if(l.from || l.to) route = [esc(l.from), esc(l.to)].filter(Boolean).join(l.roundTrip ? ' ↔ ' : ' → ') + (l.roundTrip && !(l.from && l.to) ? ' (round trip)' : '');
+    else if(l.roundTrip) route = 'round trip';
+    return [l.durationMin?esc(l.durationMin)+' min':'', l.distance?esc(l.distance)+' mi':'', route].filter(Boolean).join(' · ') || 'Walk';
+  }
   if(l.type==='weight') return esc(l.value)+' '+esc(l.unit||'lb');
   return '';
 }
@@ -1242,7 +1259,8 @@ function renderProfile(){
   if(w) facts.push(['Current weight', esc(w.value)+' '+esc(w.unit||'lb')+' ('+fmtDate(w.dateTime)+')']);
   if(p.microchip) facts.push(['Microchip', esc(p.microchip)]);
   if(p.license) facts.push(['License', esc(p.license)]);
-  if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor?esc(p.vetDoctor):'', p.vetName?esc(p.vetName):'', p.vetPhone?esc(p.vetPhone):''].filter(Boolean).join(' · ')]);
+  if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor?esc(p.vetDoctor):'', p.vetName?esc(p.vetName):'', p.vetPhone?esc(p.vetPhone):'', p.vetEmail?esc(p.vetEmail):''].filter(Boolean).join(' · ')]);
+  if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor?esc(p.vet2Doctor):'', p.vet2Name?esc(p.vet2Name):'', p.vet2Phone?esc(p.vet2Phone):'', p.vet2Email?esc(p.vet2Email):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
   html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button><button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
