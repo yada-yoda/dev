@@ -170,6 +170,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <div id="view-supplies" class="hidden"></div>
   <div id="view-insights" class="hidden"></div>
   <div id="view-history" class="hidden"></div>
+  <div id="view-activity" class="hidden"></div>
 </div>
 <footer style="text-align:center;padding:24px 16px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px">
   <a href="?demo=1" style="color:var(--accent-2);text-decoration:none;font-weight:500">🎭 Try the demo</a>
@@ -184,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.13.0';
+const APP_VERSION = 'v0.13.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -539,6 +540,27 @@ function logChange(action, entity, detail){
 const AUDIT_ICON = { added:'➕', edited:'✏️', deleted:'🗑️', logged:'📝', restored:'♻️', cleared:'🧹', marked:'✅' };
 let historyReturnView = 'today';
 function openHistory(){ historyReturnView = (currentView && currentView !== 'history') ? currentView : 'today'; switchView('history'); }
+let activityReturnView = 'today';
+function openActivity(){ activityReturnView = (currentView && currentView !== 'activity') ? currentView : 'today'; switchView('activity'); }
+// Full activity log (all types) grouped by day — its own sub-page.
+function renderActivityPage(){
+  if(!activePet()) return emptyState();
+  const logs = petLogs().filter(l => l.dateTime).sort((a,b) => new Date(b.dateTime) - new Date(a.dateTime));
+  let html = '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap"><button class="btn btn-sm" onclick="switchView(activityReturnView)">‹ Back</button><h2 style="font-size:20px;font-weight:700;flex:1;min-width:140px">📋 All activity — '+esc(activePet().name)+'</h2></div>';
+  if(!logs.length) return html + '<div class="card empty"><div class="ico">📋</div><p style="color:var(--text-secondary)">No activity logged yet.</p></div>';
+  const byDay = {};
+  logs.forEach(l => { const k = l.dateTime.slice(0,10); (byDay[k] = byDay[k] || []).push(l); });
+  const today = todayISO(), yest = (function(){ const d=new Date(Date.now()-86400000); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; })();
+  html += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">'+logs.length+' entr'+(logs.length===1?'y':'ies')+' across '+Object.keys(byDay).length+' day'+(Object.keys(byDay).length===1?'':'s')+', newest first.</p>';
+  html += Object.keys(byDay).sort().reverse().map(d => {
+    const items = byDay[d];
+    const counts = {}; items.forEach(l => counts[l.type] = (counts[l.type]||0) + 1);
+    const summary = Object.keys(counts).map(t => (LOG_META[t] ? LOG_META[t].i : '•') + ' ' + counts[t]).join('  ');
+    const label = d === today ? 'Today' : d === yest ? 'Yesterday' : fmtDate(d);
+    return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap"><h3 style="font-size:15px;font-weight:700">'+esc(label)+'</h3><div style="font-size:13px;color:var(--text-secondary)">'+summary+'</div></div>'+items.map(l => timelineRow(l)).join('')+'</div>';
+  }).join('');
+  return html;
+}
 // Activity & change history as its own full sub-page (not a modal).
 function renderHistoryPage(){
   const log = data.auditLog || [];
@@ -1383,7 +1405,7 @@ function getReminders(){
 // ═══════════════════════════════════════════════
 // VIEW SWITCHING + RENDER
 // ═══════════════════════════════════════════════
-const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history'];
+const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history','activity'];
 function switchView(v){
   currentView = v;
   VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
@@ -1448,6 +1470,7 @@ function render(){
   document.getElementById('view-supplies').innerHTML = renderSupplies();
   document.getElementById('view-insights').innerHTML = renderInsights();
   document.getElementById('view-history').innerHTML = renderHistoryPage();
+  document.getElementById('view-activity').innerHTML = renderActivityPage();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
   if(currentView === 'calendar' && gcalAccessToken && (data.settings.gcalCalendarId || gcalChoosing) && !window._gcalCalendars) loadCalendarList();
 }
@@ -1498,8 +1521,10 @@ function renderToday(){
   // today timeline
   const today = todayISO();
   const todays = petLogs().filter(l => l.dateTime && l.dateTime.slice(0,10) === today).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+  const totalLogs = petLogs().filter(l=>l.dateTime).length;
   html += '<div class="card"><h3 class="section-title">Today\'s activity</h3>'
-    + (todays.length ? todays.map(l=>timelineRow(l)).join('') : '<p style="color:var(--text-secondary);font-size:14px">Nothing logged yet today — tap a quick-log button above.</p>')
+    + (todays.length ? todays.map(l=>timelineRow(l)).join('') : '<p style="color:var(--text-secondary);font-size:14px">Nothing logged yet today'+(totalLogs?'.':' — tap a quick-log button above.')+'</p>')
+    + (totalLogs > todays.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-outline" onclick="openActivity()">📋 View all activity by day ('+totalLogs+') →</button></div>' : '')
     + '</div>';
   return html;
 }
@@ -1583,7 +1608,7 @@ function emptyState(){
 function renderLog(){
   if(!activePet()) return emptyState();
   const tabs = [['feed','🍖 Feed'],['water','💧 Water'],['potty','🚪 Potty'],['walk','🦮 Walk'],['weight','⚖️ Weight']];
-  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Log activity</h2>';
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px"><h2 style="font-size:20px;font-weight:700">Log activity</h2><button class="btn btn-sm" onclick="openActivity()">📋 All activity by day</button></div>';
   html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+l+'</button>').join('')+'</div>';
   const opener = { feed:'quickFeed', water:'quickWater', potty:'quickPotty', walk:'quickWalk', weight:'quickWeight' }[logSubtab];
   html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="'+opener+'()">+ Add '+logSubtab+' entry</button></div>';

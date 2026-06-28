@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.13.0**
+**Current Version: v0.13.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.13.1** — All-activity page. Today's activity card now has a **"View all activity by day →"**
+  button (and the Log tab has an "All activity by day" link) opening a full sub-page of every
+  activity entry grouped by day (Today / Yesterday / dates), newest first, with a per-day type
+  summary and inline edit/delete. Fills the gap where past days' activity wasn't viewable together.
 - **v0.13.0** — Sharing roles, permission levels & expiry. When inviting a helper you now set a
   **relationship** (Family/Partner/Helper/Sitter/Dog walker/Friend/Other), an **access level**, and
   an optional **end date** (access auto-revokes after it). Three access levels: **Full** (view+edit
