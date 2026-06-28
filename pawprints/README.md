@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.11.0**
+**Current Version: v0.11.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -75,6 +75,9 @@ covers both.
 
 ## Version History
 
+- **v0.11.1** — Backfill vet contacts. Dogs added *before* the vet→Contacts sync (v0.11.0) never got
+  a contact, since it only ran on save. Now a one-time idempotent backfill runs on load, so existing
+  dogs' vet(s) appear in Contacts automatically.
 - **v0.11.0** — Profile/log polish. Profile vet(s) now auto-mirror into **Contacts** (kept in sync,
   no duplicates) and show as a quick-reference **panel on the Care › Vet tab** with call/email links.
   The feed form's Food dropdown now includes your **Food & Treats from Supplies** (your actual brands

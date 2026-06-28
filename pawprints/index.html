@@ -184,7 +184,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.11.0';
+const APP_VERSION = 'v0.11.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -382,7 +382,7 @@ async function loadFromFirestore(){
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
-      saveLocal(); render();
+      backfillVetContacts(); saveLocal(); render();
       showToast('✅ Synced from cloud');
     } else if(shared){
       showToast('⚠️ Couldn’t open that shared profile — check the code and that they added your email');
@@ -809,6 +809,13 @@ function syncVetContacts(pid){
   };
   upsert(pid+':vet1', p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail);
   upsert(pid+':vet2', p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email);
+}
+// One-time backfill: ensure every existing dog's vet(s) are in Contacts (for dogs added
+// before vet→contacts sync existed). Idempotent (linked by _vetLink); only persists if it added one.
+function backfillVetContacts(){
+  const before = (data.contacts||[]).length;
+  data.pets.forEach(p => syncVetContacts(p.id));
+  if((data.contacts||[]).length > before && !demoMode){ saveLocal(); saveToFirestore(); }
 }
 function deletePet(id){
   const p = data.pets.find(x=>x.id===id); if(!p) return;
@@ -1868,7 +1875,7 @@ loadLocal();
 applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.settings.theme) || currentTheme());
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
-else render();
+else { backfillVetContacts(); render(); }
 // Refresh "time ago" status on Today every minute
 setInterval(() => { if(currentView==='today' && !document.getElementById('modal-root').innerHTML){ document.getElementById('view-today').innerHTML = renderToday(); } }, 60000);
 
