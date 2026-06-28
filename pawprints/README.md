@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.8.0**
+**Current Version: v0.8.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -66,6 +66,10 @@ covers both.
 
 ## Version History
 
+- **v0.8.1** — Calendar default. On first connect, instead of defaulting to your Primary calendar,
+  PawPrints now prompts to **create a dedicated calendar named after the dog** (e.g. "🐾 Cartier —
+  PawPrints"), with the name **editable before creating** and a **✏️ Rename** button to change it
+  later. "Choose an existing calendar" and "use my Primary calendar" remain one-tap escape hatches.
 - **v0.8.0** — Spreadsheet export, history page, calendar picker fix. Added **Export spreadsheet
   (.xlsx)** in Settings (SheetJS, one tab per category) plus a **CSV export** on the history view.
   **Activity & history** is now its own full sub-page (with Back) instead of a modal. Fixed the

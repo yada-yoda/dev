@@ -183,7 +183,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.8.0';
+const APP_VERSION = 'v0.8.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1007,6 +1007,7 @@ function calendarEvents(){
 // If the worker isn't reachable/configured, falls back to a per-session popup.
 const PAWPRINTS_WORKER = 'https://pawprints-worker.sevendwarfs.workers.dev';
 let gcalPersistent = false; // true when connected via the worker (refresh token stored server-side)
+let gcalChoosing = false;   // true when the user opts to pick an existing calendar instead of creating one
 
 async function workerFetch(path, opts){
   if(!currentUser) throw new Error('not-signed-in');
@@ -1026,7 +1027,7 @@ async function refreshGcalToken(){
 async function checkGcalConnection(){
   if(!currentUser) return;
   const got = await refreshGcalToken();
-  if(got){ if(currentView==='calendar') loadCalendarList(); render(); }
+  if(got){ if(currentView==='calendar' && (data.settings.gcalCalendarId || gcalChoosing)) loadCalendarList(); render(); }
 }
 function gcalConnected(){ return !!gcalAccessToken; }
 function connectGoogleCalendar(){
@@ -1081,17 +1082,41 @@ async function loadCalendarList(){
   }
 }
 // Create a dedicated Google calendar named after the active dog (needs full Calendar scope).
-async function createDogCalendar(){
+async function createDogCalendar(name){
   if(!gcalAccessToken){ connectGoogleCalendar(); return; }
   const p = activePet(); if(!p) return;
+  const summary = (name && name.trim()) ? name.trim() : ('🐾 '+p.name+' — PawPrints');
   showToast('⏳ Creating calendar…');
   try {
-    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars', { method:'POST', body:JSON.stringify({ summary:'🐾 '+p.name+' — PawPrints', description:'Care schedule for '+p.name+', synced from PawPrints (dev.rizzo.cc/pawprints).' }) });
-    if(r.ok){ const j = await r.json(); data.settings.gcalCalendarId = j.id; window._gcalCalendars = null; save(); loadCalendarList(); showToast('✅ Created "'+j.summary+'" — now syncing here'); }
+    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars', { method:'POST', body:JSON.stringify({ summary, description:'Care schedule for '+p.name+', synced from PawPrints (dev.rizzo.cc/pawprints).' }) });
+    if(r.ok){ const j = await r.json(); data.settings.gcalCalendarId = j.id; gcalChoosing = false; window._gcalCalendars = null; save(); loadCalendarList(); showToast('✅ Created "'+j.summary+'" — now syncing here'); }
     else { const e = await r.json().catch(()=>({})); const msg = (e.error && e.error.message) || ''; showToast('⚠️ '+(/insufficient|scope|permission/i.test(msg) ? 'Need full Calendar access — tap Disconnect then Connect again' : (msg || 'Could not create calendar'))); }
   } catch(err){ if(err.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); render(); } else showToast('⚠️ Could not create calendar'); }
 }
-function setTargetCalendar(id){ data.settings.gcalCalendarId = id; save(); }
+// Escape hatch from the create-calendar prompt → show the existing-calendar picker.
+function useExistingCalendar(){ gcalChoosing = true; if(window._gcalCalendars) render(); else loadCalendarList(); }
+// Rename the Google calendar this dog syncs to (the app-created one, or any owned calendar).
+function renameCalendarModal(){
+  const id = data.settings.gcalCalendarId;
+  if(!id || id === 'primary'){ showToast('Pick a non-primary calendar to rename'); return; }
+  const cur = (window._gcalCalendars||[]).find(c=>c.id===id);
+  const dn = activePet() ? esc(activePet().name) : '';
+  openModal('<h3>✏️ Rename calendar</h3>'
+    + '<label class="label">Calendar name</label><input class="input" id="cal-rename" value="'+(cur?esc(cur.name):'')+'" placeholder="🐾 '+dn+' — PawPrints">'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:14px">Renames the Google calendar this dog’s schedule syncs to.</p>'
+    + '<div style="display:flex;gap:10px"><button class="btn-primary" onclick="renameCalendar()">Save</button><button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+async function renameCalendar(){
+  const id = data.settings.gcalCalendarId, name = fv('cal-rename').trim();
+  if(!id || !name){ showToast('⚠️ Enter a name'); return; }
+  showToast('⏳ Renaming…');
+  try {
+    const r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(id), { method:'PATCH', body:JSON.stringify({ summary:name }) });
+    if(r.ok){ window._gcalCalendars = null; closeModal(); loadCalendarList(); showToast('✅ Renamed'); }
+    else { const e = await r.json().catch(()=>({})); showToast('⚠️ '+((e.error && e.error.message) || 'Could not rename')); }
+  } catch(err){ if(err.message==='auth-expired'){ showToast('⚠️ Reconnect Google Calendar'); render(); } else showToast('⚠️ Rename failed'); }
+}
+function setTargetCalendar(id){ data.settings.gcalCalendarId = id; gcalChoosing = false; save(); }
 async function syncToGoogleCalendar(){
   if(!gcalAccessToken){ connectGoogleCalendar(); return; }
   const calId = data.settings.gcalCalendarId || 'primary';
@@ -1204,7 +1229,7 @@ function render(){
   document.getElementById('view-insights').innerHTML = renderInsights();
   document.getElementById('view-history').innerHTML = renderHistoryPage();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
-  if(currentView === 'calendar' && gcalAccessToken && !window._gcalCalendars) loadCalendarList();
+  if(currentView === 'calendar' && gcalAccessToken && (data.settings.gcalCalendarId || gcalChoosing) && !window._gcalCalendars) loadCalendarList();
 }
 
 
@@ -1405,23 +1430,33 @@ function renderCalendar(){
     html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Connect Google Calendar to sync '+activePet().name+'’s schedule into a calendar of your choice.</p>'
       + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">🔗 Connect Google Calendar</button>';
   } else {
-    // Build the target list: always offer Primary, then any calendars we loaded.
-    const target = data.settings.gcalCalendarId || 'primary';
-    const cals = (window._gcalCalendars && window._gcalCalendars.length) ? window._gcalCalendars.slice() : [{ id:'primary', name:'Primary calendar', primary:true }];
-    if(!cals.find(c=>c.id===target)) cals.unshift({ id:target, name:target });
-    html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
-    html += '<div style="flex:1;min-width:200px"><label class="label">Write to calendar</label><select class="select" style="margin-bottom:0" onchange="setTargetCalendar(this.value)">'
-      + cals.map(c=>'<option value="'+esc(c.id)+'"'+(target===c.id?' selected':'')+'>'+esc(c.name)+(c.primary?' (primary)':'')+'</option>').join('')
-      + '</select></div>';
-    html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
-    html += '</div>';
-    html += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
-      + '<button class="btn btn-sm" onclick="createDogCalendar()">➕ Create a calendar for '+esc(activePet().name)+'</button>'
-      + (window._gcalCalendars ? '' : '<button class="btn btn-sm" onclick="window._gcalCalendars=null;loadCalendarList()">↻ Load my calendars</button>')
-      + '</div>';
+    const dog = esc(activePet().name);
+    if(!data.settings.gcalCalendarId && !gcalChoosing){
+      // First run: recommend a dedicated calendar named after the dog (name editable).
+      const defName = '🐾 ' + activePet().name + ' — PawPrints';
+      html += '<p style="font-size:14px;color:var(--text-secondary);margin-bottom:12px">Where should '+dog+'’s schedule go? We recommend a dedicated calendar just for '+dog+' — you can rename or switch it anytime.</p>';
+      html += '<label class="label">New calendar name</label><input class="input" id="gcal-newname" value="'+esc(defName)+'">';
+      html += '<button class="btn-primary" style="width:auto;padding:12px 22px;font-size:14px" onclick="createDogCalendar(document.getElementById(\'gcal-newname\').value)">➕ Create '+dog+'’s calendar</button>';
+      html += '<div style="margin-top:12px;font-size:12px;color:var(--text-secondary)">Prefer an existing one? <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="useExistingCalendar()">Choose a calendar</a> · <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="setTargetCalendar(\'primary\')">use my Primary calendar</a></div>';
+    } else {
+      const target = data.settings.gcalCalendarId || 'primary';
+      const cals = (window._gcalCalendars && window._gcalCalendars.length) ? window._gcalCalendars.slice() : [{ id:'primary', name:'Primary calendar', primary:true }];
+      if(!cals.find(c=>c.id===target)) cals.unshift({ id:target, name:(target==='primary'?'Primary calendar':target) });
+      html += '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">';
+      html += '<div style="flex:1;min-width:200px"><label class="label">Write to calendar</label><select class="select" style="margin-bottom:0" onchange="setTargetCalendar(this.value)">'
+        + cals.map(c=>'<option value="'+esc(c.id)+'"'+(target===c.id?' selected':'')+'>'+esc(c.name)+(c.primary?' (primary)':'')+'</option>').join('')
+        + '</select></div>';
+      html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
+      html += '</div>';
+      html += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
+        + '<button class="btn btn-sm" onclick="createDogCalendar()">➕ New calendar for '+dog+'</button>'
+        + (target!=='primary' ? '<button class="btn btn-sm" onclick="renameCalendarModal()">✏️ Rename calendar</button>' : '')
+        + (window._gcalCalendars ? '' : '<button class="btn btn-sm" onclick="window._gcalCalendars=null;loadCalendarList()">↻ Load my calendars</button>')
+        + '</div>';
+    }
     html += '<p style="font-size:12px;color:'+(gcalPersistent?'var(--success)':'var(--text-secondary)')+';margin-top:10px">'
       + (gcalPersistent ? '✓ Connected — reconnects automatically on every device. ' : '⏱ Connected for this session only (set up pawprints-worker for permanent connect). ')
-      + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates to the calendar above. Re-syncing updates the same events, no duplicates. (You can share the calendar with others from Google Calendar.)</p>';
+      + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates'+(data.settings.gcalCalendarId?' to the calendar above':'')+'. Re-syncing updates the same events, no duplicates. (You can share the calendar with others from Google Calendar.)</p>';
     if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:4px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
   }
   html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">📅 Download .ics</button></div>';
