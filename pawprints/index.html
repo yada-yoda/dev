@@ -184,12 +184,12 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.12.1';
+const APP_VERSION = 'v0.13.0';
 
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[], sharedWith:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -204,7 +204,13 @@ let demoBackup = null;
 let gcalAccessToken = null;
 let sharedOwnerUid = null;   // when set, the app is viewing/editing another owner's dogs (shared access)
 let sharedOwnerName = '';
+let sharedAccess = '';       // the current viewer's access level in shared mode: 'full' | 'logger' | 'read'
 function activeUid(){ return sharedOwnerUid || (currentUser ? currentUser.uid : null); }
+// Permission predicates — always true on your own dogs; restricted only when viewing a shared profile.
+function canLog(){ return !sharedOwnerUid || sharedAccess === 'full' || sharedAccess === 'logger'; }
+function canManage(){ return !sharedOwnerUid || sharedAccess === 'full'; }
+function denyLog(){ if(canLog()) return false; showToast('👀 You have view-only access'); return true; }
+function denyManage(){ if(canManage()) return false; showToast(sharedAccess==='logger' ? '🐾 Caretaker access — only the owner can change this' : '👀 You have view-only access'); return true; }
 
 // ═══════════════════════════════════════════════
 // CONSTANTS
@@ -223,6 +229,13 @@ const SEXES = ['Male','Female','Unknown'];
 const FIXED_STATUS = ['Spayed / Neutered','Not fixed (intact)','Unknown'];
 const ORIGIN_TYPES = ['Adopted (shelter / rescue)','Purchased (breeder)','Purchased (pet store)','Rehomed to you','Found / stray','Gift','Bred (own litter)','Other'];
 const CONTACT_ROLES = ['Vet','Emergency Vet','Groomer','Pet Sitter','Boarding / Daycare','Trainer','Pharmacy','Walker','Other'];
+const SHARE_ROLES = ['Family','Partner / Spouse','Helper','Sitter','Dog walker','Friend','Other'];
+const SHARE_ACCESS = [
+  { v:'full',   label:'Full access — view & edit everything' },
+  { v:'logger', label:'Sitter / walker — log daily activity, view the rest' },
+  { v:'read',   label:'View only — can’t change anything' }
+];
+const SHARE_ACCESS_LABEL = { full:'Full access', logger:'Sitter / walker (log only)', read:'View only' };
 const GCAL_SCOPES = 'https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/calendar.readonly';
 
 // ═══════════════════════════════════════════════
@@ -330,7 +343,7 @@ function initFirebase(){
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
         ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
-      else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; }
+      else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; }
     });
   } catch(e){ console.warn('Firebase init failed:', e); }
 }
@@ -364,12 +377,19 @@ async function loadFromFirestore(){
     if(doc.exists){
       const d = doc.data();
       if(shared){
+        // Determine MY access level from the owner's collaborator list (with expiry check).
+        const me = (currentUser.email||'').toLowerCase(), today = todayISO();
+        const myEntry = (d.collaborators||[]).find(x => (x.email||'').toLowerCase() === me);
+        if(myEntry && myEntry.until && myEntry.until < today){ showToast('⌛ Your access to '+(d.ownerName||'these dogs')+' has ended'); exitSharedProfile(true); return; }
+        if(myEntry) sharedAccess = myEntry.access || 'full';
+        else if((d.sharedRead||[]).includes(me) && !(d.sharedWrite||[]).includes(me)) sharedAccess = 'read';
+        else sharedAccess = 'full';
         // Viewing someone else's dogs — replace the in-memory view entirely; never touch own localStorage.
         data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
         sharedOwnerName = d.ownerName || '';
         if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
         render();
-        showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs');
+        showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs ('+(SHARE_ACCESS_LABEL[sharedAccess]||'access')+')');
         return;
       }
       // Own data — merge remote into local by id across each collection
@@ -408,21 +428,39 @@ async function saveToFirestore(){
 // ═══════════════════════════════════════════════
 // SHARING — invite collaborators (sitter / family) by email
 // ═══════════════════════════════════════════════
-// Owner side: maintain data.sharedWith (lowercased emails). The Firestore rule grants
-// read+write on pawprints/{ownerUid} to any signed-in user whose email is in that list.
+// Owner side: collaborators carry {email, role, access, until}. Derived email lists
+// (sharedWrite / sharedRead) are what the Firestore rule uses to grant write / read.
+function migrateCollaborators(){
+  // Legacy: data.sharedWith used to be a plain array of emails (all full access).
+  if((!data.collaborators || !data.collaborators.length) && Array.isArray(data.sharedWith) && data.sharedWith.length && typeof data.sharedWith[0] === 'string'){
+    data.collaborators = data.sharedWith.map(e => ({ email:e, role:'Family', access:'full', until:'' }));
+  }
+}
+function syncShareLists(){
+  const today = todayISO();
+  data.collaborators = (data.collaborators||[]).filter(c => c && c.email);
+  const active = data.collaborators.filter(c => !(c.until && c.until < today));
+  data.sharedWrite = active.filter(c => c.access === 'full' || c.access === 'logger').map(c => c.email);
+  data.sharedRead  = active.filter(c => c.access === 'read').map(c => c.email);
+  data.sharedWith  = [...new Set([...data.sharedWrite, ...data.sharedRead])]; // back-compat
+}
 function addCollaborator(){
-  const inp = document.getElementById('share-email'); if(!inp) return;
-  const email = (inp.value||'').trim().toLowerCase();
+  if(denyManage()) return;
+  const email = (fv('share-email')||'').trim().toLowerCase();
   if(!email || email.indexOf('@') < 1 || email.indexOf('.') < 0){ showToast('⚠️ Enter a valid email'); return; }
-  data.sharedWith = data.sharedWith || [];
-  if(data.sharedWith.includes(email)){ showToast('Already added'); return; }
-  data.sharedWith.push(email);
-  logChange('added','shared access', email);
+  data.collaborators = data.collaborators || [];
+  if(data.collaborators.some(c => c.email === email)){ showToast('Already added'); return; }
+  const role = fv('share-role') || 'Helper', access = fv('share-access') || 'full', until = fv('share-until') || '';
+  data.collaborators.push({ email, role, access, until });
+  syncShareLists();
+  logChange('added','shared access', email+' · '+role+' · '+(SHARE_ACCESS_LABEL[access]||access)+(until?' · until '+until:''));
   save(); settingsModal();
 }
 function removeCollaborator(email){
-  data.sharedWith = (data.sharedWith||[]).filter(e => e !== email);
-  logChange('deleted','shared access', email);
+  const c = (data.collaborators||[]).find(x => x.email === email);
+  data.collaborators = (data.collaborators||[]).filter(x => x.email !== email);
+  syncShareLists();
+  logChange('deleted','shared access', email + (c?(' · '+(c.role||'')):''));
   save(); settingsModal();
 }
 function copyShareCode(){
@@ -449,7 +487,7 @@ function openSharedProfile(code){
 }
 function exitSharedProfile(silent){
   if(!sharedOwnerUid) return;
-  sharedOwnerUid = null; sharedOwnerName = '';
+  sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = '';
   try { localStorage.removeItem('pawprints_shared_uid'); } catch(e){}
   data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
   loadLocal();
@@ -470,6 +508,7 @@ function save(rerender){ persist(); if(rerender !== false) render(); }
 function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-backup-' + todayISO() + '.json'); showToast('💾 Backup saved'); }
 function dl(blob,name){ const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u); }
 function importJSON(evt){
+  if(denyManage()){ evt.target.value=''; return; }
   const f = evt.target.files[0]; if(!f) return;
   const r = new FileReader();
   r.onload = (e) => { try {
@@ -529,12 +568,12 @@ function exportHistoryCSV(){
   showToast('📄 History CSV saved');
 }
 // Entity deletes (with audit logging) — used by the edit modals.
-function deleteVet(id){ const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteGroom(id){ const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteMed(id){ const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteIllness(id){ const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteInv(id){ const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteContact(id){ const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 function settingsModal(){
   const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.inventory.length + data.contacts.length;
@@ -561,12 +600,22 @@ function settingsSharingHTML(){
       + '<button class="btn" onclick="closeModal();exitSharedProfile()">↩ Back to my own dogs</button>';
     return h;
   }
-  h += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5">Let a sitter or family member view &amp; add to your dogs. They sign in with <strong>their own</strong> Google account; you add their email below and give them your share code.</p>';
-  h += '<div style="display:flex;gap:8px;margin-bottom:10px"><input class="input" id="share-email" type="email" placeholder="helper@email.com" style="margin-bottom:0"><button class="btn" onclick="addCollaborator()">Add</button></div>';
-  const sw = data.sharedWith || [];
-  h += sw.length
-    ? sw.map(e => '<div class="entry-row" style="padding:8px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-all">'+esc(e)+'</span><button class="btn btn-sm btn-danger" onclick="removeCollaborator(\''+esc(e)+'\')">Remove</button></div>').join('')
-    : '<p style="font-size:12px;color:var(--text-secondary)">No one added yet.</p>';
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  h += '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5">Let a sitter or family member view (and optionally edit) your dogs. They sign in with <strong>their own</strong> Google account; you add their email below, pick how much access, and give them your share code.</p>';
+  h += '<input class="input" id="share-email" type="email" placeholder="helper@email.com" style="margin-bottom:8px">'
+    + '<div class="grid-2"><div><label class="label">Relationship</label><select class="select" id="share-role" style="margin-bottom:0">'+sel(SHARE_ROLES,'Sitter')+'</select></div>'
+    + '<div><label class="label">Access</label><select class="select" id="share-access" style="margin-bottom:0">'+SHARE_ACCESS.map(a=>'<option value="'+a.v+'"'+(a.v==='logger'?' selected':'')+'>'+esc(a.label)+'</option>').join('')+'</select></div></div>'
+    + '<div class="grid-2" style="margin-top:8px"><div><label class="label">Access ends (optional)'+tip('Leave blank for ongoing access. If set, access auto-revokes after this date.')+'</label><input class="input" type="date" id="share-until" style="margin-bottom:0"></div>'
+    + '<div style="display:flex;align-items:flex-end"><button class="btn-primary" style="width:100%;padding:11px;font-size:14px" onclick="addCollaborator()">Add person</button></div></div>';
+  const cols = data.collaborators || [];
+  h += '<div style="margin-top:12px">' + (cols.length
+    ? cols.map(c => {
+        const exp = c.until && c.until < todayISO();
+        return '<div class="entry-row" style="padding:8px 12px;margin-bottom:6px"><div style="min-width:0"><div style="font-size:13px;word-break:break-all;font-weight:600">'+esc(c.email)+'</div>'
+          + '<div style="font-size:11px;color:var(--text-secondary)">'+esc(c.role||'')+' · '+esc(SHARE_ACCESS_LABEL[c.access]||c.access||'')+(c.until?' · '+(exp?'<span style="color:var(--danger)">ended '+fmtDate(c.until)+'</span>':'until '+fmtDate(c.until)):'')+'</div></div>'
+          + '<button class="btn btn-sm btn-danger" onclick="removeCollaborator(\''+esc(c.email)+'\')">Remove</button></div>';
+      }).join('')
+    : '<p style="font-size:12px;color:var(--text-secondary)">No one added yet.</p>') + '</div>';
   h += '<div style="margin-top:10px;font-size:12px;color:var(--text-secondary)">Your <strong>share code</strong> (give to people you add): <code style="word-break:break-all;background:var(--bg-tertiary);padding:2px 6px;border-radius:6px">'+esc(currentUser.uid)+'</code> <button class="btn btn-sm" onclick="copyShareCode()">Copy</button></div>';
   h += '<div style="margin-top:12px"><button class="btn" onclick="closeModal();openShareCodeModal()">👋 Open someone else’s dog (enter a code)</button></div>';
   return h;
@@ -778,6 +827,7 @@ function handlePhoto(evt){
   reader.readAsDataURL(f);
 }
 function savePet(id){
+  if(denyManage()) return;
   const name = fv('p-name').trim();
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'),
@@ -820,6 +870,10 @@ function syncVetContacts(pid){
 function backfillVetContacts(){
   const before = (data.contacts||[]).length;
   let changed = false;
+  // Sharing migration: legacy email-list → collaborators; keep derived lists fresh (prunes expired).
+  const sharedBefore = JSON.stringify([data.sharedWrite||[], data.sharedRead||[]]);
+  migrateCollaborators(); syncShareLists();
+  if(JSON.stringify([data.sharedWrite||[], data.sharedRead||[]]) !== sharedBefore) changed = true;
   data.pets.forEach(p => {
     if(p.sex === 'Male (neutered)'){ p.sex = 'Male'; if(!p.fixed) p.fixed = 'Spayed / Neutered'; changed = true; }
     else if(p.sex === 'Female (spayed)'){ p.sex = 'Female'; if(!p.fixed) p.fixed = 'Spayed / Neutered'; changed = true; }
@@ -828,6 +882,7 @@ function backfillVetContacts(){
   if(((data.contacts||[]).length > before || changed) && !demoMode){ saveLocal(); saveToFirestore(); }
 }
 function deletePet(id){
+  if(denyManage()) return;
   const p = data.pets.find(x=>x.id===id); if(!p) return;
   if(!confirm('Delete '+p.name+' and all their logs? This cannot be undone.')) return;
   data.pets = data.pets.filter(x=>x.id!==id);
@@ -842,13 +897,14 @@ function deletePet(id){
 // ═══════════════════════════════════════════════
 const LOG_ENTITY = { feed:'feeding', water:'water', potty:'potty break', walk:'walk', weight:'weight' };
 function addLog(entry){
+  if(denyLog()) return;
   if(!data.activePetId){ promptAddDog(); return; }
   const rec = { id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry };
   data.logs.unshift(rec);
   logChange('logged', LOG_ENTITY[rec.type]||'activity', (logSummary(rec)||'').replace(/<[^>]+>/g,''));
   save();
 }
-function delLog(id){ const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
+function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
 // Quick buttons
 function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
@@ -858,6 +914,7 @@ function feedFoodOptions(){
   return [...new Set([...inv, ...FOOD_TYPES])];
 }
 function quickFeed(){
+  if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
   const last = lastLog('feed');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
@@ -871,6 +928,7 @@ function quickFeed(){
     +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
 }
 function quickPotty(){
+  if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🚪 Potty break</h3>'
@@ -887,6 +945,7 @@ function savePotty(){
   closeModal(); showToast('🚪 Potty logged');
 }
 function quickWalk(){
+  if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
   openModal('<h3>🦮 Log a walk</h3>'
     +'<label class="label">When (start)</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
@@ -899,6 +958,7 @@ function quickWalk(){
     +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),from:fv(\'q-from\'),to:fv(\'q-to\'),roundTrip:document.getElementById(\'q-round\').checked,notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
 }
 function quickWeight(){
+  if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
   const unit = activePet().weightUnit || 'lb';
   openModal('<h3>⚖️ Log weight</h3>'
@@ -928,6 +988,7 @@ function vetModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveVet(id){
+  if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const f = { date:fv('vt-date'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), notes:fv('vt-notes') };
   let visitId = id;
@@ -956,6 +1017,7 @@ function groomModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveGroom(id){
+  if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
   const f = { date:fv('gr-date'), cost:fv('gr-cost'), groomer:fv('gr-by'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes') };
@@ -984,6 +1046,7 @@ function medNextDue(m){
   return '';
 }
 function saveMed(id){
+  if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const f = { name:fv('md-name'), kind:fv('md-kind'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), nextDue:fv('md-next'), notes:fv('md-notes') };
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
@@ -993,6 +1056,7 @@ function saveMed(id){
   closeModal(); save(); showToast('💊 Saved');
 }
 function giveMedNow(id){
+  if(denyManage()) return;
   const m = data.meds.find(x=>x.id===id); if(!m) return;
   m.lastGiven = todayISO(); m.nextDue = '';
   logChange('marked','medication given', m.name||'');
@@ -1018,6 +1082,7 @@ function illnessModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveIllness(id){
+  if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const symptoms = [...document.querySelectorAll('#il-symptoms .tag.active')].map(t=>t.dataset.s);
   const f = { start:fv('il-start'), recovery:fv('il-recovery'), symptoms, severity:fv('il-sev'), diagnosis:fv('il-dx'), treatment:fv('il-treat'), notes:fv('il-notes') };
@@ -1048,6 +1113,7 @@ function invModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveInv(id){
+  if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'),
     cost:fv('iv-cost'), purchaseDate:fv('iv-date'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
@@ -1057,7 +1123,7 @@ function saveInv(id){
   logChange(id?'edited':'added','supply', [f.category, (f.brand?f.brand+' ':'')+f.name].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('🛒 Saved');
 }
-function toggleLow(id){ const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+(it.runningLow?' — marked low':' — restocked')); save(); } }
+function toggleLow(id){ if(denyManage()) return; const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+(it.runningLow?' — marked low':' — restocked')); save(); } }
 
 // ═══════════════════════════════════════════════
 // CONTACTS + vCARDS
@@ -1081,6 +1147,7 @@ function contactModal(id){
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveContact(id){
+  if(denyManage()) return;
   const f = { role:fv('ct-role'), name:fv('ct-name'), org:fv('ct-org'), phone:fv('ct-phone'), email:fv('ct-email'), address:fv('ct-addr'), website:fv('ct-web'), notes:fv('ct-notes') };
   if(!f.name && !f.org){ showToast('⚠️ Enter a name or business'); return; }
   if(id) data.contacts = data.contacts.map(c=>c.id===id?{...c,...f}:c);
@@ -1348,7 +1415,7 @@ function updateHeader(){
   const selEl = document.getElementById('pet-select');
   if(data.pets.length){
     selEl.classList.remove('hidden');
-    selEl.innerHTML = data.pets.map(pt => '<option value="'+pt.id+'"'+(pt.id===data.activePetId?' selected':'')+'>🐾 '+esc(pt.name)+'</option>').join('') + '<option value="__add">＋ Add a dog…</option>';
+    selEl.innerHTML = data.pets.map(pt => '<option value="'+pt.id+'"'+(pt.id===data.activePetId?' selected':'')+'>🐾 '+esc(pt.name)+'</option>').join('') + (canManage()?'<option value="__add">＋ Add a dog…</option>':'');
   } else selEl.classList.add('hidden');
 }
 function onPetSelect(v){ if(v === '__add'){ petModal(); updateHeader(); return; } selectPet(v); }
@@ -1400,14 +1467,19 @@ function renderToday(){
   const fed = lastLog('feed'), water = lastLog('water'), potty = lastLog('potty'), walk = lastLog('walk');
   const w = latestWeight();
   let html = '';
+  // shared-access notice
+  if(sharedOwnerUid){
+    const msg = canManage() ? 'full access' : canLog() ? 'you can log daily activity, but can’t change the profile or care records' : 'view-only — you can see everything but can’t make changes';
+    html += '<div class="card" style="border-color:var(--accent-2);background:rgba(45,212,191,.06)"><div style="font-size:13px"><strong>'+esc(SHARE_ACCESS_LABEL[sharedAccess]||'Shared access')+'</strong> to '+(sharedOwnerName?esc(sharedOwnerName)+'’s':'these')+' dogs — '+msg+'.</div></div>';
+  }
   // header summary
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)">':'<div class="logo" style="width:64px;height:64px;font-size:32px">🐾</div>')
     + '<div style="flex:1;min-width:140px"><div style="font-size:20px;font-weight:700">'+esc(p.name)+'</div>'
     + '<div style="font-size:13px;color:var(--text-secondary)">'+[ageStr(p.birthday), p.breed, w?(esc(w.value)+' '+esc(w.unit||'lb')):null].filter(Boolean).map(esc).join(' · ')+'</div></div>'
     + '<button class="btn btn-sm" onclick="switchView(\'profile\')">Profile</button></div>';
-  // quick log
-  html += '<div class="card"><h3 class="section-title">Quick log</h3><div class="quick-grid">'
+  // quick log (hidden for view-only access)
+  if(canLog()) html += '<div class="card"><h3 class="section-title">Quick log</h3><div class="quick-grid">'
     + '<button class="quick-btn" onclick="quickFeed()"><span class="qi">🍖</span>Fed</button>'
     + '<button class="quick-btn" onclick="quickWater()"><span class="qi">💧</span>Water</button>'
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">🚪</span>Potty</button>'
@@ -1451,7 +1523,7 @@ function timelineRow(l){
     +'<div style="flex:1"><div style="font-weight:600;font-size:14px">'+logSummary(l)+'</div>'
     +(l.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic">'+esc(l.notes)+'</div>':'')
     +'<div class="tl-time">'+fmtTime(l.dateTime)+'</div></div>'
-    +'<div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="editLogModal(\''+l.id+'\')">Edit</button><button class="btn btn-sm btn-danger" onclick="delLog(\''+l.id+'\')" title="Delete">×</button></div></div>';
+    +(canLog()?'<div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="editLogModal(\''+l.id+'\')">Edit</button><button class="btn btn-sm btn-danger" onclick="delLog(\''+l.id+'\')" title="Delete">×</button></div>':'')+'</div>';
 }
 // Edit an existing activity log entry (feed / water / potty / walk / weight), pre-filled.
 function editLogModal(id){
@@ -1490,6 +1562,7 @@ function editLogModal(id){
     + '<button class="btn" onclick="closeModal()">Cancel</button></div>');
 }
 function saveEditLog(id){
+  if(denyLog()) return;
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
   if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); }
@@ -1539,7 +1612,7 @@ function renderProfile(){
     + (p.photo?'<img src="'+p.photo+'" class="profile-photo-lg">':'<div class="profile-photo-lg">🐾</div>')
     + '<div style="flex:1;min-width:160px"><div style="font-size:24px;font-weight:700">'+esc(p.name)+'</div>'
     + '<div style="color:var(--text-secondary);font-size:14px;margin-top:2px">'+[p.breed,p.sex,p.color].filter(Boolean).map(esc).join(' · ')+'</div></div>'
-    + '<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">✏️ Edit</button></div>';
+    + (canManage()?'<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">✏️ Edit</button>':'')+'</div>';
   // key facts grid
   const facts = [];
   if(p.birthday) facts.push(['Age', ageStr(p.birthday)+' (born '+fmtDate(p.birthday)+')']);
@@ -1557,7 +1630,7 @@ function renderProfile(){
   if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor?esc(p.vet2Doctor):'', p.vet2Name?esc(p.vet2Name):'', p.vet2Phone?esc(p.vet2Phone):'', p.vet2Email?esc(p.vet2Email):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
-  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button><button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
+  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
   html += '</div>';
   // weight chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
@@ -1572,8 +1645,8 @@ function renderProfile(){
   html += renderContacts();
   // multi-dog management
   html += '<div class="card"><h3 class="section-title">🐕 Your dogs</h3>'
-    + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div><button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button></div>').join('')
-    + '<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button></div>';
+    + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div>'+(canManage()?'<button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button>':'')+'</div>').join('')
+    + (canManage()?'<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button>':'')+'</div>';
   return html;
 }
 function renderHealthTimeline(){
@@ -1602,10 +1675,10 @@ function renderContacts(){
       +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">Call</a>':'')
       +'<button class="btn btn-sm" onclick="downloadVCard(\''+c.id+'\')" title="Download contact card">⬇️ vCard</button>'
       +'<button class="btn btn-sm" onclick="shareVCard(\''+c.id+'\')" title="Share">Share</button>'
-      +'<button class="btn btn-sm" onclick="contactModal(\''+c.id+'\')">Edit</button>'
+      +(canManage()?'<button class="btn btn-sm" onclick="contactModal(\''+c.id+'\')">Edit</button>':'')
       +'</div></div>';
   }).join('');
-  html += '<button class="btn" style="border-style:dashed;margin-top:6px" onclick="contactModal()">+ Add contact</button></div>';
+  html += (canManage()?'<button class="btn" style="border-style:dashed;margin-top:6px" onclick="contactModal()">+ Add contact</button>':'')+'</div>';
   return html;
 }
 
@@ -1728,7 +1801,7 @@ function renderVetTab(){
   const now = todayISO();
   const upcoming = visits.filter(v=>v.date > now), past = visits.filter(v=>v.date <= now);
   const followups = visits.filter(v=>v.followUpDate && v.followUpDate >= now);
-  let html = vetPanel() + '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>';
+  let html = vetPanel() + (canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>':'');
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">📌 Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span>🏥</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
@@ -1740,7 +1813,7 @@ function renderVetTab(){
 }
 function renderGroomTab(){
   const items = petArr('grooming').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
-  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="groomModal()">+ Add grooming</button></div>';
+  let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="groomModal()">+ Add grooming</button></div>':'';
   if(items.length){
     const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
     html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(items[0].date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
@@ -1750,7 +1823,7 @@ function renderGroomTab(){
 }
 function renderMedsTab(){
   const meds = petArr('meds');
-  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="medModal()">+ Add med / preventative</button></div>';
+  let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="medModal()">+ Add med / preventative</button></div>':'';
   if(meds.length){
     html += '<div class="card">'+meds.slice().sort((a,b)=>{const x=untilStr(medNextDue(a)),y=untilStr(medNextDue(b));return (x?x.days:999)-(y?y.days:999);}).map(m=>{
       const nd = medNextDue(m), u = nd?untilStr(nd):null;
@@ -1762,7 +1835,7 @@ function renderMedsTab(){
 }
 function renderIllnessTab(){
   const items = petArr('illnesses').slice().sort((a,b)=>new Date(dateSafe(b.start))-new Date(dateSafe(a.start)));
-  let html = '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>';
+  let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>':'';
   if(items.length){
     html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">🤒</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
@@ -1773,7 +1846,7 @@ function renderIllnessTab(){
 function renderSupplies(){
   if(!activePet()) return emptyState();
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Supplies</h2>';
-  html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="invModal()">+ Add supply purchase</button></div>';
+  if(canManage()) html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="invModal()">+ Add supply purchase</button></div>';
   const all = petArr('inventory');
   const yearStart = new Date().getFullYear()+'-01-01';
   const ytd = all.filter(i=>i.purchaseDate && i.purchaseDate >= yearStart).reduce((s,i)=>s+(num(i.cost)||0),0);

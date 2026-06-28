@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.12.1**
+**Current Version: v0.13.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -55,26 +55,42 @@ covers both.
 1. Deploy `index.html` (served under `/pawprints/`).
 2. Firebase: reuses the Illness Tracker project (`illnesstracker-8d888`) so the Google login
    is shared. Dog data lives in a separate `pawprints/{uid}` Firestore doc.
-3. **Add a Firestore security rule** (Firebase console → Firestore → Rules). The sharing
-   feature (v0.10.0) needs the rule to also grant access to allow-listed collaborator emails,
-   so replace the simple owner-only `pawprints/{uid}` block with:
+3. **Add a Firestore security rule** (Firebase console → Firestore → Rules). Sharing with
+   permission levels (v0.13.0) needs a **read/write split** so "view-only" collaborators truly
+   can't write. Replace the `pawprints/{uid}` block with:
    ```
    match /pawprints/{ownerUid} {
-     allow read, write: if request.auth != null && (
+     allow read: if request.auth != null && (
        request.auth.uid == ownerUid ||
-       (resource != null && resource.data.sharedWith is list
+       (resource != null && request.auth.token.email != null && (
+         (resource.data.sharedWrite is list && request.auth.token.email.lower() in resource.data.sharedWrite) ||
+         (resource.data.sharedRead  is list && request.auth.token.email.lower() in resource.data.sharedRead)
+       ))
+     );
+     allow write: if request.auth != null && (
+       request.auth.uid == ownerUid ||
+       (resource != null && resource.data.sharedWrite is list
          && request.auth.token.email != null
-         && request.auth.token.email.lower() in resource.data.sharedWith)
+         && request.auth.token.email.lower() in resource.data.sharedWrite)
      );
    }
    ```
-   The owner always has access; anyone whose email the owner added to `sharedWith` (via
-   Settings → Sharing) can read/write that owner's doc. Until the rule is added, the app works
-   locally (localStorage); the rule turns on cross-device sync + sharing.
+   The owner always has full access. Collaborators in `sharedWrite` (Full or Sitter/Walker
+   access) can read+write; collaborators in `sharedRead` (View-only) can read but not write.
+   The app derives these two lists from the owner's collaborator settings. Until the rule is
+   added, the app works locally (localStorage); the rule turns on cross-device sync + sharing.
 4. `dev.rizzo.cc` is already an authorized Firebase domain, so sign-in works as-is.
 
 ## Version History
 
+- **v0.13.0** — Sharing roles, permission levels & expiry. When inviting a helper you now set a
+  **relationship** (Family/Partner/Helper/Sitter/Dog walker/Friend/Other), an **access level**, and
+  an optional **end date** (access auto-revokes after it). Three access levels: **Full** (view+edit
+  everything), **Sitter / Walker** (log daily activity, view the rest, can't edit the profile or care
+  records), and **View only** (read everything, change nothing). View-only is hard-enforced by the
+  Firestore rule (new read/write split — see Setup); the sitter/walker restrictions are enforced in
+  the app (edit/add buttons hidden, actions blocked). A banner tells the helper their access level.
+  Legacy collaborators migrate to Full automatically.
 - **v0.12.1** — Edit activity entries. Each row in Today's timeline and the Log tab now has an **Edit**
   button (next to the delete ×) that opens a pre-filled form for that entry — feed/water/potty/walk/
   weight — so you can fix the time, amount, result, etc. without deleting and re-adding.
