@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.18.0**
+**Current Version: v0.18.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.18.1** — Analytics opt-out. Visit with `?noga=1` to stop counting your own visits on that device
+  (stored locally, survives IP changes); `?noga=0` re-enables. Documented in the privacy page. The GA-side
+  alternative is an Internal Traffic filter by IP (Admin → Data settings → Data filters).
 - **v0.18.0** — Privacy page. Added a plain-English `privacy.html` (linked from the footer) covering Google
   sign-in, Firebase storage, optional Calendar and weather lookups, and the anonymous analytics — what's
   collected, what isn't, and how to export or delete it. (No custom 404 page needed — the dev.rizzo.cc site

@@ -187,7 +187,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.18.0';
+const APP_VERSION = 'v0.18.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1639,7 +1639,16 @@ const NAV_LABEL = { today:'Today', log:'Log', profile:'Profile', care:'Care', ca
 let analyticsOn = false;
 function initAnalytics(){
   if(!GA_ID || analyticsOn) return;
-  if(new URLSearchParams(location.search).has('demo')) return; // never track the demo
+  const q = new URLSearchParams(location.search);
+  // Per-device opt-out: visit with ?noga=1 to never count this browser again (?noga=0 re-enables).
+  if(q.has('noga')){
+    try {
+      if(q.get('noga') === '0'){ localStorage.removeItem('pawprints_noga'); showToast('📊 Analytics re-enabled on this device'); }
+      else { localStorage.setItem('pawprints_noga','1'); showToast('🚫 Your visits won’t be counted on this device'); }
+    } catch(e){}
+  }
+  if(localStorage.getItem('pawprints_noga') === '1') return; // opted out on this browser
+  if(q.has('demo')) return; // never track the demo
   const s = document.createElement('script');
   s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
   document.head.appendChild(s);
