@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.2**
+**Current Version: v0.15.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.15.3** — Potty entry separator + smarter poop counting. The timeline now reads
+  "Pee · Backyard · Normal stool" (dot separators instead of run-together words). In Insights, an
+  entry where a **stool was noted counts as a poop** even if it was tagged "Pee" — so the popular-spots
+  and intervals reflect reality (this is why a "Pee + Normal stool" entry showed 0 poops before).
 - **v0.15.2** — Sync-failure warning + privacy + clearer lists. Cloud-save failures (usually a missing
   Firestore rule) are no longer silent — a one-time toast and a persistent Today banner warn that data
   is only on this device, so apparent "missing data" across devices is explained. The ZIP field's
