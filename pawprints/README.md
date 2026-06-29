@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.18.1**
+**Current Version: v0.19.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.19.0** — New icons. Replaced the emoji in the tab bar and the Today quick-log buttons (Fed/Water/
+  Potty/Walk) with clean **Material Symbols (Outlined)** icons, embedded as inline SVG (no font dependency,
+  works offline, follows the theme color). Pulls in the icon's color via `currentColor`, so the active tab
+  still highlights teal.
 - **v0.18.1** — Analytics opt-out. Visit with `?noga=1` to stop counting your own visits on that device
   (stored locally, survives IP changes); `?noga=0` re-enables. Documented in the privacy page. The GA-side
   alternative is an Internal Traffic filter by IP (Admin → Data settings → Data filters).

@@ -54,6 +54,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 var(--border)}
 .nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
 .nav button.active{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}.nav button .nav-icon{font-size:17px}
+.nav-icon{display:inline-flex;align-items:center;justify-content:center}.msi{width:22px;height:22px;display:block;fill:currentColor}
 .content{padding:20px;max-width:860px;margin:0 auto}
 .card{background:var(--bg-card);border-radius:16px;padding:22px;border:1px solid var(--border);margin-bottom:12px}
 .btn{padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}
@@ -84,7 +85,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
 .quick-btn{padding:16px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:transform .15s,border-color .2s}
 .quick-btn:hover{transform:translateY(-2px);border-color:var(--accent)}
-.quick-btn .qi{font-size:26px}
+.quick-btn .qi{font-size:26px;display:flex;align-items:center;justify-content:center;height:28px}.quick-btn .qi .msi{width:27px;height:27px}
 /* Status cards */
 .status-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}
 .status-card{padding:14px;border-radius:13px;background:var(--bg-tertiary);border:1px solid var(--border)}
@@ -152,13 +153,13 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 </div>
 
 <div class="nav" id="nav">
-  <button class="active" data-view="today" onclick="switchView('today')"><span class="nav-icon">☀️</span> Today</button>
-  <button data-view="log" onclick="switchView('log')"><span class="nav-icon">✚</span> Log</button>
-  <button data-view="profile" onclick="switchView('profile')"><span class="nav-icon">🐶</span> Profile</button>
-  <button data-view="care" onclick="switchView('care')"><span class="nav-icon">🩺</span> Care</button>
-  <button data-view="calendar" onclick="switchView('calendar')"><span class="nav-icon">📅</span> Calendar</button>
-  <button data-view="supplies" onclick="switchView('supplies')"><span class="nav-icon">🛒</span> Supplies</button>
-  <button data-view="insights" onclick="switchView('insights')"><span class="nav-icon">📊</span> Insights</button>
+  <button class="active" data-view="today" onclick="switchView('today')"><span class="nav-icon"></span> Today</button>
+  <button data-view="log" onclick="switchView('log')"><span class="nav-icon"></span> Log</button>
+  <button data-view="profile" onclick="switchView('profile')"><span class="nav-icon"></span> Profile</button>
+  <button data-view="care" onclick="switchView('care')"><span class="nav-icon"></span> Care</button>
+  <button data-view="calendar" onclick="switchView('calendar')"><span class="nav-icon"></span> Calendar</button>
+  <button data-view="supplies" onclick="switchView('supplies')"><span class="nav-icon"></span> Supplies</button>
+  <button data-view="insights" onclick="switchView('insights')"><span class="nav-icon"></span> Insights</button>
 </div>
 
 <div class="content">
@@ -187,11 +188,28 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.18.1';
+const APP_VERSION = 'v0.19.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
 const GA_ID = 'G-5R71TRBEQW';
+
+// Material Symbols (Outlined) icons, reproduced as inline SVG (no font dependency, offline,
+// themeable via currentColor). Used for the 7 nav tabs + 4 quick-log buttons.
+const ICONS = {
+  today:    { vb:'0 -960 960 960', d:'M579-381q41-41 41-99t-41-99q-41-41-99-41t-99 41q-41 41-41 99t41 99q41 41 99 41t99-41Zm-240.5 42.5Q280-397 280-480t58.5-141.5Q397-680 480-680t141.5 58.5Q680-563 680-480t-58.5 141.5Q563-280 480-280t-141.5-58.5ZM200-450H40v-60h160v60Zm720 0H760v-60h160v60ZM450-760v-160h60v160h-60Zm0 720v-160h60v160h-60ZM262-658l-100-97 43-44 96 100-39 41Zm494 496-98-100 41-41 99 98-42 43Zm-99-537 98-99 44 42-99 98-43-41ZM162-205l99-98 42 42-98 99-43-43Zm318-275Z' },
+  log:      { vb:'0 -960 960 960', d:'M180-120q-24.75 0-42.37-17.63Q120-155.25 120-180v-600q0-24.75 17.63-42.38Q155.25-840 180-840h205q5-35 32-57.5t63-22.5q36 0 63 22.5t32 57.5h205q24.75 0 42.38 17.62Q840-804.75 840-780v600q0 24.75-17.62 42.37Q804.75-120 780-120H180Zm0-60h600v-600H180v600Zm100-100h273v-60H280v60Zm0-170h400v-60H280v60Zm0-170h400v-60H280v60Zm224.5-187.5Q515-818 515-832t-10.5-24.5Q494-867 480-867t-24.5 10.5Q445-846 445-832t10.5 24.5Q466-797 480-797t24.5-10.5ZM180-180v-600 600Z' },
+  profile:  { vb:'0 -960 960 960', d:'M169.86-485Q132-485 106-511.14t-26-64Q80-613 106.14-639t64-26Q208-665 234-638.86t26 64Q260-537 233.86-511t-64 26ZM291-681.14q-26-26.14-26-64T291.14-809q26.14-26 64-26T419-808.86q26 26.14 26 64T418.86-681q-26.14 26-64 26T291-681.14Zm250 0q-26-26.14-26-64T541.14-809q26.14-26 64-26T669-808.86q26 26.14 26 64T668.86-681q-26.14 26-64 26T541-681.14ZM789.86-485Q752-485 726-511.14t-26-64Q700-613 726.14-639t64-26Q828-665 854-638.86t26 64Q880-537 853.86-511t-64 26ZM266-75q-42 0-69-31.53-27-31.52-27-74.47 0-42 25.5-74.5T250-318q22-22 41-46.5t36-50.5q29-44 65-82t88-38q52 0 88.5 38t65.5 83q17 26 35.5 50t40.5 46q29 30 54.5 62.5T790-181q0 42.95-27 74.47Q736-75 694-75q-54 0-107-9t-107-9q-54 0-107 9t-107 9Z' },
+  care:     { vb:'0 -960 960 960', d:'M540-81q-112 0-186-78.5T280-347v-35q-85-11-142.5-75.71T80-610v-230h120v-40h60v140h-60v-40h-60v169.68q0 71.32 49.5 120.82T310-440q71 0 120.5-49.5T480-610.32V-780h-60v40h-60v-140h60v40h120v230q0 87.58-57.5 152.29T340-382v35q0 85 56.5 145.5T540-141q81 0 140.5-60.15T740-347.23V-424q-35-10-57.5-39T660-530q0-45.83 32.12-77.92 32.12-32.08 78-32.08T848-607.92q32 32.09 32 77.92 0 38-22.5 67T800-424v77q0 111-76.5 188.5T540-81Zm265.5-413.32q14.5-14.33 14.5-35.5 0-21.18-14.32-35.68-14.33-14.5-35.5-14.5-21.18 0-35.68 14.32-14.5 14.33-14.5 35.5 0 21.18 14.32 35.68 14.33 14.5 35.5 14.5 21.18 0 35.68-14.32ZM770-530Z' },
+  calendar: { vb:'0 -960 960 960', d:'M180-80q-24 0-42-18t-18-42v-620q0-24 18-42t42-18h65v-60h65v60h340v-60h65v60h65q24 0 42 18t18 42v620q0 24-18 42t-42 18H180Zm0-60h600v-430H180v430Zm0-490h600v-130H180v130Zm0 0v-130 130Zm300 230q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z' },
+  supplies: { vb:'0 -960 960 960', d:'M180-80q-24.75 0-42.37-17.63Q120-115.25 120-140v-483q-17-6-28.5-21.39T80-680v-140q0-24.75 17.63-42.38Q115.25-880 140-880h680q24.75 0 42.38 17.62Q880-844.75 880-820v140q0 20.22-11.5 35.61T840-623v483q0 24.75-17.62 42.37Q804.75-80 780-80H180Zm0-540v480h600v-480H180Zm-40-60h680v-140H140v140Zm220 260h240v-60H360v60Zm120 40Z' },
+  insights: { vb:'0 0 24 24', d:'M3 20q-.825 0-1.412-.587Q1 18.825 1 18q0-.825.588-1.413Q2.175 16 3 16h.263q.112 0 .237.05l4.55-4.55Q8 11.375 8 11.262V11q0-.825.588-1.413Q9.175 9 10 9t1.413.587Q12 10.175 12 11q0 .05-.05.5l2.55 2.55q.125-.05.238-.05h.524q.113 0 .238.05l3.55-3.55q-.05-.125-.05-.238V10q0-.825.587-1.413Q20.175 8 21 8q.825 0 1.413.587Q23 9.175 23 10q0 .825-.587 1.412Q21.825 12 21 12h-.262q-.113 0-.238-.05l-3.55 3.55q.05.125.05.238V16q0 .825-.587 1.413Q15.825 18 15 18q-.825 0-1.412-.587Q13 16.825 13 16v-.262q0-.113.05-.238l-2.55-2.55q-.125.05-.238.05H10q-.05 0-.5-.05L4.95 17.5q.05.125.05.238V18q0 .825-.588 1.413Q3.825 20 3 20ZM4 9.975l-.625-1.35L2.025 8l1.35-.625L4 6.025l.625 1.35L5.975 8l-1.35.625ZM15 9l-.95-2.05L12 6l2.05-.95L15 3l.95 2.05L18 6l-2.05.95Z' },
+  fed:      { vb:'0 -960 960 960', d:'M285-80v-368q-52-11-88.5-52.5T160-600v-280h60v280h65v-280h60v280h65v-280h60v280q0 58-36.5 99.5T345-448v368h-60Zm415 0v-320H585v-305q0-79 48-127t127-48v800h-60Z' },
+  water:    { vb:'0 -960 960 960', d:'M479-208q16 0 24.5-5.5T512-230q0-11-8.5-17t-25.5-6q-42 0-85.5-26.5T337-373q-2-9-9-14.5t-15-5.5q-11 0-17 8.5t-4 17.5q15 84 71 121.5T479-208Zm-227.5 34Q160-268 160-408q0-100 79.5-217.5T480-880q161 137 240.5 254.5T800-408q0 140-91.5 234T480-80q-137 0-228.5-94ZM666-216.5Q740-293 740-408q0-79-66.5-179.5T480-800Q353-688 286.5-587.5T220-408q0 115 74 191.5T480-140q112 0 186-76.5ZM480-480Z' },
+  potty:    { vb:'0 -960 960 960', d:'M538-80H423v-149H120l189-274h-95l266-377 266 377h-94l188 274H538v149ZM236-289h189-90 290-89 189-489Zm0 0h489L536-563h89L480-769 335-563h90L236-289Z' },
+  walk:     { vb:'0 -960 960 960', d:'m278-40 116-586-101 43v133h-61v-173l192-81q14-6 29.5-7.5T484-710q17 3 29.5 11t20.5 20l42 66q31 48 77.5 75.5T753-510v60q-70-2-123.5-30.5T533-568l-38 152 92 83v293h-60v-240l-108-98-79 338h-62Zm210.5-735.5Q467-797 467-827t21.5-51.5Q510-900 540-900t51.5 21.5Q613-857 613-827t-21.5 51.5Q570-754 540-754t-51.5-21.5Z' },
+};
+function svgIcon(key){ const i = ICONS[key]; if(!i) return ''; return '<svg class="msi" viewBox="'+i.vb+'" fill="currentColor" aria-hidden="true"><path d="'+i.d+'"/></svg>'; }
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1769,10 +1787,10 @@ function renderToday(){
     + '<button class="btn btn-sm" onclick="switchView(\'profile\')">Profile</button></div>';
   // quick log (hidden for view-only access)
   if(canLog()) html += '<div class="card"><h3 class="section-title">Quick log</h3><div class="quick-grid">'
-    + '<button class="quick-btn" onclick="quickFeed()"><span class="qi">🍖</span>Fed</button>'
-    + '<button class="quick-btn" onclick="quickWater()"><span class="qi">💧</span>Water</button>'
-    + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">🚪</span>Potty</button>'
-    + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">🦮</span>Walk</button>'
+    + '<button class="quick-btn" onclick="quickFeed()"><span class="qi">'+svgIcon('fed')+'</span>Fed</button>'
+    + '<button class="quick-btn" onclick="quickWater()"><span class="qi">'+svgIcon('water')+'</span>Water</button>'
+    + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">'+svgIcon('potty')+'</span>Potty</button>'
+    + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">'+svgIcon('walk')+'</span>Walk</button>'
     + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). One tap logs it instantly — no form. The others open a quick form.</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
@@ -2323,6 +2341,7 @@ function exitDemo(){
 // ═══════════════════════════════════════════════
 document.getElementById('app-version').textContent = APP_VERSION;
 document.getElementById('app-version-footer').textContent = APP_VERSION;
+document.querySelectorAll('#nav button').forEach(b => { const s = b.querySelector('.nav-icon'); if(s) s.innerHTML = svgIcon(b.dataset.view); });
 document.title = 'PawPrints ' + APP_VERSION + ' — Feed · Walk · Care';
 loadLocal();
 applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.settings.theme) || currentTheme());
