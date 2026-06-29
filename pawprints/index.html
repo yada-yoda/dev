@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.14.1';
+const APP_VERSION = 'v0.14.2';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -931,7 +931,7 @@ function addLog(entry){
 function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
 // Quick buttons
-function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Water logged'); }
+function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Fresh water given'); }
 // Food choices for the feed form = your Food/Treats from inventory (specific brands first) + the generic types.
 function feedFoodOptions(){
   const inv = petArr('inventory').filter(i => i.category==='Food' || i.category==='Treats').map(i => ((i.brand?i.brand+' ':'')+(i.name||'')).trim()).filter(Boolean);
@@ -1524,11 +1524,11 @@ function renderToday(){
     + '<button class="quick-btn" onclick="quickWater()"><span class="qi">💧</span>Water</button>'
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">🚪</span>Potty</button>'
     + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">🦮</span>Walk</button>'
-    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> logs instantly with one tap — no form. The others open a quick form.</div></div>';
+    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). One tap logs it instantly — no form. The others open a quick form.</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed','🍖',fed?fed.dateTime:null,12)
-    + statusCard('Water','💧',water?water.dateTime:null,null)
+    + statusCard('Water refilled','💧',water?water.dateTime:null,null)
     + statusCard('Last potty','🚪',potty?potty.dateTime:null,8)
     + statusCard('Last walk','🦮',walk?walk.dateTime:null,null)
     + '</div></div>';
@@ -1548,7 +1548,7 @@ function renderToday(){
 const LOG_META = { feed:{i:'🍖',c:'var(--accent)'}, water:{i:'💧',c:'var(--blue)'}, potty:{i:'🚪',c:'var(--accent-2)'}, walk:{i:'🦮',c:'var(--success)'}, weight:{i:'⚖️',c:'var(--accent-purple)'} };
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food')].filter(Boolean).join(' · ');
-  if(l.type==='water') return 'Water refilled';
+  if(l.type==='water') return 'Refilled fresh water';
   if(l.type==='potty') return [esc(l.result||'Potty'), l.place?esc(l.place):'', l.stool?'· '+esc(l.stool)+' stool':''].filter(Boolean).join(' ');
   if(l.type==='walk'){
     let route = '';

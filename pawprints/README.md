@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.14.1**
+**Current Version: v0.14.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.14.2** — Clarified that the **Water** log means *you gave/refilled fresh water* (not the dog
+  drinking): status card now reads "Water refilled", the toast says "Fresh water given", the timeline
+  entry reads "Refilled fresh water", and the Today note spells it out.
 - **v0.14.1** — Mobile fix: Contact cards no longer crowd. The name/details and the action buttons
   (Call / vCard / Share / Edit) now stack — full-width text on top, buttons wrapping on their own row
   below — instead of the buttons floating over a one-word-per-line name on narrow screens.
