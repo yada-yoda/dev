@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.25.3**
+**Current Version: v0.26.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.26.0** — Supply lifecycle (started/finished). Supplies now have **Started** and **Finished** date
+  fields (like the Usage tracker): an item with no start date is on-hand **Inventory**, setting a start date
+  marks it **In use**, and a finish date marks it **Finished**. Each item shows its status badge and dates,
+  and the spreadsheet export includes the new columns.
 - **v0.25.3** — Pre-tax cost labels. The Cost fields on supplies, vet visits, and grooming are now labeled
   **"Cost (pre-tax)"** (with a tip) so spending totals stay consistent.
 - **v0.25.2** — UPC field on supplies. The add/edit supply form now has a **UPC / barcode** field, so you can
