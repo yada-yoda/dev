@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.23.0**
+**Current Version: v0.24.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.24.0** — Better weather (NWS). Current conditions + the hourly forecast now come from the **U.S.
+  National Weather Service** (api.weather.gov), which is station-backed and more accurate for "right now"
+  than a model — fixing cases where it showed rain on a clear day. Open-Meteo is kept as an automatic
+  fallback (and still powers historical backfill, which NWS doesn't offer). The weather panel now shows the
+  condition + precip chance and notes its source; new walk/potty entries use NWS too.
 - **v0.23.0** — Reminders in the header + potty "Home" tied to your ZIP. The reminders that used to live only
   on the Today tab now also have a **bell pill in the top toolbar** (with a count, red if anything's overdue)
   that opens a panel from any tab — meds due, vet follow-ups, grooming due, low supplies. The potty

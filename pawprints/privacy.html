@@ -101,9 +101,10 @@ footer{border-top:1px solid var(--border);margin-top:36px;padding-top:18px;text-
     <p>If you set a <strong>home ZIP code</strong>, PawPrints records the weather on walks and on potty
     breaks logged at home. To do that it sends that ZIP (and the
     latitude/longitude it resolves to) to <a href="https://www.zippopotam.us/" rel="noopener">zippopotam.us</a>
-    and <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> to look up the weather. Only location
-    coordinates are sent — never your name, your dog, or anything identifying. If you don't set a ZIP, no
-    weather lookups happen.</p>
+    (ZIP → coordinates) and to the <a href="https://www.weather.gov/" rel="noopener">U.S. National Weather
+    Service</a> (api.weather.gov), with <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> as a
+    fallback and for historical lookups. Only location coordinates are sent — never your name, your dog, or
+    anything identifying. If you don't set a ZIP, no weather lookups happen.</p>
   </div>
 
   <h2>Analytics</h2>

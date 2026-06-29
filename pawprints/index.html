@@ -204,7 +204,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.23.0';
+const APP_VERSION = 'v0.24.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1181,30 +1181,74 @@ async function fetchWalkWeather(logId){
   const zip = (data.settings.homeZip||'').trim(); if(!zip) return;
   try {
     const geo = await geocodeZip(zip);
-    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lon+'&temperature_unit=fahrenheit&current=temperature_2m,weather_code');
-    const j = await r.json(); const cur = j.current; if(!cur) return;
-    const w = weatherFromCode(cur.weather_code);
+    const b = await fetchWxBundle(geo);
     const log = data.logs.find(l => l.id === logId); if(!log) return;
-    log.weather = { tempF:Math.round(cur.temperature_2m), code:cur.weather_code, label:w.label, emoji:w.emoji, place:geo.name };
+    log.weather = { tempF:b.current.tempF, label:b.current.label, emoji:b.current.emoji, place:geo.name, source:b.source };
     save(false);
     if(currentView==='today' || currentView==='log' || currentView==='activity') render();
   } catch(e){ /* weather is optional — silently skip */ }
 }
-// ── Header weather pill (current + hour-by-hour for the home ZIP, via Open-Meteo) ──
+// ── Weather (current + hourly). Primary source: NWS / api.weather.gov (US, station-backed,
+// more accurate "right now" than a model). Falls back to Open-Meteo if NWS errors or is
+// outside the US. Historical backfill still uses Open-Meteo (NWS has no past data). ──
 let headerWeather = null;
+// Map an NWS icon URL (…/icons/land/day/sct…) + shortForecast to an emoji + label.
+function weatherFromNWS(iconUrl, shortForecast){
+  let tok = '';
+  const m = String(iconUrl||'').match(/\/icons\/land\/(day|night)\/([a-z_]+)/i);
+  if(m) tok = m[2].toLowerCase().replace(/^wind_/, '');
+  const night = /\/night\//.test(iconUrl||'');
+  const M = { skc: night?'🌙':'☀️', few: night?'🌙':'🌤️', sct:'⛅', bkn:'☁️', ovc:'☁️',
+    rain:'🌧️', rain_showers:'🌦️', rain_showers_hi:'🌦️', rain_fzra:'🌧️', fzra:'🌧️',
+    tsra:'⛈️', tsra_sct:'⛈️', tsra_hi:'⛈️', snow:'❄️', blizzard:'❄️', cold:'❄️',
+    snow_fzra:'🌨️', snow_sleet:'🌨️', sleet:'🌨️', rain_snow:'🌨️', rain_sleet:'🌨️',
+    fog:'🌫️', haze:'🌫️', smoke:'🌫️', dust:'🌫️', hot:'🌡️', wind:'💨' };
+  return { emoji: M[tok] || '🌡️', label: shortForecast || '' };
+}
+const nwsCache = {};
+async function nwsHourlyPeriods(lat, lon){
+  const key = (+lat).toFixed(4)+','+(+lon).toFixed(4);
+  if(!nwsCache[key]){
+    const p = await fetch('https://api.weather.gov/points/'+key, { headers:{ Accept:'application/geo+json' } });
+    if(!p.ok) throw new Error('nws points '+p.status);
+    const pj = await p.json();
+    const url = pj.properties && pj.properties.forecastHourly;
+    if(!url) throw new Error('nws no hourly');
+    nwsCache[key] = url;
+  }
+  const h = await fetch(nwsCache[key], { headers:{ Accept:'application/geo+json' } });
+  if(!h.ok) throw new Error('nws hourly '+h.status);
+  const hj = await h.json();
+  return (hj.properties && hj.properties.periods) || [];
+}
+async function nwsBundle(geo){
+  const periods = await nwsHourlyPeriods(geo.lat, geo.lon);
+  if(!periods.length) throw new Error('nws empty');
+  const now = periods[0], cw = weatherFromNWS(now.icon, now.shortForecast);
+  const hourly = periods.slice(0,12).map(p => { const w = weatherFromNWS(p.icon, p.shortForecast); return { t:p.startTime, tempF:Math.round(p.temperature), emoji:w.emoji, pop:(p.probabilityOfPrecipitation||{}).value }; });
+  return { current:{ tempF:Math.round(now.temperature), label:cw.label, emoji:cw.emoji, pop:(now.probabilityOfPrecipitation||{}).value }, hourly, source:'NWS' };
+}
+async function openMeteoBundle(geo){
+  const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lon+'&temperature_unit=fahrenheit&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code,precipitation_probability&forecast_days=2&timezone=auto');
+  const j = await r.json(); const cur = j.current; if(!cur) throw new Error('om current');
+  const cw = weatherFromCode(cur.weather_code);
+  const times = (j.hourly&&j.hourly.time)||[], temps = (j.hourly&&j.hourly.temperature_2m)||[], codes = (j.hourly&&j.hourly.weather_code)||[], pops = (j.hourly&&j.hourly.precipitation_probability)||[];
+  const nowMs = Date.now(); let start = 0;
+  for(let i=0;i<times.length;i++){ if(new Date(times[i]).getTime() >= nowMs - 3600000){ start = i; break; } }
+  const hourly = [];
+  for(let i=start;i<times.length && hourly.length<12;i++){ const w = weatherFromCode(codes[i]); hourly.push({ t:times[i], tempF:Math.round(temps[i]), emoji:w.emoji, pop:pops[i] }); }
+  return { current:{ tempF:Math.round(cur.temperature_2m), label:cw.label, emoji:cw.emoji, pop:null }, hourly, source:'Open-Meteo' };
+}
+async function fetchWxBundle(geo){
+  try { return await nwsBundle(geo); }
+  catch(e){ return await openMeteoBundle(geo); }
+}
 async function fetchHeaderWeather(){
   const zip = (data.settings && (data.settings.homeZip||'').trim()); if(!zip) return;
   try {
     const geo = await geocodeZip(zip);
-    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lon+'&temperature_unit=fahrenheit&current=temperature_2m,weather_code,apparent_temperature&hourly=temperature_2m,weather_code&forecast_days=2&timezone=auto');
-    const j = await r.json(); const cur = j.current; if(!cur) return;
-    const cw = weatherFromCode(cur.weather_code);
-    const times = (j.hourly&&j.hourly.time)||[], temps = (j.hourly&&j.hourly.temperature_2m)||[], codes = (j.hourly&&j.hourly.weather_code)||[];
-    const nowMs = Date.now(); let start = 0;
-    for(let i=0;i<times.length;i++){ if(new Date(times[i]).getTime() >= nowMs - 3600000){ start = i; break; } }
-    const hourly = [];
-    for(let i=start;i<times.length && hourly.length<12;i++){ const w = weatherFromCode(codes[i]); hourly.push({ t:times[i], tempF:Math.round(temps[i]), emoji:w.emoji }); }
-    headerWeather = { tempF:Math.round(cur.temperature_2m), feelsF:Math.round(cur.apparent_temperature), label:cw.label, emoji:cw.emoji, place:geo.name, hourly, ts:Date.now() };
+    const b = await fetchWxBundle(geo);
+    headerWeather = { tempF:b.current.tempF, label:b.current.label, emoji:b.current.emoji, pop:b.current.pop, place:geo.name, source:b.source, hourly:b.hourly, ts:Date.now() };
     updateWeatherPill();
     const panel = document.getElementById('weather-panel');
     if(panel && !panel.classList.contains('hidden')) renderWeatherPanel();
@@ -1222,8 +1266,10 @@ function renderWeatherPanel(){
   const w = headerWeather;
   if(!w){ panel.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">Set a home ZIP in Settings → Lists &amp; preferences to see weather.</div>'; return; }
   const fmtHour = t => { const d = new Date(t); let h = d.getHours(); const ap = h>=12?'PM':'AM'; h = h%12||12; return h+' '+ap; };
-  panel.innerHTML = '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+esc(w.label)+' · feels '+w.feelsF+'°</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
-    + '<div class="wx-hourly">'+w.hourly.map(h=>'<div class="wx-cell"><div class="wx-h-time">'+fmtHour(h.t)+'</div><div class="wx-h-emoji">'+h.emoji+'</div><div class="wx-h-temp">'+h.tempF+'°</div></div>').join('')+'</div>';
+  const sub = [esc(w.label), (w.pop!=null && w.pop>0)?(w.pop+'% precip'):''].filter(Boolean).join(' · ');
+  panel.innerHTML = '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+sub+'</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
+    + '<div class="wx-hourly">'+w.hourly.map(h=>'<div class="wx-cell"><div class="wx-h-time">'+fmtHour(h.t)+'</div><div class="wx-h-emoji">'+h.emoji+'</div><div class="wx-h-temp">'+h.tempF+'°</div>'+((h.pop!=null&&h.pop>0)?'<div class="wx-h-time" style="color:var(--blue)">'+h.pop+'%</div>':'')+'</div>').join('')+'</div>'
+    + (w.source?'<div style="font-size:10px;color:var(--text-secondary);text-align:right;margin-top:8px">via '+esc(w.source)+'</div>':'');
 }
 function toggleWeatherPanel(ev){
   if(ev) ev.stopPropagation();
