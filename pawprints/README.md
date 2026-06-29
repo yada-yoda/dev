@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.25.2**
+**Current Version: v0.25.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.25.3** — Pre-tax cost labels. The Cost fields on supplies, vet visits, and grooming are now labeled
+  **"Cost (pre-tax)"** (with a tip) so spending totals stay consistent.
 - **v0.25.2** — UPC field on supplies. The add/edit supply form now has a **UPC / barcode** field, so you can
   record a product's barcode for easy re-ordering. It's included in the spreadsheet export.
 - **v0.25.1** — Grooming supplies category. Added a **Grooming** category to the Supplies dropdown (Food ·
