@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.0**
+**Current Version: v0.15.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.15.1** — Insights: Potty breakdown now lists the dog's **popular spots** ranked by visits, each
+  split into pee (💧) and poop (💩) counts.
 - **v0.15.0** — Custom lists, food location, walk favorites & weather, potty intervals. **Settings →
   Lists & preferences** lets you add **custom Potty and Food locations**, a **home ZIP** (for weather),
   and manage **favorite walk routes**. The feed form gained a **Where** dropdown. The walk form shows
