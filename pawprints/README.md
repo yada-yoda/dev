@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.3**
+**Current Version: v0.15.4**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.15.4** — Clearer potty title + stool only when relevant. The timeline now separates the potty
+  type from the rest with an em-dash ("Pee — Backyard · Normal stool"). The **Stool** dropdown only
+  appears when the result is **Poop** or **Both** (hidden for Pee/Nothing, and cleared if you switch
+  away), so you can't accidentally tag a pee with a stool.
 - **v0.15.3** — Potty entry separator + smarter poop counting. The timeline now reads
   "Pee · Backyard · Normal stool" (dot separators instead of run-together words). In Insights, an
   entry where a **stool was noted counts as a poop** even if it was tagged "Pee" — so the popular-spots

@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.15.3';
+const APP_VERSION = 'v0.15.4';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1027,11 +1027,20 @@ function quickPotty(){
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🚪 Potty break</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
-    +'<div class="grid-2"><div><label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select></div>'
-    +'<div><label class="label">Stool (if any)</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div></div>'
+    +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'q\')">'+esc(r)+'</button>').join('')+'</div>'
+    +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
+    +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
+}
+// Show the stool dropdown only when the potty result includes poop (Poop or Both); clear it otherwise.
+function updateStoolVisibility(prefix){
+  const active = document.querySelector('#'+prefix+'-potty-tags .tag.active');
+  const r = active ? active.dataset.pr : '';
+  const wrap = document.getElementById(prefix+'-stool-wrap');
+  const show = (r === 'Poop' || r === 'Both');
+  if(wrap) wrap.style.display = show ? '' : 'none';
+  if(!show){ const s = document.getElementById(prefix+'-stool'); if(s) s.value = ''; }
 }
 function savePotty(){
   const result = document.querySelector('#q-potty-tags .tag.active')?.dataset.pr || 'Pee';
@@ -1678,7 +1687,7 @@ const LOG_META = { feed:{i:'🍖',c:'var(--accent)'}, water:{i:'💧',c:'var(--b
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water';
-  if(l.type==='potty') return [esc(l.result||'Potty'), l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':''].filter(Boolean).join(' · ');
+  if(l.type==='potty'){ const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':''].filter(Boolean); return esc(l.result||'Potty') + (rest.length ? ' — ' + rest.join(' · ') : ''); }
   if(l.type==='walk'){
     let route = '';
     if(l.from || l.to) route = [esc(l.from), esc(l.to)].filter(Boolean).join(l.roundTrip ? ' ↔ ' : ' → ') + (l.roundTrip && !(l.from && l.to) ? ' (round trip)' : '');
@@ -1713,9 +1722,9 @@ function editLogModal(id){
     title = '💧 Edit water';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
-    body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
-      + '<div class="grid-2"><div><label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select></div>'
-      + '<div><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div></div>';
+    body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
+      + '<label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select>'
+      + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
     body += '<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="e-dur" value="'+esc(l.durationMin||'')+'"></div>'
