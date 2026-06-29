@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.17.0**
+**Current Version: v0.17.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.17.1** — Analytics turned on. Set the dedicated GA4 measurement ID (`G-5R71TRBEQW`), so anonymous
+  pageview + per-tab tracking is now live (still skipped in demo mode, still no personal data).
 - **v0.17.0** — Optional Google Analytics. Added anonymous, privacy-respecting GA4 support: a single
   `GA_ID` constant near the top of `index.html` turns it on (paste your dedicated property's
   `G-XXXXXXXXXX`; empty = fully off). When set, it records a pageview plus a virtual pageview each time
