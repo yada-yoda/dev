@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.5**
+**Current Version: v0.16.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.16.0** — Sticky tab bar + backfill past walk weather. The tab menu bar now **stays pinned to the
+  top** as you scroll. New in **Settings → Lists & preferences**: once a home ZIP is set, a **"Add
+  weather to past Home walks"** button looks up the *historical* weather (closest hour) for any past
+  walk whose From or To is "Home" but has no weather yet — so older walks get the same temp/condition
+  the new ones record automatically.
 - **v0.15.5** — Smoother Settings saves. Saving a ZIP, custom location, or walk favorite (and adding/
   removing a shared person) no longer re-opens the whole Settings panel with a flash — only that
   section updates in place, the modal stays open, and your scroll position is kept. Adding a custom

@@ -51,7 +51,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .header h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}.header .sub{font-size:12px;color:var(--text-secondary)}
 .header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pet-select{appearance:none;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-family:inherit;padding:8px 30px 8px 12px;border-radius:10px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-.nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto}
+.nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 var(--border)}
 .nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
 .nav button.active{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}.nav button .nav-icon{font-size:17px}
 .content{padding:20px;max-width:860px;margin:0 auto}
@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.15.5';
+const APP_VERSION = 'v0.16.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -645,7 +645,12 @@ function refreshSettingsSection(id, htmlFn, focusId){
 function settingsListsHTML(){
   const s = data.settings || {};
   let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
-  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
+  h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
+  if((s.homeZip||'').trim()){
+    const pastHomeWalks = (data.logs||[]).filter(l => l.type==='walk' && !l.weather && l.dateTime && isHomeWalk(l)).length;
+    h += '<button class="btn" style="margin-bottom:14px"'+(pastHomeWalks?'':' disabled')+' onclick="backfillWalkWeather()">🌤️ Add weather to past Home walks'+(pastHomeWalks?' ('+pastHomeWalks+')':'')+'</button>';
+    h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Looks up historical weather for walks whose From or To is "Home" but don\'t have weather yet.</div>';
+  }
   h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The two lists below customize the <strong>"Where" dropdowns</strong> you choose from while logging. Built-in options are always there — add your own here for spots you use often.</div>';
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
   h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a feeding (e.g. kitchen, crate).');
@@ -1121,6 +1126,39 @@ async function fetchWalkWeather(logId){
     save(false);
     if(currentView==='today' || currentView==='log' || currentView==='activity') render();
   } catch(e){ /* weather is optional — silently skip */ }
+}
+// A walk counts as a "home" walk for backfill if its From or To is "Home".
+function isHomeWalk(l){ const h = s => String(s||'').trim().toLowerCase() === 'home'; return h(l.from) || h(l.to); }
+// Fetch the *historical* weather for a past walk (closest hour) using the home ZIP location.
+async function fetchWalkWeatherFor(log){
+  const zip = (data.settings.homeZip||'').trim(); if(!zip || !log.dateTime) return false;
+  const geo = await geocodeZip(zip);
+  const date = log.dateTime.slice(0,10);
+  const targetMs = new Date(log.dateTime).getTime();
+  const daysAgo = (Date.now() - targetMs) / 86400000;
+  // Forecast API serves the last ~92 days with no delay; the archive API covers older dates.
+  const base = daysAgo > 90 ? 'https://archive-api.open-meteo.com/v1/archive' : 'https://api.open-meteo.com/v1/forecast';
+  const r = await fetch(base+'?latitude='+geo.lat+'&longitude='+geo.lon+'&hourly=temperature_2m,weather_code&temperature_unit=fahrenheit&timezone=auto&start_date='+date+'&end_date='+date);
+  const j = await r.json();
+  const times = j.hourly && j.hourly.time; if(!times || !times.length) return false;
+  let bi = 0, bd = Infinity;
+  for(let i=0;i<times.length;i++){ const d = Math.abs(new Date(times[i]).getTime() - targetMs); if(d < bd){ bd = d; bi = i; } }
+  const code = j.hourly.weather_code[bi], w = weatherFromCode(code);
+  log.weather = { tempF:Math.round(j.hourly.temperature_2m[bi]), code, label:w.label, emoji:w.emoji, place:geo.name, historical:true };
+  return true;
+}
+// Backfill weather on past Home walks that don't have it yet.
+async function backfillWalkWeather(){
+  if(denyLog()) return;
+  if(!(data.settings && (data.settings.homeZip||'').trim())){ showToast('⚠️ Set a home ZIP first'); return; }
+  const targets = (data.logs||[]).filter(l => l.type==='walk' && !l.weather && l.dateTime && isHomeWalk(l));
+  if(!targets.length){ showToast('No past Home walks need weather'); return; }
+  showToast('🌤️ Fetching weather for '+targets.length+' walk'+(targets.length===1?'':'s')+'…');
+  let ok = 0;
+  for(const l of targets){ try { if(await fetchWalkWeatherFor(l)) ok++; } catch(e){ /* skip this one */ } }
+  if(ok){ save(false); render(); }
+  if(document.getElementById('settings-lists')) refreshSettingsSection('settings-lists', settingsListsHTML);
+  showToast(ok ? '🌤️ Added weather to '+ok+' walk'+(ok===1?'':'s') : '⚠️ Couldn’t fetch weather — try again later');
 }
 function quickWeight(){
   if(denyLog()) return;
