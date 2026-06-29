@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.13.1**
+**Current Version: v0.14.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.14.0** — Vet appointment times. Vet visits now take an optional **time** (and follow-up time)
+  — works for past or future appointments. When a time is set, the **Google Calendar** sync and
+  **.ics** export create a **timed 1-hour event** instead of an all-day one, and the time shows on the
+  vet card, the calendar's Upcoming list, and in the PDF / spreadsheet exports.
 - **v0.13.1** — All-activity page. Today's activity card now has a **"View all activity by day →"**
   button (and the Log tab has an "All activity by day" link) opening a full sub-page of every
   activity entry grouped by day (Today / Yesterday / dates), newest first, with a per-day type

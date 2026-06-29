@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.13.1';
+const APP_VERSION = 'v0.14.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -247,6 +247,8 @@ const esc = (s) => { if (s === 0) return '0'; if (!s && s !== 0) return ''; if (
 const fmtDate = (d) => d ? new Date(dateSafe(d)).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' }) : '—';
 const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : '—';
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '—';
+// "14:30" → "2:30 PM" (for time-only fields like appointment time)
+function fmtClock(t){ if(!t) return ''; const parts = String(t).split(':'); const h = parseInt(parts[0],10), m = parseInt(parts[1]||'0',10); if(isNaN(h)) return t; const ap = h>=12?'PM':'AM'; return (((h+11)%12)+1)+':'+String(isNaN(m)?0:m).padStart(2,'0')+' '+ap; }
 const money = (n) => { const v = parseFloat(n); return isNaN(v) ? '' : '$' + v.toFixed(2); };
 const num = (n) => { const v = parseFloat(n); return isNaN(v) ? null : v; };
 // Treat a bare YYYY-MM-DD as local noon so it doesn't shift a day across timezones
@@ -685,7 +687,7 @@ async function exportXLSX(){
     data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,p.originLocation,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
-  add('Vet Visits', ['Dog','Date','Reason','Vet','Clinic','Weight','Cost','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,v.reason,v.vet,v.clinic,v.weight,v.cost,v.followUpDate,v.notes].map(clean)));
+  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Weight','Cost','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.weight,v.cost,(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Services','Groomer','Cost','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.services||[]).join(', '),g.groomer,g.cost,g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
@@ -742,7 +744,7 @@ async function exportPDF(){
     if(W.length){ y = heading('Weight history', y); y = table(['Date','Weight','Recorded'], W.map(l=>[fmtDate(l.dateTime), l.value+' '+(l.unit||'lb'), (l.source && l.source!=='manual')?'At vet visit':'Manual']), y); }
 
     const vets = recordsFor('vetVisits', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, v.followUpDate?fmtDate(v.followUpDate):dash, v.notes||'']), y); }
+    if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date)+(v.time?' '+fmtClock(v.time):''), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, v.followUpDate?(fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):'')):dash, v.notes||'']), y); }
 
     const grm = recordsFor('grooming', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(grm.length){ y = heading('Grooming', y); y = table(['Date','Services','Groomer','Cost','Next due'], grm.map(g=>[fmtDate(g.date), (g.services||[]).join(', ')||dash, g.groomer||dash, g.cost?money(g.cost):dash, g.nextDueDate?fmtDate(g.nextDueDate):dash]), y); }
@@ -998,12 +1000,14 @@ function vetModal(id){
   const unit = activePet()?.weightUnit || 'lb';
   openModal('<h3>🏥 '+(v?'Edit vet visit':'Vet visit')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
-    +'<div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div></div>'
+    +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
     +'<div class="grid-2"><div><label class="label">Vet</label><input class="input" id="vt-vet" value="'+(v?esc(v.vet||''):'')+'" placeholder="Dr. Lee"></div>'
     +'<div><label class="label">Clinic</label><input class="input" id="vt-clinic" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div>'
-    +'<div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
+    +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div>'
+    +'<div><label class="label">Follow-up time (optional)</label><input class="input" type="time" id="vt-followtime" value="'+(v?esc(v.followUpTime||''):'')+'"></div></div>'
     +'<label class="label">Notes / Diagnosis / Meds prescribed</label><textarea class="textarea" id="vt-notes" rows="3">'+(v?esc(v.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
     +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
@@ -1012,7 +1016,7 @@ function vetModal(id){
 function saveVet(id){
   if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
-  const f = { date:fv('vt-date'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), notes:fv('vt-notes') };
+  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes') };
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
   else { visitId = genId(); data.vetVisits.unshift({ id:visitId, petId:data.activePetId, ...f }); }
@@ -1233,8 +1237,8 @@ async function shareDogCard(){
 function calendarEvents(){
   const p = activePet(); if(!p) return [];
   const dn = p.name, ev = [];
-  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, icon:'🏥', type:'Vet', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
-    if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
+  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
+    if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
   petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, icon:'✂️', type:'Grooming', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
@@ -1367,7 +1371,16 @@ async function syncToGoogleCalendar(){
   data.gcalEvents = data.gcalEvents || {};
   for(const e of events){
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const body = { summary:e.title, description:(e.desc||'')+'\n\n— via PawPrints', start:{ date:e.date }, end:{ date:e.date }, transparency:'transparent' };
+    let body;
+    if(e.time){
+      // Timed event: 1-hour block at the given time.
+      const startISO = e.date + 'T' + (e.time.length===5 ? e.time+':00' : e.time);
+      const endDt = new Date(new Date(startISO).getTime() + 60*60000);
+      const endISO = `${endDt.getFullYear()}-${pad(endDt.getMonth()+1)}-${pad(endDt.getDate())}T${pad(endDt.getHours())}:${pad(endDt.getMinutes())}:00`;
+      body = { summary:e.title, description:(e.desc||'')+'\n\n— via PawPrints', start:{ dateTime:startISO, timeZone:tz }, end:{ dateTime:endISO, timeZone:tz } };
+    } else {
+      body = { summary:e.title, description:(e.desc||'')+'\n\n— via PawPrints', start:{ date:e.date }, end:{ date:e.date }, transparency:'transparent' };
+    }
     const existing = data.gcalEvents[e.key];
     try {
       let r;
@@ -1385,7 +1398,11 @@ function exportICS(){
   const events = calendarEvents();
   if(!events.length){ showToast('No dated events to export'); return; }
   const stamp = (s)=> (s||todayISO()).replace(/-/g,'');
-  const body = events.map(e => 'BEGIN:VEVENT\r\nUID:'+e.key.replace(/[^a-z0-9]/gi,'')+'@pawprints\r\nDTSTART;VALUE=DATE:'+stamp(e.date)+'\r\nSUMMARY:'+(e.title.replace(/[\n,;]/g,' '))+'\r\nDESCRIPTION:'+((e.desc||'').replace(/\r?\n/g,'\\n'))+'\r\nEND:VEVENT').join('\r\n');
+  const dtstart = (e) => {
+    if(e.time){ const hm = (e.time.length===5 ? e.time+':00' : e.time).replace(/:/g,''); return 'DTSTART:'+stamp(e.date)+'T'+hm; }
+    return 'DTSTART;VALUE=DATE:'+stamp(e.date);
+  };
+  const body = events.map(e => 'BEGIN:VEVENT\r\nUID:'+e.key.replace(/[^a-z0-9]/gi,'')+'@pawprints\r\n'+dtstart(e)+'\r\nSUMMARY:'+(e.title.replace(/[\n,;]/g,' '))+'\r\nDESCRIPTION:'+((e.desc||'').replace(/\r?\n/g,'\\n'))+'\r\nEND:VEVENT').join('\r\n');
   dl(new Blob(['BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//PawPrints//EN\r\nCALSCALE:GREGORIAN\r\n'+body+'\r\nEND:VCALENDAR'],{type:'text/calendar'}), safeName(activePet()?activePet().name:'pawprints')+'-schedule.ics');
   showToast('📅 .ics downloaded');
 }
@@ -1787,7 +1804,7 @@ function renderCalendar(){
   const upcoming = events.filter(e => (e.date||'').slice(0,10) >= todayK).slice(0,12);
   html += '<div class="card"><h3 class="section-title">Upcoming</h3>';
   if(!upcoming.length) html += '<p style="color:var(--text-secondary);font-size:14px">Nothing scheduled. Add a vet visit, grooming, or med to populate the calendar.</p>';
-  else html += upcoming.map(e=>'<div class="entry-row clickable" onclick="'+e.open+'"><div><div style="font-weight:600;font-size:14px">'+e.icon+' '+esc(e.title.replace(/^.\s/,''))+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(e.type)+'</div></div><div class="tl-time">'+fmtDate(e.date)+'</div></div>').join('');
+  else html += upcoming.map(e=>'<div class="entry-row clickable" onclick="'+e.open+'"><div><div style="font-weight:600;font-size:14px">'+e.icon+' '+esc(e.title.replace(/^.\s/,''))+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(e.type)+(e.time?' · '+fmtClock(e.time):'')+'</div></div><div class="tl-time">'+fmtDate(e.date)+(e.time?'<br>'+fmtClock(e.time):'')+'</div></div>').join('');
   html += '</div>';
   return html;
 }
@@ -1830,7 +1847,7 @@ function renderVetTab(){
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">📌 Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span>🏥</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
-  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):''].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
+  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):''].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
   if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
   if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
   if(!visits.length) html += '<div class="card empty"><div class="ico">🏥</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
