@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.20.0**
+**Current Version: v0.21.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.21.0** — Potty weather. Potty breaks are now assumed to be at home, so each one records the current
+  weather (from your home ZIP) just like walks. A new **Location** dropdown on the potty form (Home / Other)
+  lets you mark a break as away — no weather is saved then. Weather shows in the potty entry, and the
+  Settings backfill button now fills past **walks and potty breaks** at home (was walks only).
 - **v0.20.0** — Icons everywhere. Finished the Material Symbols sweep across all the remaining tabs:
   section headings (Reminders, Weight trend, Health timeline, Your dogs, Contacts, Google Calendar,
   Follow-ups, Restock list, Spending, Potty breakdown), the Care sub-tabs (Vet/Grooming/Meds/Illness),

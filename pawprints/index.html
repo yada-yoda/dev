@@ -188,7 +188,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.20.0';
+const APP_VERSION = 'v0.21.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -690,9 +690,9 @@ function settingsListsHTML(){
   let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
   h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
   if((s.homeZip||'').trim()){
-    const pastHomeWalks = (data.logs||[]).filter(l => l.type==='walk' && !l.weather && l.dateTime && isHomeWalk(l)).length;
-    h += '<button class="btn" style="margin-bottom:14px"'+(pastHomeWalks?'':' disabled')+' onclick="backfillWalkWeather()">🌤️ Add weather to past Home walks'+(pastHomeWalks?' ('+pastHomeWalks+')':'')+'</button>';
-    h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Looks up historical weather for walks whose From or To is "Home" but don\'t have weather yet.</div>';
+    const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
+    h += '<button class="btn" style="margin-bottom:14px"'+(pastHomeEntries?'':' disabled')+' onclick="backfillWalkWeather()">🌤️ Add weather to past Home walks &amp; potty'+(pastHomeEntries?' ('+pastHomeEntries+')':'')+'</button>';
+    h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Looks up historical weather for walks whose From or To is "Home" and potty breaks at home that don\'t have weather yet.</div>';
   }
   h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The two lists below customize the <strong>"Where" dropdowns</strong> you choose from while logging. Built-in options are always there — add your own here for spots you use often.</div>';
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
@@ -1084,6 +1084,7 @@ function quickPotty(){
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'q\')">'+esc(r)+'</button>').join('')+'</div>'
     +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
+    +'<label class="label">Location'+tip('Potty breaks are assumed to be at home, so the current weather (from your home ZIP) is saved with them. Pick Other if you were away — no weather is recorded then.')+'</label><select class="select" id="q-loc"><option value="home" selected>Home</option><option value="other">Other (away)</option></select>'
     +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
@@ -1099,8 +1100,10 @@ function updateStoolVisibility(prefix){
 }
 function savePotty(){
   const result = document.querySelector('#q-potty-tags .tag.active')?.dataset.pr || 'Pee';
-  addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), notes:fv('q-note') });
+  const atHome = (fv('q-loc') || 'home') !== 'other';
+  const id = addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), location:atHome?'home':'other', notes:fv('q-note') });
   closeModal(); showToast('🚪 Potty logged');
+  if(id && atHome && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
 }
 function quickWalk(){
   if(denyLog()) return;
@@ -1172,6 +1175,8 @@ async function fetchWalkWeather(logId){
 }
 // A walk counts as a "home" walk for backfill if its From or To is "Home".
 function isHomeWalk(l){ const h = s => String(s||'').trim().toLowerCase() === 'home'; return h(l.from) || h(l.to); }
+// A log qualifies for home-weather backfill: walks From/To Home, and potty breaks at home (default).
+function isHomeEntry(l){ if(l.type==='walk') return isHomeWalk(l); if(l.type==='potty') return (l.location||'home') !== 'other'; return false; }
 // Fetch the *historical* weather for a past walk (closest hour) using the home ZIP location.
 async function fetchWalkWeatherFor(log){
   const zip = (data.settings.homeZip||'').trim(); if(!zip || !log.dateTime) return false;
@@ -1194,14 +1199,14 @@ async function fetchWalkWeatherFor(log){
 async function backfillWalkWeather(){
   if(denyLog()) return;
   if(!(data.settings && (data.settings.homeZip||'').trim())){ showToast('⚠️ Set a home ZIP first'); return; }
-  const targets = (data.logs||[]).filter(l => l.type==='walk' && !l.weather && l.dateTime && isHomeWalk(l));
-  if(!targets.length){ showToast('No past Home walks need weather'); return; }
-  showToast('🌤️ Fetching weather for '+targets.length+' walk'+(targets.length===1?'':'s')+'…');
+  const targets = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l));
+  if(!targets.length){ showToast('No past Home entries need weather'); return; }
+  showToast('🌤️ Fetching weather for '+targets.length+' entr'+(targets.length===1?'y':'ies')+'…');
   let ok = 0;
   for(const l of targets){ try { if(await fetchWalkWeatherFor(l)) ok++; } catch(e){ /* skip this one */ } }
   if(ok){ save(false); render(); }
   if(document.getElementById('settings-lists')) refreshSettingsSection('settings-lists', settingsListsHTML);
-  showToast(ok ? '🌤️ Added weather to '+ok+' walk'+(ok===1?'':'s') : '⚠️ Couldn’t fetch weather — try again later');
+  showToast(ok ? '🌤️ Added weather to '+ok+' entr'+(ok===1?'y':'ies') : '⚠️ Couldn’t fetch weather — try again later');
 }
 function quickWeight(){
   if(denyLog()) return;
@@ -1835,7 +1840,7 @@ const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--b
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water';
-  if(l.type==='potty'){ const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':''].filter(Boolean); return esc(l.result||'Potty') + (rest.length ? ' — ' + rest.join(' · ') : ''); }
+  if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result||'Potty') + (rest.length ? ' — ' + rest.join(' · ') : ''); }
   if(l.type==='walk'){
     let route = '';
     if(l.from || l.to) route = [esc(l.from), esc(l.to)].filter(Boolean).join(l.roundTrip ? ' ↔ ' : ' → ') + (l.roundTrip && !(l.from && l.to) ? ' (round trip)' : '');
@@ -1872,6 +1877,7 @@ function editLogModal(id){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
       + '<label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select>'
+      + '<label class="label">Location</label><select class="select" id="e-loc"><option value="home"'+((l.location||'home')!=='other'?' selected':'')+'>Home</option><option value="other"'+(l.location==='other'?' selected':'')+'>Other (away)</option></select>'
       + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
@@ -1896,7 +1902,7 @@ function saveEditLog(id){
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
   if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
-  else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); }
+  else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
   else if(l.type === 'weight'){ l.value = fv('e-w'); }
   logChange('edited', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,''));
