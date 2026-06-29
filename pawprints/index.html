@@ -204,7 +204,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.24.0';
+const APP_VERSION = 'v0.24.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -709,6 +709,9 @@ function settingsListsHTML(){
     const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
     h += '<button class="btn" style="margin-bottom:14px"'+(pastHomeEntries?'':' disabled')+' onclick="backfillWalkWeather()">🌤️ Add weather to past Home walks &amp; potty'+(pastHomeEntries?' ('+pastHomeEntries+')':'')+'</button>';
     h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Looks up historical weather for walks whose From or To is "Home" and potty breaks at home that don\'t have weather yet.</div>';
+    const homeEntriesTotal = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && l.dateTime && isHomeEntry(l)).length;
+    h += '<button class="btn" style="margin-bottom:14px"'+(homeEntriesTotal?'':' disabled')+' onclick="recheckHomeWeather()">🔄 Re-check weather for home walks &amp; potty'+(homeEntriesTotal?' ('+homeEntriesTotal+')':'')+'</button>';
+    h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Overwrites saved weather on every at-home walk &amp; potty break with the actual reading for that time — NWS station observations for about the last 7 days, Open-Meteo for older. Use this to correct entries logged before the NWS switch.</div>';
   }
   h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The two lists below customize the <strong>"Where" dropdowns</strong> you choose from while logging. Built-in options are always there — add your own here for spots you use often.</div>';
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
@@ -1243,6 +1246,29 @@ async function fetchWxBundle(geo){
   try { return await nwsBundle(geo); }
   catch(e){ return await openMeteoBundle(geo); }
 }
+// Nearest NWS observation station for a location (cached).
+async function nwsStationId(lat, lon){
+  const k = 'st:'+(+lat).toFixed(4)+','+(+lon).toFixed(4);
+  if(nwsCache[k]) return nwsCache[k];
+  const p = await fetch('https://api.weather.gov/points/'+(+lat).toFixed(4)+','+(+lon).toFixed(4), { headers:{ Accept:'application/geo+json' } });
+  if(!p.ok) throw new Error('points '+p.status);
+  const pj = await p.json();
+  const su = pj.properties && pj.properties.observationStations; if(!su) throw new Error('no stations');
+  const s = await fetch(su, { headers:{ Accept:'application/geo+json' } }); if(!s.ok) throw new Error('stations '+s.status);
+  const sj = await s.json();
+  const id = sj.features && sj.features[0] && sj.features[0].properties && sj.features[0].properties.stationIdentifier;
+  if(!id) throw new Error('no station id');
+  nwsCache[k] = id; return id;
+}
+// Actual NWS station observations across one local day → [{ms,tempF,emoji,label}] (temps are °C → °F).
+async function nwsDayObservations(geo, dateStr){
+  const id = await nwsStationId(geo.lat, geo.lon);
+  const start = new Date(dateStr+'T00:00'), end = new Date(start.getTime()+24*3600000);
+  const r = await fetch('https://api.weather.gov/stations/'+encodeURIComponent(id)+'/observations?start='+encodeURIComponent(start.toISOString())+'&end='+encodeURIComponent(end.toISOString()), { headers:{ Accept:'application/geo+json' } });
+  if(!r.ok) throw new Error('obs '+r.status);
+  const j = await r.json();
+  return (j.features||[]).map(f=>f.properties).filter(p=>p && p.temperature && p.temperature.value!=null).map(p=>{ const w = weatherFromNWS(p.icon, p.textDescription); return { ms:new Date(p.timestamp).getTime(), tempF:Math.round(p.temperature.value*9/5+32), emoji:w.emoji, label:p.textDescription||w.label }; });
+}
 async function fetchHeaderWeather(){
   const zip = (data.settings && (data.settings.homeZip||'').trim()); if(!zip) return;
   try {
@@ -1358,6 +1384,34 @@ async function backfillWalkWeather(){
   if(ok){ save(false); render(); }
   if(document.getElementById('settings-lists')) refreshSettingsSection('settings-lists', settingsListsHTML);
   showToast(ok ? '🌤️ Added weather to '+ok+' entr'+(ok===1?'y':'ies') : '⚠️ Couldn’t fetch weather — try again later');
+}
+// Re-fetch and OVERWRITE weather on all at-home walks & potty breaks with the actual reading for
+// that time — NWS station observations (≈last 7 days), Open-Meteo historical for older entries.
+async function recheckHomeWeather(){
+  if(denyLog()) return;
+  const zip = (data.settings && (data.settings.homeZip||'').trim());
+  if(!zip){ showToast('⚠️ Set a home ZIP first'); return; }
+  const targets = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && l.dateTime && isHomeEntry(l));
+  if(!targets.length){ showToast('No home walks or potty breaks to update'); return; }
+  showToast('🌤️ Re-checking weather for '+targets.length+' entr'+(targets.length===1?'y':'ies')+'…');
+  let geo; try { geo = await geocodeZip(zip); } catch(e){ showToast('⚠️ Couldn’t resolve your ZIP'); return; }
+  const byDate = {}; targets.forEach(l => { const d = l.dateTime.slice(0,10); (byDate[d]=byDate[d]||[]).push(l); });
+  let ok = 0, nws = 0;
+  for(const d of Object.keys(byDate)){
+    let obs = null;
+    try { obs = await nwsDayObservations(geo, d); } catch(e){ obs = null; }
+    for(const l of byDate[d]){
+      const t = new Date(l.dateTime).getTime();
+      let chosen = null;
+      if(obs && obs.length){ let bd = Infinity; for(const o of obs){ const dd = Math.abs(o.ms - t); if(dd < bd){ bd = dd; chosen = o; } } if(bd > 3*3600000) chosen = null; }
+      if(chosen){ l.weather = { tempF:chosen.tempF, label:chosen.label, emoji:chosen.emoji, place:geo.name, source:'NWS obs', historical:true }; ok++; nws++; }
+      else { try { if(await fetchWalkWeatherFor(l)) ok++; } catch(e){} }
+    }
+    await new Promise(r=>setTimeout(r,150));
+  }
+  if(ok){ save(false); render(); }
+  if(document.getElementById('settings-lists')) refreshSettingsSection('settings-lists', settingsListsHTML);
+  showToast(ok ? '🌤️ Updated '+ok+' entr'+(ok===1?'y':'ies')+(nws?' ('+nws+' via NWS)':'') : '⚠️ Couldn’t update — try again later');
 }
 function quickWeight(){
   if(denyLog()) return;
