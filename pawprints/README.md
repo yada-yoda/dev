@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.24.2**
+**Current Version: v0.25.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.25.0** — Insights drill-down. Numbers on the Insights page are now clickable: tap the top stat cards
+  (Meals today, Walks, Walk time, Avg walk), the Potty breakdown count chips, the avg-between pee/poop boxes,
+  or the 💧/💩 chips in Popular spots to see exactly which entries are counted — and tap any of them to edit.
 - **v0.24.2** — Sticky modal headers. Every pop-up's title bar and ✕ close button now stay pinned at the top
   while the contents scroll, so on long panels like Settings & Data you can always reach the ✕ without
   scrolling back up.
