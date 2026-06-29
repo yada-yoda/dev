@@ -54,7 +54,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 var(--border)}
 .nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
 .nav button.active{color:var(--accent);font-weight:600;border-bottom-color:var(--accent)}.nav button .nav-icon{font-size:17px}
-.nav-icon{display:inline-flex;align-items:center;justify-content:center}.msi{width:22px;height:22px;display:block;fill:currentColor}
+.nav-icon{display:inline-flex;align-items:center;justify-content:center}.msi{display:inline-block;vertical-align:middle;fill:currentColor}.nav-icon .msi{width:22px;height:22px;display:block}
 .content{padding:20px;max-width:860px;margin:0 auto}
 .card{background:var(--bg-card);border-radius:16px;padding:22px;border:1px solid var(--border);margin-bottom:12px}
 .btn{padding:8px 16px;border-radius:10px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:opacity .2s}
@@ -188,7 +188,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.19.0';
+const APP_VERSION = 'v0.19.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -208,8 +208,9 @@ const ICONS = {
   water:    { vb:'0 -960 960 960', d:'M479-208q16 0 24.5-5.5T512-230q0-11-8.5-17t-25.5-6q-42 0-85.5-26.5T337-373q-2-9-9-14.5t-15-5.5q-11 0-17 8.5t-4 17.5q15 84 71 121.5T479-208Zm-227.5 34Q160-268 160-408q0-100 79.5-217.5T480-880q161 137 240.5 254.5T800-408q0 140-91.5 234T480-80q-137 0-228.5-94ZM666-216.5Q740-293 740-408q0-79-66.5-179.5T480-800Q353-688 286.5-587.5T220-408q0 115 74 191.5T480-140q112 0 186-76.5ZM480-480Z' },
   potty:    { vb:'0 -960 960 960', d:'M538-80H423v-149H120l189-274h-95l266-377 266 377h-94l188 274H538v149ZM236-289h189-90 290-89 189-489Zm0 0h489L536-563h89L480-769 335-563h90L236-289Z' },
   walk:     { vb:'0 -960 960 960', d:'m278-40 116-586-101 43v133h-61v-173l192-81q14-6 29.5-7.5T484-710q17 3 29.5 11t20.5 20l42 66q31 48 77.5 75.5T753-510v60q-70-2-123.5-30.5T533-568l-38 152 92 83v293h-60v-240l-108-98-79 338h-62Zm210.5-735.5Q467-797 467-827t21.5-51.5Q510-900 540-900t51.5 21.5Q613-857 613-827t-21.5 51.5Q570-754 540-754t-51.5-21.5Z' },
+  weight:   { vb:'0 -960 960 960', d:'M480.5-489q50.5 0 84-33.5t33.5-84q0-50.5-33.5-84.5t-84-34q-50.5 0-84.5 34t-34 84.5q0 50.5 34 84t84.5 33.5ZM403-593q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6Zm63 0q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6Zm63 0q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm0-600v600-600Z' },
 };
-function svgIcon(key){ const i = ICONS[key]; if(!i) return ''; return '<svg class="msi" viewBox="'+i.vb+'" fill="currentColor" aria-hidden="true"><path d="'+i.d+'"/></svg>'; }
+function svgIcon(key, px){ const i = ICONS[key]; if(!i) return ''; const sz = px ? ' width="'+px+'" height="'+px+'"' : ''; return '<svg class="msi" viewBox="'+i.vb+'" fill="currentColor"'+sz+' aria-hidden="true"><path d="'+i.d+'"/></svg>'; }
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -597,7 +598,7 @@ function renderActivityPage(){
   html += Object.keys(byDay).sort().reverse().map(d => {
     const items = byDay[d];
     const counts = {}; items.forEach(l => counts[l.type] = (counts[l.type]||0) + 1);
-    const summary = Object.keys(counts).map(t => (LOG_META[t] ? LOG_META[t].i : '•') + ' ' + counts[t]).join('  ');
+    const summary = Object.keys(counts).map(t => (LOG_META[t] ? svgIcon(LOG_META[t].i,15) : '•') + ' ' + counts[t]).join('  ');
     const label = d === today ? 'Today' : d === yest ? 'Yesterday' : fmtDate(d);
     return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:8px;flex-wrap:wrap"><h3 style="font-size:15px;font-weight:700">'+esc(label)+'</h3><div style="font-size:13px;color:var(--text-secondary)">'+summary+'</div></div>'+items.map(l => timelineRow(l)).join('')+'</div>';
   }).join('');
@@ -1794,10 +1795,10 @@ function renderToday(){
     + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). One tap logs it instantly — no form. The others open a quick form.</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
-    + statusCard('Last fed','🍖',fed?fed.dateTime:null,12)
-    + statusCard('Water refilled','💧',water?water.dateTime:null,null)
-    + statusCard('Last potty','🚪',potty?potty.dateTime:null,8)
-    + statusCard('Last walk','🦮',walk?walk.dateTime:null,null)
+    + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)
+    + statusCard('Water refilled',svgIcon('water',16),water?water.dateTime:null,null)
+    + statusCard('Last potty',svgIcon('potty',16),potty?potty.dateTime:null,8)
+    + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
     + '</div></div>';
   // reminders
   const rem = getReminders();
@@ -1812,7 +1813,7 @@ function renderToday(){
     + '</div>';
   return html;
 }
-const LOG_META = { feed:{i:'🍖',c:'var(--accent)'}, water:{i:'💧',c:'var(--blue)'}, potty:{i:'🚪',c:'var(--accent-2)'}, walk:{i:'🦮',c:'var(--success)'}, weight:{i:'⚖️',c:'var(--accent-purple)'} };
+const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'} };
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water';
@@ -1829,7 +1830,7 @@ function logSummary(l){
 }
 function timelineRow(l){
   const m = LOG_META[l.type] || {i:'•',c:'var(--text-secondary)'};
-  return '<div class="timeline-item"><div class="tl-icon" style="color:'+m.c+'">'+m.i+'</div>'
+  return '<div class="timeline-item"><div class="tl-icon" style="color:'+m.c+'">'+svgIcon(m.i,20)+'</div>'
     +'<div style="flex:1"><div style="font-weight:600;font-size:14px">'+logSummary(l)+'</div>'
     +(l.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic">'+esc(l.notes)+'</div>':'')
     +'<div class="tl-time">'+fmtTime(l.dateTime)+'</div></div>'
@@ -1893,13 +1894,13 @@ function emptyState(){
 // ── LOG ──
 function renderLog(){
   if(!activePet()) return emptyState();
-  const tabs = [['feed','🍖 Feed'],['water','💧 Water'],['potty','🚪 Potty'],['walk','🦮 Walk'],['weight','⚖️ Weight']];
+  const tabs = [['feed','Feed'],['water','Water'],['potty','Potty'],['walk','Walk'],['weight','Weight']];
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px"><h2 style="font-size:20px;font-weight:700">Log activity</h2><button class="btn btn-sm" onclick="openActivity()">📋 All activity by day</button></div>';
-  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+svgIcon(LOG_META[k].i,16)+' '+l+'</button>').join('')+'</div>';
   const opener = { feed:'quickFeed', water:'quickWater', potty:'quickPotty', walk:'quickWalk', weight:'quickWeight' }[logSubtab];
   html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="'+opener+'()">+ Add '+logSubtab+' entry</button></div>';
   const entries = petLogs(logSubtab).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
-  if(!entries.length) return html + '<div class="card empty"><div class="ico">'+(LOG_META[logSubtab].i)+'</div><p style="color:var(--text-secondary)">No '+logSubtab+' entries yet.</p></div>';
+  if(!entries.length) return html + '<div class="card empty"><div class="ico">'+svgIcon(LOG_META[logSubtab].i,46)+'</div><p style="color:var(--text-secondary)">No '+logSubtab+' entries yet.</p></div>';
   // group by date
   let lastDate = '';
   html += '<div class="card">';

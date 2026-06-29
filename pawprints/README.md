@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.19.0**
+**Current Version: v0.19.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.19.1** — Activity icons too. Extended the Material Symbols set to the activity entries — the Today
+  status cards (Last fed/Water/Potty/Walk), every timeline row, the per-day activity summaries, the Log
+  sub-tabs, and empty states — all now use inline-SVG icons (including a new weight icon) instead of emoji,
+  keeping each log type's accent color via `currentColor`.
 - **v0.19.0** — New icons. Replaced the emoji in the tab bar and the Today quick-log buttons (Fed/Water/
   Potty/Walk) with clean **Material Symbols (Outlined)** icons, embedded as inline SVG (no font dependency,
   works offline, follows the theme color). Pulls in the icon's color via `currentColor`, so the active tab
