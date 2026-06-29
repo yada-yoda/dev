@@ -185,7 +185,11 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.16.1';
+const APP_VERSION = 'v0.17.0';
+// Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
+// "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
+// anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
+const GA_ID = '';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1628,10 +1632,35 @@ function getReminders(){
 // VIEW SWITCHING + RENDER
 // ═══════════════════════════════════════════════
 const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history','activity'];
+// ── Google Analytics (anonymous pageviews + per-tab virtual pageviews) ──
+const NAV_LABEL = { today:'Today', log:'Log', profile:'Profile', care:'Care', calendar:'Calendar', supplies:'Supplies', insights:'Insights', history:'Activity history', activity:'Activity' };
+let analyticsOn = false;
+function initAnalytics(){
+  if(!GA_ID || analyticsOn) return;
+  if(new URLSearchParams(location.search).has('demo')) return; // never track the demo
+  const s = document.createElement('script');
+  s.async = true; s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function(){ dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', GA_ID, { anonymize_ip:true, send_page_view:false });
+  analyticsOn = true;
+  trackView(currentView || 'today');
+}
+function trackView(v){
+  if(!analyticsOn || typeof gtag === 'undefined') return;
+  gtag('event', 'page_view', {
+    page_title: 'PawPrints — ' + (NAV_LABEL[v] || v),
+    page_location: location.origin + location.pathname + '#' + v,
+    page_path: location.pathname + '#' + v
+  });
+}
 function switchView(v){
   currentView = v;
   VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view===v));
+  trackView(v);
   render();
   window.scrollTo({top:0,behavior:'smooth'});
   // No dog yet → a feature tab can't do anything useful. Prompt to add one.
@@ -2289,6 +2318,7 @@ applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.set
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
 else { backfillVetContacts(); render(); }
+initAnalytics();
 // Refresh "time ago" status on Today every minute
 setInterval(() => { if(currentView==='today' && !document.getElementById('modal-root').innerHTML){ document.getElementById('view-today').innerHTML = renderToday(); } }, 60000);
 

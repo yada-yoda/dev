@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.16.1**
+**Current Version: v0.17.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.17.0** — Optional Google Analytics. Added anonymous, privacy-respecting GA4 support: a single
+  `GA_ID` constant near the top of `index.html` turns it on (paste your dedicated property's
+  `G-XXXXXXXXXX`; empty = fully off). When set, it records a pageview plus a virtual pageview each time
+  you switch tabs (Today, Log, Care, etc.), with `anonymize_ip` on and **no personal data** ever sent.
+  Tracking is skipped entirely in demo mode (`?demo=1`).
 - **v0.16.1** — Pick a saved vet. On a vet visit, the **Vet** and **Clinic** fields now show a dropdown
   of vets/clinics you've used before (pulled from past visits and your vet contacts) — choose one or
   type a new name. Picking a saved vet auto-fills its clinic, so repeat visits take two taps.
