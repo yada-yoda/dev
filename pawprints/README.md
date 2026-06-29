@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.4**
+**Current Version: v0.15.5**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.15.5** — Smoother Settings saves. Saving a ZIP, custom location, or walk favorite (and adding/
+  removing a shared person) no longer re-opens the whole Settings panel with a flash — only that
+  section updates in place, the modal stays open, and your scroll position is kept. Adding a custom
+  location also re-focuses the input so you can add several in a row.
 - **v0.15.4** — Clearer potty title + stool only when relevant. The timeline now separates the potty
   type from the rest with an em-dash ("Pee — Backyard · Normal stool"). The **Stool** dropdown only
   appears when the result is **Poop** or **Both** (hidden for Pee/Nothing, and cleared if you switch

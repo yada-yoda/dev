@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.15.4';
+const APP_VERSION = 'v0.15.5';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -473,14 +473,14 @@ function addCollaborator(){
   data.collaborators.push({ email, role, access, until });
   syncShareLists();
   logChange('added','shared access', email+' · '+role+' · '+(SHARE_ACCESS_LABEL[access]||access)+(until?' · until '+until:''));
-  save(); settingsModal();
+  save(); refreshSettingsSection('settings-sharing', settingsSharingHTML);
 }
 function removeCollaborator(email){
   const c = (data.collaborators||[]).find(x => x.email === email);
   data.collaborators = (data.collaborators||[]).filter(x => x.email !== email);
   syncShareLists();
   logChange('deleted','shared access', email + (c?(' · '+(c.role||'')):''));
-  save(); settingsModal();
+  save(); refreshSettingsSection('settings-sharing', settingsSharingHTML);
 }
 function copyShareCode(){
   const code = currentUser ? currentUser.uid : '';
@@ -630,9 +630,16 @@ function settingsModal(){
     + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p>'
     + '<div class="label" style="margin-top:18px">History</div>'
     + '<button class="btn" onclick="closeModal();openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
-    + (sharedOwnerUid ? '' : settingsListsHTML())
-    + (currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:18px">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')
+    + (sharedOwnerUid ? '' : '<div id="settings-lists">'+settingsListsHTML()+'</div>')
+    + '<div id="settings-sharing">'+(currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:18px">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')+'</div>'
     + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+// Re-render one section of the open Settings modal in place — no overlay re-animation, scroll preserved.
+function refreshSettingsSection(id, htmlFn, focusId){
+  const el = document.getElementById(id);
+  if(!el){ settingsModal(); return; }
+  el.innerHTML = htmlFn();
+  if(focusId){ const f = document.getElementById(focusId); if(f) f.focus(); }
 }
 // ── Lists & preferences (custom potty/food locations, home zip, walk favorites) ──
 function settingsListsHTML(){
@@ -664,13 +671,13 @@ function addListItem(kind){
   const key = kind==='potty'?'customPottyPlaces':'customFoodPlaces';
   data.settings[key] = data.settings[key] || [];
   if(!data.settings[key].some(x=>x.toLowerCase()===v.toLowerCase())){ data.settings[key].push(v); save(false); }
-  settingsModal();
+  refreshSettingsSection('settings-lists', settingsListsHTML, kind==='potty'?'list-potty':'list-food');
 }
 function removeListItem(kind, idx){
   if(denyManage()) return;
   const key = kind==='potty'?'customPottyPlaces':'customFoodPlaces';
   data.settings[key] = (data.settings[key]||[]).filter((_,i)=>i!==idx);
-  save(false); settingsModal();
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
 }
 function saveHomeZip(){
   if(denyManage()) return;
@@ -678,12 +685,12 @@ function saveHomeZip(){
   data.settings = data.settings || {};
   data.settings.homeZip = z;
   if(data.settings.weatherGeo && data.settings.weatherGeo.zip !== z) data.settings.weatherGeo = null;
-  save(false); settingsModal(); showToast(z?'🌤️ Home ZIP saved':'ZIP cleared');
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML); showToast(z?'🌤️ Home ZIP saved':'ZIP cleared');
 }
 function removeWalkFavorite(i){
   if(denyManage()) return;
   data.settings.walkFavorites = (data.settings.walkFavorites||[]).filter((_,idx)=>idx!==i);
-  save(false); settingsModal();
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
 }
 function settingsSharingHTML(){
   let h = '<div class="label" style="margin-top:18px">Sharing &amp; access</div>';
