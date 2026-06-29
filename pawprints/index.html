@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.25.0';
+const APP_VERSION = 'v0.25.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -288,7 +288,7 @@ function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPo
 function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
-const INV_CATEGORIES = ['Food','Treats','Supplies','Meds'];
+const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
 const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
 const SEVERITY = ['Mild','Moderate','Severe'];
 const SEXES = ['Male','Female','Unknown'];

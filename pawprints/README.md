@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.25.0**
+**Current Version: v0.25.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.25.1** — Grooming supplies category. Added a **Grooming** category to the Supplies dropdown (Food ·
+  Treats · Grooming · Supplies · Meds) so shampoo, brushes, nail clippers, and the like have a natural home
+  instead of the generic Supplies bucket.
 - **v0.25.0** — Insights drill-down. Numbers on the Insights page are now clickable: tap the top stat cards
   (Meals today, Walks, Walk time, Avg walk), the Potty breakdown count chips, the avg-between pee/poop boxes,
   or the 💧/💩 chips in Popular spots to see exactly which entries are counted — and tap any of them to edit.
