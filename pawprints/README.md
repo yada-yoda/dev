@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.17.1**
+**Current Version: v0.18.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.18.0** — Privacy page. Added a plain-English `privacy.html` (linked from the footer) covering Google
+  sign-in, Firebase storage, optional Calendar and weather lookups, and the anonymous analytics — what's
+  collected, what isn't, and how to export or delete it. (No custom 404 page needed — the dev.rizzo.cc site
+  already serves a root 404, and the app navigates by hash so there are no sub-paths to miss.)
 - **v0.17.1** — Analytics turned on. Set the dedicated GA4 measurement ID (`G-5R71TRBEQW`), so anonymous
   pageview + per-tab tracking is now live (still skipped in demo mode, still no personal data).
 - **v0.17.0** — Optional Google Analytics. Added anonymous, privacy-respecting GA4 support: a single

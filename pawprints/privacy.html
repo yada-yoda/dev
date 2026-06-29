@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="dark light">
+<title>Privacy Policy — PawPrints</title>
+<meta name="description" content="What PawPrints collects, what it doesn't, and what happens to your dog's data. Short and honest.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://dev.rizzo.cc/pawprints/privacy.html">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PawPrints">
+<meta property="og:title" content="Privacy Policy — PawPrints">
+<meta property="og:description" content="What PawPrints collects, what it doesn't, and what happens to your dog's data.">
+<meta property="og:url" content="https://dev.rizzo.cc/pawprints/privacy.html">
+<meta property="og:image" content="https://dev.rizzo.cc/pawprints/og-image.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-5R71TRBEQW"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-5R71TRBEQW', { 'anonymize_ip': true });
+</script>
+
+<style>
+:root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-tertiary:#21262d;--text-primary:#e6edf3;--text-secondary:#8b949e;
+--accent:#f4a261;--accent-2:#2dd4bf;--border:#30363d;}
+@media (prefers-color-scheme: light){:root{--bg-primary:#f6f8fa;--bg-card:#ffffff;--bg-tertiary:#eef1f5;--text-primary:#1f2328;--text-secondary:#59636e;--accent:#b45309;--accent-2:#0d9488;--border:#d0d7de;}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);line-height:1.65;-webkit-font-smoothing:antialiased}
+.wrap{max-width:760px;margin:0 auto;padding:32px 20px 64px}
+.brand{display:inline-flex;align-items:center;gap:10px;text-decoration:none;color:var(--text-primary);font-weight:700;font-size:18px;margin-bottom:8px}
+.logo{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#f4a261,#2dd4bf);display:flex;align-items:center;justify-content:center;font-size:20px}
+h1{font-size:26px;font-weight:700;letter-spacing:-0.02em;margin:18px 0 6px}
+.updated{color:var(--text-secondary);font-size:13px;margin-bottom:26px}
+h2{font-size:17px;font-weight:600;margin:28px 0 8px;color:var(--text-primary)}
+p{margin:0 0 12px;color:var(--text-primary)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+ul{margin:0 0 12px 20px}li{margin-bottom:6px}
+a{color:var(--accent-2);text-decoration:none}a:hover{text-decoration:underline}
+.muted{color:var(--text-secondary);font-size:14px}
+.pill{display:inline-block;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:999px;padding:2px 10px;font-size:12px;font-family:'JetBrains Mono',monospace;color:var(--text-secondary)}
+footer{border-top:1px solid var(--border);margin-top:36px;padding-top:18px;text-align:center;color:var(--text-secondary);font-size:13px}
+.back{display:inline-block;margin-top:8px;font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <a class="brand" href="/pawprints/" aria-label="PawPrints home"><span class="logo">🐾</span> PawPrints</a>
+
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: June 29, 2026</p>
+
+  <p>PawPrints is a small, personal, non-commercial app for keeping track of a dog's daily care —
+  feeding, water, potty trips, walks, vet visits, grooming, meds, weight, and supplies. This page
+  explains, plainly, what it stores and who it talks to. There are no ads, no trackers sold to anyone,
+  and nothing about your dog is ever sold or shared for marketing.</p>
+
+  <h2>Signing in</h2>
+  <div class="card">
+    <p>You sign in with <strong>Google Sign-In</strong> (through Google Firebase Authentication). When you
+    do, PawPrints receives your Google account's <strong>email address</strong> and a unique user ID. These
+    are used only to save your data to your own account and to sync it across your devices — nothing else.
+    You can use the app signed out, in which case data stays only in your browser.</p>
+  </div>
+
+  <h2>What's stored, and where</h2>
+  <div class="card">
+    <p>The things you enter — your dog's profile and photo, and your logs (feeding, water, potty, walks,
+    weight), vet visits, grooming, medications, illnesses, supplies, contacts, and settings — are stored:</p>
+    <ul>
+      <li>In your browser's <strong>local storage</strong>, so the app works offline; and</li>
+      <li>When signed in, in <strong>Google Firebase (Cloud Firestore)</strong> under your account, so it
+      syncs across devices.</li>
+    </ul>
+    <p class="muted">Photos are stored inline with your data (no separate image host). Your dog's data is kept
+    in a separate record from any other app that shares the same Google login.</p>
+  </div>
+
+  <h2>Google Calendar (optional)</h2>
+  <div class="card">
+    <p>If you choose to <strong>connect Google Calendar</strong>, PawPrints can add and update calendar events
+    for vet visits, grooming, follow-ups, and reminders. To keep you connected without re-asking every visit,
+    a small helper service stores a Google <strong>refresh token</strong> on the server side (Cloudflare KV) —
+    it never reaches the browser and is used only to talk to your calendar. You can <strong>disconnect at any
+    time</strong> from the Calendar tab, which revokes and deletes that token. If you never connect Calendar,
+    none of this applies.</p>
+  </div>
+
+  <h2>Weather on walks (optional)</h2>
+  <div class="card">
+    <p>If you set a <strong>home ZIP code</strong> for walk weather, PawPrints sends that ZIP (and the
+    latitude/longitude it resolves to) to <a href="https://www.zippopotam.us/" rel="noopener">zippopotam.us</a>
+    and <a href="https://open-meteo.com/" rel="noopener">Open-Meteo</a> to look up the weather. Only location
+    coordinates are sent — never your name, your dog, or anything identifying. If you don't set a ZIP, no
+    weather lookups happen.</p>
+  </div>
+
+  <h2>Analytics</h2>
+  <div class="card">
+    <p>PawPrints uses <strong>Google Analytics 4</strong> <span class="pill">G-5R71TRBEQW</span> to understand
+    basic, anonymous usage — how many visits there are and which sections (tabs) get used. IP addresses are
+    anonymized, and <strong>no personal data is sent</strong> (no dog names, no health details, no account
+    info). Analytics is turned off entirely in the demo (<span class="pill">?demo=1</span>). Google Analytics
+    sets its own cookies; see <a href="https://policies.google.com/privacy" rel="noopener">Google's Privacy
+    Policy</a>.</p>
+  </div>
+
+  <h2>Sharing access</h2>
+  <div class="card">
+    <p>If you invite someone (a family member, sitter, or dog walker) to help, the <strong>email address</strong>
+    you invite is stored with your data so the app can grant them access at the level you choose. You can remove
+    their access at any time in Settings.</p>
+  </div>
+
+  <h2>Your control</h2>
+  <div class="card">
+    <ul>
+      <li><strong>Export</strong> everything as a JSON backup (or spreadsheet/PDF) from Settings, any time.</li>
+      <li><strong>Delete</strong> data within the app; signed-in deletions remove it from Firestore. Clearing
+      your browser data removes the local copy.</li>
+      <li><strong>Disconnect</strong> Google Calendar to revoke that access.</li>
+    </ul>
+  </div>
+
+  <h2>Children &amp; scope</h2>
+  <p class="muted">PawPrints is a personal tool for tracking pets, not a service aimed at children, and it
+  isn't intended to collect data about people beyond the optional collaborator emails described above.</p>
+
+  <h2>Contact</h2>
+  <p>This is a personal project. For privacy questions, reach the maintainer on GitHub at
+  <a href="https://github.com/itsavibecode" rel="noopener">github.com/itsavibecode</a>. If this policy changes,
+  the "last updated" date above will change with it.</p>
+
+  <footer>
+    <a class="back" href="/pawprints/">← Back to PawPrints</a>
+  </footer>
+
+</div>
+</body>
+</html>
