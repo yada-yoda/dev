@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.15.1';
+const APP_VERSION = 'v0.15.2';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -421,6 +421,8 @@ async function loadFromFirestore(){
     if(shared){ showToast('⚠️ No access to that profile — ask the owner to add your email under Sharing'); exitSharedProfile(true); }
   }
 }
+let cloudSaveOk = null;     // null=unknown, true=saving to cloud, false=failing (rule not set / no access)
+let cloudSaveWarned = false;
 async function saveToFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
   const uid = activeUid(); if(!uid) return;
@@ -429,7 +431,17 @@ async function saveToFirestore(){
     const payload = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
     if(!sharedOwnerUid) payload.ownerName = currentUser.displayName || currentUser.email || '';
     await db.collection('pawprints').doc(uid).set(payload);
-  } catch(e){ console.error('Firestore save error:', e); /* graceful: localStorage still holds data */ }
+    if(cloudSaveOk !== true){ cloudSaveOk = true; if(currentView==='today') render(); }
+  } catch(e){
+    console.error('Firestore save error:', e);
+    const perm = e && (e.code === 'permission-denied' || /permission/i.test(e.message||''));
+    cloudSaveOk = false;
+    if(perm && !cloudSaveWarned && !sharedOwnerUid){
+      cloudSaveWarned = true;
+      showToast('⚠️ Not syncing to the cloud — your data is only on THIS device. Add the Firestore rule to sync across devices.');
+    }
+    if(currentView==='today') render();
+  }
 }
 
 // ═══════════════════════════════════════════════
@@ -626,18 +638,20 @@ function settingsModal(){
 function settingsListsHTML(){
   const s = data.settings || {};
   let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
-  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="e.g. 60477" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
-  h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES);
-  h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES);
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
+  h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The two lists below customize the <strong>"Where" dropdowns</strong> you choose from while logging. Built-in options are always there — add your own here for spots you use often.</div>';
+  h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
+  h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a feeding (e.g. kitchen, crate).');
   const favs = s.walkFavorites || [];
   h += '<div style="margin-bottom:8px"><div class="label" style="margin-bottom:4px">Favorite walk routes</div>'
     + (favs.length ? favs.map((f,i)=>'<div class="entry-row" style="padding:6px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-word">'+esc((f.from||'?')+' → '+(f.to||'?'))+'</span><button class="btn btn-sm btn-danger" onclick="removeWalkFavorite('+i+')">Remove</button></div>').join('') : '<p style="font-size:12px;color:var(--text-secondary)">Save routes from the walk form (★ checkbox).</p>')
     + '</div>';
   return h;
 }
-function listEditor(label, kind, custom, base){
+function listEditor(label, kind, custom, base, desc){
   const inputId = kind==='potty'?'list-potty':'list-food';
   let h = '<div style="margin-bottom:14px"><div class="label" style="margin-bottom:4px">'+label+'</div>';
+  if(desc) h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">'+esc(desc)+'</div>';
   h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Built-in: '+esc(base.join(', '))+'</div>';
   h += '<div style="display:flex;gap:8px;margin-bottom:'+(custom.length?'8px':'0')+'"><input class="input" id="'+inputId+'" placeholder="Add a custom location" style="margin-bottom:0"><button class="btn" onclick="addListItem(\''+kind+'\')">Add</button></div>';
   if(custom.length) h += '<div style="display:flex;flex-wrap:wrap;gap:6px">'+custom.map((v,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(v)+' <button onclick="removeListItem(\''+kind+'\','+i+')" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>';
@@ -1622,6 +1636,10 @@ function renderToday(){
   if(sharedOwnerUid){
     const msg = canManage() ? 'full access' : canLog() ? 'you can log daily activity, but can’t change the profile or care records' : 'view-only — you can see everything but can’t make changes';
     html += '<div class="card" style="border-color:var(--accent-2);background:rgba(45,212,191,.06)"><div style="font-size:13px"><strong>'+esc(SHARE_ACCESS_LABEL[sharedAccess]||'Shared access')+'</strong> to '+(sharedOwnerName?esc(sharedOwnerName)+'’s':'these')+' dogs — '+msg+'.</div></div>';
+  }
+  // cloud-sync-off warning (signed in but writes are being denied — usually the Firestore rule isn't set)
+  if(cloudSaveOk === false && currentUser && !sharedOwnerUid){
+    html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Not syncing to the cloud.</strong> Your entries are saved on <strong>this device only</strong> — they won’t appear on your other devices, and clearing this browser would lose them. This usually means the Firestore security rule isn’t set up yet.</div></div>';
   }
   // header summary
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'

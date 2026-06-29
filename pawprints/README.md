@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.15.1**
+**Current Version: v0.15.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.15.2** — Sync-failure warning + privacy + clearer lists. Cloud-save failures (usually a missing
+  Firestore rule) are no longer silent — a one-time toast and a persistent Today banner warn that data
+  is only on this device, so apparent "missing data" across devices is explained. The ZIP field's
+  example no longer uses a real-area ZIP. The Lists & preferences section now explains what the
+  custom Potty/Food location lists do.
 - **v0.15.1** — Insights: Potty breakdown now lists the dog's **popular spots** ranked by visits, each
   split into pee (💧) and poop (💩) counts.
 - **v0.15.0** — Custom lists, food location, walk favorites & weather, potty intervals. **Settings →
