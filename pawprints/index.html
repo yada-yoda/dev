@@ -50,6 +50,18 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .pet-photo{width:42px;height:42px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);flex-shrink:0;background:var(--bg-tertiary)}
 .header h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}.header .sub{font-size:12px;color:var(--text-secondary)}
 .header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.weather-pill{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;white-space:nowrap;padding:8px 12px}
+.weather-panel{position:fixed;top:66px;right:16px;z-index:140;width:300px;max-width:calc(100vw - 32px);background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px var(--shadow);padding:14px}
+.weather-panel.hidden{display:none}
+.wx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.wx-now-temp{font-size:24px;font-weight:700;line-height:1}
+.wx-now-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
+.wx-loc{font-size:12px;color:var(--text-secondary);text-align:right;max-width:130px}
+.wx-hourly{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
+.wx-cell{flex:0 0 auto;text-align:center;min-width:42px;padding:6px 2px;border-radius:9px;background:var(--bg-tertiary)}
+.wx-h-time{font-size:10px;color:var(--text-secondary)}
+.wx-h-emoji{font-size:17px;margin:3px 0}
+.wx-h-temp{font-size:13px;font-weight:600}
 .pet-select{appearance:none;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-family:inherit;padding:8px 30px 8px 12px;border-radius:10px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 var(--border)}
 .nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -145,6 +157,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
     <div><h1 id="header-title">PawPrints</h1><div class="sub" id="header-sub">Feed · Walk · Care <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500" id="app-version"></span></div></div>
   </div>
   <div class="header-actions">
+    <button class="btn weather-pill hidden" id="weather-pill" onclick="toggleWeatherPanel(event)" title="Weather" aria-label="Current weather"></button>
     <select id="pet-select" class="pet-select hidden" onchange="onPetSelect(this.value)"></select>
     <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
     <button class="btn" onclick="settingsModal()" title="Settings, backup &amp; export" aria-label="Settings, backup and export">⚙️</button>
@@ -181,6 +194,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <span>PawPrints <span id="app-version-footer" style="font-family:'JetBrains Mono',monospace"></span></span>
 </footer>
 <div id="png-render-area"></div>
+<div id="weather-panel" class="weather-panel hidden"></div>
 <div id="modal-root"></div>
 <div id="toast" class="toast hidden"></div>
 
@@ -188,7 +202,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.21.0';
+const APP_VERSION = 'v0.22.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -734,6 +748,7 @@ function saveHomeZip(){
   data.settings.homeZip = z;
   if(data.settings.weatherGeo && data.settings.weatherGeo.zip !== z) data.settings.weatherGeo = null;
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML); showToast(z?'🌤️ Home ZIP saved':'ZIP cleared');
+  if(z) fetchHeaderWeather(); else { headerWeather = null; updateWeatherPill(); }
 }
 function removeWalkFavorite(i){
   if(denyManage()) return;
@@ -1172,6 +1187,58 @@ async function fetchWalkWeather(logId){
     save(false);
     if(currentView==='today' || currentView==='log' || currentView==='activity') render();
   } catch(e){ /* weather is optional — silently skip */ }
+}
+// ── Header weather pill (current + hour-by-hour for the home ZIP, via Open-Meteo) ──
+let headerWeather = null;
+async function fetchHeaderWeather(){
+  const zip = (data.settings && (data.settings.homeZip||'').trim()); if(!zip) return;
+  try {
+    const geo = await geocodeZip(zip);
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lon+'&temperature_unit=fahrenheit&current=temperature_2m,weather_code,apparent_temperature&hourly=temperature_2m,weather_code&forecast_days=2&timezone=auto');
+    const j = await r.json(); const cur = j.current; if(!cur) return;
+    const cw = weatherFromCode(cur.weather_code);
+    const times = (j.hourly&&j.hourly.time)||[], temps = (j.hourly&&j.hourly.temperature_2m)||[], codes = (j.hourly&&j.hourly.weather_code)||[];
+    const nowMs = Date.now(); let start = 0;
+    for(let i=0;i<times.length;i++){ if(new Date(times[i]).getTime() >= nowMs - 3600000){ start = i; break; } }
+    const hourly = [];
+    for(let i=start;i<times.length && hourly.length<12;i++){ const w = weatherFromCode(codes[i]); hourly.push({ t:times[i], tempF:Math.round(temps[i]), emoji:w.emoji }); }
+    headerWeather = { tempF:Math.round(cur.temperature_2m), feelsF:Math.round(cur.apparent_temperature), label:cw.label, emoji:cw.emoji, place:geo.name, hourly, ts:Date.now() };
+    updateWeatherPill();
+    const panel = document.getElementById('weather-panel');
+    if(panel && !panel.classList.contains('hidden')) renderWeatherPanel();
+  } catch(e){ /* weather is optional — silently skip */ }
+}
+function updateWeatherPill(){
+  const pill = document.getElementById('weather-pill'); if(!pill) return;
+  if(!headerWeather){ pill.classList.add('hidden'); return; }
+  pill.innerHTML = headerWeather.emoji + ' ' + headerWeather.tempF + '°';
+  pill.title = headerWeather.place + ' · ' + headerWeather.label + ' · ' + headerWeather.tempF + '° (feels ' + headerWeather.feelsF + '°)';
+  pill.classList.remove('hidden');
+}
+function renderWeatherPanel(){
+  const panel = document.getElementById('weather-panel'); if(!panel) return;
+  const w = headerWeather;
+  if(!w){ panel.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">Set a home ZIP in Settings → Lists &amp; preferences to see weather.</div>'; return; }
+  const fmtHour = t => { const d = new Date(t); let h = d.getHours(); const ap = h>=12?'PM':'AM'; h = h%12||12; return h+' '+ap; };
+  panel.innerHTML = '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+esc(w.label)+' · feels '+w.feelsF+'°</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
+    + '<div class="wx-hourly">'+w.hourly.map(h=>'<div class="wx-cell"><div class="wx-h-time">'+fmtHour(h.t)+'</div><div class="wx-h-emoji">'+h.emoji+'</div><div class="wx-h-temp">'+h.tempF+'°</div></div>').join('')+'</div>';
+}
+function toggleWeatherPanel(ev){
+  if(ev) ev.stopPropagation();
+  const panel = document.getElementById('weather-panel'); if(!panel) return;
+  if(panel.classList.contains('hidden')){
+    if(!headerWeather || Date.now()-headerWeather.ts > 1800000) fetchHeaderWeather();
+    renderWeatherPanel(); panel.classList.remove('hidden');
+    setTimeout(()=>document.addEventListener('click', weatherOutside), 0);
+  } else closeWeatherPanel();
+}
+function weatherOutside(e){
+  const panel = document.getElementById('weather-panel'), pill = document.getElementById('weather-pill');
+  if(panel && !panel.contains(e.target) && pill && !pill.contains(e.target)) closeWeatherPanel();
+}
+function closeWeatherPanel(){
+  const panel = document.getElementById('weather-panel'); if(panel) panel.classList.add('hidden');
+  document.removeEventListener('click', weatherOutside);
 }
 // A walk counts as a "home" walk for backfill if its From or To is "Home".
 function isHomeWalk(l){ const h = s => String(s||'').trim().toLowerCase() === 'home'; return h(l.from) || h(l.to); }
@@ -2374,6 +2441,8 @@ if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
 else { backfillVetContacts(); render(); }
 initAnalytics();
+if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather();
+setInterval(() => { if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather(); }, 1800000);
 // Refresh "time ago" status on Today every minute
 setInterval(() => { if(currentView==='today' && !document.getElementById('modal-root').innerHTML){ document.getElementById('view-today').innerHTML = renderToday(); } }, 60000);
 
