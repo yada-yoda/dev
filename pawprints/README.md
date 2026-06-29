@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.25.1**
+**Current Version: v0.25.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.25.2** — UPC field on supplies. The add/edit supply form now has a **UPC / barcode** field, so you can
+  record a product's barcode for easy re-ordering. It's included in the spreadsheet export.
 - **v0.25.1** — Grooming supplies category. Added a **Grooming** category to the Supplies dropdown (Food ·
   Treats · Grooming · Supplies · Meds) so shampoo, brushes, nail clippers, and the like have a natural home
   instead of the generic Supplies bucket.
