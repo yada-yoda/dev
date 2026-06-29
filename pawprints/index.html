@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.14.2';
+const APP_VERSION = 'v0.15.0';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -220,7 +220,11 @@ const FOOD_TYPES = ['Dry kibble','Wet food','Raw','Home-cooked','Mixed','Treat',
 const AMOUNT_UNITS = ['cups','grams','oz','cans','scoops','pieces'];
 const POTTY_RESULTS = ['Pee','Poop','Both','Nothing'];
 const POTTY_PLACES = ['Backyard','Front yard','On a walk','Pee pad','Other'];
+const FOOD_PLACES = ['Kitchen','Bowl (usual spot)','Crate / kennel','Outside','Living room','Other'];
 const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus'];
+// Base options + the owner's custom additions from Settings (Other always last).
+function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPottyPlaces) || []; const base = POTTY_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
+function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
 const INV_CATEGORIES = ['Food','Treats','Supplies','Meds'];
@@ -614,8 +618,58 @@ function settingsModal(){
     + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p>'
     + '<div class="label" style="margin-top:18px">History</div>'
     + '<button class="btn" onclick="closeModal();openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
+    + (sharedOwnerUid ? '' : settingsListsHTML())
     + (currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:18px">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')
     + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+// ── Lists & preferences (custom potty/food locations, home zip, walk favorites) ──
+function settingsListsHTML(){
+  const s = data.settings || {};
+  let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="e.g. 60477" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
+  h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES);
+  h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES);
+  const favs = s.walkFavorites || [];
+  h += '<div style="margin-bottom:8px"><div class="label" style="margin-bottom:4px">Favorite walk routes</div>'
+    + (favs.length ? favs.map((f,i)=>'<div class="entry-row" style="padding:6px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-word">'+esc((f.from||'?')+' → '+(f.to||'?'))+'</span><button class="btn btn-sm btn-danger" onclick="removeWalkFavorite('+i+')">Remove</button></div>').join('') : '<p style="font-size:12px;color:var(--text-secondary)">Save routes from the walk form (★ checkbox).</p>')
+    + '</div>';
+  return h;
+}
+function listEditor(label, kind, custom, base){
+  const inputId = kind==='potty'?'list-potty':'list-food';
+  let h = '<div style="margin-bottom:14px"><div class="label" style="margin-bottom:4px">'+label+'</div>';
+  h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Built-in: '+esc(base.join(', '))+'</div>';
+  h += '<div style="display:flex;gap:8px;margin-bottom:'+(custom.length?'8px':'0')+'"><input class="input" id="'+inputId+'" placeholder="Add a custom location" style="margin-bottom:0"><button class="btn" onclick="addListItem(\''+kind+'\')">Add</button></div>';
+  if(custom.length) h += '<div style="display:flex;flex-wrap:wrap;gap:6px">'+custom.map((v,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(v)+' <button onclick="removeListItem(\''+kind+'\','+i+')" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>';
+  return h + '</div>';
+}
+function addListItem(kind){
+  if(denyManage()) return;
+  const v = (fv(kind==='potty'?'list-potty':'list-food')||'').trim(); if(!v) return;
+  data.settings = data.settings || {};
+  const key = kind==='potty'?'customPottyPlaces':'customFoodPlaces';
+  data.settings[key] = data.settings[key] || [];
+  if(!data.settings[key].some(x=>x.toLowerCase()===v.toLowerCase())){ data.settings[key].push(v); save(false); }
+  settingsModal();
+}
+function removeListItem(kind, idx){
+  if(denyManage()) return;
+  const key = kind==='potty'?'customPottyPlaces':'customFoodPlaces';
+  data.settings[key] = (data.settings[key]||[]).filter((_,i)=>i!==idx);
+  save(false); settingsModal();
+}
+function saveHomeZip(){
+  if(denyManage()) return;
+  const z = (fv('home-zip')||'').trim();
+  data.settings = data.settings || {};
+  data.settings.homeZip = z;
+  if(data.settings.weatherGeo && data.settings.weatherGeo.zip !== z) data.settings.weatherGeo = null;
+  save(false); settingsModal(); showToast(z?'🌤️ Home ZIP saved':'ZIP cleared');
+}
+function removeWalkFavorite(i){
+  if(denyManage()) return;
+  data.settings.walkFavorites = (data.settings.walkFavorites||[]).filter((_,idx)=>idx!==i);
+  save(false); settingsModal();
 }
 function settingsSharingHTML(){
   let h = '<div class="label" style="margin-top:18px">Sharing &amp; access</div>';
@@ -927,6 +981,7 @@ function addLog(entry){
   data.logs.unshift(rec);
   logChange('logged', LOG_ENTITY[rec.type]||'activity', (logSummary(rec)||'').replace(/<[^>]+>/g,''));
   save();
+  return rec.id;
 }
 function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
@@ -948,8 +1003,9 @@ function quickFeed(){
     +'<label class="label">Food'+tip('Your Food & Treats from the Supplies tab show up here automatically, plus the generic types.')+'</label><select class="select" id="q-food">'+sel(foods, last?last.foodType:(foods.includes('Dry kibble')?'Dry kibble':foods[0]))+'</select>'
     +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(last?esc(last.amount||''):'')+'" placeholder="1"></div>'
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, last?last.unit:'cups')+'</select></div></div>'
+    +'<label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
 }
 function quickPotty(){
   if(denyLog()) return;
@@ -958,7 +1014,7 @@ function quickPotty(){
   openModal('<h3>🚪 Potty break</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
-    +'<div class="grid-2"><div><label class="label">Where</label><select class="select" id="q-place">'+sel(POTTY_PLACES,'Backyard')+'</select></div>'
+    +'<div class="grid-2"><div><label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select></div>'
     +'<div><label class="label">Stool (if any)</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
@@ -971,15 +1027,70 @@ function savePotty(){
 function quickWalk(){
   if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
+  const favs = (data.settings && data.settings.walkFavorites) || [];
+  const favChips = favs.length ? '<label class="label">Favorite routes'+tip('Tap to fill From/To. Save new ones with the checkbox below; manage them in Settings → Lists.')+'</label><div class="tag-grid">'+favs.map((f,i)=>'<button class="tag" onclick="fillWalkRoute('+i+')">'+esc((f.from||'?')+' → '+(f.to||'?'))+'</button>').join('')+'</div>' : '';
   openModal('<h3>🦮 Log a walk</h3>'
+    + favChips
     +'<label class="label">When (start)</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="q-dur" placeholder="30"></div>'
     +'<div><label class="label">Distance (mi, optional)</label><input class="input" type="number" step="0.1" id="q-dist" placeholder="1.5"></div></div>'
     +'<div class="grid-2"><div><label class="label">From'+tip('Where the walk started — optional. e.g. Home.')+'</label><input class="input" id="q-from" placeholder="Home"></div>'
     +'<div><label class="label">To'+tip('Where the walk went — optional. e.g. the park.')+'</label><input class="input" id="q-to" placeholder="The park"></div></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="q-round" checked> Round trip (came back to the start)</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="q-round" checked> Round trip (came back to the start)</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:14px;cursor:pointer"><input type="checkbox" id="q-fav"> ★ Save this From → To as a favorite route</label>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="How did it go?">'
-    +'<button class="btn-primary" onclick="addLog({type:\'walk\',dateTime:fv(\'q-dt\'),durationMin:fv(\'q-dur\'),distance:fv(\'q-dist\'),from:fv(\'q-from\'),to:fv(\'q-to\'),roundTrip:document.getElementById(\'q-round\').checked,notes:fv(\'q-note\')});closeModal();showToast(\'🦮 Walk logged\')">Save</button>');
+    +((data.settings && data.settings.homeZip)?'<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">🌤️ Current weather for '+esc(data.settings.homeZip)+' will be saved with this walk.</div>':'<div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">Add a home ZIP in Settings → Lists to record the weather on each walk.</div>')
+    +'<button class="btn-primary" onclick="saveWalk()">Save</button>');
+}
+function fillWalkRoute(i){ const f = ((data.settings&&data.settings.walkFavorites)||[])[i]; if(f){ const a=document.getElementById('q-from'), b=document.getElementById('q-to'); if(a) a.value=f.from||''; if(b) b.value=f.to||''; } }
+function addWalkFavorite(from, to){
+  data.settings = data.settings || {}; data.settings.walkFavorites = data.settings.walkFavorites || [];
+  if(!data.settings.walkFavorites.some(f => f.from===from && f.to===to)){ data.settings.walkFavorites.push({ from, to }); }
+}
+function saveWalk(){
+  const entry = { type:'walk', dateTime:fv('q-dt'), durationMin:fv('q-dur'), distance:fv('q-dist'), from:fv('q-from'), to:fv('q-to'), roundTrip:document.getElementById('q-round').checked, notes:fv('q-note') };
+  const saveFav = document.getElementById('q-fav') && document.getElementById('q-fav').checked && (entry.from || entry.to);
+  if(saveFav) addWalkFavorite(entry.from, entry.to);
+  const id = addLog(entry);
+  closeModal(); showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
+  if(id && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
+}
+// ── Weather for walks (zip → Open-Meteo, no API key) ──
+function weatherFromCode(code){
+  const c = Number(code);
+  if(c===0) return {emoji:'☀️', label:'Clear'};
+  if(c<=2) return {emoji:'🌤️', label:'Mostly clear'};
+  if(c===3) return {emoji:'☁️', label:'Cloudy'};
+  if(c===45||c===48) return {emoji:'🌫️', label:'Fog'};
+  if(c>=51&&c<=57) return {emoji:'🌦️', label:'Drizzle'};
+  if(c>=61&&c<=67) return {emoji:'🌧️', label:'Rain'};
+  if(c>=71&&c<=77) return {emoji:'❄️', label:'Snow'};
+  if(c>=80&&c<=82) return {emoji:'🌧️', label:'Showers'};
+  if(c>=85&&c<=86) return {emoji:'🌨️', label:'Snow showers'};
+  if(c>=95) return {emoji:'⛈️', label:'Thunderstorm'};
+  return {emoji:'🌡️', label:''};
+}
+async function geocodeZip(zip){
+  if(data.settings.weatherGeo && data.settings.weatherGeo.zip === zip) return data.settings.weatherGeo;
+  const r = await fetch('https://api.zippopotam.us/us/' + encodeURIComponent(zip));
+  if(!r.ok) throw new Error('bad zip');
+  const j = await r.json(); const p = (j.places||[])[0]; if(!p) throw new Error('bad zip');
+  const geo = { zip, lat:p.latitude, lon:p.longitude, name:(p['place name']||'') + (p['state abbreviation']?', '+p['state abbreviation']:'') };
+  data.settings.weatherGeo = geo; saveLocal();
+  return geo;
+}
+async function fetchWalkWeather(logId){
+  const zip = (data.settings.homeZip||'').trim(); if(!zip) return;
+  try {
+    const geo = await geocodeZip(zip);
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude='+geo.lat+'&longitude='+geo.lon+'&temperature_unit=fahrenheit&current=temperature_2m,weather_code');
+    const j = await r.json(); const cur = j.current; if(!cur) return;
+    const w = weatherFromCode(cur.weather_code);
+    const log = data.logs.find(l => l.id === logId); if(!log) return;
+    log.weather = { tempF:Math.round(cur.temperature_2m), code:cur.weather_code, label:w.label, emoji:w.emoji, place:geo.name };
+    save(false);
+    if(currentView==='today' || currentView==='log' || currentView==='activity') render();
+  } catch(e){ /* weather is optional — silently skip */ }
 }
 function quickWeight(){
   if(denyLog()) return;
@@ -1547,14 +1658,15 @@ function renderToday(){
 }
 const LOG_META = { feed:{i:'🍖',c:'var(--accent)'}, water:{i:'💧',c:'var(--blue)'}, potty:{i:'🚪',c:'var(--accent-2)'}, walk:{i:'🦮',c:'var(--success)'}, weight:{i:'⚖️',c:'var(--accent-purple)'} };
 function logSummary(l){
-  if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food')].filter(Boolean).join(' · ');
+  if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water';
   if(l.type==='potty') return [esc(l.result||'Potty'), l.place?esc(l.place):'', l.stool?'· '+esc(l.stool)+' stool':''].filter(Boolean).join(' ');
   if(l.type==='walk'){
     let route = '';
     if(l.from || l.to) route = [esc(l.from), esc(l.to)].filter(Boolean).join(l.roundTrip ? ' ↔ ' : ' → ') + (l.roundTrip && !(l.from && l.to) ? ' (round trip)' : '');
     else if(l.roundTrip) route = 'round trip';
-    return [l.durationMin?esc(l.durationMin)+' min':'', l.distance?esc(l.distance)+' mi':'', route].filter(Boolean).join(' · ') || 'Walk';
+    const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : '';
+    return [l.durationMin?esc(l.durationMin)+' min':'', l.distance?esc(l.distance)+' mi':'', route, wx].filter(Boolean).join(' · ') || 'Walk';
   }
   if(l.type==='weight') return esc(l.value)+' '+esc(l.unit||'lb');
   return '';
@@ -1577,13 +1689,14 @@ function editLogModal(id){
     title = '🍖 Edit feeding';
     body += '<label class="label">Food</label><select class="select" id="e-food">'+sel(feedFoodOptions(), l.foodType||'')+'</select>'
       + '<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="e-amt" value="'+esc(l.amount||'')+'"></div>'
-      + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>';
+      + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>'
+      + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.foodPlace||'')+'</select>';
   } else if(l.type === 'water'){
     title = '💧 Edit water';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+esc(r)+'</button>').join('')+'</div>'
-      + '<div class="grid-2"><div><label class="label">Where</label><select class="select" id="e-place">'+sel(POTTY_PLACES, l.place||'Backyard')+'</select></div>'
+      + '<div class="grid-2"><div><label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select></div>'
       + '<div><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
@@ -1607,7 +1720,7 @@ function saveEditLog(id){
   if(denyLog()) return;
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
-  if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); }
+  if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
   else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
   else if(l.type === 'weight'){ l.value = fv('e-w'); }
@@ -1940,7 +2053,20 @@ function renderInsights(){
   // potty / feeding summary
   if(potty.length){
     const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
-    html += '<div class="card"><h3 class="section-title">🚪 Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2">'+esc(k)+': '+v+'</span>').join('')+'</div></div>';
+    // Average gap between pees (Pee or Both) and between poops (Poop or Both).
+    const avgGapHrs = (matchFn) => {
+      const times = potty.filter(p=>p.dateTime && matchFn(p.result||'')).map(p=>new Date(p.dateTime).getTime()).sort((a,b)=>a-b);
+      if(times.length < 2) return null;
+      let sum=0; for(let i=1;i<times.length;i++) sum += times[i]-times[i-1];
+      return (sum/(times.length-1))/3600000; // hours
+    };
+    const fmtGap = (h) => h==null ? '—' : (h>=24 ? (h/24).toFixed(1)+'d' : h.toFixed(1)+'h');
+    const peeGap = avgGapHrs(r => r==='Pee' || r==='Both');
+    const poopGap = avgGapHrs(r => r==='Poop' || r==='Both');
+    html += '<div class="card"><h3 class="section-title">🚪 Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2">'+esc(k)+': '+v+'</span>').join('')+'</div>'
+      + '<div class="grid-2"><div class="timing-box"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
+      + '<div class="timing-box"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
+      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks (a "Both" counts toward both). Needs at least 2 of each.</p></div>';
   }
   if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">📊</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
   return html;

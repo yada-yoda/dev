@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.14.2**
+**Current Version: v0.15.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,13 @@ covers both.
 
 ## Version History
 
+- **v0.15.0** — Custom lists, food location, walk favorites & weather, potty intervals. **Settings →
+  Lists & preferences** lets you add **custom Potty and Food locations**, a **home ZIP** (for weather),
+  and manage **favorite walk routes**. The feed form gained a **Where** dropdown. The walk form shows
+  **favorite-route chips** (tap to fill From/To) and a "★ save as favorite" option, and — if a home ZIP
+  is set — records the **current weather** (temp + condition via Open-Meteo, ZIP geocoded by
+  Zippopotam) on each walk. Insights' Potty breakdown now shows the **average time between pees and
+  between poops**.
 - **v0.14.2** — Clarified that the **Water** log means *you gave/refilled fresh water* (not the dog
   drinking): status card now reads "Water refilled", the toast says "Fresh water given", the timeline
   entry reads "Refilled fresh water", and the Today note spells it out.
