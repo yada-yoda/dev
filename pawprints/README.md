@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.14.0**
+**Current Version: v0.14.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.14.1** — Mobile fix: Contact cards no longer crowd. The name/details and the action buttons
+  (Call / vCard / Share / Edit) now stack — full-width text on top, buttons wrapping on their own row
+  below — instead of the buttons floating over a one-word-per-line name on narrow screens.
 - **v0.14.0** — Vet appointment times. Vet visits now take an optional **time** (and follow-up time)
   — works for past or future appointments. When a time is set, the **Google Calendar** sync and
   **.ics** export create a **timed 1-hour event** instead of an all-day one, and the time shows on the

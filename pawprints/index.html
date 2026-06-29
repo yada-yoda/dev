@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.14.0';
+const APP_VERSION = 'v0.14.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1710,11 +1710,12 @@ function renderContacts(){
     const title = c.name || c.org || 'Contact';
     const sub = [c.org && c.org!==title ? c.org : '', c.phone, c.email].filter(Boolean).join(' · ');
     const tel = (c.phone||'').replace(/[^0-9+]/g,'');
-    return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(title)+' <span class="chip-2" style="font-size:10px">'+esc(c.role||'')+'</span></div>'
-      +(sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(sub)+'</div>':'')
-      +(c.address?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(c.address)+'</div>':'')+'</div>'
-      +'<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">'
-      +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">Call</a>':'')
+    return '<div class="entry-row" style="flex-direction:column;align-items:stretch;gap:10px">'
+      +'<div><div style="font-weight:600;word-break:break-word">'+esc(title)+' <span class="chip-2" style="font-size:10px">'+esc(c.role||'')+'</span></div>'
+      +(sub?'<div style="font-size:12px;color:var(--text-secondary);word-break:break-word">'+esc(sub)+'</div>':'')
+      +(c.address?'<div style="font-size:12px;color:var(--text-secondary);word-break:break-word">'+esc(c.address)+'</div>':'')+'</div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+      +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">📞 Call</a>':'')
       +'<button class="btn btn-sm" onclick="downloadVCard(\''+c.id+'\')" title="Download contact card">⬇️ vCard</button>'
       +'<button class="btn btn-sm" onclick="shareVCard(\''+c.id+'\')" title="Share">Share</button>'
       +(canManage()?'<button class="btn btn-sm" onclick="contactModal(\''+c.id+'\')">Edit</button>':'')
