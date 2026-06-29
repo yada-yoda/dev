@@ -157,6 +157,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
     <div><h1 id="header-title">PawPrints</h1><div class="sub" id="header-sub">Feed · Walk · Care <span style="color:var(--accent);font-family:'JetBrains Mono',monospace;font-weight:500" id="app-version"></span></div></div>
   </div>
   <div class="header-actions">
+    <button class="btn weather-pill hidden" id="reminders-pill" onclick="toggleRemindersPanel(event)" title="Reminders" aria-label="Reminders"></button>
     <button class="btn weather-pill hidden" id="weather-pill" onclick="toggleWeatherPanel(event)" title="Weather" aria-label="Current weather"></button>
     <select id="pet-select" class="pet-select hidden" onchange="onPetSelect(this.value)"></select>
     <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
@@ -194,6 +195,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <span>PawPrints <span id="app-version-footer" style="font-family:'JetBrains Mono',monospace"></span></span>
 </footer>
 <div id="png-render-area"></div>
+<div id="reminders-panel" class="weather-panel hidden"></div>
 <div id="weather-panel" class="weather-panel hidden"></div>
 <div id="modal-root"></div>
 <div id="toast" class="toast hidden"></div>
@@ -202,7 +204,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.22.0';
+const APP_VERSION = 'v0.23.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1099,7 +1101,7 @@ function quickPotty(){
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'q\')">'+esc(r)+'</button>').join('')+'</div>'
     +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
-    +'<label class="label">Location'+tip('Potty breaks are assumed to be at home, so the current weather (from your home ZIP) is saved with them. Pick Other if you were away — no weather is recorded then.')+'</label><select class="select" id="q-loc"><option value="home" selected>Home</option><option value="other">Other (away)</option></select>'
+    +pottyLocationField('home','q-loc')
     +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
@@ -1225,6 +1227,7 @@ function renderWeatherPanel(){
 }
 function toggleWeatherPanel(ev){
   if(ev) ev.stopPropagation();
+  closeRemindersPanel();
   const panel = document.getElementById('weather-panel'); if(!panel) return;
   if(panel.classList.contains('hidden')){
     if(!headerWeather || Date.now()-headerWeather.ts > 1800000) fetchHeaderWeather();
@@ -1239,6 +1242,41 @@ function weatherOutside(e){
 function closeWeatherPanel(){
   const panel = document.getElementById('weather-panel'); if(panel) panel.classList.add('hidden');
   document.removeEventListener('click', weatherOutside);
+}
+// ── Header reminders bell + panel (same reminders as the Today card, on every tab) ──
+function updateRemindersPill(){
+  const pill = document.getElementById('reminders-pill'); if(!pill) return;
+  if(!activePet()){ pill.classList.add('hidden'); return; }
+  const rem = getReminders(), n = rem.length, over = rem.some(r=>r.over);
+  pill.innerHTML = svgIcon('restock',16) + (n ? '<span style="font-weight:700">'+n+'</span>' : '');
+  pill.title = n ? (n+' reminder'+(n===1?'':'s')+(over?' · some overdue':'')) : 'No reminders right now';
+  pill.style.color = over ? 'var(--danger)' : '';
+  pill.classList.remove('hidden');
+}
+function renderRemindersPanel(){
+  const panel = document.getElementById('reminders-panel'); if(!panel) return;
+  const head = '<div style="font-weight:600;font-size:14px;margin-bottom:10px">Reminders</div>';
+  if(!activePet()){ panel.innerHTML = head+'<div style="font-size:13px;color:var(--text-secondary)">Add a dog to see reminders.</div>'; return; }
+  const rem = getReminders();
+  if(!rem.length){ panel.innerHTML = head+'<div style="font-size:13px;color:var(--text-secondary)">All caught up — nothing due right now.</div>'; return; }
+  panel.innerHTML = head + rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="display:inline-flex">'+iconFor(r.icon,18)+'</span><span>'+esc(r.text)+'</span></div>').join('');
+}
+function toggleRemindersPanel(ev){
+  if(ev) ev.stopPropagation();
+  closeWeatherPanel();
+  const panel = document.getElementById('reminders-panel'); if(!panel) return;
+  if(panel.classList.contains('hidden')){ renderRemindersPanel(); panel.classList.remove('hidden'); setTimeout(()=>document.addEventListener('click', remindersOutside), 0); }
+  else closeRemindersPanel();
+}
+function remindersOutside(e){ const panel = document.getElementById('reminders-panel'), pill = document.getElementById('reminders-pill'); if(panel && !panel.contains(e.target) && pill && !pill.contains(e.target)) closeRemindersPanel(); }
+function closeRemindersPanel(){ const p = document.getElementById('reminders-panel'); if(p) p.classList.add('hidden'); document.removeEventListener('click', remindersOutside); }
+// "Home" potty/walk weather is recorded from the home ZIP in Settings — label reflects that.
+function homeWeatherLabel(){ const s = data.settings||{}; const zip = (s.homeZip||'').trim(); const place = (s.weatherGeo && s.weatherGeo.zip === zip) ? s.weatherGeo.name : ''; return zip ? ('Home — '+(place||zip)) : 'Home'; }
+function pottyLocationField(loc, id){
+  const zip = (data.settings && (data.settings.homeZip||'').trim());
+  const hint = zip ? '' : '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 8px">Set a home ZIP in Settings → Lists &amp; preferences to record weather for home potty breaks.</div>';
+  return '<label class="label">Location'+tip('“Home” uses your home ZIP from Settings to record the current weather with this potty break. Pick Other if you were away — no weather is saved then.')+'</label>'
+    + '<select class="select" id="'+id+'"><option value="home"'+((loc||'home')!=='other'?' selected':'')+'>'+esc(homeWeatherLabel())+'</option><option value="other"'+(loc==='other'?' selected':'')+'>Other (away)</option></select>'+hint;
 }
 // A walk counts as a "home" walk for backfill if its From or To is "Home".
 function isHomeWalk(l){ const h = s => String(s||'').trim().toLowerCase() === 'home'; return h(l.from) || h(l.to); }
@@ -1831,6 +1869,7 @@ function toggleTheme(){
 
 function render(){
   updateHeader();
+  updateRemindersPill();
   const sb = document.getElementById('shared-banner');
   if(sb){ sb.classList.toggle('hidden', !sharedOwnerUid); if(sharedOwnerUid){ document.getElementById('shared-banner-text').textContent = '👋 Viewing '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs — changes save to their account'; } }
   document.getElementById('view-today').innerHTML = renderToday();
@@ -1944,7 +1983,7 @@ function editLogModal(id){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
       + '<label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select>'
-      + '<label class="label">Location</label><select class="select" id="e-loc"><option value="home"'+((l.location||'home')!=='other'?' selected':'')+'>Home</option><option value="other"'+(l.location==='other'?' selected':'')+'>Other (away)</option></select>'
+      + pottyLocationField(l.location, 'e-loc')
       + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';

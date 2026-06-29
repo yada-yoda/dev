@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.22.0**
+**Current Version: v0.23.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,12 @@ covers both.
 
 ## Version History
 
+- **v0.23.0** — Reminders in the header + potty "Home" tied to your ZIP. The reminders that used to live only
+  on the Today tab now also have a **bell pill in the top toolbar** (with a count, red if anything's overdue)
+  that opens a panel from any tab — meds due, vet follow-ups, grooming due, low supplies. The potty
+  **Location** dropdown's "Home" now shows your settings location (e.g. "Home — Chicago, IL") so it's clear
+  weather is pulled from your home ZIP, with a hint to set one if you haven't; each at-home potty break still
+  records the current weather.
 - **v0.22.0** — Weather in the header. A current-weather pill now sits in the top toolbar (just left of the
   dog switcher) showing the temperature + condition for your home ZIP; tap it for a panel with "feels like"
   and the next 12 hours, hour by hour. Powered by Open-Meteo (no key, same source as the walk/potty
