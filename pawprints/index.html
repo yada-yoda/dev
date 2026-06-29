@@ -188,7 +188,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.19.1';
+const APP_VERSION = 'v0.20.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -209,8 +209,26 @@ const ICONS = {
   potty:    { vb:'0 -960 960 960', d:'M538-80H423v-149H120l189-274h-95l266-377 266 377h-94l188 274H538v149ZM236-289h189-90 290-89 189-489Zm0 0h489L536-563h89L480-769 335-563h90L236-289Z' },
   walk:     { vb:'0 -960 960 960', d:'m278-40 116-586-101 43v133h-61v-173l192-81q14-6 29.5-7.5T484-710q17 3 29.5 11t20.5 20l42 66q31 48 77.5 75.5T753-510v60q-70-2-123.5-30.5T533-568l-38 152 92 83v293h-60v-240l-108-98-79 338h-62Zm210.5-735.5Q467-797 467-827t21.5-51.5Q510-900 540-900t51.5 21.5Q613-857 613-827t-21.5 51.5Q570-754 540-754t-51.5-21.5Z' },
   weight:   { vb:'0 -960 960 960', d:'M480.5-489q50.5 0 84-33.5t33.5-84q0-50.5-33.5-84.5t-84-34q-50.5 0-84.5 34t-34 84.5q0 50.5 34 84t84.5 33.5ZM403-593q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6Zm63 0q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6Zm63 0q-6-6-6-14t6-14q6-6 14-6t14 6q6 6 6 14t-6 14q-6 6-14 6t-14-6ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm0-600v600-600Z' },
+  schedule:{ vb:'0 -960 960 960', d:'m627-287 45-45-159-160v-201h-60v225l174 181ZM480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-82 31.5-155t86-127.5Q252-817 325-848.5T480-880q82 0 155 31.5t127.5 86Q817-708 848.5-635T880-480q0 82-31.5 155t-86 127.5Q708-143 635-111.5T480-80Zm0-400Zm0 340q140 0 240-100t100-240q0-140-100-240T480-820q-140 0-240 100T140-480q0 140 100 240t240 100Z' },
+  contacts:{ vb:'0 -960 960 960', d:'M144-40v-60h672v60H144Zm0-820v-60h672v60H144Zm336 416q50 0 84-34t34-84q0-50-34-84t-84-34q-50 0-84 34t-34 84q0 50 34 84t84 34ZM132-160q-24 0-42-18t-18-42v-520q0-26 18-43t42-17h696q24 0 42 18t18 42v520q0 24-18 42t-42 18H132Zm88-60q51-63 121-94.5T479.5-346q68.5 0 140 31.5T740-220h88v-520H132v520h88Zm94 0h334q-31-30-72.5-48T480-286q-54 0-94.5 18T314-220Zm125.5-301Q423-538 423-562t16.34-41q16.34-17 40.5-17t40.66 17q16.5 17 16.5 41t-16.34 41q-16.34 17-40.5 17t-40.66-17Zm40.5 41Z' },
+  vet:{ vb:'0 -960 960 960', d:'M435-279h90v-156h156v-90H525v-156h-90v156H279v90h156v156ZM180-120q-24 0-42-18t-18-42v-600q0-24 18-42t42-18h600q24 0 42 18t18 42v600q0 24-18 42t-42 18H180Zm0-60h600v-600H180v600Zm0-600v600-600Z' },
+  groom:{ vb:'0 -960 960 960', d:'M782-114 481-415 364-298q11 17 13.5 33t2.5 35q0 64-43 107T230-80q-64 0-107-43T80-230q0-64 43-107t107-43q18 0 35.5 5t36.5 15l116-116-118-118q-17 8-34.5 11t-35.5 3q-64 0-107-43T80-730q0-64 43-107t107-43q64 0 107 43t43 107q0 19-2.5 36T367-662l514 514v34h-99ZM599-527l-66-66 249-249h99v33L599-527ZM294-666q26-26 26-64t-26-64q-26-26-64-26t-64 26q-26 26-26 64t26 64q26 26 64 26t64-26Zm202.5 203.5Q502-468 502-476t-5.5-13.5Q491-495 483-495t-13.5 5.5Q464-484 464-476t5.5 13.5Q475-457 483-457t13.5-5.5ZM294-166q26-26 26-64t-26-64q-26-26-64-26t-64 26q-26 26-26 64t26 64q26 26 64 26t64-26Z' },
+  meds:{ vb:'0 -960 960 960', d:'M440-269h79v-111h114v-80H519v-111h-79v111H327v80h113v111ZM260-120q-24.75 0-42.37-17.63Q200-155.25 200-180v-479q0-24.75 17.63-42.38Q235.25-719 260-719h440q24.75 0 42.38 17.62Q760-683.75 760-659v479q0 24.75-17.62 42.37Q724.75-120 700-120H260Zm0-60h440v-479H260v479Zm-20-600v-60h481v60H240Zm20 121v479-479Z' },
+  illness:{ vb:'0 -960 960 960', d:'M85-545q23-143 134.5-239T480-880q75 0 141 25.5T740-784q-10 17-16.5 30.5T713-728q-46-43-105.5-67.5T480-820q-112 0-199 64T159-592q-22 5-41 16.5T85-545ZM480-80q-149 0-260.5-96.5T85-416q13 20 32 32t42 17q35 100 122.5 163.5T480-140q142 0 241-99.5T820-480q0-17-2-34t-5-34q7 2 13.5 2.5t13.5.5q9 0 17.5-1t16.5-3q3 17 4.5 34t1.5 35q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80ZM336-503l77-77-78-78-35 35 43 42-43 43 36 35Zm451-124q-22-22-22-53 0-26 13.5-54t61.5-97q48 69 61.5 97t13.5 54q0 31-22 53t-53 22q-31 0-53-22ZM625-502l36-36-43-43 42-42-35-35-78 78 78 78Zm-145 85q-26 0-51 6t-48 18l-146-84q0-16-7-29.5T208-528q-20-11-42-5.5T132-508q-11 20-5 42t26 34q14 8 28.5 7t28.5-9l125 73q-18 17-32.5 37T278-280h53q22-42 62.5-65t87.5-23q47 0 86.5 23t62.5 65h52q-25-62-80-99.5T480-417Zm0-63Z' },
+  followups:{ vb:'0 -960 960 960', d:'M566-80v-60h214v-430H180v220h-60v-410q0-24 18-42t42-18h65v-60h65v60h340v-60h65v60h65q24 0 42 18t18 42v620q0 24-18 42t-42 18H566ZM320-14l-42-42 113-114H50v-60h341L278-344l42-42 186 186L320-14ZM180-630h600v-130H180v130Zm0 0v-130 130Z' },
+  link:{ vb:'0 -960 960 960', d:'M450-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h170v60H280q-58.33 0-99.17 40.76-40.83 40.77-40.83 99Q140-422 180.83-381q40.84 41 99.17 41h170v60ZM325-450v-60h310v60H325Zm185 170v-60h170q58.33 0 99.17-40.76 40.83-40.77 40.83-99Q820-538 779.17-579q-40.84-41-99.17-41H510v-60h170q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H510Z' },
+  restock:{ vb:'0 -960 960 960', d:'M160-200v-60h80v-304q0-84 49.5-150.5T420-798v-22q0-25 17.5-42.5T480-880q25 0 42.5 17.5T540-820v22q81 17 130.5 83.5T720-564v304h80v60H160Zm320-302Zm0 422q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM300-260h360v-304q0-75-52.5-127.5T480-744q-75 0-127.5 52.5T300-564v304Z' },
+  spend:{ vb:'0 -960 960 960', d:'M540-420q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM220-280q-24.75 0-42.37-17.63Q160-315.25 160-340v-400q0-24.75 17.63-42.38Q195.25-800 220-800h640q24.75 0 42.38 17.62Q920-764.75 920-740v400q0 24.75-17.62 42.37Q884.75-280 860-280H220Zm100-60h440q0-42 29-71t71-29v-200q-42 0-71-29t-29-71H320q0 42-29 71t-71 29v200q42 0 71 29t29 71Zm480 180H100q-24.75 0-42.37-17.63Q40-195.25 40-220v-460h60v460h700v60ZM220-340v-400 400Z' },
+  spots:{ vb:'0 -960 960 960', d:'M529.5-510.5Q550-531 550-560t-20.5-49.5Q509-630 480-630t-49.5 20.5Q410-589 410-560t20.5 49.5Q451-490 480-490t49.5-20.5ZM480-159q133-121 196.5-219.5T740-552q0-118-75.5-193T480-820q-109 0-184.5 75T220-552q0 75 65 173.5T480-159Zm0 79Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Zm0-480Z' },
+  add:{ vb:'0 -960 960 960', d:'M450-450H200v-60h250v-250h60v250h250v60H510v250h-60v-250Z' },
+  edit:{ vb:'0 -960 960 960', d:'M180-180h44l472-471-44-44-472 471v44Zm-60 60v-128l575-574q8-8 19-12.5t23-4.5q11 0 22 4.5t20 12.5l44 44q9 9 13 20t4 22q0 11-4.5 22.5T823-694L248-120H120Zm659-617-41-41 41 41Zm-105 64-22-22 44 44-22-22Z' },
+  download:{ vb:'0 -960 960 960', d:'M480-313 287-506l43-43 120 120v-371h60v371l120-120 43 43-193 193ZM220-160q-24 0-42-18t-18-42v-143h60v143h520v-143h60v143q0 24-18 42t-42 18H220Z' },
+  call:{ vb:'0 -960 960 960', d:'M795-120q-116 0-236.5-56T335-335Q232-438 176-558.5T120-795q0-19.29 12.86-32.14Q145.71-840 165-840h140q14 0 24 10t14 25l26.93 125.64Q372-665 369.5-653.5t-10.73 19.73L259-533q26 44 55 82t64 72q37 38 78 69.5t86 55.5l95-98q10-11 23.15-15 13.15-4 25.85-2l119 26q15 4 25 16.04 10 12.05 10 26.96v135q0 19.29-12.86 32.14Q814.29-120 795-120ZM229-588l81-82-23-110H180q2 42 13.5 88.5T229-588Zm369 363q41 19 89 31t93 14v-107l-103-21-79 83ZM229-588Zm369 363Z' },
+  share:{ vb:'0 -960 960 960', d:'M686-80q-47.5 0-80.75-33.25T572-194q0-8 5-34L278-403q-16.28 17.34-37.64 27.17Q219-366 194-366q-47.5 0-80.75-33T80-480q0-48 33.25-81T194-594q24 0 45 9.3 21 9.29 37 25.7l301-173q-2-8-3.5-16.5T572-766q0-47.5 33.25-80.75T686-880q47.5 0 80.75 33.25T800-766q0 47.5-33.25 80.75T686-652q-23.27 0-43.64-9Q622-670 606-685L302-516q3 8 4.5 17.5t1.5 18q0 8.5-1 16t-3 15.5l303 173q16-15 36.09-23.5 20.1-8.5 43.07-8.5Q734-308 767-274.75T800-194q0 47.5-33.25 80.75T686-80Zm.04-60q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5Zm-492-286q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5ZM724.5-727.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM686-194ZM194-480Zm492-286Z' },
 };
+const EMOJI_ICON = { '💊':'meds','🏥':'vet','✂️':'groom','🤒':'illness','🛒':'supplies','📅':'calendar','📌':'followups' };
 function svgIcon(key, px){ const i = ICONS[key]; if(!i) return ''; const sz = px ? ' width="'+px+'" height="'+px+'"' : ''; return '<svg class="msi" viewBox="'+i.vb+'" fill="currentColor"'+sz+' aria-hidden="true"><path d="'+i.d+'"/></svg>'; }
+function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e||''); }
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1802,14 +1820,14 @@ function renderToday(){
     + '</div></div>';
   // reminders
   const rem = getReminders();
-  if(rem.length) html += '<div class="card"><h3 class="section-title">⏰ Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px">'+r.icon+'</span><span>'+esc(r.text)+'</span></div>').join('')+'</div>';
+  if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span>'+esc(r.text)+'</span></div>').join('')+'</div>';
   // today timeline
   const today = todayISO();
   const todays = petLogs().filter(l => l.dateTime && l.dateTime.slice(0,10) === today).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
   const totalLogs = petLogs().filter(l=>l.dateTime).length;
   html += '<div class="card"><h3 class="section-title">Today\'s activity</h3>'
     + (todays.length ? todays.map(l=>timelineRow(l)).join('') : '<p style="color:var(--text-secondary);font-size:14px">Nothing logged yet today'+(totalLogs?'.':' — tap a quick-log button above.')+'</p>')
-    + (totalLogs > todays.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-outline" onclick="openActivity()">📋 View all activity by day ('+totalLogs+') →</button></div>' : '')
+    + (totalLogs > todays.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-outline" onclick="openActivity()">'+svgIcon('log',16)+' View all activity by day ('+totalLogs+') →</button></div>' : '')
     + '</div>';
   return html;
 }
@@ -1895,7 +1913,7 @@ function emptyState(){
 function renderLog(){
   if(!activePet()) return emptyState();
   const tabs = [['feed','Feed'],['water','Water'],['potty','Potty'],['walk','Walk'],['weight','Weight']];
-  let html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px"><h2 style="font-size:20px;font-weight:700">Log activity</h2><button class="btn btn-sm" onclick="openActivity()">📋 All activity by day</button></div>';
+  let html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px"><h2 style="font-size:20px;font-weight:700">Log activity</h2><button class="btn btn-sm" onclick="openActivity()">'+svgIcon('log',16)+' All activity by day</button></div>';
   html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+svgIcon(LOG_META[k].i,16)+' '+l+'</button>').join('')+'</div>';
   const opener = { feed:'quickFeed', water:'quickWater', potty:'quickPotty', walk:'quickWalk', weight:'quickWeight' }[logSubtab];
   html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="'+opener+'()">+ Add '+logSubtab+' entry</button></div>';
@@ -1924,7 +1942,7 @@ function renderProfile(){
     + (p.photo?'<img src="'+p.photo+'" class="profile-photo-lg">':'<div class="profile-photo-lg">🐾</div>')
     + '<div style="flex:1;min-width:160px"><div style="font-size:24px;font-weight:700">'+esc(p.name)+'</div>'
     + '<div style="color:var(--text-secondary);font-size:14px;margin-top:2px">'+[p.breed,p.sex,p.color].filter(Boolean).map(esc).join(' · ')+'</div></div>'
-    + (canManage()?'<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">✏️ Edit</button>':'')+'</div>';
+    + (canManage()?'<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">'+svgIcon('edit',15)+' Edit</button>':'')+'</div>';
   // key facts grid
   const facts = [];
   if(p.birthday) facts.push(['Age', ageStr(p.birthday)+' (born '+fmtDate(p.birthday)+')']);
@@ -1942,21 +1960,21 @@ function renderProfile(){
   if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor?esc(p.vet2Doctor):'', p.vet2Name?esc(p.vet2Name):'', p.vet2Phone?esc(p.vet2Phone):'', p.vet2Email?esc(p.vet2Email):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
-  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">⚖️ Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">📇 Share '+esc(p.name)+'’s info card</button></div>';
+  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">'+svgIcon('weight',15)+' Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">'+svgIcon('share',15)+' Share '+esc(p.name)+'’s info card</button></div>';
   html += '</div>';
   // weight chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
   if(weights.length >= 2){
-    html += '<div class="card"><h3 class="section-title">⚖️ Weight trend</h3><div style="height:200px"><canvas id="weight-chart"></canvas></div></div>';
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:200px"><canvas id="weight-chart"></canvas></div></div>';
   } else if(weights.length === 1){
-    html += '<div class="card"><h3 class="section-title">⚖️ Weight</h3><p style="color:var(--text-secondary);font-size:14px">'+esc(weights[0].value)+' '+esc(weights[0].unit||'lb')+' — log another to see a trend.</p></div>';
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight</h3><p style="color:var(--text-secondary);font-size:14px">'+esc(weights[0].value)+' '+esc(weights[0].unit||'lb')+' — log another to see a trend.</p></div>';
   }
   // health timeline
-  html += '<div class="card"><h3 class="section-title">🩺 Health timeline</h3>'+renderHealthTimeline()+'</div>';
+  html += '<div class="card"><h3 class="section-title">'+svgIcon('care',18)+' Health timeline</h3>'+renderHealthTimeline()+'</div>';
   // contacts / care team
   html += renderContacts();
   // multi-dog management
-  html += '<div class="card"><h3 class="section-title">🐕 Your dogs</h3>'
+  html += '<div class="card"><h3 class="section-title">'+svgIcon('profile',18)+' Your dogs</h3>'
     + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div>'+(canManage()?'<button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button>':'')+'</div>').join('')
     + (canManage()?'<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button>':'')+'</div>';
   return html;
@@ -1970,11 +1988,11 @@ function renderHealthTimeline(){
   petLogs('weight').filter(l=>l.source && l.source!=='manual').forEach(l => {}); // already shown via vet
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, and meds will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
-  return items.slice(0,40).map(it => '<div class="timeline-item"><div class="tl-icon">'+it.icon+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
+  return items.slice(0,40).map(it => '<div class="timeline-item"><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
 }
 function renderContacts(){
   const cs = data.contacts || [];
-  let html = '<div class="card"><h3 class="section-title">📇 Contacts — vet, groomer &amp; care team</h3>';
+  let html = '<div class="card"><h3 class="section-title">'+svgIcon('contacts',18)+' Contacts — vet, groomer &amp; care team</h3>';
   if(!cs.length) html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:10px">Save your vet, emergency vet, groomer, sitter and more — each downloads or shares as a phone contact card (.vcf).</p>';
   else html += cs.map(c=>{
     const title = c.name || c.org || 'Contact';
@@ -1985,8 +2003,8 @@ function renderContacts(){
       +(sub?'<div style="font-size:12px;color:var(--text-secondary);word-break:break-word">'+esc(sub)+'</div>':'')
       +(c.address?'<div style="font-size:12px;color:var(--text-secondary);word-break:break-word">'+esc(c.address)+'</div>':'')+'</div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
-      +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">📞 Call</a>':'')
-      +'<button class="btn btn-sm" onclick="downloadVCard(\''+c.id+'\')" title="Download contact card">⬇️ vCard</button>'
+      +(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">'+svgIcon('call',15)+' Call</a>':'')
+      +'<button class="btn btn-sm" onclick="downloadVCard(\''+c.id+'\')" title="Download contact card">'+svgIcon('download',15)+' vCard</button>'
       +'<button class="btn btn-sm" onclick="shareVCard(\''+c.id+'\')" title="Share">Share</button>'
       +(canManage()?'<button class="btn btn-sm" onclick="contactModal(\''+c.id+'\')">Edit</button>':'')
       +'</div></div>';
@@ -2013,13 +2031,13 @@ function renderCalendar(){
   events.forEach(e => { const k = (e.date||'').slice(0,10); (byDay[k] = byDay[k]||[]).push(e); });
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Calendar</h2>';
   // Google Calendar control card
-  html += '<div class="card"><h3 class="section-title">📅 Google Calendar</h3>';
+  html += '<div class="card"><h3 class="section-title">'+svgIcon('calendar',18)+' Google Calendar</h3>';
   if(!currentUser){
     html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Sign in with Google to push vet, grooming and med dates straight to your calendar.</p>'
       + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">Sign in &amp; connect Google Calendar</button>';
   } else if(!gcalAccessToken){
     html += '<p style="color:var(--text-secondary);font-size:14px;margin-bottom:12px">Connect Google Calendar to sync '+activePet().name+'’s schedule into a calendar of your choice.</p>'
-      + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">🔗 Connect Google Calendar</button>';
+      + '<button class="btn btn-outline" onclick="connectGoogleCalendar()">'+svgIcon('link',15)+' Connect Google Calendar</button>';
   } else {
     const dog = esc(activePet().name);
     if(!data.settings.gcalCalendarId && !gcalChoosing){
@@ -2040,8 +2058,8 @@ function renderCalendar(){
       html += '<button class="btn-primary" style="width:auto;padding:12px 20px;font-size:14px" onclick="syncToGoogleCalendar()">🔄 Sync schedule</button>';
       html += '</div>';
       html += '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">'
-        + '<button class="btn btn-sm" onclick="createDogCalendar()">➕ New calendar for '+dog+'</button>'
-        + (target!=='primary' ? '<button class="btn btn-sm" onclick="renameCalendarModal()">✏️ Rename calendar</button>' : '')
+        + '<button class="btn btn-sm" onclick="createDogCalendar()">'+svgIcon('add',15)+' New calendar for '+dog+'</button>'
+        + (target!=='primary' ? '<button class="btn btn-sm" onclick="renameCalendarModal()">'+svgIcon('edit',15)+' Rename calendar</button>' : '')
         + (window._gcalCalendars ? '' : '<button class="btn btn-sm" onclick="window._gcalCalendars=null;loadCalendarList()">↻ Load my calendars</button>')
         + '</div>';
     }
@@ -2050,7 +2068,7 @@ function renderCalendar(){
       + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates'+(data.settings.gcalCalendarId?' to the calendar above':'')+'. Re-syncing updates the same events, no duplicates. (You can share the calendar with others from Google Calendar.)</p>';
     if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:4px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
   }
-  html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">📅 Download .ics</button></div>';
+  html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">'+svgIcon('download',15)+' Download .ics</button></div>';
   html += '</div>';
   // Month grid
   const first = new Date(view.y, view.m, 1), startDow = first.getDay(), daysIn = new Date(view.y, view.m+1, 0).getDate();
@@ -2066,7 +2084,7 @@ function renderCalendar(){
     html += '<div style="min-height:58px;border-radius:8px;border:1px solid '+(isToday?'var(--accent)':'var(--border)')+';background:'+(isToday?'rgba(244,162,97,.08)':'var(--bg-tertiary)')+';padding:4px 5px;overflow:hidden">'
       + '<div style="font-size:11px;color:'+(isToday?'var(--accent)':'var(--text-secondary)')+';font-weight:'+(isToday?'700':'400')+'">'+day+'</div>'
       + '<div style="display:flex;flex-wrap:wrap;gap:2px;margin-top:2px">'
-        + evs.slice(0,4).map(e=>'<span onclick="'+e.open+'" title="'+esc(e.title)+'" style="cursor:pointer;font-size:12px;line-height:1">'+e.icon+'</span>').join('')
+        + evs.slice(0,4).map(e=>'<span onclick="'+e.open+'" title="'+esc(e.title)+'" style="cursor:pointer;font-size:12px;line-height:1">'+iconFor(e.icon,15)+'</span>').join('')
         + (evs.length>4?'<span style="font-size:9px;color:var(--text-secondary);align-self:center">+'+(evs.length-4)+'</span>':'')
       + '</div></div>';
   }
@@ -2075,7 +2093,7 @@ function renderCalendar(){
   const upcoming = events.filter(e => (e.date||'').slice(0,10) >= todayK).slice(0,12);
   html += '<div class="card"><h3 class="section-title">Upcoming</h3>';
   if(!upcoming.length) html += '<p style="color:var(--text-secondary);font-size:14px">Nothing scheduled. Add a vet visit, grooming, or med to populate the calendar.</p>';
-  else html += upcoming.map(e=>'<div class="entry-row clickable" onclick="'+e.open+'"><div><div style="font-weight:600;font-size:14px">'+e.icon+' '+esc(e.title.replace(/^.\s/,''))+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(e.type)+(e.time?' · '+fmtClock(e.time):'')+'</div></div><div class="tl-time">'+fmtDate(e.date)+(e.time?'<br>'+fmtClock(e.time):'')+'</div></div>').join('');
+  else html += upcoming.map(e=>'<div class="entry-row clickable" onclick="'+e.open+'"><div><div style="font-weight:600;font-size:14px">'+iconFor(e.icon,16)+' '+esc(e.title.replace(/^\S+\s/,''))+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(e.type)+(e.time?' · '+fmtClock(e.time):'')+'</div></div><div class="tl-time">'+fmtDate(e.date)+(e.time?'<br>'+fmtClock(e.time):'')+'</div></div>').join('');
   html += '</div>';
   return html;
 }
@@ -2083,9 +2101,9 @@ function renderCalendar(){
 // ── CARE ──
 function renderCare(){
   if(!activePet()) return emptyState();
-  const tabs = [['vet','🏥 Vet'],['grooming','✂️ Grooming'],['meds','💊 Meds'],['illness','🤒 Illness']];
+  const tabs = [['vet','Vet','vet'],['grooming','Grooming','groom'],['meds','Meds','meds'],['illness','Illness','illness']];
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Care</h2>';
-  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(careSubtab===k?'active':'')+'" onclick="setCareSubtab(\''+k+'\')">'+l+'</button>').join('')+'</div>';
+  html += '<div class="subtab">'+tabs.map(([k,l,ic])=>'<button class="'+(careSubtab===k?'active':'')+'" onclick="setCareSubtab(\''+k+'\')">'+svgIcon(ic,16)+' '+l+'</button>').join('')+'</div>';
   if(careSubtab==='vet') html += renderVetTab();
   else if(careSubtab==='grooming') html += renderGroomTab();
   else if(careSubtab==='meds') html += renderMedsTab();
@@ -2100,14 +2118,14 @@ function vetPanel(){
     const tel = (phone||'').replace(/[^0-9+]/g,'');
     return '<div style="padding:10px 0;border-top:1px solid var(--border)"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-secondary);margin-bottom:3px">'+title+'</div>'
       + '<div style="font-weight:600">'+esc([doctor,clinic].filter(Boolean).join(' · ')||'Vet')+'</div>'
-      + ((phone||email)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">📞 '+esc(phone)+'</a>':'')+(email?'<a class="btn btn-sm" href="mailto:'+esc(email)+'">✉️ Email</a>':'')+'</div>':'')
+      + ((phone||email)?'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'+(tel?'<a class="btn btn-sm btn-accent" href="tel:'+esc(tel)+'">'+svgIcon('call',15)+' '+esc(phone)+'</a>':'')+(email?'<a class="btn btn-sm" href="mailto:'+esc(email)+'">✉️ Email</a>':'')+'</div>':'')
       + '</div>';
   };
   const primary = blk('Primary vet', p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail);
   const secondary = blk('Secondary vet', p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email);
   const hasTwo = !!(p.vet2Name || p.vet2Doctor);
-  if(!primary && !secondary) return '<div class="card"><h3 class="section-title" style="margin:0 0 8px">🩺 '+esc(p.name)+'’s vet</h3><p style="color:var(--text-secondary);font-size:14px;margin:0">No vet saved yet — <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="petModal(\''+p.id+'\')">add your vet</a> in the profile and it shows here.</p></div>';
-  return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="section-title" style="margin:0">🩺 '+esc(p.name)+'’s vet'+(hasTwo?'s':'')+'</h3><button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">Edit</button></div>'+primary+secondary+'</div>';
+  if(!primary && !secondary) return '<div class="card"><h3 class="section-title" style="margin:0 0 8px">'+svgIcon('care',18)+' '+esc(p.name)+'’s vet</h3><p style="color:var(--text-secondary);font-size:14px;margin:0">No vet saved yet — <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="petModal(\''+p.id+'\')">add your vet</a> in the profile and it shows here.</p></div>';
+  return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="section-title" style="margin:0">'+svgIcon('care',18)+' '+esc(p.name)+'’s vet'+(hasTwo?'s':'')+'</h3><button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">Edit</button></div>'+primary+secondary+'</div>';
 }
 function renderVetTab(){
   const visits = petArr('vetVisits').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
@@ -2117,11 +2135,11 @@ function renderVetTab(){
   let html = vetPanel() + (canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>':'');
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
-  if(followups.length){ html += '<div class="card"><h3 class="section-title">📌 Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span>🏥</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
+  if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
   const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):''].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
   if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
   if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
-  if(!visits.length) html += '<div class="card empty"><div class="ico">🏥</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
+  if(!visits.length) html += '<div class="card empty"><div class="ico">'+svgIcon('vet',46)+'</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
   return html;
 }
 function renderGroomTab(){
@@ -2131,7 +2149,7 @@ function renderGroomTab(){
     const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
     html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(items[0].date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
     html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.groomer?' · '+esc(g.groomer):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
-  } else html += '<div class="card empty"><div class="ico">✂️</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
+  } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
 function renderMedsTab(){
@@ -2143,7 +2161,7 @@ function renderMedsTab(){
       const status = u ? (u.past?'<span style="color:var(--danger);font-weight:600">overdue '+u.text+'</span>':'<span style="color:'+(u.days<=7?'var(--warning)':'var(--success)')+'">due '+u.text+'</span>') : '<span style="color:var(--text-secondary)">no schedule</span>';
       return '<div class="entry-row"><div style="flex:1"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span></div><div style="font-size:12px;color:var(--text-secondary)">'+(m.lastGiven?'Last: '+fmtDate(m.lastGiven):'')+(m.intervalDays?' · every '+esc(m.intervalDays)+'d':'')+' · '+(nd?'Next: '+fmtDate(nd):'')+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
     }).join('')+'</div>';
-  } else html += '<div class="card empty"><div class="ico">💊</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders.</p></div>';
+  } else html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders.</p></div>';
   return html;
 }
 function renderIllnessTab(){
@@ -2151,7 +2169,7 @@ function renderIllnessTab(){
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>':'';
   if(items.length){
     html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
-  } else html += '<div class="card empty"><div class="ico">🤒</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
+  } else html += '<div class="card empty"><div class="ico">'+svgIcon('illness',46)+'</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
   return html;
 }
 
@@ -2167,11 +2185,11 @@ function renderSupplies(){
   html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+all.length+'</div><div class="stat-label">Items tracked</div></div>'
     + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(ytd)+'</div><div class="stat-label">Spent this year</div></div>'
     + '<div class="card stat-card"><div class="stat-value" style="color:'+(low.length?'var(--warning)':'var(--text-secondary)')+'">'+low.length+'</div><div class="stat-label">Running low</div></div></div>';
-  if(low.length) html += '<div class="card"><h3 class="section-title">🔔 Restock list</h3>'+low.map(i=>'<div class="reminder due"><span>🛒</span><span style="flex:1">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span><button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
+  if(low.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('restock',18)+' Restock list</h3>'+low.map(i=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('supplies',18)+'</span><span style="flex:1">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span><button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
   const cats = ['all',...INV_CATEGORIES];
   html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
   const shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
-  if(!shown.length) return html + '<div class="card empty"><div class="ico">🛒</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';
+  if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';
   html += '<div class="card">'+shown.map(i=>'<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+'</div></div>'+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+'</div>').join('')+'</div>';
   return html;
 }
@@ -2199,12 +2217,12 @@ function renderInsights(){
     + '</div>';
   // weight trend
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
-  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">⚖️ Weight trend</h3><div style="height:220px"><canvas id="weight-chart"></canvas></div></div>';
+  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:220px"><canvas id="weight-chart"></canvas></div></div>';
   // spend breakdown
   if(spendTotal>0){
     const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
-    html += '<div class="card"><h3 class="section-title">💰 Spending this year — '+money(spendTotal)+'</h3>'
-      + bar('🏥 Vet', spendVet, 'var(--blue)') + bar('✂️ Grooming', spendGroom, 'var(--accent)') + bar('🛒 Food & supplies', spendSupplies, 'var(--success)')
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('spend',18)+' Spending this year — '+money(spendTotal)+'</h3>'
+      + bar(svgIcon('vet',16)+' Vet', spendVet, 'var(--blue)') + bar(svgIcon('groom',16)+' Grooming', spendGroom, 'var(--accent)') + bar(svgIcon('supplies',16)+' Food & supplies', spendSupplies, 'var(--success)')
       + '</div>';
   }
   // potty / feeding summary
@@ -2233,15 +2251,15 @@ function renderInsights(){
       spots[place].total++;
     });
     const spotList = Object.entries(spots).sort((a,b)=>b[1].total-a[1].total);
-    html += '<div class="card"><h3 class="section-title">🚪 Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2">'+esc(k)+': '+v+'</span>').join('')+'</div>'
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('potty',18)+' Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2">'+esc(k)+': '+v+'</span>').join('')+'</div>'
       + '<div class="grid-2"><div class="timing-box"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
       + '<div class="timing-box"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
       + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks. A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
-      + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">📍 Popular spots</div>'
+      + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
       + spotList.map(([place, c]) => '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--border)"><span style="font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px"><span class="chip-2">💧 '+c.pee+'</span><span class="chip">💩 '+c.poop+'</span></span></div>').join('')
       + '</div>';
   }
-  if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">📊</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
+  if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
   return html;
 }
 

@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.19.1**
+**Current Version: v0.20.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.20.0** — Icons everywhere. Finished the Material Symbols sweep across all the remaining tabs:
+  section headings (Reminders, Weight trend, Health timeline, Your dogs, Contacts, Google Calendar,
+  Follow-ups, Restock list, Spending, Potty breakdown), the Care sub-tabs (Vet/Grooming/Meds/Illness),
+  every empty-state icon, the Health timeline and calendar-event entries, spending bars, and the action
+  buttons (Connect, Call, Edit, Rename, Download, Share, New calendar). All inline SVG, theme-colored.
 - **v0.19.1** — Activity icons too. Extended the Material Symbols set to the activity entries — the Today
   status cards (Last fed/Water/Potty/Walk), every timeline row, the per-day activity summaries, the Log
   sub-tabs, and empty states — all now use inline-SVG icons (including a new weight icon) instead of emoji,
