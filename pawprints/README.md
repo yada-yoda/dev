@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.24.1**
+**Current Version: v0.24.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.24.2** — Sticky modal headers. Every pop-up's title bar and ✕ close button now stay pinned at the top
+  while the contents scroll, so on long panels like Settings & Data you can always reach the ✕ without
+  scrolling back up.
 - **v0.24.1** — Re-check weather. New Settings button overwrites the saved weather on every at-home walk
   and potty break with the **actual reading for that time** — pulling real **NWS station observations** for
   about the last 7 days (Open-Meteo historical for older). Use it to correct entries that were logged with
