@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.26.1**
+**Current Version: v0.26.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.26.2** — Where purchased. Supplies now have a **Where purchased** field (store/retailer), shown in the
+  item row and included in the spreadsheet export.
 - **v0.26.1** — Supply duration. Items in use now show how many **days in use** (start → today), and finished
   items show how many **days they were used** (start → finish), right in the row. Added a Days column to the
   spreadsheet export.
