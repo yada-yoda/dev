@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.16.0**
+**Current Version: v0.16.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.16.1** — Pick a saved vet. On a vet visit, the **Vet** and **Clinic** fields now show a dropdown
+  of vets/clinics you've used before (pulled from past visits and your vet contacts) — choose one or
+  type a new name. Picking a saved vet auto-fills its clinic, so repeat visits take two taps.
 - **v0.16.0** — Sticky tab bar + backfill past walk weather. The tab menu bar now **stays pinned to the
   top** as you scroll. New in **Settings → Lists & preferences**: once a home ZIP is set, a **"Add
   weather to past Home walks"** button looks up the *historical* weather (closest hour) for any past

@@ -185,7 +185,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.16.0';
+const APP_VERSION = 'v0.16.1';
 
 // ═══════════════════════════════════════════════
 // STATE
@@ -1174,15 +1174,41 @@ function quickWeight(){
 // ═══════════════════════════════════════════════
 // CARE: VET / GROOMING / MEDS / ILLNESS
 // ═══════════════════════════════════════════════
+// Saved vets/clinics for the vet-visit dropdowns — drawn from past visits + vet contacts.
+function vetSuggestions(){
+  const vets = new Set(), clinics = new Set(), map = {};
+  (data.vetVisits||[]).forEach(v => {
+    if(v.vet){ vets.add(v.vet); if(v.clinic && !map[v.vet]) map[v.vet] = v.clinic; }
+    if(v.clinic) clinics.add(v.clinic);
+  });
+  (data.contacts||[]).forEach(c => {
+    if((c.role||'').toLowerCase().indexOf('vet') > -1){
+      if(c.name){ vets.add(c.name); if(c.org && !map[c.name]) map[c.name] = c.org; }
+      if(c.org) clinics.add(c.org);
+    }
+  });
+  const pc = activePet(); if(pc && pc.vetName) clinics.add(pc.vetName);
+  return { vets:[...vets].sort((a,b)=>a.localeCompare(b)), clinics:[...clinics].sort((a,b)=>a.localeCompare(b)), map };
+}
+// When a saved vet is chosen, fill its clinic (only if the clinic field is still empty).
+function onVetPick(){
+  const clinicEl = document.getElementById('vt-clinic');
+  if(!clinicEl || clinicEl.value) return;
+  const c = vetSuggestions().map[fv('vt-vet')];
+  if(c) clinicEl.value = c;
+}
 function vetModal(id){
   const v = id ? data.vetVisits.find(x=>x.id===id) : null;
   const unit = activePet()?.weightUnit || 'lb';
+  const sug = vetSuggestions();
+  const vetOpts = sug.vets.map(x => '<option value="'+esc(x)+'"></option>').join('');
+  const clinicOpts = sug.clinics.map(x => '<option value="'+esc(x)+'"></option>').join('');
   openModal('<h3>🏥 '+(v?'Edit vet visit':'Vet visit')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
-    +'<div class="grid-2"><div><label class="label">Vet</label><input class="input" id="vt-vet" value="'+(v?esc(v.vet||''):'')+'" placeholder="Dr. Lee"></div>'
-    +'<div><label class="label">Clinic</label><input class="input" id="vt-clinic" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):'')+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
+    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
     +'<div class="grid-2"><div><label class="label">Cost</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
     +'<div class="grid-2"><div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div>'
