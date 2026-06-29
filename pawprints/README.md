@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.26.0**
+**Current Version: v0.26.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.26.1** — Supply duration. Items in use now show how many **days in use** (start → today), and finished
+  items show how many **days they were used** (start → finish), right in the row. Added a Days column to the
+  spreadsheet export.
 - **v0.26.0** — Supply lifecycle (started/finished). Supplies now have **Started** and **Finished** date
   fields (like the Usage tracker): an item with no start date is on-hand **Inventory**, setting a start date
   marks it **In use**, and a finish date marks it **Finished**. Each item shows its status badge and dates,
