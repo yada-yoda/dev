@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.29.0**
+**Current Version: v0.29.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.29.1** — Upcoming vet visits now remind. Fixed reminders so a scheduled vet visit within the next 30
+  days shows up (e.g. "Vet visit in 7d · Annual checkup"), not just its follow-up date.
 - **v0.29.0** — Custom calendar reminders + vet address. The Calendar tab has a new **"+ Add reminder /
   event"** button — set a title, date, optional time, location, and notes; it shows on the calendar and, if
   Google Calendar is connected, is added there automatically on save. Vet visits gained a **Vet / clinic

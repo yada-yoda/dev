@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.29.0';
+const APP_VERSION = 'v0.29.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1986,7 +1986,10 @@ function exportICS(){
 function getReminders(){
   const out = [];
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd){ const u = untilStr(nd); if(u && u.days <= 7) out.push({ icon:'💊', text:m.name+' '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
-  petArr('vetVisits').forEach(v => { if(v.followUpDate){ const u = untilStr(v.followUpDate); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet follow-up '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); } });
+  petArr('vetVisits').forEach(v => {
+    if(v.date){ const u = untilStr(v.date); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet visit '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
+    if(v.followUpDate){ const u = untilStr(v.followUpDate); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet follow-up '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
+  });
   petArr('grooming').forEach(g => { if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
   petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));
   return out.sort((a,b)=>a.sort-b.sort);
