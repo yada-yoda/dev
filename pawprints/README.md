@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.26.2**
+**Current Version: v0.27.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.27.0** — Water gets a form. The Water quick-log now opens a form like Fed instead of logging
+  instantly, so you can set the date/time and pick where you refilled the bowl (same place list as feeding).
+  The location is shown in the entry and editable afterward.
 - **v0.26.2** — Where purchased. Supplies now have a **Where purchased** field (store/retailer), shown in the
   item row and included in the spreadsheet export.
 - **v0.26.1** — Supply duration. Items in use now show how many **days in use** (start → today), and finished

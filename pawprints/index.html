@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.26.2';
+const APP_VERSION = 'v0.27.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1084,7 +1084,21 @@ function addLog(entry){
 function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
 // Quick buttons
-function quickWater(){ addLog({ type:'water', dateTime:nowLocalISO(), refilled:true }); showToast('💧 Fresh water given'); }
+function quickWater(){
+  if(denyLog()) return;
+  if(!activePet()){ promptAddDog(); return; }
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  const last = petLogs('water').filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0];
+  openModal('<h3>💧 Water refilled</h3>'
+    +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
+    +'<label class="label">Where'+tip('Where you refilled the bowl. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.place:'')+'</select>'
+    +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
+    +'<button class="btn-primary" onclick="saveWater()">Save</button>');
+}
+function saveWater(){
+  addLog({ type:'water', dateTime:fv('q-dt'), refilled:true, place:fv('q-place'), notes:fv('q-note') });
+  closeModal(); showToast('💧 Fresh water given');
+}
 // Food choices for the feed form = your Food/Treats from inventory (specific brands first) + the generic types.
 function feedFoodOptions(){
   const inv = petArr('inventory').filter(i => i.category==='Food' || i.category==='Treats').map(i => ((i.brand?i.brand+' ':'')+(i.name||'')).trim()).filter(Boolean);
@@ -2034,7 +2048,7 @@ function renderToday(){
     + '<button class="quick-btn" onclick="quickWater()"><span class="qi">'+svgIcon('water')+'</span>Water</button>'
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">'+svgIcon('potty')+'</span>Potty</button>'
     + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">'+svgIcon('walk')+'</span>Walk</button>'
-    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). One tap logs it instantly — no form. The others open a quick form.</div></div>';
+    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). Each button opens a quick form where you can set the time and place.</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)
@@ -2058,7 +2072,7 @@ function renderToday(){
 const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'} };
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
-  if(l.type==='water') return 'Refilled fresh water';
+  if(l.type==='water') return 'Refilled fresh water'+(l.place?' @ '+esc(l.place):'');
   if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result||'Potty') + (rest.length ? ' — ' + rest.join(' · ') : ''); }
   if(l.type==='walk'){
     let route = '';
@@ -2092,6 +2106,7 @@ function editLogModal(id){
       + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.foodPlace||'')+'</select>';
   } else if(l.type === 'water'){
     title = '💧 Edit water';
+    body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.place||'')+'</select>';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
@@ -2121,6 +2136,7 @@ function saveEditLog(id){
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
   if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
+  else if(l.type === 'water'){ l.place = fv('e-place'); }
   else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
   else if(l.type === 'weight'){ l.value = fv('e-w'); }
