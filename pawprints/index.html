@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.30.1';
+const APP_VERSION = 'v0.30.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1486,13 +1486,15 @@ function vetModal(id){
   const vetOpts = sug.vets.map(x => '<option value="'+esc(x)+'"></option>').join('');
   const clinicOpts = sug.clinics.map(x => '<option value="'+esc(x)+'"></option>').join('');
   const addrOpts = sug.addresses.map(x => '<option value="'+esc(x)+'"></option>').join('');
+  // New visit → prefill from a saved vet contact (name/clinic/address) to save typing.
+  const vetC = v ? null : (data.contacts||[]).find(c => (c.role||'').toLowerCase().indexOf('vet') > -1);
   openModal('<h3>🏥 '+(v?'Edit vet visit':'Vet visit')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
-    +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):'')+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
-    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
-    +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):'')+'" placeholder="123 Main St, City, ST"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
+    +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"<datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
+    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
+    +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St, City, ST"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
@@ -1609,11 +1611,13 @@ function groomModal(id){
   const sug = groomSuggestions();
   const groomerOpts = sug.groomers.map(x => '<option value="'+esc(x)+'"></option>').join('');
   const addrOpts = sug.addresses.map(x => '<option value="'+esc(x)+'"></option>').join('');
+  // New grooming → prefill from a saved groomer contact.
+  const groomC = g ? null : (data.contacts||[]).find(c => (c.role||'').toLowerCase().indexOf('groom') > -1);
   openModal('<h3>✂️ '+(g?'Edit grooming':'Grooming')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="gr-date" value="'+(g?esc(g.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="gr-time" value="'+(g?esc(g.time||''):'')+'"></div></div>'
-    +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):'')+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'
-    +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):'')+'" placeholder="123 Main St, City, ST"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
+    +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):esc((groomC&&(groomC.name||groomC.org))||''))+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'
+    +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):esc((groomC&&groomC.address)||''))+'" placeholder="123 Main St, City, ST"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
     +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+GROOM_SERVICES.map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'"></div></div>'
@@ -2049,13 +2053,14 @@ function exportICS(){
 // ═══════════════════════════════════════════════
 function getReminders(){
   const out = [];
+  const todayK = todayISO();
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd){ const u = untilStr(nd); if(u && u.days <= 7) out.push({ icon:'💊', text:m.name+' '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
   petArr('vetVisits').forEach(v => {
-    if(v.date){ const u = untilStr(v.date); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet visit '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
+    if(v.date && v.date > todayK){ const u = untilStr(v.date); if(u && u.days <= 30) out.push({ icon:'🏥', text:'Vet visit '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
     if(v.followUpDate){ const u = untilStr(v.followUpDate); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet follow-up '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
   });
   petArr('grooming').forEach(g => {
-    if(g.date){ const u = untilStr(g.date); if(u && !u.past && u.days <= 30) out.push({ icon:'✂️', text:'Grooming '+u.text+(g.services&&g.services.length?' · '+g.services.join(', '):''), over:false, sort:u.days }); }
+    if(g.date && g.date > todayK){ const u = untilStr(g.date); if(u && u.days <= 30) out.push({ icon:'✂️', text:'Grooming '+u.text+(g.services&&g.services.length?' · '+g.services.join(', '):''), over:false, sort:u.days }); }
     if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); }
   });
   petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));

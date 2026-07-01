@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.30.1**
+**Current Version: v0.30.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.30.2** — Prefill from saved contacts + reminder fix. A new vet visit or grooming entry now auto-fills
+  the vet/groomer, clinic, and address from a matching saved **contact** on the dog's profile (still editable).
+  Also fixed the Today reminders so a vet visit dated **today** no longer shows as upcoming after it's
+  happened — a visit only reminds if it's a future date (same rule now for grooming).
 - **v0.30.1** — Calendar "Upcoming" fix + vet icon. A vet visit or grooming session dated **today** no
   longer lingers in the calendar's Upcoming list once it's happened — record-type events only appear there
   if they're genuinely in the future (due/follow-up items still show for today). Swapped the vet icon from
