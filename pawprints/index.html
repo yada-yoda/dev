@@ -209,7 +209,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.33.0';
+const APP_VERSION = 'v0.34.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -254,7 +254,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], journal:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -393,7 +393,61 @@ function openModal(html){
     + '<div class="modal-head"><h3>'+title+'</h3><button class="modal-x" type="button" onclick="closeModal()" aria-label="Close" title="Close">×</button></div>'
     + '<div class="modal-body">'+body+'</div></div></div>';
 }
-function closeModal(){ document.getElementById('modal-root').innerHTML = ''; }
+function closeModal(){
+  const wasDraft = openDraft;
+  if(wasDraft){
+    draftClearTimer();
+    if(wasDraft.committed){ if(wasDraft.id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==wasDraft.id); save(false); } }
+    else { draftSnapshot(); }
+    openDraft = null;
+  }
+  document.getElementById('modal-root').innerHTML = '';
+  if(wasDraft) render();
+}
+// ── Auto-save drafts: while a NEW record form is open with input, snapshot it (timer + on close) ──
+const DRAFT_KINDS = {
+  vet:     { opener:'vetModal',     section:'care',     name:'Vet visit', label:['vt-reason'] },
+  groom:   { opener:'groomModal',   section:'care',     name:'Grooming',  label:['gr-by'] },
+  med:     { opener:'medModal',     section:'care',     name:'Med',       label:['md-name'] },
+  illness: { opener:'illnessModal', section:'care',     name:'Illness',   label:['il-dx','il-treat'] },
+  supply:  { opener:'invModal',     section:'supplies', name:'Supply',    label:['iv-name'] },
+  contact: { opener:'contactModal', section:'profile',  name:'Contact',   label:['ct-name','ct-org'] },
+  note:    { opener:'noteModal',    section:'profile',  name:'Note',      label:['nt-text'] },
+  event:   { opener:'eventModal',   section:'calendar', name:'Reminder',  label:['ev-title'] },
+  pet:     { opener:'petModal',     section:'profile',  name:'Dog',       label:['p-name'] }
+};
+let openDraft = null;
+function draftClearTimer(){ if(openDraft && openDraft.timer){ clearInterval(openDraft.timer); openDraft.timer = null; } }
+function draftInit(kind){ if(!DRAFT_KINDS[kind] || denyManage()) return; draftClearTimer(); openDraft = { kind, id:null, committed:false, timer:setInterval(draftSnapshot, 60000) }; }
+function draftCommit(){ if(openDraft) openDraft.committed = true; }
+function draftFields(){ return [...document.querySelectorAll('#modal-root input, #modal-root select, #modal-root textarea')].filter(el => el.id && el.type!=='file').map(el => ({ id:el.id, v: el.type==='checkbox' ? el.checked : el.value })); }
+function draftMeaningful(kind){ return (DRAFT_KINDS[kind].label||[]).some(id => (fv(id)||'').trim()); }
+function draftLabelText(kind){ for(const id of (DRAFT_KINDS[kind].label||[])){ const v = (fv(id)||'').trim(); if(v) return v; } return DRAFT_KINDS[kind].name; }
+function draftSnapshot(){
+  if(!openDraft || openDraft.committed) return;
+  const kind = openDraft.kind;
+  if(!draftMeaningful(kind)) return;
+  data.drafts = data.drafts || [];
+  const rec = { kind, label:draftLabelText(kind), fields:draftFields(), savedAt:Date.now(), petId:data.activePetId };
+  if(openDraft.id && data.drafts.some(d=>d.id===openDraft.id)){ data.drafts = data.drafts.map(d => d.id===openDraft.id ? {...d, ...rec} : d); }
+  else { if(!openDraft.id) openDraft.id = genId(); data.drafts.unshift({ id:openDraft.id, ...rec }); }
+  save(false);
+}
+function resumeDraft(id){
+  const d = (data.drafts||[]).find(x=>x.id===id); if(!d) return;
+  const K = DRAFT_KINDS[d.kind]; if(!K || typeof window[K.opener] !== 'function') return;
+  window[K.opener]();
+  (d.fields||[]).forEach(f => { const el = document.getElementById(f.id); if(el){ if(el.type==='checkbox') el.checked = !!f.v; else el.value = f.v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } });
+  if(openDraft) openDraft.id = d.id;
+}
+function deleteDraft(id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==id); save(false); render(); }
+function draftStrip(section){
+  const ds = (data.drafts||[]).filter(d => d.petId===data.activePetId && DRAFT_KINDS[d.kind] && DRAFT_KINDS[d.kind].section===section);
+  if(!ds.length || !canManage()) return '';
+  return '<div class="card" style="border-color:var(--warning);background:rgba(210,153,34,.06)"><div class="label" style="margin-top:0;color:var(--warning)">📝 Unsaved draft'+(ds.length===1?'':'s')+'</div>'
+    + ds.map(d=>'<div class="entry-row"><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(DRAFT_KINDS[d.kind].name)+': '+esc(d.label)+'</div><div class="tl-time">saved '+fmtDateTime(d.savedAt)+'</div></div><div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="resumeDraft(\''+d.id+'\')">Resume</button><button class="btn btn-sm btn-danger" onclick="deleteDraft(\''+d.id+'\')" title="Discard draft">×</button></div></div>').join('')
+    + '</div>';
+}
 function fv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
 // Small info tooltip for confusing fields: tip('explanation') → appended after a label.
 function tip(t){ return t ? ' <span class="tip" tabindex="0" role="img" aria-label="Help: '+esc(t)+'" data-tip="'+esc(t)+'">i</span>' : ''; }
@@ -481,7 +535,7 @@ async function loadFromFirestore(){
         return;
       }
       // Own data — merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','journal','auditLog'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','journal','drafts','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
@@ -952,6 +1006,7 @@ async function exportPDF(){
 function selectPet(id){ data.activePetId = id; save(); }
 function petModal(id){
   const p = id ? data.pets.find(x=>x.id===id) : null;
+  if(!p) draftInit('pet');
   const sel = (arr,v) => arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal(
     '<h3>'+(p?'🐶 Edit '+esc(p.name):'🐶 Add a dog')+'</h3>'
@@ -1021,6 +1076,7 @@ function handlePhoto(evt){
 }
 function savePet(id){
   if(denyManage()) return;
+  draftCommit();
   const name = fv('p-name').trim();
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'),
@@ -1497,6 +1553,7 @@ function onVetPick(){
 }
 function vetModal(id){
   const v = id ? data.vetVisits.find(x=>x.id===id) : null;
+  if(!v) draftInit('vet');
   const unit = activePet()?.weightUnit || 'lb';
   const sug = vetSuggestions();
   const vetOpts = sug.vets.map(x => '<option value="'+esc(x)+'"></option>').join('');
@@ -1558,6 +1615,7 @@ function vetTogglePay(){
 }
 function saveVet(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const lineItems = [...document.querySelectorAll('#vt-lines .vt-line')].map(r => ({ desc:r.querySelector('.vt-desc').value.trim(), amount:r.querySelector('.vt-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
   let cost = fv('vt-cost');
@@ -1623,6 +1681,7 @@ function onGroomPick(){
 }
 function groomModal(id){
   const g = id ? data.grooming.find(x=>x.id===id) : null;
+  if(!g) draftInit('groom');
   const chosen = g ? (g.services||[]) : [];
   const sug = groomSuggestions();
   const groomerOpts = sug.groomers.map(x => '<option value="'+esc(x)+'"></option>').join('');
@@ -1653,6 +1712,7 @@ function groomModal(id){
 }
 function saveGroom(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
   const lineItems = lineCollect('gr');
@@ -1669,6 +1729,7 @@ function saveGroom(id){
 }
 function medModal(id){
   const m = id ? data.meds.find(x=>x.id===id) : null;
+  if(!m) draftInit('med');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>💊 '+(m?'Edit med':'Med / Preventative')+'</h3>'
     +'<label class="label">Name</label><input class="input" id="md-name" value="'+(m?esc(m.name||''):'')+'" placeholder="Heartgard, NexGard, Rabies…">'
@@ -1688,6 +1749,7 @@ function medNextDue(m){
 }
 function saveMed(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const f = { name:fv('md-name'), kind:fv('md-kind'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), nextDue:fv('md-next'), notes:fv('md-notes') };
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
@@ -1708,6 +1770,7 @@ function giveMedNow(id){
 let formSymptoms = [];
 function illnessModal(id){
   const e = id ? data.illnesses.find(x=>x.id===id) : null;
+  if(!e) draftInit('illness');
   formSymptoms = e ? [...(e.symptoms||[])] : [];
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🤒 '+(e?'Edit illness':'Log illness')+'</h3>'
@@ -1724,6 +1787,7 @@ function illnessModal(id){
 }
 function saveIllness(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const symptoms = [...document.querySelectorAll('#il-symptoms .tag.active')].map(t=>t.dataset.s);
   const f = { start:fv('il-start'), recovery:fv('il-recovery'), symptoms, severity:fv('il-sev'), diagnosis:fv('il-dx'), treatment:fv('il-treat'), notes:fv('il-notes') };
@@ -1738,6 +1802,7 @@ function saveIllness(id){
 // ═══════════════════════════════════════════════
 function invModal(id){
   const it = id ? data.inventory.find(x=>x.id===id) : null;
+  if(!it) draftInit('supply');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   const unitList = [...new Set([...(it && it.unit ? [it.unit] : []), ...unitOptions()])];
   openModal('<h3>🛒 '+(it?'Edit item':'Add supply')+'</h3>'
@@ -1761,6 +1826,7 @@ function invModal(id){
 }
 function saveInv(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
     cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
@@ -1777,6 +1843,7 @@ function toggleLow(id){ if(denyManage()) return; const it = data.inventory.find(
 // ═══════════════════════════════════════════════
 function contactModal(id){
   const c = id ? data.contacts.find(x=>x.id===id) : null;
+  if(!c) draftInit('contact');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   // First add: prefill a Vet from the active dog's saved vet info
   const pre = (!c && activePet()) ? { role:'Vet', name:activePet().vetDoctor||'', org:activePet().vetName||'', phone:activePet().vetPhone||'', email:activePet().vetEmail||'' } : {};
@@ -1795,6 +1862,7 @@ function contactModal(id){
 }
 function saveContact(id){
   if(denyManage()) return;
+  draftCommit();
   const f = { role:fv('ct-role'), name:fv('ct-name'), org:fv('ct-org'), phone:fv('ct-phone'), email:fv('ct-email'), address:fv('ct-addr'), website:fv('ct-web'), notes:fv('ct-notes') };
   if(!f.name && !f.org){ showToast('⚠️ Enter a name or business'); return; }
   if(id) data.contacts = data.contacts.map(c=>c.id===id?{...c,...f}:c);
@@ -2021,6 +2089,7 @@ function eventModal(id){
   if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const e = id ? (data.customEvents||[]).find(x=>x.id===id) : null;
+  if(!e) draftInit('event');
   openModal('<h3>📌 '+(e?'Edit reminder':'Add reminder / event')+'</h3>'
     +'<label class="label">Title</label><input class="input" id="ev-title" value="'+(e?esc(e.title||''):'')+'" placeholder="Nail trim, refill Rx, boarding drop-off…">'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="ev-date" value="'+(e?esc(e.date||''):todayISO())+'"></div>'
@@ -2034,6 +2103,7 @@ function eventModal(id){
 }
 function saveEvent(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const title = fv('ev-title'); if(!title){ showToast('⚠️ Enter a title'); return; }
   const f = { title:title, date:fv('ev-date'), time:fv('ev-time'), location:fv('ev-loc'), notes:fv('ev-notes'), evtype:'Reminder' };
@@ -2361,7 +2431,7 @@ function renderProfile(){
   if(!activePet()) return emptyState();
   const p = activePet();
   const w = latestWeight();
-  let html = '';
+  let html = draftStrip('profile');
   // profile card
   html += '<div class="card"><div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
     + (p.photo?'<img src="'+p.photo+'" class="profile-photo-lg">':'<div class="profile-photo-lg">🐾</div>')
@@ -2418,6 +2488,7 @@ function noteModal(id){
   if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const n = id ? (data.journal||[]).find(x=>x.id===id) : null;
+  if(!n) draftInit('note');
   openModal('<h3>📝 '+(n?'Edit note':'Add note')+'</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="nt-dt" value="'+(n?esc(n.dateTime||nowLocalISO()):nowLocalISO())+'">'
     +'<label class="label">Note</label><textarea class="textarea" id="nt-text" rows="4" placeholder="e.g. We think he’s about 4 years old.">'+(n?esc(n.text||''):'')+'</textarea>'
@@ -2427,6 +2498,7 @@ function noteModal(id){
 }
 function saveNote(id){
   if(denyManage()) return;
+  draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const text = fv('nt-text'); if(!text){ showToast('⚠️ Enter a note'); return; }
   const f = { text:text, dateTime:fv('nt-dt')||nowLocalISO() };
@@ -2492,7 +2564,7 @@ function renderCalendar(){
   // group events by yyyy-mm-dd
   const byDay = {};
   events.forEach(e => { const k = (e.date||'').slice(0,10); (byDay[k] = byDay[k]||[]).push(e); });
-  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Calendar</h2>';
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Calendar</h2>'+draftStrip('calendar');
   // Google Calendar control card
   html += '<div class="card"><h3 class="section-title">'+svgIcon('calendar',18)+' Google Calendar</h3>';
   if(!currentUser){
@@ -2566,7 +2638,7 @@ function renderCalendar(){
 function renderCare(){
   if(!activePet()) return emptyState();
   const tabs = [['vet','Vet','vet'],['grooming','Grooming','groom'],['meds','Meds','meds'],['illness','Illness','illness']];
-  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Care</h2>';
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Care</h2>'+draftStrip('care');
   html += '<div class="subtab">'+tabs.map(([k,l,ic])=>'<button class="'+(careSubtab===k?'active':'')+'" onclick="setCareSubtab(\''+k+'\')">'+svgIcon(ic,16)+' '+l+'</button>').join('')+'</div>';
   if(careSubtab==='vet') html += renderVetTab();
   else if(careSubtab==='grooming') html += renderGroomTab();
@@ -2655,7 +2727,7 @@ function invStatusChip(i){
 }
 function renderSupplies(){
   if(!activePet()) return emptyState();
-  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Supplies</h2>';
+  let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Supplies</h2>'+draftStrip('supplies');
   if(canManage()) html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="invModal()">+ Add supply purchase</button></div>';
   const all = petArr('inventory');
   const yearStart = new Date().getFullYear()+'-01-01';

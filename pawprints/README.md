@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.33.0**
+**Current Version: v0.34.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.34.0** — Auto-saved drafts. If you start a new record (vet, grooming, med, illness, supply, contact,
+  note, reminder, or dog) and enter something, it's auto-saved as a **draft** — snapshotted every ~60s and
+  again if you close the form without saving. Drafts appear in a "📝 Unsaved drafts" strip at the top of the
+  matching section (Care, Supplies, Profile, Calendar) with **Resume** and discard (×). Saving the record
+  clears its draft. (Note: line items and tag selections aren't captured in a draft yet — the main fields are.)
 - **v0.33.0** — Settings is now a full page. The ⚙️ gear opens Settings & Data as its own wider, scrollable
   page (with a ← Back button) instead of a cramped pop-up, with each area in its own card — easier to read
   and navigate.
