@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.30.0**
+**Current Version: v0.30.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.30.1** — Calendar "Upcoming" fix + vet icon. A vet visit or grooming session dated **today** no
+  longer lingers in the calendar's Upcoming list once it's happened — record-type events only appear there
+  if they're genuinely in the future (due/follow-up items still show for today). Swapped the vet icon from
+  the box-with-plus to a proper first-aid-kit icon.
 - **v0.30.0** — Grooming parity + clearer Insights periods. Grooming now matches vet visits: a **time** field,
   **groomer/salon suggestions** with an **address** (autofills, becomes the Google Calendar location),
   **itemized line items** with an auto-total, and **payment** fields (paid by, method, card brand/last 4).
