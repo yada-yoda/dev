@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.31.0**
+**Current Version: v0.32.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.32.0** — Supply units dropdown + package size. The supply **Unit** is now a dropdown of common units
+  (bag, box, can, lb, oz, count…), and you can add your own in **Settings → Lists & preferences**. New
+  **Package size** field handles things like a 5-lb bag (Qty 1 · Unit bag · Size 5 lb) instead of cramming
+  "lb bag" into the unit. Both show on the item and in the export.
 - **v0.31.0** — Emergency contact + dog notes. Added an **"Emergency Contact"** type to Contacts (for a
   person to call, distinct from the emergency vet). New **Notes** section on the Profile tab — jot down
   timestamped observations about your dog (e.g. "we think he's about 4 years old"), each with an editable
