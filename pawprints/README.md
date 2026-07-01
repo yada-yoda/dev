@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.27.1**
+**Current Version: v0.28.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.28.0** — Itemized vet bills + payment. Vet visits can now break the bill into **line items** (add a
+  row per charge); their total auto-fills the Cost. New fields for **Paid by** and **Payment method** — and
+  when it's a credit/debit card, the **card brand** and **last 4**. Shown on the visit card and in the
+  spreadsheet export. (Only the last 4 digits are stored — never a full card number.)
 - **v0.27.1** — Tidied the quick-log note. Removed the explainer under the quick-log buttons (now redundant
   since every button opens a form); the "water = you refilled the bowl, not the dog drinking" clarification
   moved into the water form itself.

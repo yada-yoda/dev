@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.27.1';
+const APP_VERSION = 'v0.28.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -289,6 +289,8 @@ function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoo
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
+const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
+const CC_BRANDS = ['Visa','Mastercard','Amex','Discover','Other'];
 const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
 const SEVERITY = ['Mild','Moderate','Severe'];
 const SEXES = ['Male','Female','Unknown'];
@@ -839,7 +841,7 @@ async function exportXLSX(){
     data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,p.originLocation,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
-  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Weight','Cost','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.weight,v.cost,(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
+  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.weight,v.cost,((v.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Services','Groomer','Cost','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.services||[]).join(', '),g.groomer,g.cost,g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
@@ -1488,17 +1490,59 @@ function vetModal(id){
     +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
+    +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
+    +'<div id="vt-lines"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="vetAddLineRow()">+ Add line item</button><span id="vt-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
+    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="vt-paidby" value="'+(v?esc(v.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div><label class="label">Payment method</label><select class="select" id="vt-paymethod" onchange="vetTogglePay()"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((v&&v.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
+    +'<div id="vt-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="vt-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((v&&v.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
+    +'<div><label class="label">Last 4</label><input class="input" id="vt-cclast4" inputmode="numeric" maxlength="4" value="'+(v?esc(v.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
     +'<div class="grid-2"><div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div>'
     +'<div><label class="label">Follow-up time (optional)</label><input class="input" type="time" id="vt-followtime" value="'+(v?esc(v.followUpTime||''):'')+'"></div></div>'
     +'<label class="label">Notes / Diagnosis / Meds prescribed</label><textarea class="textarea" id="vt-notes" rows="3">'+(v?esc(v.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
     +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+  ((v&&v.lineItems)||[]).forEach(li => vetAddLineRow(li.desc, li.amount));
+  vetRecalcTotal(); vetTogglePay();
+}
+function vetAddLineRow(desc, amount){
+  const wrap = document.getElementById('vt-lines'); if(!wrap) return;
+  const div = document.createElement('div');
+  div.className = 'vt-line';
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
+  div.innerHTML = '<input class="input vt-desc" style="flex:1;margin:0" placeholder="e.g. Exam fee, vaccine, X-ray" value="'+esc(desc||'')+'">'
+    + '<input class="input vt-amt" type="number" step="0.01" style="width:92px;margin:0" placeholder="0.00" value="'+esc(amount||'')+'" oninput="vetRecalcTotal()">'
+    + '<button type="button" onclick="this.parentNode.remove();vetRecalcTotal()" title="Remove" style="width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--danger);font-size:18px;line-height:1;cursor:pointer">×</button>';
+  wrap.appendChild(div);
+  vetRecalcTotal();
+}
+function vetRecalcTotal(){
+  const rows = [...document.querySelectorAll('#vt-lines .vt-line')];
+  let sum = 0, any = false;
+  rows.forEach(r => { const a = parseFloat(r.querySelector('.vt-amt').value); if(!isNaN(a)){ sum += a; any = true; } });
+  const costEl = document.getElementById('vt-cost'), totalEl = document.getElementById('vt-total');
+  if(costEl){
+    if(rows.length){ costEl.value = any ? sum.toFixed(2) : ''; costEl.readOnly = true; costEl.style.opacity = '.7'; }
+    else { costEl.readOnly = false; costEl.style.opacity = ''; }
+  }
+  if(totalEl) totalEl.textContent = rows.length ? ('Total: '+money(sum)) : '';
+}
+function vetTogglePay(){
+  const w = document.getElementById('vt-cc-wrap'); if(!w) return;
+  const m = fv('vt-paymethod');
+  w.style.display = (m==='Credit card' || m==='Debit card') ? '' : 'none';
 }
 function saveVet(id){
   if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
-  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:fv('vt-cost'), reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes') };
+  const lineItems = [...document.querySelectorAll('#vt-lines .vt-line')].map(r => ({ desc:r.querySelector('.vt-desc').value.trim(), amount:r.querySelector('.vt-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
+  let cost = fv('vt-cost');
+  if(lineItems.length){ const s = lineItems.reduce((a,li)=>a+(parseFloat(li.amount)||0),0); cost = s ? s.toFixed(2) : ''; }
+  const payMethod = fv('vt-paymethod');
+  const isCard = payMethod==='Credit card' || payMethod==='Debit card';
+  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:cost, reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes'),
+    lineItems:lineItems, paidBy:fv('vt-paidby'), payMethod:payMethod, ccBrand:isCard?fv('vt-ccbrand'):'', ccLast4:isCard?fv('vt-cclast4'):'' };
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
   else { visitId = genId(); data.vetVisits.unshift({ id:visitId, petId:data.activePetId, ...f }); }
@@ -2378,7 +2422,7 @@ function renderVetTab(){
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
-  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):''].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
+  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):'',(v.lineItems&&v.lineItems.length?' · '+v.lineItems.length+' item'+(v.lineItems.length===1?'':'s'):''),(v.payMethod?' · '+esc(v.payMethod)+(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?' '+(v.ccBrand?esc(v.ccBrand)+' ':'')+'••'+esc(v.ccLast4):''):'')].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
   if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
   if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
   if(!visits.length) html += '<div class="card empty"><div class="ico">'+svgIcon('vet',46)+'</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
