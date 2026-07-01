@@ -190,6 +190,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
   <div id="view-insights" class="hidden"></div>
   <div id="view-history" class="hidden"></div>
   <div id="view-activity" class="hidden"></div>
+  <div id="view-settings" class="hidden"></div>
 </div>
 <footer style="text-align:center;padding:24px 16px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px">
   <a href="?demo=1" style="color:var(--accent-2);text-decoration:none;font-weight:500">🎭 Try the demo</a>
@@ -208,7 +209,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.32.1';
+const APP_VERSION = 'v0.33.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -695,24 +696,26 @@ function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find
 function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
-function settingsModal(){
+// Settings is a full page (view-settings). The gear + other callers just navigate to it.
+function settingsModal(){ switchView('settings'); }
+function settingsPageHTML(){
   const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.inventory.length + data.contacts.length;
-  openModal('<h3>⚙️ Settings &amp; Data</h3>'
-    + '<div style="margin-bottom:18px"><div class="label">Appearance</div><button class="btn" onclick="toggleTheme();settingsModal()">'+(currentTheme()==='light'?'☀️ Light mode — switch to dark':'🌙 Dark mode — switch to light')+'</button></div>'
-    + '<div class="label">Backup &amp; export</div>'
-    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, illness, supplies, contacts) plus photos &amp; settings.</p>'
-    + '<div style="display:flex;flex-direction:column;gap:8px">'
-      + '<button class="btn" onclick="exportJSON()">💾 Export backup (.json)</button>'
-      + '<button class="btn" onclick="document.getElementById(\'import-file\').click()">📂 Import / restore backup (.json)</button>'
-      + '<button class="btn" onclick="exportXLSX()">📊 Export spreadsheet (.xlsx)</button>'
-      + '<button class="btn btn-outline" onclick="exportPDF()">📄 Export full report (PDF)</button>'
-    + '</div>'
-    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p>'
-    + '<div class="label" style="margin-top:18px">History</div>'
-    + '<button class="btn" onclick="closeModal();openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button>'
-    + (sharedOwnerUid ? '' : '<div id="settings-lists">'+settingsListsHTML()+'</div>')
-    + '<div id="settings-sharing">'+(currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:18px">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')+'</div>'
-    + '<div style="margin-top:16px;display:flex;justify-content:space-between;align-items:center"><span style="font-size:12px;color:var(--text-secondary)">PawPrints '+APP_VERSION+'</span><button class="btn" onclick="closeModal()">Close</button></div>');
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><button class="btn btn-sm" onclick="switchView(settingsReturnView)">← Back</button><h2 style="font-size:20px;font-weight:700;margin:0">⚙️ Settings &amp; Data</h2></div>'
+    + '<div class="card"><div class="label" style="margin-top:0">Appearance</div><button class="btn" onclick="toggleTheme();settingsModal()">'+(currentTheme()==='light'?'☀️ Light mode — switch to dark':'🌙 Dark mode — switch to light')+'</button></div>'
+    + '<div class="card"><div class="label" style="margin-top:0">Backup &amp; export</div>'
+      + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, illness, supplies, contacts) plus photos &amp; settings.</p>'
+      + '<div style="display:flex;flex-direction:column;gap:8px">'
+        + '<button class="btn" onclick="exportJSON()">💾 Export backup (.json)</button>'
+        + '<button class="btn" onclick="document.getElementById(\'import-file\').click()">📂 Import / restore backup (.json)</button>'
+        + '<button class="btn" onclick="exportXLSX()">📊 Export spreadsheet (.xlsx)</button>'
+        + '<button class="btn btn-outline" onclick="exportPDF()">📄 Export full report (PDF)</button>'
+      + '</div>'
+      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:12px;margin-bottom:0">The .json backup is the one to keep for restoring later. The spreadsheet (Excel/Sheets, one tab per category) and PDF are for viewing &amp; sharing.</p></div>'
+    + '<div class="card"><div class="label" style="margin-top:0">History</div>'
+      + '<button class="btn" onclick="openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button></div>'
+    + (sharedOwnerUid ? '' : '<div class="card"><div id="settings-lists">'+settingsListsHTML()+'</div></div>')
+    + '<div class="card"><div id="settings-sharing">'+(currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:0">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')+'</div></div>'
+    + '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:6px">PawPrints '+APP_VERSION+'</div>';
 }
 // Re-render one section of the open Settings modal in place — no overlay re-animation, scroll preserved.
 function refreshSettingsSection(id, htmlFn, focusId){
@@ -2085,7 +2088,8 @@ function getReminders(){
 // ═══════════════════════════════════════════════
 // VIEW SWITCHING + RENDER
 // ═══════════════════════════════════════════════
-const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history','activity'];
+const VIEWS = ['today','log','profile','care','calendar','supplies','insights','history','activity','settings'];
+let settingsReturnView = 'today';
 // ── Google Analytics (anonymous pageviews + per-tab virtual pageviews) ──
 const NAV_LABEL = { today:'Today', log:'Log', profile:'Profile', care:'Care', calendar:'Calendar', supplies:'Supplies', insights:'Insights', history:'Activity history', activity:'Activity' };
 let analyticsOn = false;
@@ -2120,14 +2124,15 @@ function trackView(v){
   });
 }
 function switchView(v){
+  if(v==='settings' && currentView!=='settings') settingsReturnView = currentView;
   currentView = v;
   VIEWS.forEach(id => document.getElementById('view-'+id).classList.toggle('hidden', id!==v));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.view===v));
   trackView(v);
   render();
   window.scrollTo({top:0,behavior:'smooth'});
-  // No dog yet → a feature tab can't do anything useful. Prompt to add one.
-  if(!activePet() && v !== 'today' && v !== 'history') promptAddDog();
+  // No dog yet → a feature tab can't do anything useful. Prompt to add one. (Settings/history are fine.)
+  if(!activePet() && v !== 'today' && v !== 'history' && v !== 'settings') promptAddDog();
 }
 // Modal shown when an action needs a dog but none exists yet.
 function promptAddDog(){
@@ -2186,6 +2191,7 @@ function render(){
   document.getElementById('view-insights').innerHTML = renderInsights();
   document.getElementById('view-history').innerHTML = renderHistoryPage();
   document.getElementById('view-activity').innerHTML = renderActivityPage();
+  if(currentView==='settings') document.getElementById('view-settings').innerHTML = settingsPageHTML();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
   if(currentView === 'calendar' && gcalAccessToken && (data.settings.gcalCalendarId || gcalChoosing) && !window._gcalCalendars) loadCalendarList();
 }

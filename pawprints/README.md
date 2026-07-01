@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.32.1**
+**Current Version: v0.33.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.33.0** — Settings is now a full page. The ⚙️ gear opens Settings & Data as its own wider, scrollable
+  page (with a ← Back button) instead of a cramped pop-up, with each area in its own card — easier to read
+  and navigate.
 - **v0.32.1** — Weather panel tune-up. The hourly forecast is now a 6-across grid (bigger cells, no
   horizontal scrolling), the panel sits toward the center of the screen instead of jammed to the right, and
   it has a close ✕.
