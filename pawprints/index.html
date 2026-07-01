@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.36.0';
+const APP_VERSION = 'v0.37.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -248,7 +248,15 @@ const ICONS = {
   call:{ vb:'0 -960 960 960', d:'M795-120q-116 0-236.5-56T335-335Q232-438 176-558.5T120-795q0-19.29 12.86-32.14Q145.71-840 165-840h140q14 0 24 10t14 25l26.93 125.64Q372-665 369.5-653.5t-10.73 19.73L259-533q26 44 55 82t64 72q37 38 78 69.5t86 55.5l95-98q10-11 23.15-15 13.15-4 25.85-2l119 26q15 4 25 16.04 10 12.05 10 26.96v135q0 19.29-12.86 32.14Q814.29-120 795-120ZM229-588l81-82-23-110H180q2 42 13.5 88.5T229-588Zm369 363q41 19 89 31t93 14v-107l-103-21-79 83ZM229-588Zm369 363Z' },
   share:{ vb:'0 -960 960 960', d:'M686-80q-47.5 0-80.75-33.25T572-194q0-8 5-34L278-403q-16.28 17.34-37.64 27.17Q219-366 194-366q-47.5 0-80.75-33T80-480q0-48 33.25-81T194-594q24 0 45 9.3 21 9.29 37 25.7l301-173q-2-8-3.5-16.5T572-766q0-47.5 33.25-80.75T686-880q47.5 0 80.75 33.25T800-766q0 47.5-33.25 80.75T686-652q-23.27 0-43.64-9Q622-670 606-685L302-516q3 8 4.5 17.5t1.5 18q0 8.5-1 16t-3 15.5l303 173q16-15 36.09-23.5 20.1-8.5 43.07-8.5Q734-308 767-274.75T800-194q0 47.5-33.25 80.75T686-80Zm.04-60q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5Zm-492-286q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5ZM724.5-727.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM686-194ZM194-480Zm492-286Z' },
 };
-const EMOJI_ICON = { '💊':'meds','🏥':'vet','✂️':'groom','🤒':'illness','🛒':'supplies','📅':'calendar','📌':'followups' };
+const EMOJI_ICON = { '💊':'meds','🏥':'vet','✂️':'groom','🤒':'illness','🛒':'supplies','📅':'calendar','📌':'followups','🍖':'fed','🦮':'walk','🚪':'potty','⚖️':'weight','📝':'log' };
+// Reminder/event types → the icon shown on the calendar & Upcoming list.
+const REMINDER_TYPES = [
+  { label:'General', emoji:'📌' }, { label:'Vet', emoji:'🏥' }, { label:'Grooming', emoji:'✂️' },
+  { label:'Medication', emoji:'💊' }, { label:'Feeding', emoji:'🍖' }, { label:'Walk', emoji:'🦮' },
+  { label:'Potty', emoji:'🚪' }, { label:'Supplies', emoji:'🛒' }, { label:'Appointment', emoji:'📅' },
+  { label:'Weight', emoji:'⚖️' }, { label:'Birthday', emoji:'🎂' }, { label:'Note', emoji:'📝' }
+];
+function reminderIcon(t){ const r = REMINDER_TYPES.find(x=>x.label===t); return r ? r.emoji : '📌'; }
 function svgIcon(key, px){ const i = ICONS[key]; if(!i) return ''; const sz = px ? ' width="'+px+'" height="'+px+'"' : ''; return '<svg class="msi" viewBox="'+i.vb+'" fill="currentColor"'+sz+' aria-hidden="true"><path d="'+i.d+'"/></svg>'; }
 function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e||''); }
 
@@ -1948,7 +1956,7 @@ function calendarEvents(){
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
-  petArr('customEvents').forEach(e => { if(e.date) ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:'📌', type:e.evtype||'Reminder', location:e.location||'', title:'📌 '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); });
+  petArr('customEvents').forEach(e => { if(e.date){ const ic = reminderIcon(e.evtype); ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:ic, type:e.evtype||'Reminder', location:e.location||'', title:ic+' '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); } });
   // birthday + gotcha day (recurring annual, shown for current year)
   return ev.sort((a,b)=> new Date(dateSafe(a.date)) - new Date(dateSafe(b.date)));
 }
@@ -2108,6 +2116,7 @@ function eventModal(id){
   if(!e) draftInit('event');
   openModal('<h3>📌 '+(e?'Edit reminder':'Add reminder / event')+'</h3>'
     +'<label class="label">Title</label><input class="input" id="ev-title" value="'+(e?esc(e.title||''):'')+'" placeholder="Nail trim, refill Rx, boarding drop-off…">'
+    +'<label class="label">Type'+tip('Sets the icon shown for this reminder on the calendar and in the Upcoming list.')+'</label><select class="select" id="ev-type">'+REMINDER_TYPES.map(t=>'<option value="'+esc(t.label)+'"'+(((e&&e.evtype===t.label)||(!(e&&REMINDER_TYPES.some(x=>x.label===e.evtype))&&t.label==='General'))?' selected':'')+'>'+t.emoji+' '+esc(t.label)+'</option>').join('')+'</select>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="ev-date" value="'+(e?esc(e.date||''):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Leave blank for an all-day reminder. If set, the calendar event is a timed 1-hour block.')+'</label><input class="input" type="time" id="ev-time" value="'+(e?esc(e.time||''):'')+'"></div></div>'
     +'<label class="label">Location (optional)</label><input class="input" id="ev-loc" value="'+(e?esc(e.location||''):'')+'" placeholder="Address or place">'
@@ -2122,7 +2131,7 @@ function saveEvent(id){
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const title = fv('ev-title'); if(!title){ showToast('⚠️ Enter a title'); return; }
-  const f = { title:title, date:fv('ev-date'), time:fv('ev-time'), location:fv('ev-loc'), notes:fv('ev-notes'), evtype:'Reminder' };
+  const f = { title:title, date:fv('ev-date'), time:fv('ev-time'), location:fv('ev-loc'), notes:fv('ev-notes'), evtype:fv('ev-type')||'General' };
   data.customEvents = data.customEvents || [];
   let eid = id;
   if(id){ data.customEvents = data.customEvents.map(x => x.id===id ? {...x, ...f} : x); }

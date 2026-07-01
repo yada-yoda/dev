@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.36.0**
+**Current Version: v0.37.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.37.0** — Reminder types. The "Add reminder / event" form now has a **Type** dropdown (General, Vet,
+  Grooming, Medication, Feeding, Walk, Supplies, Appointment, Birthday, etc.) that sets the **icon** shown for
+  that reminder on the calendar grid and in the Upcoming list.
 - **v0.36.0** — Contacts city/state + fuller drafts. Contacts now have **City** and **State** fields (flow into
   the vCard and the vet/groomer autofill). Drafts now also **capture line items and tag selections** (service
   tags, symptoms), so resuming a vet/grooming/illness draft restores those too.
