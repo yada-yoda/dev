@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.27.0';
+const APP_VERSION = 'v0.27.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1090,6 +1090,7 @@ function quickWater(){
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   const last = petLogs('water').filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0];
   openModal('<h3>💧 Water refilled</h3>'
+    +'<p style="font-size:12px;color:var(--text-secondary);margin:-4px 0 12px">You gave fresh water / refilled the bowl — not the dog drinking.</p>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">Where'+tip('Where you refilled the bowl. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.place:'')+'</select>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
@@ -2048,7 +2049,7 @@ function renderToday(){
     + '<button class="quick-btn" onclick="quickWater()"><span class="qi">'+svgIcon('water')+'</span>Water</button>'
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">'+svgIcon('potty')+'</span>Potty</button>'
     + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">'+svgIcon('walk')+'</span>Walk</button>'
-    + '</div><div style="font-size:12px;color:var(--text-secondary);margin-top:8px">💧 <strong>Water</strong> = you gave fresh water / refilled the bowl (not the dog drinking). Each button opens a quick form where you can set the time and place.</div></div>';
+    + '</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)

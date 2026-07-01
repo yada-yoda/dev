@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.27.0**
+**Current Version: v0.27.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.27.1** — Tidied the quick-log note. Removed the explainer under the quick-log buttons (now redundant
+  since every button opens a form); the "water = you refilled the bowl, not the dog drinking" clarification
+  moved into the water form itself.
 - **v0.27.0** — Water gets a form. The Water quick-log now opens a form like Fed instead of logging
   instantly, so you can set the date/time and pick where you refilled the bowl (same place list as feeding).
   The location is shown in the entry and editable afterward.
