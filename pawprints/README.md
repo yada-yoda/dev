@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.32.0**
+**Current Version: v0.32.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.32.1** — Weather panel tune-up. The hourly forecast is now a 6-across grid (bigger cells, no
+  horizontal scrolling), the panel sits toward the center of the screen instead of jammed to the right, and
+  it has a close ✕.
 - **v0.32.0** — Supply units dropdown + package size. The supply **Unit** is now a dropdown of common units
   (bag, box, can, lb, oz, count…), and you can add your own in **Settings → Lists & preferences**. New
   **Package size** field handles things like a 5-lb bag (Qty 1 · Unit bag · Size 5 lb) instead of cramming

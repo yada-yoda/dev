@@ -51,17 +51,19 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .header h1{font-size:19px;font-weight:700;letter-spacing:-0.02em}.header .sub{font-size:12px;color:var(--text-secondary)}
 .header-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .weather-pill{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:600;white-space:nowrap;padding:8px 12px}
-.weather-panel{position:fixed;top:66px;right:16px;z-index:140;width:300px;max-width:calc(100vw - 32px);background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px var(--shadow);padding:14px}
+.weather-panel{position:fixed;top:66px;left:50%;transform:translateX(-50%);z-index:140;width:420px;max-width:calc(100vw - 24px);background:var(--bg-card);border:1px solid var(--border);border-radius:14px;box-shadow:0 10px 30px var(--shadow);padding:16px}
 .weather-panel.hidden{display:none}
-.wx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px}
+.wx-close{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.wx-close:hover{color:var(--text-primary);border-color:var(--accent)}
+.wx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;padding-right:32px}
 .wx-now-temp{font-size:24px;font-weight:700;line-height:1}
 .wx-now-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
-.wx-loc{font-size:12px;color:var(--text-secondary);text-align:right;max-width:130px}
-.wx-hourly{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px}
-.wx-cell{flex:0 0 auto;text-align:center;min-width:42px;padding:6px 2px;border-radius:9px;background:var(--bg-tertiary)}
-.wx-h-time{font-size:10px;color:var(--text-secondary)}
-.wx-h-emoji{font-size:17px;margin:3px 0}
-.wx-h-temp{font-size:13px;font-weight:600}
+.wx-loc{font-size:12px;color:var(--text-secondary);text-align:right;max-width:150px}
+.wx-hourly{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.wx-cell{text-align:center;padding:9px 2px;border-radius:9px;background:var(--bg-tertiary)}
+.wx-h-time{font-size:11px;color:var(--text-secondary)}
+.wx-h-emoji{font-size:21px;margin:4px 0}
+.wx-h-temp{font-size:14px;font-weight:600}
 .pet-select{appearance:none;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-primary);font-size:13px;font-family:inherit;padding:8px 30px 8px 12px;border-radius:10px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238b949e' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
 .nav{display:flex;border-bottom:1px solid var(--border);background:var(--bg-card);overflow-x:auto;position:sticky;top:0;z-index:50;box-shadow:0 1px 0 var(--border)}
 .nav button{flex:1;padding:13px 8px;border:none;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;transition:all .2s;min-width:74px;display:flex;flex-direction:column;align-items:center;gap:4px}
@@ -206,7 +208,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.32.0';
+const APP_VERSION = 'v0.32.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1329,7 +1331,8 @@ function renderWeatherPanel(){
   if(!w){ panel.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">Set a home ZIP in Settings → Lists &amp; preferences to see weather.</div>'; return; }
   const fmtHour = t => { const d = new Date(t); let h = d.getHours(); const ap = h>=12?'PM':'AM'; h = h%12||12; return h+' '+ap; };
   const sub = [esc(w.label), (w.pop!=null && w.pop>0)?(w.pop+'% precip'):''].filter(Boolean).join(' · ');
-  panel.innerHTML = '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+sub+'</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
+  panel.innerHTML = '<button class="wx-close" type="button" onclick="closeWeatherPanel()" aria-label="Close" title="Close">×</button>'
+    + '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+sub+'</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
     + '<div class="wx-hourly">'+w.hourly.map(h=>'<div class="wx-cell"><div class="wx-h-time">'+fmtHour(h.t)+'</div><div class="wx-h-emoji">'+h.emoji+'</div><div class="wx-h-temp">'+h.tempF+'°</div>'+((h.pop!=null&&h.pop>0)?'<div class="wx-h-time" style="color:var(--blue)">'+h.pop+'%</div>':'')+'</div>').join('')+'</div>'
     + (w.source?'<div style="font-size:10px;color:var(--text-secondary);text-align:right;margin-top:8px">via '+esc(w.source)+'</div>':'');
 }
