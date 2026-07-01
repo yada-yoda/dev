@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.28.0**
+**Current Version: v0.29.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.29.0** — Custom calendar reminders + vet address. The Calendar tab has a new **"+ Add reminder /
+  event"** button — set a title, date, optional time, location, and notes; it shows on the calendar and, if
+  Google Calendar is connected, is added there automatically on save. Vet visits gained a **Vet / clinic
+  address** field (autofills from saved clinics), which becomes the Google Calendar event's location.
 - **v0.28.0** — Itemized vet bills + payment. Vet visits can now break the bill into **line items** (add a
   row per charge); their total auto-fills the Cost. New fields for **Paid by** and **Payment method** — and
   when it's a credit/debit card, the **card brand** and **last 4**. Shown on the visit card and in the

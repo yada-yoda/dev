@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.28.0';
+const APP_VERSION = 'v0.29.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -251,7 +251,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -470,7 +470,7 @@ async function loadFromFirestore(){
         return;
       }
       // Own data — merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','auditLog'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
@@ -841,7 +841,7 @@ async function exportXLSX(){
     data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,p.originLocation,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
-  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.weight,v.cost,((v.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
+  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.address,v.weight,v.cost,((v.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Services','Groomer','Cost','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.services||[]).join(', '),g.groomer,g.cost,g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
@@ -1455,26 +1455,29 @@ function quickWeight(){
 // ═══════════════════════════════════════════════
 // Saved vets/clinics for the vet-visit dropdowns — drawn from past visits + vet contacts.
 function vetSuggestions(){
-  const vets = new Set(), clinics = new Set(), map = {};
+  const vets = new Set(), clinics = new Set(), addresses = new Set(), map = {}, addrMap = {};
   (data.vetVisits||[]).forEach(v => {
     if(v.vet){ vets.add(v.vet); if(v.clinic && !map[v.vet]) map[v.vet] = v.clinic; }
-    if(v.clinic) clinics.add(v.clinic);
+    if(v.clinic){ clinics.add(v.clinic); if(v.address && !addrMap[v.clinic]) addrMap[v.clinic] = v.address; }
+    if(v.address) addresses.add(v.address);
   });
   (data.contacts||[]).forEach(c => {
     if((c.role||'').toLowerCase().indexOf('vet') > -1){
       if(c.name){ vets.add(c.name); if(c.org && !map[c.name]) map[c.name] = c.org; }
-      if(c.org) clinics.add(c.org);
+      if(c.org){ clinics.add(c.org); if(c.address && !addrMap[c.org]) addrMap[c.org] = c.address; }
+      if(c.address) addresses.add(c.address);
     }
   });
   const pc = activePet(); if(pc && pc.vetName) clinics.add(pc.vetName);
-  return { vets:[...vets].sort((a,b)=>a.localeCompare(b)), clinics:[...clinics].sort((a,b)=>a.localeCompare(b)), map };
+  return { vets:[...vets].sort((a,b)=>a.localeCompare(b)), clinics:[...clinics].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), map, addrMap };
 }
 // When a saved vet is chosen, fill its clinic (only if the clinic field is still empty).
 function onVetPick(){
+  const sug = vetSuggestions();
   const clinicEl = document.getElementById('vt-clinic');
-  if(!clinicEl || clinicEl.value) return;
-  const c = vetSuggestions().map[fv('vt-vet')];
-  if(c) clinicEl.value = c;
+  if(clinicEl && !clinicEl.value){ const c = sug.map[fv('vt-vet')]; if(c) clinicEl.value = c; }
+  const addrEl = document.getElementById('vt-address');
+  if(addrEl && !addrEl.value){ const a = sug.addrMap[fv('vt-clinic')]; if(a) addrEl.value = a; }
 }
 function vetModal(id){
   const v = id ? data.vetVisits.find(x=>x.id===id) : null;
@@ -1482,12 +1485,14 @@ function vetModal(id){
   const sug = vetSuggestions();
   const vetOpts = sug.vets.map(x => '<option value="'+esc(x)+'"></option>').join('');
   const clinicOpts = sug.clinics.map(x => '<option value="'+esc(x)+'"></option>').join('');
+  const addrOpts = sug.addresses.map(x => '<option value="'+esc(x)+'"></option>').join('');
   openModal('<h3>🏥 '+(v?'Edit vet visit':'Vet visit')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
     +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):'')+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
     +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc(activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
+    +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):'')+'" placeholder="123 Main St, City, ST"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
@@ -1541,7 +1546,7 @@ function saveVet(id){
   if(lineItems.length){ const s = lineItems.reduce((a,li)=>a+(parseFloat(li.amount)||0),0); cost = s ? s.toFixed(2) : ''; }
   const payMethod = fv('vt-paymethod');
   const isCard = payMethod==='Credit card' || payMethod==='Debit card';
-  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:cost, reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes'),
+  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:cost, reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), address:fv('vt-address'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes'),
     lineItems:lineItems, paidBy:fv('vt-paidby'), payMethod:payMethod, ccBrand:isCard?fv('vt-ccbrand'):'', ccLast4:isCard?fv('vt-cclast4'):'' };
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
@@ -1767,12 +1772,13 @@ async function shareDogCard(){
 function calendarEvents(){
   const p = activePet(); if(!p) return [];
   const dn = p.name, ev = [];
-  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
+  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', location:v.address||'', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.address&&'Address: '+v.address, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
     if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
   petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, icon:'✂️', type:'Grooming', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
+  petArr('customEvents').forEach(e => { if(e.date) ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:'📌', type:e.evtype||'Reminder', location:e.location||'', title:'📌 '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); });
   // birthday + gotcha day (recurring annual, shown for current year)
   return ev.sort((a,b)=> new Date(dateSafe(a.date)) - new Date(dateSafe(b.date)));
 }
@@ -1911,6 +1917,7 @@ async function syncToGoogleCalendar(){
     } else {
       body = { summary:e.title, description:(e.desc||'')+'\n\n— via PawPrints', start:{ date:e.date }, end:{ date:e.date }, transparency:'transparent' };
     }
+    if(e.location) body.location = e.location;
     const existing = data.gcalEvents[e.key];
     try {
       let r;
@@ -1922,6 +1929,42 @@ async function syncToGoogleCalendar(){
   }
   save();
   showToast('✅ Synced '+ok+' event'+(ok===1?'':'s')+' to Google Calendar'+(fail?' ('+fail+' failed)':''));
+}
+// ── Custom reminders / events (show on the calendar + sync to Google Calendar) ──
+function eventModal(id){
+  if(denyManage()) return;
+  if(!activePet()){ promptAddDog(); return; }
+  const e = id ? (data.customEvents||[]).find(x=>x.id===id) : null;
+  openModal('<h3>📌 '+(e?'Edit reminder':'Add reminder / event')+'</h3>'
+    +'<label class="label">Title</label><input class="input" id="ev-title" value="'+(e?esc(e.title||''):'')+'" placeholder="Nail trim, refill Rx, boarding drop-off…">'
+    +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="ev-date" value="'+(e?esc(e.date||''):todayISO())+'"></div>'
+    +'<div><label class="label">Time (optional)'+tip('Leave blank for an all-day reminder. If set, the calendar event is a timed 1-hour block.')+'</label><input class="input" type="time" id="ev-time" value="'+(e?esc(e.time||''):'')+'"></div></div>'
+    +'<label class="label">Location (optional)</label><input class="input" id="ev-loc" value="'+(e?esc(e.location||''):'')+'" placeholder="Address or place">'
+    +'<label class="label">Notes</label><textarea class="textarea" id="ev-notes" rows="2">'+(e?esc(e.notes||''):'')+'</textarea>'
+    +'<p style="font-size:11px;color:var(--text-secondary);margin:2px 0 12px">Shows on the calendar and, if Google Calendar is connected, is added there on save.</p>'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveEvent('+(e?"'"+e.id+"'":'null')+')">Save</button>'
+    +(e?'<button class="btn btn-danger" onclick="deleteEvent(\''+e.id+'\')">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveEvent(id){
+  if(denyManage()) return;
+  if(!activePet()){ promptAddDog(); return; }
+  const title = fv('ev-title'); if(!title){ showToast('⚠️ Enter a title'); return; }
+  const f = { title:title, date:fv('ev-date'), time:fv('ev-time'), location:fv('ev-loc'), notes:fv('ev-notes'), evtype:'Reminder' };
+  data.customEvents = data.customEvents || [];
+  let eid = id;
+  if(id){ data.customEvents = data.customEvents.map(x => x.id===id ? {...x, ...f} : x); }
+  else { eid = genId(); data.customEvents.unshift({ id:eid, petId:data.activePetId, ...f }); }
+  logChange(id?'edited':'added','reminder', title+' · '+fmtDate(f.date));
+  closeModal(); save(); showToast('📌 Reminder saved');
+  if(gcalAccessToken) syncToGoogleCalendar(); // push it (and anything else pending) to Google Calendar
+}
+function deleteEvent(id){
+  if(denyManage()) return;
+  const e = (data.customEvents||[]).find(x=>x.id===id);
+  data.customEvents = (data.customEvents||[]).filter(x=>x.id!==id);
+  if(e) logChange('deleted','reminder', e.title||'');
+  closeModal(); save(); showToast('🗑️ Deleted');
 }
 // .ics export fallback (no Google account needed)
 function exportICS(){
@@ -2356,6 +2399,7 @@ function renderCalendar(){
   }
   html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">'+svgIcon('download',15)+' Download .ics</button></div>';
   html += '</div>';
+  if(canManage()) html += '<div class="card" style="text-align:center;padding:16px"><button class="btn-primary" style="max-width:320px" onclick="eventModal()">+ Add reminder / event</button><div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Custom reminders show on the calendar and sync to Google Calendar with everything else.</div></div>';
   // Month grid
   const first = new Date(view.y, view.m, 1), startDow = first.getDay(), daysIn = new Date(view.y, view.m+1, 0).getDate();
   const todayK = todayISO();
