@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.29.1';
+const APP_VERSION = 'v0.30.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -842,7 +842,7 @@ async function exportXLSX(){
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.address,v.weight,v.cost,((v.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
-  add('Grooming', ['Dog','Date','Services','Groomer','Cost','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.services||[]).join(', '),g.groomer,g.cost,g.nextDueDate,g.notes].map(clean)));
+  add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,g.address,g.cost,((g.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
@@ -1559,25 +1559,89 @@ function saveVet(id){
   logChange(id?'edited':'added','vet visit', (f.reason||'visit')+' · '+fmtDate(f.date));
   closeModal(); save(); showToast('🏥 Vet visit saved');
 }
+// ── Generic itemized line-items + payment (shared by vet & grooming; px = 'gr' etc.) ──
+function lineAddRow(px, desc, amount){
+  const wrap = document.getElementById(px+'-lines'); if(!wrap) return;
+  const div = document.createElement('div');
+  div.className = 'line-row';
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
+  div.innerHTML = '<input class="input line-desc" style="flex:1;margin:0" placeholder="e.g. Bath, nail trim, de-shed" value="'+esc(desc||'')+'">'
+    + '<input class="input line-amt" type="number" step="0.01" style="width:92px;margin:0" placeholder="0.00" value="'+esc(amount||'')+'" oninput="lineRecalc(\''+px+'\')">'
+    + '<button type="button" onclick="this.parentNode.remove();lineRecalc(\''+px+'\')" title="Remove" style="width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--danger);font-size:18px;line-height:1;cursor:pointer">×</button>';
+  wrap.appendChild(div);
+  lineRecalc(px);
+}
+function lineRecalc(px){
+  const rows = [...document.querySelectorAll('#'+px+'-lines .line-row')];
+  let sum = 0, any = false;
+  rows.forEach(r => { const a = parseFloat(r.querySelector('.line-amt').value); if(!isNaN(a)){ sum += a; any = true; } });
+  const costEl = document.getElementById(px+'-cost'), totalEl = document.getElementById(px+'-total');
+  if(costEl){
+    if(rows.length){ costEl.value = any ? sum.toFixed(2) : ''; costEl.readOnly = true; costEl.style.opacity = '.7'; }
+    else { costEl.readOnly = false; costEl.style.opacity = ''; }
+  }
+  if(totalEl) totalEl.textContent = rows.length ? ('Total: '+money(sum)) : '';
+}
+function lineCollect(px){
+  return [...document.querySelectorAll('#'+px+'-lines .line-row')].map(r => ({ desc:r.querySelector('.line-desc').value.trim(), amount:r.querySelector('.line-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
+}
+function payToggle(px){
+  const w = document.getElementById(px+'-cc-wrap'); if(!w) return;
+  const m = fv(px+'-paymethod');
+  w.style.display = (m==='Credit card' || m==='Debit card') ? '' : 'none';
+}
+// Saved groomers/addresses for the grooming dropdowns.
+function groomSuggestions(){
+  const groomers = new Set(), addresses = new Set(), addrMap = {};
+  (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(g.address && !addrMap[g.groomer]) addrMap[g.groomer] = g.address; } if(g.address) addresses.add(g.address); });
+  (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){ if(c.name){ groomers.add(c.name); if(c.address && !addrMap[c.name]) addrMap[c.name] = c.address; } if(c.org) groomers.add(c.org); if(c.address) addresses.add(c.address); } });
+  return { groomers:[...groomers].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), addrMap };
+}
+function onGroomPick(){
+  const addrEl = document.getElementById('gr-address');
+  if(!addrEl || addrEl.value) return;
+  const a = groomSuggestions().addrMap[fv('gr-by')];
+  if(a) addrEl.value = a;
+}
 function groomModal(id){
   const g = id ? data.grooming.find(x=>x.id===id) : null;
   const chosen = g ? (g.services||[]) : [];
+  const sug = groomSuggestions();
+  const groomerOpts = sug.groomers.map(x => '<option value="'+esc(x)+'"></option>').join('');
+  const addrOpts = sug.addresses.map(x => '<option value="'+esc(x)+'"></option>').join('');
   openModal('<h3>✂️ '+(g?'Edit grooming':'Grooming')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="gr-date" value="'+(g?esc(g.date):todayISO())+'"></div>'
-    +'<div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div></div>'
-    +'<label class="label">Groomer / Salon</label><input class="input" id="gr-by" value="'+(g?esc(g.groomer||''):'')+'" placeholder="Petco / mobile groomer / at home">'
+    +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="gr-time" value="'+(g?esc(g.time||''):'')+'"></div></div>'
+    +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):'')+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'
+    +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):'')+'" placeholder="123 Main St, City, ST"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
     +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+GROOM_SERVICES.map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
-    +'<label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'">'
+    +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div>'
+    +'<div><label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'"></div></div>'
+    +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
+    +'<div id="gr-lines"></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="lineAddRow(\'gr\')">+ Add line item</button><span id="gr-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
+    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="gr-paidby" value="'+(g?esc(g.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div><label class="label">Payment method</label><select class="select" id="gr-paymethod" onchange="payToggle(\'gr\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((g&&g.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
+    +'<div id="gr-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="gr-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((g&&g.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
+    +'<div><label class="label">Last 4</label><input class="input" id="gr-cclast4" inputmode="numeric" maxlength="4" value="'+(g?esc(g.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
     +'<label class="label">Notes</label><textarea class="textarea" id="gr-notes" rows="2">'+(g?esc(g.notes||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveGroom('+(g?"'"+g.id+"'":'null')+')">Save</button>'
     +(g?'<button class="btn btn-danger" onclick="deleteGroom(\''+g.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+  ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.amount));
+  lineRecalc('gr'); payToggle('gr');
 }
 function saveGroom(id){
   if(denyManage()) return;
   if(!activePet()){ promptAddDog(); return; }
   const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
-  const f = { date:fv('gr-date'), cost:fv('gr-cost'), groomer:fv('gr-by'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes') };
+  const lineItems = lineCollect('gr');
+  let cost = fv('gr-cost');
+  if(lineItems.length){ const s = lineItems.reduce((a,li)=>a+(parseFloat(li.amount)||0),0); cost = s ? s.toFixed(2) : ''; }
+  const payMethod = fv('gr-paymethod');
+  const isCard = payMethod==='Credit card' || payMethod==='Debit card';
+  const f = { date:fv('gr-date'), time:fv('gr-time'), cost:cost, groomer:fv('gr-by'), address:fv('gr-address'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes'),
+    lineItems:lineItems, paidBy:fv('gr-paidby'), payMethod:payMethod, ccBrand:isCard?fv('gr-ccbrand'):'', ccLast4:isCard?fv('gr-cclast4'):'' };
   if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
   else data.grooming.unshift({ id:genId(), petId:data.activePetId, ...f });
   logChange(id?'edited':'added','grooming', [services.join(', '), fmtDate(f.date)].filter(Boolean).join(' · '));
@@ -1774,7 +1838,7 @@ function calendarEvents(){
   const dn = p.name, ev = [];
   petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', location:v.address||'', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.address&&'Address: '+v.address, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
     if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
-  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, icon:'✂️', type:'Grooming', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
+  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', location:g.address||'', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.address&&'Address: '+g.address, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
@@ -1990,7 +2054,10 @@ function getReminders(){
     if(v.date){ const u = untilStr(v.date); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet visit '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
     if(v.followUpDate){ const u = untilStr(v.followUpDate); if(u && !u.past && u.days <= 30) out.push({ icon:'🏥', text:'Vet follow-up '+u.text+(v.reason?' · '+v.reason:''), over:false, sort:u.days }); }
   });
-  petArr('grooming').forEach(g => { if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); } });
+  petArr('grooming').forEach(g => {
+    if(g.date){ const u = untilStr(g.date); if(u && !u.past && u.days <= 30) out.push({ icon:'✂️', text:'Grooming '+u.text+(g.services&&g.services.length?' · '+g.services.join(', '):''), over:false, sort:u.days }); }
+    if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); }
+  });
   petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));
   return out.sort((a,b)=>a.sort-b.sort);
 }
@@ -2481,7 +2548,7 @@ function renderGroomTab(){
   if(items.length){
     const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
     html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(items[0].date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
-    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.groomer?' · '+esc(g.groomer):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
+    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
@@ -2576,7 +2643,7 @@ function insightStat(which){
   if(which==='meals') logListModal('Meals today', petLogs('feed').filter(f=>f.dateTime && f.dateTime.slice(0,10)===today));
   else if(which==='walks7') logListModal('Walks · last 7 days', last7(petLogs('walk')));
   else if(which==='walktime7') logListModal('Walks · last 7 days', last7(petLogs('walk')).filter(w=>num(w.durationMin)));
-  else if(which==='avgwalk') logListModal('Walks with a recorded duration', petLogs('walk').filter(w=>num(w.durationMin)!=null));
+  else if(which==='avgwalk') logListModal('Walks · last 7 days', last7(petLogs('walk')).filter(w=>num(w.durationMin)!=null));
 }
 function encArg(s){ return encodeURIComponent(s).replace(/'/g,'%27'); }
 function renderInsights(){
@@ -2584,7 +2651,8 @@ function renderInsights(){
   const feeds = petLogs('feed'), walks = petLogs('walk'), potty = petLogs('potty');
   const last7 = (logs) => logs.filter(l=>l.dateTime && (Date.now()-new Date(l.dateTime).getTime()) < 7*86400000);
   const walkMins = last7(walks).reduce((s,w)=>s+(num(w.durationMin)||0),0);
-  const avgWalk = walks.filter(w=>num(w.durationMin)).length ? Math.round(walks.reduce((s,w)=>s+(num(w.durationMin)||0),0)/walks.filter(w=>num(w.durationMin)).length) : null;
+  const walksDur7 = last7(walks).filter(w=>num(w.durationMin)!=null);
+  const avgWalk = walksDur7.length ? Math.round(walksDur7.reduce((s,w)=>s+num(w.durationMin),0)/walksDur7.length) : null;
   const today = todayISO();
   const mealsToday = feeds.filter(f=>f.dateTime && f.dateTime.slice(0,10)===today).length;
   const yearStart = new Date().getFullYear()+'-01-01';
@@ -2597,7 +2665,7 @@ function renderInsights(){
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'meals\')"><div class="stat-value" style="color:var(--accent)">'+mealsToday+'</div><div class="stat-label">Meals today</div></div>'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'walks7\')"><div class="stat-value" style="color:var(--success)">'+last7(walks).length+'</div><div class="stat-label">Walks (7d)</div></div>'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'walktime7\')"><div class="stat-value" style="color:var(--accent-2)">'+walkMins+'<span style="font-size:14px">m</span></div><div class="stat-label">Walk time (7d)</div></div>'
-    + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'avgwalk\')"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk</div></div>'
+    + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'avgwalk\')"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk (7d)</div></div>'
     + '</div>';
   // weight trend
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
@@ -2615,9 +2683,11 @@ function renderInsights(){
     // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
     const isPee = p => { const r = p.result||''; return r==='Pee' || r==='Both'; };
     const isPoop = p => { const r = p.result||''; return r==='Poop' || r==='Both' || !!(p.stool && String(p.stool).trim()); };
-    // Average gap between pees and between poops.
+    // Average gap between pees and between poops — over the last 30 days so it reflects the current rhythm.
+    const potty30 = potty.filter(p => p.dateTime && (Date.now()-new Date(p.dateTime).getTime()) < 30*86400000);
+    const pee30 = potty30.filter(isPee).length, poop30 = potty30.filter(isPoop).length;
     const avgGapHrs = (pred) => {
-      const times = potty.filter(p=>p.dateTime && pred(p)).map(p=>new Date(p.dateTime).getTime()).sort((a,b)=>a-b);
+      const times = potty30.filter(p=>p.dateTime && pred(p)).map(p=>new Date(p.dateTime).getTime()).sort((a,b)=>a-b);
       if(times.length < 2) return null;
       let sum=0; for(let i=1;i<times.length;i++) sum += times[i]-times[i-1];
       return (sum/(times.length-1))/3600000; // hours
@@ -2638,7 +2708,7 @@ function renderInsights(){
     html += '<div class="card"><h3 class="section-title">'+svgIcon('potty',18)+' Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\''+esc(k)+'\')">'+esc(k)+': '+v+'</span>').join('')+'</div>'
       + '<div class="grid-2"><div class="timing-box" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
       + '<div class="timing-box" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
-      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks. A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
+      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>last 30 days</strong> ('+pee30+' pee'+(pee30===1?'':'s')+', '+poop30+' poop'+(poop30===1?'':'s')+'). A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
       + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
       + spotList.map(([place, c]) => '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--border)"><span style="font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px"><span class="chip-2" style="cursor:pointer" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧 '+c.pee+'</span><span class="chip" style="cursor:pointer" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩 '+c.poop+'</span></span></div>').join('')
       + '</div>';
