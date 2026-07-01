@@ -122,6 +122,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
 .modal{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;max-width:480px;width:100%;max-height:90vh;overflow:hidden;display:flex;flex-direction:column}
+.modal-wide{max-width:760px}
 .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg-card);flex-shrink:0}
 .modal-head h3{font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px;min-width:0}
 .modal-body{overflow-y:auto;padding:18px 22px 22px}
@@ -209,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.34.0';
+const APP_VERSION = 'v0.35.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -290,6 +291,22 @@ const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus']
 function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPottyPlaces) || []; const base = POTTY_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
 function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
+function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...GROOM_SERVICES, ...c])]; }
+function addGroomService(){
+  if(denyManage()) return;
+  const input = document.getElementById('gr-new-service'); if(!input) return;
+  const v = (input.value||'').trim(); if(!v){ return; }
+  data.settings = data.settings || {};
+  data.settings.customGroomServices = data.settings.customGroomServices || [];
+  if(!groomServiceOptions().some(s=>s.toLowerCase()===v.toLowerCase())){ data.settings.customGroomServices.push(v); save(false); }
+  const grid = document.getElementById('gr-services');
+  if(grid){
+    const ex = [...grid.querySelectorAll('.tag')].find(t=>t.dataset.s.toLowerCase()===v.toLowerCase());
+    if(ex){ ex.classList.add('active'); }
+    else { const btn = document.createElement('button'); btn.className='tag active'; btn.type='button'; btn.dataset.s=v; btn.textContent=v; btn.onclick=function(){ this.classList.toggle('active'); }; grid.appendChild(btn); }
+  }
+  input.value=''; input.focus();
+}
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
@@ -300,7 +317,8 @@ function unitOptions(){ const c = (data.settings && data.settings.customUnits) |
 const LIST_KINDS = {
   potty: { key:'customPottyPlaces', input:'list-potty', word:'location' },
   food:  { key:'customFoodPlaces',  input:'list-food',  word:'location' },
-  unit:  { key:'customUnits',       input:'list-unit',  word:'unit' }
+  unit:  { key:'customUnits',       input:'list-unit',  word:'unit' },
+  groomservice: { key:'customGroomServices', input:'list-groomservice', word:'service' }
 };
 const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
 const SEVERITY = ['Mild','Moderate','Severe'];
@@ -382,14 +400,15 @@ function petArr(key){ const pid = data.activePetId; return (data[key]||[]).filte
 // ═══════════════════════════════════════════════
 // Modals close ONLY via the X, Cancel, or the confirming action — never on an
 // outside/backdrop click — so a stray click or paste can't lose a half-filled form.
-function openModal(html){
+function openModal(html, opts){
   // Pull a leading <h3>…</h3> title out so the title + ✕ live in a sticky header
   // while the rest scrolls in the body.
   let title = '', body = html;
   const m = html.match(/^\s*<h3[^>]*>([\s\S]*?)<\/h3>/);
   if(m){ title = m[1]; body = html.slice(m.index + m[0].length); }
+  const wide = opts && opts.wide ? ' modal-wide' : '';
   document.getElementById('modal-root').innerHTML =
-    '<div class="modal-overlay"><div class="modal">'
+    '<div class="modal-overlay"><div class="modal'+wide+'">'
     + '<div class="modal-head"><h3>'+title+'</h3><button class="modal-x" type="button" onclick="closeModal()" aria-label="Close" title="Close">×</button></div>'
     + '<div class="modal-body">'+body+'</div></div></div>';
 }
@@ -795,6 +814,7 @@ function settingsListsHTML(){
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
   h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a feeding (e.g. kitchen, crate).');
   h += listEditor('Supply units', 'unit', s.customUnits||[], UNIT_OPTIONS, 'Shows up in the Unit dropdown when you add a supply (e.g. flat, roll, dose).');
+  h += listEditor('Grooming services', 'groomservice', s.customGroomServices||[], GROOM_SERVICES, 'Shows up as a service tag when you log grooming.');
   const favs = s.walkFavorites || [];
   h += '<div style="margin-bottom:8px"><div class="label" style="margin-bottom:4px">Favorite walk routes</div>'
     + (favs.length ? favs.map((f,i)=>'<div class="entry-row" style="padding:6px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-word">'+esc((f.from||'?')+' → '+(f.to||'?'))+'</span><button class="btn btn-sm btn-danger" onclick="removeWalkFavorite('+i+')">Remove</button></div>').join('') : '<p style="font-size:12px;color:var(--text-secondary)">Save routes from the walk form (★ checkbox).</p>')
@@ -909,8 +929,8 @@ async function exportXLSX(){
     data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,p.originLocation,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
-  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,v.address,v.weight,v.cost,((v.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
-  add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,g.address,g.cost,((g.lineItems||[]).map(li=>li.desc+': '+money(li.amount)).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
+  add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
+  add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
@@ -1051,7 +1071,7 @@ function petModal(id){
     +'<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="savePet('+(p?"'"+p.id+"'":'null')+')">'+(p?'Save':'Add dog')+'</button>'
     +(p?'<button class="btn btn-danger" style="white-space:nowrap" onclick="deletePet(\''+p.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>'
-  );
+  , {wide:true});
 }
 function handlePhoto(evt){
   const f = evt.target.files[0]; if(!f) return;
@@ -1530,13 +1550,13 @@ function vetSuggestions(){
   const vets = new Set(), clinics = new Set(), addresses = new Set(), map = {}, addrMap = {};
   (data.vetVisits||[]).forEach(v => {
     if(v.vet){ vets.add(v.vet); if(v.clinic && !map[v.vet]) map[v.vet] = v.clinic; }
-    if(v.clinic){ clinics.add(v.clinic); if(v.address && !addrMap[v.clinic]) addrMap[v.clinic] = v.address; }
+    if(v.clinic){ clinics.add(v.clinic); if(!addrMap[v.clinic] && (v.address||v.city||v.state)) addrMap[v.clinic] = { address:v.address||'', city:v.city||'', state:v.state||'' }; }
     if(v.address) addresses.add(v.address);
   });
   (data.contacts||[]).forEach(c => {
     if((c.role||'').toLowerCase().indexOf('vet') > -1){
       if(c.name){ vets.add(c.name); if(c.org && !map[c.name]) map[c.name] = c.org; }
-      if(c.org){ clinics.add(c.org); if(c.address && !addrMap[c.org]) addrMap[c.org] = c.address; }
+      if(c.org){ clinics.add(c.org); if(!addrMap[c.org] && c.address) addrMap[c.org] = { address:c.address, city:c.city||'', state:c.state||'' }; }
       if(c.address) addresses.add(c.address);
     }
   });
@@ -1544,12 +1564,14 @@ function vetSuggestions(){
   return { vets:[...vets].sort((a,b)=>a.localeCompare(b)), clinics:[...clinics].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), map, addrMap };
 }
 // When a saved vet is chosen, fill its clinic (only if the clinic field is still empty).
+function fullAddr(r){ const cs = [r.city, r.state].filter(Boolean).join(', '); return [r.address, cs].filter(Boolean).join(', '); }
+function fillIfEmpty(id, val){ const el = document.getElementById(id); if(el && !el.value && val) el.value = val; }
 function onVetPick(){
   const sug = vetSuggestions();
   const clinicEl = document.getElementById('vt-clinic');
   if(clinicEl && !clinicEl.value){ const c = sug.map[fv('vt-vet')]; if(c) clinicEl.value = c; }
-  const addrEl = document.getElementById('vt-address');
-  if(addrEl && !addrEl.value){ const a = sug.addrMap[fv('vt-clinic')]; if(a) addrEl.value = a; }
+  const a = sug.addrMap[fv('vt-clinic')];
+  if(a){ fillIfEmpty('vt-address', a.address); fillIfEmpty('vt-city', a.city); fillIfEmpty('vt-state', a.state); }
 }
 function vetModal(id){
   const v = id ? data.vetVisits.find(x=>x.id===id) : null;
@@ -1567,14 +1589,16 @@ function vetModal(id){
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
     +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"<datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
     +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
-    +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St, City, ST"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
+    +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
+    +'<div class="grid-2"><div><label class="label">City</label><input class="input" id="vt-city" value="'+(v?esc(v.city||''):esc((vetC&&vetC.city)||''))+'" placeholder="City"></div>'
+    +'<div><label class="label">State</label><input class="input" id="vt-state" value="'+(v?esc(v.state||''):esc((vetC&&vetC.state)||''))+'" placeholder="ST"></div></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="vt-cost" value="'+(v?esc(v.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Weight at visit ('+unit+')</label><input class="input" type="number" step="0.1" id="vt-weight" value="'+(v?esc(v.weight||''):'')+'" placeholder="optional"></div></div>'
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
     +'<div id="vt-lines"></div>'
-    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="vetAddLineRow()">+ Add line item</button><span id="vt-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="lineAddRow(\'vt\')">+ Add line item</button><span id="vt-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
     +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="vt-paidby" value="'+(v?esc(v.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
-    +'<div><label class="label">Payment method</label><select class="select" id="vt-paymethod" onchange="vetTogglePay()"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((v&&v.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
+    +'<div><label class="label">Payment method</label><select class="select" id="vt-paymethod" onchange="payToggle(\'vt\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((v&&v.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="vt-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="vt-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((v&&v.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="vt-cclast4" inputmode="numeric" maxlength="4" value="'+(v?esc(v.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
     +'<div class="grid-2"><div><label class="label">Follow-up date</label><input class="input" type="date" id="vt-follow" value="'+(v?esc(v.followUpDate||''):'')+'"></div>'
@@ -1583,46 +1607,19 @@ function vetModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
     +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  ((v&&v.lineItems)||[]).forEach(li => vetAddLineRow(li.desc, li.amount));
-  vetRecalcTotal(); vetTogglePay();
-}
-function vetAddLineRow(desc, amount){
-  const wrap = document.getElementById('vt-lines'); if(!wrap) return;
-  const div = document.createElement('div');
-  div.className = 'vt-line';
-  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
-  div.innerHTML = '<input class="input vt-desc" style="flex:1;margin:0" placeholder="e.g. Exam fee, vaccine, X-ray" value="'+esc(desc||'')+'">'
-    + '<input class="input vt-amt" type="number" step="0.01" style="width:92px;margin:0" placeholder="0.00" value="'+esc(amount||'')+'" oninput="vetRecalcTotal()">'
-    + '<button type="button" onclick="this.parentNode.remove();vetRecalcTotal()" title="Remove" style="width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--danger);font-size:18px;line-height:1;cursor:pointer">×</button>';
-  wrap.appendChild(div);
-  vetRecalcTotal();
-}
-function vetRecalcTotal(){
-  const rows = [...document.querySelectorAll('#vt-lines .vt-line')];
-  let sum = 0, any = false;
-  rows.forEach(r => { const a = parseFloat(r.querySelector('.vt-amt').value); if(!isNaN(a)){ sum += a; any = true; } });
-  const costEl = document.getElementById('vt-cost'), totalEl = document.getElementById('vt-total');
-  if(costEl){
-    if(rows.length){ costEl.value = any ? sum.toFixed(2) : ''; costEl.readOnly = true; costEl.style.opacity = '.7'; }
-    else { costEl.readOnly = false; costEl.style.opacity = ''; }
-  }
-  if(totalEl) totalEl.textContent = rows.length ? ('Total: '+money(sum)) : '';
-}
-function vetTogglePay(){
-  const w = document.getElementById('vt-cc-wrap'); if(!w) return;
-  const m = fv('vt-paymethod');
-  w.style.display = (m==='Credit card' || m==='Debit card') ? '' : 'none';
+  ((v&&v.lineItems)||[]).forEach(li => lineAddRow('vt', li.desc, li.qty, li.amount));
+  lineRecalc('vt'); payToggle('vt');
 }
 function saveVet(id){
   if(denyManage()) return;
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
-  const lineItems = [...document.querySelectorAll('#vt-lines .vt-line')].map(r => ({ desc:r.querySelector('.vt-desc').value.trim(), amount:r.querySelector('.vt-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
+  const lineItems = lineCollect('vt');
   let cost = fv('vt-cost');
-  if(lineItems.length){ const s = lineItems.reduce((a,li)=>a+(parseFloat(li.amount)||0),0); cost = s ? s.toFixed(2) : ''; }
+  if(lineItems.length){ const s = lineItemsTotal(lineItems); cost = s ? s.toFixed(2) : ''; }
   const payMethod = fv('vt-paymethod');
   const isCard = payMethod==='Credit card' || payMethod==='Debit card';
-  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:cost, reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), address:fv('vt-address'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes'),
+  const f = { date:fv('vt-date'), time:fv('vt-time'), cost:cost, reason:fv('vt-reason'), vet:fv('vt-vet'), clinic:fv('vt-clinic'), address:fv('vt-address'), city:fv('vt-city'), state:fv('vt-state'), weight:fv('vt-weight'), followUpDate:fv('vt-follow'), followUpTime:fv('vt-followtime'), notes:fv('vt-notes'),
     lineItems:lineItems, paidBy:fv('vt-paidby'), payMethod:payMethod, ccBrand:isCard?fv('vt-ccbrand'):'', ccLast4:isCard?fv('vt-cclast4'):'' };
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
@@ -1636,13 +1633,14 @@ function saveVet(id){
   closeModal(); save(); showToast('🏥 Vet visit saved');
 }
 // ── Generic itemized line-items + payment (shared by vet & grooming; px = 'gr' etc.) ──
-function lineAddRow(px, desc, amount){
+function lineAddRow(px, desc, qty, amount){
   const wrap = document.getElementById(px+'-lines'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'line-row';
-  div.style.cssText = 'display:flex;gap:8px;margin-bottom:6px;align-items:center';
-  div.innerHTML = '<input class="input line-desc" style="flex:1;margin:0" placeholder="e.g. Bath, nail trim, de-shed" value="'+esc(desc||'')+'">'
-    + '<input class="input line-amt" type="number" step="0.01" style="width:92px;margin:0" placeholder="0.00" value="'+esc(amount||'')+'" oninput="lineRecalc(\''+px+'\')">'
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center';
+  div.innerHTML = '<input class="input line-desc" style="flex:1;margin:0" placeholder="e.g. Exam, vaccine, bath" value="'+esc(desc||'')+'">'
+    + '<input class="input line-qty" type="number" min="1" step="1" style="width:52px;margin:0" placeholder="Qty" value="'+esc(qty||'')+'" oninput="lineRecalc(\''+px+'\')" title="Quantity">'
+    + '<input class="input line-amt" type="number" step="0.01" style="width:84px;margin:0" placeholder="Price" value="'+esc(amount||'')+'" oninput="lineRecalc(\''+px+'\')" title="Unit price (pre-tax)">'
     + '<button type="button" onclick="this.parentNode.remove();lineRecalc(\''+px+'\')" title="Remove" style="width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--danger);font-size:18px;line-height:1;cursor:pointer">×</button>';
   wrap.appendChild(div);
   lineRecalc(px);
@@ -1650,7 +1648,7 @@ function lineAddRow(px, desc, amount){
 function lineRecalc(px){
   const rows = [...document.querySelectorAll('#'+px+'-lines .line-row')];
   let sum = 0, any = false;
-  rows.forEach(r => { const a = parseFloat(r.querySelector('.line-amt').value); if(!isNaN(a)){ sum += a; any = true; } });
+  rows.forEach(r => { const a = parseFloat(r.querySelector('.line-amt').value); const q = parseFloat(r.querySelector('.line-qty').value); if(!isNaN(a)){ sum += (q>0?q:1) * a; any = true; } });
   const costEl = document.getElementById(px+'-cost'), totalEl = document.getElementById(px+'-total');
   if(costEl){
     if(rows.length){ costEl.value = any ? sum.toFixed(2) : ''; costEl.readOnly = true; costEl.style.opacity = '.7'; }
@@ -1659,8 +1657,10 @@ function lineRecalc(px){
   if(totalEl) totalEl.textContent = rows.length ? ('Total: '+money(sum)) : '';
 }
 function lineCollect(px){
-  return [...document.querySelectorAll('#'+px+'-lines .line-row')].map(r => ({ desc:r.querySelector('.line-desc').value.trim(), amount:r.querySelector('.line-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
+  return [...document.querySelectorAll('#'+px+'-lines .line-row')].map(r => ({ desc:r.querySelector('.line-desc').value.trim(), qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
 }
+function lineItemsTotal(items){ return (items||[]).reduce((a,li)=>{ const q=parseFloat(li.qty); const amt=parseFloat(li.amount)||0; return a + (q>0?q:1)*amt; }, 0); }
+function lineItemStr(li){ const q=parseFloat(li.qty); const t=(q>0?q:1)*(parseFloat(li.amount)||0); return li.desc+(q>1?' ×'+q:'')+': '+money(t); }
 function payToggle(px){
   const w = document.getElementById(px+'-cc-wrap'); if(!w) return;
   const m = fv(px+'-paymethod');
@@ -1669,15 +1669,13 @@ function payToggle(px){
 // Saved groomers/addresses for the grooming dropdowns.
 function groomSuggestions(){
   const groomers = new Set(), addresses = new Set(), addrMap = {};
-  (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(g.address && !addrMap[g.groomer]) addrMap[g.groomer] = g.address; } if(g.address) addresses.add(g.address); });
-  (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){ if(c.name){ groomers.add(c.name); if(c.address && !addrMap[c.name]) addrMap[c.name] = c.address; } if(c.org) groomers.add(c.org); if(c.address) addresses.add(c.address); } });
+  (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(!addrMap[g.groomer] && (g.address||g.city||g.state)) addrMap[g.groomer] = { address:g.address||'', city:g.city||'', state:g.state||'' }; } if(g.address) addresses.add(g.address); });
+  (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){ if(c.name){ groomers.add(c.name); if(!addrMap[c.name] && c.address) addrMap[c.name] = { address:c.address, city:c.city||'', state:c.state||'' }; } if(c.org) groomers.add(c.org); if(c.address) addresses.add(c.address); } });
   return { groomers:[...groomers].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), addrMap };
 }
 function onGroomPick(){
-  const addrEl = document.getElementById('gr-address');
-  if(!addrEl || addrEl.value) return;
   const a = groomSuggestions().addrMap[fv('gr-by')];
-  if(a) addrEl.value = a;
+  if(a){ fillIfEmpty('gr-address', a.address); fillIfEmpty('gr-city', a.city); fillIfEmpty('gr-state', a.state); }
 }
 function groomModal(id){
   const g = id ? data.grooming.find(x=>x.id===id) : null;
@@ -1692,8 +1690,11 @@ function groomModal(id){
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="gr-date" value="'+(g?esc(g.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="gr-time" value="'+(g?esc(g.time||''):'')+'"></div></div>'
     +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):esc((groomC&&(groomC.name||groomC.org))||''))+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'
-    +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. If Google Calendar is connected, this becomes the event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):esc((groomC&&groomC.address)||''))+'" placeholder="123 Main St, City, ST"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
-    +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+GROOM_SERVICES.map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
+    +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):esc((groomC&&groomC.address)||''))+'" placeholder="123 Main St"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
+    +'<div class="grid-2"><div><label class="label">City</label><input class="input" id="gr-city" value="'+(g?esc(g.city||''):esc((groomC&&groomC.city)||''))+'" placeholder="City"></div>'
+    +'<div><label class="label">State</label><input class="input" id="gr-state" value="'+(g?esc(g.state||''):esc((groomC&&groomC.state)||''))+'" placeholder="ST"></div></div>'
+    +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+[...new Set([...groomServiceOptions(), ...chosen])].map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" type="button" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
+    +'<div style="display:flex;gap:8px;margin-bottom:14px"><input class="input" id="gr-new-service" placeholder="Add a service…" style="margin-bottom:0" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addGroomService();}"><button type="button" class="btn" onclick="addGroomService()">Add</button></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Next due (optional)</label><input class="input" type="date" id="gr-next" value="'+(g?esc(g.nextDueDate||''):'')+'"></div></div>'
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
@@ -1707,7 +1708,7 @@ function groomModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveGroom('+(g?"'"+g.id+"'":'null')+')">Save</button>'
     +(g?'<button class="btn btn-danger" onclick="deleteGroom(\''+g.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.amount));
+  ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.qty, li.amount));
   lineRecalc('gr'); payToggle('gr');
 }
 function saveGroom(id){
@@ -1717,10 +1718,10 @@ function saveGroom(id){
   const services = [...document.querySelectorAll('#gr-services .tag.active')].map(t=>t.dataset.s);
   const lineItems = lineCollect('gr');
   let cost = fv('gr-cost');
-  if(lineItems.length){ const s = lineItems.reduce((a,li)=>a+(parseFloat(li.amount)||0),0); cost = s ? s.toFixed(2) : ''; }
+  if(lineItems.length){ const s = lineItemsTotal(lineItems); cost = s ? s.toFixed(2) : ''; }
   const payMethod = fv('gr-paymethod');
   const isCard = payMethod==='Credit card' || payMethod==='Debit card';
-  const f = { date:fv('gr-date'), time:fv('gr-time'), cost:cost, groomer:fv('gr-by'), address:fv('gr-address'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes'),
+  const f = { date:fv('gr-date'), time:fv('gr-time'), cost:cost, groomer:fv('gr-by'), address:fv('gr-address'), city:fv('gr-city'), state:fv('gr-state'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes'),
     lineItems:lineItems, paidBy:fv('gr-paidby'), payMethod:payMethod, ccBrand:isCard?fv('gr-ccbrand'):'', ccLast4:isCard?fv('gr-cclast4'):'' };
   if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
   else data.grooming.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -1926,9 +1927,9 @@ async function shareDogCard(){
 function calendarEvents(){
   const p = activePet(); if(!p) return [];
   const dn = p.name, ev = [];
-  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', record:true, location:v.address||'', title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, v.address&&'Address: '+v.address, v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
+  petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', record:true, location:fullAddr(v), title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, fullAddr(v)&&'Address: '+fullAddr(v), v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
     if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
-  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:g.address||'', title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.address&&'Address: '+g.address, g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
+  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
@@ -2516,14 +2517,13 @@ function deleteNote(id){
 }
 function renderHealthTimeline(){
   const items = [];
-  petArr('vetVisits').forEach(v => items.push({ date:v.date, icon:'🏥', title:v.reason||'Vet visit', sub:[v.vet,v.clinic,v.weight?v.weight+(activePet().weightUnit||'lb'):'',money(v.cost)].filter(Boolean).join(' · '), notes:v.notes }));
-  petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes }));
-  petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes }));
-  petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'' }); });
-  petLogs('weight').filter(l=>l.source && l.source!=='manual').forEach(l => {}); // already shown via vet
+  petArr('vetVisits').forEach(v => items.push({ date:v.date, icon:'🏥', title:v.reason||'Vet visit', sub:[v.vet,v.clinic,v.weight?v.weight+(activePet().weightUnit||'lb'):'',money(v.cost)].filter(Boolean).join(' · '), notes:v.notes, open:"vetModal('"+v.id+"')" }));
+  petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes, open:"groomModal('"+g.id+"')" }));
+  petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes, open:"illnessModal('"+e.id+"')" }));
+  petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'', open:"medModal('"+m.id+"')" }); });
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, and meds will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
-  return items.slice(0,40).map(it => '<div class="timeline-item"><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
+  return items.slice(0,40).map(it => '<div class="timeline-item'+(it.open&&canManage()?' clickable':'')+'"'+(it.open&&canManage()?' onclick="'+it.open+'"':'')+'><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
 }
 function renderContacts(){
   const cs = data.contacts || [];

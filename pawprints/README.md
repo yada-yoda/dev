@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.34.0**
+**Current Version: v0.35.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,12 @@ covers both.
 
 ## Version History
 
+- **v0.35.0** — Form refinements. (1) **Line items now have a quantity** — each row is Qty × unit price, and
+  the pre-tax total updates live (vet + grooming). (2) Vet/clinic and grooming addresses gained **City** and
+  **State** fields (autofilled from saved records, and combined into the Google Calendar event location). (3)
+  Grooming lets you **add custom services** on the spot (managed in Settings too). (4) **Health-timeline
+  entries are now clickable** and open the exact record they came from (vet/grooming/illness/med) to edit.
+  (5) The **Edit-dog form is wider** on desktop (stays full-width on mobile).
 - **v0.34.0** — Auto-saved drafts. If you start a new record (vet, grooming, med, illness, supply, contact,
   note, reminder, or dog) and enter something, it's auto-saved as a **draft** — snapshotted every ~60s and
   again if you close the form without saving. Drafts appear in a "📝 Unsaved drafts" strip at the top of the
