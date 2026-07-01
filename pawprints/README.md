@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.30.2**
+**Current Version: v0.30.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.30.3** — Trimmed the signed-out prompt to just "Sign in to sync across devices" (dropped the Illness
+  Tracker mention).
 - **v0.30.2** — Prefill from saved contacts + reminder fix. A new vet visit or grooming entry now auto-fills
   the vet/groomer, clinic, and address from a matching saved **contact** on the dog's profile (still editable).
   Also fixed the Today reminders so a vet visit dated **today** no longer shows as upcoming after it's
