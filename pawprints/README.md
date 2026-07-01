@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.35.0**
+**Current Version: v0.36.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.36.0** — Contacts city/state + fuller drafts. Contacts now have **City** and **State** fields (flow into
+  the vCard and the vet/groomer autofill). Drafts now also **capture line items and tag selections** (service
+  tags, symptoms), so resuming a vet/grooming/illness draft restores those too.
 - **v0.35.0** — Form refinements. (1) **Line items now have a quantity** — each row is Qty × unit price, and
   the pre-tax total updates live (vet + grooming). (2) Vet/clinic and grooming addresses gained **City** and
   **State** fields (autofilled from saved records, and combined into the Google Calendar event location). (3)

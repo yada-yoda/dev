@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.35.0';
+const APP_VERSION = 'v0.36.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -442,12 +442,23 @@ function draftCommit(){ if(openDraft) openDraft.committed = true; }
 function draftFields(){ return [...document.querySelectorAll('#modal-root input, #modal-root select, #modal-root textarea')].filter(el => el.id && el.type!=='file').map(el => ({ id:el.id, v: el.type==='checkbox' ? el.checked : el.value })); }
 function draftMeaningful(kind){ return (DRAFT_KINDS[kind].label||[]).some(id => (fv(id)||'').trim()); }
 function draftLabelText(kind){ for(const id of (DRAFT_KINDS[kind].label||[])){ const v = (fv(id)||'').trim(); if(v) return v; } return DRAFT_KINDS[kind].name; }
+function draftLines(){
+  const wrap = document.querySelector('#modal-root [id$="-lines"]'); if(!wrap) return null;
+  const rows = [...wrap.querySelectorAll('.line-row')]; if(!rows.length) return null;
+  return { px: wrap.id.replace('-lines',''), rows: rows.map(r => ({ desc:r.querySelector('.line-desc').value, qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value })) };
+}
+function draftTags(){
+  const grids = [...document.querySelectorAll('#modal-root .tag-grid[id]')]; if(!grids.length) return null;
+  const out = {};
+  grids.forEach(g => { out[g.id] = [...g.querySelectorAll('.tag.active')].map(t=>t.dataset.s); });
+  return out;
+}
 function draftSnapshot(){
   if(!openDraft || openDraft.committed) return;
   const kind = openDraft.kind;
   if(!draftMeaningful(kind)) return;
   data.drafts = data.drafts || [];
-  const rec = { kind, label:draftLabelText(kind), fields:draftFields(), savedAt:Date.now(), petId:data.activePetId };
+  const rec = { kind, label:draftLabelText(kind), fields:draftFields(), lines:draftLines(), tags:draftTags(), savedAt:Date.now(), petId:data.activePetId };
   if(openDraft.id && data.drafts.some(d=>d.id===openDraft.id)){ data.drafts = data.drafts.map(d => d.id===openDraft.id ? {...d, ...rec} : d); }
   else { if(!openDraft.id) openDraft.id = genId(); data.drafts.unshift({ id:openDraft.id, ...rec }); }
   save(false);
@@ -457,6 +468,8 @@ function resumeDraft(id){
   const K = DRAFT_KINDS[d.kind]; if(!K || typeof window[K.opener] !== 'function') return;
   window[K.opener]();
   (d.fields||[]).forEach(f => { const el = document.getElementById(f.id); if(el){ if(el.type==='checkbox') el.checked = !!f.v; else el.value = f.v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } });
+  if(d.lines && d.lines.px){ d.lines.rows.forEach(li => lineAddRow(d.lines.px, li.desc, li.qty, li.amount)); lineRecalc(d.lines.px); }
+  if(d.tags){ Object.keys(d.tags).forEach(gid => { const grid = document.getElementById(gid); if(!grid) return; const want = d.tags[gid]||[]; grid.querySelectorAll('.tag').forEach(t => t.classList.toggle('active', want.indexOf(t.dataset.s)>-1)); want.forEach(s => { if(![...grid.querySelectorAll('.tag')].some(t=>t.dataset.s===s)){ const b=document.createElement('button'); b.className='tag active'; b.type='button'; b.dataset.s=s; b.textContent=s; b.onclick=function(){ this.classList.toggle('active'); }; grid.appendChild(b); } }); }); }
   if(openDraft) openDraft.id = d.id;
 }
 function deleteDraft(id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==id); save(false); render(); }
@@ -934,7 +947,7 @@ async function exportXLSX(){
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
-  add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,c.address,c.website,c.notes].map(clean)));
+  add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
   try { XLSX.writeFile(wb, 'pawprints-'+todayISO()+'.xlsx'); showToast('✅ Spreadsheet saved'); } catch(e){ showToast('⚠️ Could not save spreadsheet'); }
@@ -1010,7 +1023,7 @@ async function exportPDF(){
     doc.addPage(); let y = 54;
     doc.setFillColor(...ACCENT); doc.rect(0,0,pageW,7,'F');
     y = heading('Contacts — care team', y);
-    y = table(['Type','Name / Business','Phone','Email','Address'], data.contacts.map(c=>[c.role||dash, c.name||c.org||dash, c.phone||dash, c.email||dash, c.address||'']), y);
+    y = table(['Type','Name / Business','Phone','Email','Address'], data.contacts.map(c=>[c.role||dash, c.name||c.org||dash, c.phone||dash, c.email||dash, fullAddr(c)||'']), y);
   }
 
   const n = doc.internal.getNumberOfPages();
@@ -1854,7 +1867,9 @@ function contactModal(id){
     +'<label class="label">Clinic / Business</label><input class="input" id="ct-org" value="'+(c?esc(c.org||''):esc(pre.org||''))+'" placeholder="Riverside Animal Hospital">'
     +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="ct-phone" value="'+(c?esc(c.phone||''):esc(pre.phone||''))+'"></div>'
     +'<div><label class="label">Email</label><input class="input" type="email" id="ct-email" value="'+(c?esc(c.email||''):esc(pre.email||''))+'"></div></div>'
-    +'<label class="label">Address</label><input class="input" id="ct-addr" value="'+(c?esc(c.address||''):'')+'" placeholder="123 Main St, City, ST 00000">'
+    +'<label class="label">Address</label><input class="input" id="ct-addr" value="'+(c?esc(c.address||''):'')+'" placeholder="123 Main St">'
+    +'<div class="grid-2"><div><label class="label">City</label><input class="input" id="ct-city" value="'+(c?esc(c.city||''):'')+'" placeholder="City"></div>'
+    +'<div><label class="label">State</label><input class="input" id="ct-state" value="'+(c?esc(c.state||''):'')+'" placeholder="ST"></div></div>'
     +'<label class="label">Website</label><input class="input" type="url" id="ct-web" value="'+(c?esc(c.website||''):'')+'" placeholder="https://">'
     +'<label class="label">Notes</label><input class="input" id="ct-notes" value="'+(c?esc(c.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveContact('+(c?"'"+c.id+"'":'null')+')">Save</button>'
@@ -1864,7 +1879,7 @@ function contactModal(id){
 function saveContact(id){
   if(denyManage()) return;
   draftCommit();
-  const f = { role:fv('ct-role'), name:fv('ct-name'), org:fv('ct-org'), phone:fv('ct-phone'), email:fv('ct-email'), address:fv('ct-addr'), website:fv('ct-web'), notes:fv('ct-notes') };
+  const f = { role:fv('ct-role'), name:fv('ct-name'), org:fv('ct-org'), phone:fv('ct-phone'), email:fv('ct-email'), address:fv('ct-addr'), city:fv('ct-city'), state:fv('ct-state'), website:fv('ct-web'), notes:fv('ct-notes') };
   if(!f.name && !f.org){ showToast('⚠️ Enter a name or business'); return; }
   if(id) data.contacts = data.contacts.map(c=>c.id===id?{...c,...f}:c);
   else data.contacts.unshift({ id:genId(), ...f });
@@ -1881,7 +1896,7 @@ function vCardFor(c){
   if(c.role) lines.push('TITLE:'+vcEsc(c.role+(dog?' — '+dog:'')));
   if(c.phone) lines.push('TEL;TYPE=WORK,VOICE:'+vcEsc(c.phone));
   if(c.email) lines.push('EMAIL;TYPE=WORK:'+vcEsc(c.email));
-  if(c.address) lines.push('ADR;TYPE=WORK:;;'+vcEsc(c.address)+';;;;');
+  if(c.address||c.city||c.state) lines.push('ADR;TYPE=WORK:;;'+vcEsc(c.address||'')+';'+vcEsc(c.city||'')+';'+vcEsc(c.state||'')+';;');
   if(c.website) lines.push('URL:'+vcEsc(c.website));
   const note = [c.notes, (c.role&&dog)?(c.role+' for '+dog):''].filter(Boolean).join(' · ');
   if(note) lines.push('NOTE:'+vcEsc(note));
