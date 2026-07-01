@@ -206,7 +206,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.30.3';
+const APP_VERSION = 'v0.31.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -251,7 +251,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], journal:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -296,7 +296,7 @@ const SEVERITY = ['Mild','Moderate','Severe'];
 const SEXES = ['Male','Female','Unknown'];
 const FIXED_STATUS = ['Spayed / Neutered','Not fixed (intact)','Unknown'];
 const ORIGIN_TYPES = ['Adopted (shelter / rescue)','Purchased (breeder)','Purchased (pet store)','Rehomed to you','Found / stray','Gift','Bred (own litter)','Other'];
-const CONTACT_ROLES = ['Vet','Emergency Vet','Groomer','Pet Sitter','Boarding / Daycare','Trainer','Pharmacy','Walker','Other'];
+const CONTACT_ROLES = ['Vet','Emergency Vet','Emergency Contact','Groomer','Pet Sitter','Boarding / Daycare','Trainer','Pharmacy','Walker','Other'];
 const SHARE_ROLES = ['Family','Partner / Spouse','Helper','Sitter','Dog walker','Friend','Other'];
 const SHARE_ACCESS = [
   { v:'full',   label:'Full access — view & edit everything' },
@@ -470,7 +470,7 @@ async function loadFromFirestore(){
         return;
       }
       // Own data — merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','auditLog'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','journal','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
@@ -847,6 +847,7 @@ async function exportXLSX(){
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,c.address,c.website,c.notes].map(clean)));
+  add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
   try { XLSX.writeFile(wb, 'pawprints-'+todayISO()+'.xlsx'); showToast('✅ Spreadsheet saved'); } catch(e){ showToast('⚠️ Could not save spreadsheet'); }
 }
@@ -2375,6 +2376,8 @@ function renderProfile(){
   }
   // health timeline
   html += '<div class="card"><h3 class="section-title">'+svgIcon('care',18)+' Health timeline</h3>'+renderHealthTimeline()+'</div>';
+  // notes / journal
+  html += renderNotes();
   // contacts / care team
   html += renderContacts();
   // multi-dog management
@@ -2382,6 +2385,42 @@ function renderProfile(){
     + data.pets.map(pt=>'<div class="entry-row'+(pt.id===p.id?'':' clickable')+'"'+(pt.id===p.id?'':' onclick="selectPet(\''+pt.id+'\')"')+'><div style="display:flex;align-items:center;gap:10px">'+(pt.photo?'<img src="'+pt.photo+'" style="width:32px;height:32px;border-radius:50%;object-fit:cover">':'<span style="font-size:22px">🐾</span>')+'<div><div style="font-weight:600">'+esc(pt.name)+(pt.id===p.id?' <span class="chip-2" style="font-size:10px">active</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(pt.breed||'')+'</div></div></div>'+(canManage()?'<button class="btn btn-sm" onclick="event.stopPropagation();petModal(\''+pt.id+'\')">Edit</button>':'')+'</div>').join('')
     + (canManage()?'<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button>':'')+'</div>';
   return html;
+}
+// ── Dog notes / journal (free-form, timestamped observations) ──
+function renderNotes(){
+  const notes = petArr('journal').slice().sort((a,b)=>new Date(b.dateTime||0)-new Date(a.dateTime||0));
+  let html = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(notes.length?'12px':'0')+'"><h3 class="section-title" style="margin:0">'+svgIcon('log',18)+' Notes</h3>'+(canManage()?'<button class="btn btn-sm" onclick="noteModal()">+ Add note</button>':'')+'</div>';
+  if(notes.length) html += notes.map(n=>'<div class="entry-row'+(canManage()?' clickable':'')+'"'+(canManage()?' onclick="noteModal(\''+n.id+'\')"':'')+'><div style="flex:1"><div style="font-size:14px;white-space:pre-wrap">'+esc(n.text)+'</div><div class="tl-time">'+fmtDateTime(n.dateTime)+'</div></div></div>').join('');
+  else html += '<p style="color:var(--text-secondary);font-size:14px;margin:8px 0 0">No notes yet — jot down anything worth remembering (a guess at his age, a quirk, a vet’s remark).</p>';
+  return html + '</div>';
+}
+function noteModal(id){
+  if(denyManage()) return;
+  if(!activePet()){ promptAddDog(); return; }
+  const n = id ? (data.journal||[]).find(x=>x.id===id) : null;
+  openModal('<h3>📝 '+(n?'Edit note':'Add note')+'</h3>'
+    +'<label class="label">When</label><input class="input" type="datetime-local" id="nt-dt" value="'+(n?esc(n.dateTime||nowLocalISO()):nowLocalISO())+'">'
+    +'<label class="label">Note</label><textarea class="textarea" id="nt-text" rows="4" placeholder="e.g. We think he’s about 4 years old.">'+(n?esc(n.text||''):'')+'</textarea>'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveNote('+(n?"'"+n.id+"'":'null')+')">Save</button>'
+    +(n?'<button class="btn btn-danger" onclick="deleteNote(\''+n.id+'\')">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+function saveNote(id){
+  if(denyManage()) return;
+  if(!activePet()){ promptAddDog(); return; }
+  const text = fv('nt-text'); if(!text){ showToast('⚠️ Enter a note'); return; }
+  const f = { text:text, dateTime:fv('nt-dt')||nowLocalISO() };
+  data.journal = data.journal || [];
+  if(id){ data.journal = data.journal.map(x=>x.id===id ? {...x, ...f} : x); }
+  else { data.journal.unshift({ id:genId(), petId:data.activePetId, ...f }); }
+  logChange(id?'edited':'added','note', text.slice(0,40));
+  closeModal(); save(); showToast('📝 Note saved');
+}
+function deleteNote(id){
+  if(denyManage()) return;
+  data.journal = (data.journal||[]).filter(x=>x.id!==id);
+  logChange('deleted','note','');
+  closeModal(); save(); showToast('🗑️ Deleted');
 }
 function renderHealthTimeline(){
   const items = [];

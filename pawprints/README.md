@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.30.3**
+**Current Version: v0.31.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.31.0** — Emergency contact + dog notes. Added an **"Emergency Contact"** type to Contacts (for a
+  person to call, distinct from the emergency vet). New **Notes** section on the Profile tab — jot down
+  timestamped observations about your dog (e.g. "we think he's about 4 years old"), each with an editable
+  date/time; included in the spreadsheet export.
 - **v0.30.3** — Trimmed the signed-out prompt to just "Sign in to sync across devices" (dropped the Illness
   Tracker mention).
 - **v0.30.2** — Prefill from saved contacts + reminder fix. A new vet visit or grooming entry now auto-fills
