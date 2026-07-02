@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.42.1';
+const APP_VERSION = 'v0.42.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -817,10 +817,10 @@ function onRecordPick(){
   const sug = vetSuggestions();
   const clinicEl = document.getElementById('rc-clinic');
   if(clinicEl && !clinicEl.value){ const c = sug.map[fv('rc-vet')]; if(c) clinicEl.value = c; }
-  const a = sug.addrMap[fv('rc-clinic')];
-  if(a){ fillIfEmpty('rc-address', a.address); fillIfEmpty('rc-city', a.city); fillIfEmpty('rc-state', a.state); fillIfEmpty('rc-zip', a.zip); }
-  const ph = sug.phoneMap[fv('rc-vet')] || sug.phoneMap[fv('rc-clinic')];
-  if(ph) fillIfEmpty('rc-phone', ph);
+  const key = fv('rc-clinic');
+  const a = sug.addrMap[key] || sug.addrMap[fv('rc-vet')];
+  const ph = sug.phoneMap[key] || sug.phoneMap[fv('rc-vet')];
+  fillPlace('rc-clinic', 'rc', a, ph);
 }
 function recordModal(id){
   const r = id ? data.records.find(x=>x.id===id) : null;
@@ -851,6 +851,7 @@ function recordModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveRecord('+(r?"'"+r.id+"'":'null')+')">Save</button>'
     +(r?'<button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+  markPlaceFilled('rc-clinic');
 }
 
 function saveRecord(id){
@@ -1706,12 +1707,26 @@ function recProvider(r){ return [r.vet, r.clinic].filter(Boolean).join(' · ') |
 // Origin source address, structured fields with legacy originLocation ("City, ST") fallback.
 function originAddr(p){ return fullAddr({address:p.originAddress, city:p.originCity, state:p.originState, zip:p.originZip}) || p.originLocation || ''; }
 function fillIfEmpty(id, val){ const el = document.getElementById(id); if(el && !el.value && val) el.value = val; }
+// Fill address/phone from a chosen clinic/groomer. Overwrites (so switching places updates the fields),
+// but only when the place actually changed since the last autofill — so manual edits aren't clobbered.
+// keyElId = clinic/groomer field; prefix = field-id prefix ('rc'/'vt'/'gr'); a = {address,city,state,zip}.
+function fillPlace(keyElId, prefix, a, phone){
+  const el = document.getElementById(keyElId); if(!el || !a) return;
+  const key = el.value;
+  if(el.dataset.placeFill === key) return;
+  const set = (id, v) => { const e = document.getElementById(id); if(e) e.value = v || ''; };
+  set(prefix+'-address', a.address); set(prefix+'-city', a.city); set(prefix+'-state', a.state); set(prefix+'-zip', a.zip);
+  if(phone) set(prefix+'-phone', phone);
+  el.dataset.placeFill = key;
+}
+// Mark the currently-shown place as in-sync so touching other fields won't re-fill over manual edits.
+function markPlaceFilled(keyElId){ const el = document.getElementById(keyElId); if(el) el.dataset.placeFill = el.value; }
 function onVetPick(){
   const sug = vetSuggestions();
   const clinicEl = document.getElementById('vt-clinic');
   if(clinicEl && !clinicEl.value){ const c = sug.map[fv('vt-vet')]; if(c) clinicEl.value = c; }
-  const a = sug.addrMap[fv('vt-clinic')];
-  if(a){ fillIfEmpty('vt-address', a.address); fillIfEmpty('vt-city', a.city); fillIfEmpty('vt-state', a.state); fillIfEmpty('vt-zip', a.zip); }
+  const a = sug.addrMap[fv('vt-clinic')] || sug.addrMap[fv('vt-vet')];
+  fillPlace('vt-clinic', 'vt', a);
 }
 function vetModal(id){
   const v = id ? data.vetVisits.find(x=>x.id===id) : null;
@@ -1728,7 +1743,7 @@ function vetModal(id){
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
     +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"<datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
-    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
+    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
     +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="vt-city" value="'+(v?esc(v.city||''):esc((vetC&&vetC.city)||''))+'" placeholder="City"></div>'
     +'<div><label class="label">State</label><input class="input" id="vt-state" value="'+(v?esc(v.state||''):esc((vetC&&vetC.state)||''))+'" placeholder="ST"></div>'
@@ -1749,7 +1764,7 @@ function vetModal(id){
     +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
   ((v&&v.lineItems)||[]).forEach(li => lineAddRow('vt', li.desc, li.qty, li.amount));
-  lineRecalc('vt'); payToggle('vt');
+  lineRecalc('vt'); payToggle('vt'); markPlaceFilled('vt-clinic');
 }
 function saveVet(id){
   if(denyManage()) return;
@@ -1811,12 +1826,17 @@ function payToggle(px){
 function groomSuggestions(){
   const groomers = new Set(), addresses = new Set(), addrMap = {};
   (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(!addrMap[g.groomer] && (g.address||g.city||g.state||g.zip)) addrMap[g.groomer] = { address:g.address||'', city:g.city||'', state:g.state||'', zip:g.zip||'' }; } if(g.address) addresses.add(g.address); });
-  (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){ if(c.name){ groomers.add(c.name); if(!addrMap[c.name] && c.address) addrMap[c.name] = { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' }; } if(c.org) groomers.add(c.org); if(c.address) addresses.add(c.address); } });
+  (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){
+    const addr = c.address ? { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' } : null;
+    if(c.name){ groomers.add(c.name); if(addr && !addrMap[c.name]) addrMap[c.name] = addr; }
+    if(c.org){ groomers.add(c.org); if(addr && !addrMap[c.org]) addrMap[c.org] = addr; }
+    if(c.address) addresses.add(c.address);
+  } });
   return { groomers:[...groomers].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), addrMap };
 }
 function onGroomPick(){
   const a = groomSuggestions().addrMap[fv('gr-by')];
-  if(a){ fillIfEmpty('gr-address', a.address); fillIfEmpty('gr-city', a.city); fillIfEmpty('gr-state', a.state); fillIfEmpty('gr-zip', a.zip); }
+  fillPlace('gr-by', 'gr', a);
 }
 function groomModal(id){
   const g = id ? data.grooming.find(x=>x.id===id) : null;
@@ -1851,7 +1871,7 @@ function groomModal(id){
     +(g?'<button class="btn btn-danger" onclick="deleteGroom(\''+g.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
   ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.qty, li.amount));
-  lineRecalc('gr'); payToggle('gr');
+  lineRecalc('gr'); payToggle('gr'); markPlaceFilled('gr-by');
 }
 function saveGroom(id){
   if(denyManage()) return;

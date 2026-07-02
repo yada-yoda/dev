@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.42.1**
+**Current Version: v0.42.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.42.2** — Fixed clinic/vet autofill. Picking a saved **clinic** (or groomer) from the
+  dropdown now fills in its address and phone — and **switching** to a different one updates
+  the fields instead of keeping the first one's details. Manual edits you make afterward are
+  preserved. Applies to medical records, vet visits, and grooming. Groomers saved under a
+  business name (not a person's name) now autofill too.
 - **v0.42.1** — Medical records gain a **Record #** field (chart / invoice / certificate number)
   next to the name. It shows on the record row, the calendar event details, and the spreadsheet
   export.
