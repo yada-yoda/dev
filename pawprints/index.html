@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.0';
+const APP_VERSION = 'v0.44.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1706,8 +1706,11 @@ function vetSuggestions(){
   });
   (data.contacts||[]).forEach(c => {
     if((c.role||'').toLowerCase().indexOf('vet') > -1){
+      const addr = c.address ? { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' } : null;
       if(c.name){ vets.add(c.name); if(c.org && !map[c.name]) map[c.name] = c.org; }
-      if(c.org){ clinics.add(c.org); if(!addrMap[c.org] && c.address) addrMap[c.org] = { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' }; }
+      if(c.org) clinics.add(c.org);
+      else if(c.name) clinics.add(c.name); // business-only contact: the name IS the clinic
+      if(addr){ if(c.org && !addrMap[c.org]) addrMap[c.org] = addr; if(c.name && !addrMap[c.name]) addrMap[c.name] = addr; }
       if(c.address) addresses.add(c.address);
       if(c.phone){ if(c.name && !phoneMap[c.name]) phoneMap[c.name] = c.phone; if(c.org && !phoneMap[c.org]) phoneMap[c.org] = c.phone; }
     }

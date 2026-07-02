@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.0**
+**Current Version: v0.44.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.44.1** — Fixed vet clinic autofill from contacts. A clinic saved as a contact now shows
+  up in the clinic dropdown and fills its address/phone whether you stored the name in the
+  contact's **Name** or **Organization** field (previously only Organization worked). Applies to
+  medical records and vet visits; a vet's personal name no longer clutters the clinic list.
 - **v0.44.0** — **Interactive Trends chart on Insights.** A new chart you can steer: pick a
   **metric** (Feeding, Potty as pee/poop, Walks, Weight), a **style** (Auto, Line, Bar, Area),
   and a **range** (14 / 30 / 90 days). "Auto" chooses the best fit per metric — bars for
