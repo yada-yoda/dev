@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.4';
+const APP_VERSION = 'v0.44.5';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -269,7 +269,7 @@ let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
 let careSubtab = 'vet';
-let trendMetric = 'feeding', trendStyle = 'auto', trendRange = 30, trendsChart = null;
+let trendMetric = 'feeding', trendStyle = 'auto', trendRange = 7, trendsChart = null;
 let suppliesCat = 'all';
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
@@ -866,8 +866,8 @@ function recordModal(id){
     +'<div id="rc-vax-wrap" style="display:none"><label class="label">Vaccine type'+tip('The kind of vaccine — e.g. Modified Live, Killed/Inactivated, Recombinant. Pick one or type your own.')+'</label><input class="input" id="rc-vactype" list="rc-vactype-list" autocomplete="off" value="'+(r?esc(r.vaccineType||''):'')+'" placeholder="e.g. Modified Live"><datalist id="rc-vactype-list">'+VACCINE_TYPES.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div>'
     +'<div id="rc-test-wrap" style="display:none"><div class="grid-2"><div><label class="label">Tested for / condition'+tip('What was tested — e.g. Heartworm, thyroid panel, Lyme, tick-borne panel.')+'</label><input class="input" id="rc-testfor" value="'+(r?esc(r.testedFor||''):'')+'" placeholder="e.g. Heartworm"></div>'
     +'<div><label class="label">Result'+tip('The outcome — e.g. Negative, Normal, Positive, or a measured value.')+'</label><input class="input" id="rc-result" list="rc-result-list" autocomplete="off" value="'+(r?esc(r.result||''):'')+'" placeholder="e.g. Negative"><datalist id="rc-result-list">'+RESULT_OPTIONS.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div></div></div>'
-    +'<div class="grid-2"><div><label class="label">Vet / doctor'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic, address & phone.'):'')+'</label><input class="input" id="rc-vet" list="rc-vet-list" autocomplete="off" oninput="onRecordPick()" value="'+(r?esc(r.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="rc-vet-list">'+vetOpts+'</datalist></div>'
-    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic or type a new one.'):'')+'</label><input class="input" id="rc-clinic" list="rc-clinic-list" autocomplete="off" oninput="onRecordPick()" value="'+esc(clinicVal)+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="rc-clinic-list">'+clinicOpts+'</datalist></div></div>'
+    +'<div class="grid-2"><div><label class="label">Vet / doctor'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic, address & phone.'):'')+'</label><input class="input" id="rc-vet" list="rc-vet-list" autocomplete="off" oninput="onRecordPick()" value="'+(r?esc(r.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="rc-vet-list">'+vetOpts+'</datalist>'+savedPick('rc-vet', sug.vets, 'Pick a saved vet')+'</div>'
+    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic or type a new one.'):'')+'</label><input class="input" id="rc-clinic" list="rc-clinic-list" autocomplete="off" oninput="onRecordPick()" value="'+esc(clinicVal)+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="rc-clinic-list">'+clinicOpts+'</datalist>'+savedPick('rc-clinic', sug.clinics, 'Pick a saved clinic')+'</div></div>'
     +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location (tappable in Maps).'):'')+'</label><input class="input" id="rc-address" list="rc-addr-list" autocomplete="off" value="'+(r?esc(r.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St"><datalist id="rc-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="rc-city" value="'+(r?esc(r.city||''):esc((vetC&&vetC.city)||''))+'" placeholder="City"></div>'
     +'<div><label class="label">State</label><input class="input" id="rc-state" value="'+(r?esc(r.state||''):esc((vetC&&vetC.state)||''))+'" placeholder="ST"></div>'
@@ -1766,6 +1766,13 @@ function fillPlace(keyElId, prefix, a, phone){
 }
 // Mark the currently-shown place as in-sync so touching other fields won't re-fill over manual edits.
 function markPlaceFilled(keyElId){ const el = document.getElementById(keyElId); if(el) el.dataset.placeFill = el.value; }
+// A native <select> quick-picker beside a type-or-pick input. <datalist> alone is unreliable (a
+// prefilled field hides the other options), so this guarantees you can always pick a saved value.
+function savedPick(inputId, options, label){
+  if(!options || !options.length) return '';
+  return '<select class="select" onchange="pickInto(\''+inputId+'\',this)" style="margin-top:6px;font-size:12px;color:var(--text-secondary);height:auto;padding:6px 10px"><option value="">▾ '+(label||'Pick a saved one')+'…</option>'+options.map(o=>'<option value="'+esc(o)+'">'+esc(o)+'</option>').join('')+'</select>';
+}
+function pickInto(inputId, selEl){ const v = selEl.value; if(!v) return; const el = document.getElementById(inputId); if(el){ el.value = v; el.dispatchEvent(new Event('input', {bubbles:true})); } selEl.value = ''; }
 function onVetPick(){
   const sug = vetSuggestions();
   const clinicEl = document.getElementById('vt-clinic');
@@ -1787,8 +1794,8 @@ function vetModal(id){
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="vt-date" value="'+(v?esc(v.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="vt-time" value="'+(v?esc(v.time||''):'')+'"></div></div>'
     +'<label class="label">Reason / Visit type</label><input class="input" id="vt-reason" value="'+(v?esc(v.reason||''):'')+'" placeholder="Annual checkup, vaccines, ear infection…">'
-    +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"<datalist id="vt-vet-list">'+vetOpts+'</datalist></div>'
-    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist></div></div>'
+    +'<div class="grid-2"><div><label class="label">Vet'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic.'):'')+'</label><input class="input" id="vt-vet" list="vt-vet-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="vt-vet-list">'+vetOpts+'</datalist>'+savedPick('vt-vet', sug.vets, 'Pick a saved vet')+'</div>'
+    +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic from the list or type a new one.'):'')+'</label><input class="input" id="vt-clinic" list="vt-clinic-list" autocomplete="off" oninput="onVetPick()" value="'+(v?esc(v.clinic||activePet()?.vetName||''):esc((vetC&&vetC.org)||activePet()?.vetName||''))+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="vt-clinic-list">'+clinicOpts+'</datalist>'+savedPick('vt-clinic', sug.clinics, 'Pick a saved clinic')+'</div></div>'
     +'<label class="label">Vet / clinic address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location (tappable in Maps).'):'')+'</label><input class="input" id="vt-address" list="vt-addr-list" autocomplete="off" value="'+(v?esc(v.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St"><datalist id="vt-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="vt-city" value="'+(v?esc(v.city||''):esc((vetC&&vetC.city)||''))+'" placeholder="City"></div>'
     +'<div><label class="label">State</label><input class="input" id="vt-state" value="'+(v?esc(v.state||''):esc((vetC&&vetC.state)||''))+'" placeholder="ST"></div>'
@@ -1896,7 +1903,7 @@ function groomModal(id){
   openModal('<h3>✂️ '+(g?'Edit grooming':'Grooming')+'</h3>'
     +'<div class="grid-2"><div><label class="label">Date</label><input class="input" type="date" id="gr-date" value="'+(g?esc(g.date):todayISO())+'"></div>'
     +'<div><label class="label">Time (optional)'+tip('Appointment time. If set, the calendar event is timed instead of all-day. Works for past or future visits.')+'</label><input class="input" type="time" id="gr-time" value="'+(g?esc(g.time||''):'')+'"></div></div>'
-    +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):esc((groomC&&(groomC.name||groomC.org))||''))+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'
+    +'<label class="label">Groomer / Salon'+(sug.groomers.length?tip('Pick a saved groomer from the list or type a new one. Choosing a saved one fills in its address.'):'')+'</label><input class="input" id="gr-by" list="gr-by-list" autocomplete="off" oninput="onGroomPick()" value="'+(g?esc(g.groomer||''):esc((groomC&&(groomC.name||groomC.org))||''))+'" placeholder="Petco / mobile groomer / at home"><datalist id="gr-by-list">'+groomerOpts+'</datalist>'+savedPick('gr-by', sug.groomers, 'Pick a saved groomer')
     +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location.'):'')+'</label><input class="input" id="gr-address" list="gr-addr-list" autocomplete="off" value="'+(g?esc(g.address||''):esc((groomC&&groomC.address)||''))+'" placeholder="123 Main St"><datalist id="gr-addr-list">'+addrOpts+'</datalist>'
     +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="gr-city" value="'+(g?esc(g.city||''):esc((groomC&&groomC.city)||''))+'" placeholder="City"></div>'
     +'<div><label class="label">State</label><input class="input" id="gr-state" value="'+(g?esc(g.state||''):esc((groomC&&groomC.state)||''))+'" placeholder="ST"></div>'
@@ -3037,11 +3044,14 @@ function renderInsights(){
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'walktime7\')"><div class="stat-value" style="color:var(--accent-2)">'+walkMins+'<span style="font-size:14px">m</span></div><div class="stat-label">Walk time (7d)</div></div>'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'avgwalk\')"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk (7d)</div></div>'
     + '</div>';
+  // Weight trend — the original dedicated chart, kept above the selectable Trends chart
+  const weights = petLogs('weight').filter(l=>num(l.value)!=null);
+  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
   // Trends — selectable chart (feeding / potty / walks / weight)
   const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
   const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
   const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
-  const rangeBtns = [['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
+  const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
   html += '<div class="card"><h3 class="section-title">'+svgIcon('insights',18)+' Trends</h3>'
     + '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
     + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'

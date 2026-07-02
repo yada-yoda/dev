@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.4**
+**Current Version: v0.44.5**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,15 @@ covers both.
 
 ## Version History
 
+- **v0.44.5** — Insights + clinic-dropdown improvements:
+  - The **Weight trend** chart is back on Insights, above the selectable Trends chart, exactly as
+    it was.
+  - The Trends chart gains a **7-day** range and now **defaults to 7 days** (the shortest) instead
+    of 30.
+  - **Reliable clinic/vet/groomer dropdowns.** Because a plain autocomplete list hides its options
+    once a field is filled, each vet/clinic/groomer field now has a real "Pick a saved…" dropdown
+    beside it — so you can always choose a saved one, and still type a new name. Applies to medical
+    records, vet visits, and grooming.
 - **v0.44.4** — **Time zone setting.** A new Time zone picker in Settings (defaults to Central —
   Chicago) labels the times you log. Exported PDFs now footer every page with "Times shown in
   &lt;zone&gt;" so records are unambiguous, and Google Calendar events use the chosen zone.
