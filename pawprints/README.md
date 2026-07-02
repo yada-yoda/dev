@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.42.0**
+**Current Version: v0.42.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.42.1** — Medical records gain a **Record #** field (chart / invoice / certificate number)
+  next to the name. It shows on the record row, the calendar event details, and the spreadsheet
+  export.
 - **v0.42.0** — More profile detail for adopted & chipped dogs:
   - **Shelter / rescue details.** When "Adopted (shelter / rescue)" is the origin, the profile
     reveals extra fields — **ARN #** (Animal Record Number), **Animal ID**, **Intake date**, and
