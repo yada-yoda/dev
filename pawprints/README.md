@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.5**
+**Current Version: v0.44.6**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.44.6** — **Tag a vet-bill line item as medication.** Each itemized charge on a vet visit
+  (and grooming) now has a 💊 toggle. Tagged items appear under Care → Meds in a "From vet visits"
+  section with their cost, so meds you bought at the vet show up alongside your scheduled ones.
+  The tag also flags the item (💊) in the spreadsheet export.
 - **v0.44.5** — Insights + clinic-dropdown improvements:
   - The **Weight trend** chart is back on Insights, above the selectable Trends chart, exactly as
     it was.

@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.5';
+const APP_VERSION = 'v0.44.6';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -479,7 +479,7 @@ function draftLabelText(kind){ for(const id of (DRAFT_KINDS[kind].label||[])){ c
 function draftLines(){
   const wrap = document.querySelector('#modal-root [id$="-lines"]'); if(!wrap) return null;
   const rows = [...wrap.querySelectorAll('.line-row')]; if(!rows.length) return null;
-  return { px: wrap.id.replace('-lines',''), rows: rows.map(r => ({ desc:r.querySelector('.line-desc').value, qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value })) };
+  return { px: wrap.id.replace('-lines',''), rows: rows.map(r => { const mb=r.querySelector('.line-med-btn'); return { desc:r.querySelector('.line-desc').value, qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value, med:!!(mb && mb.dataset.med==='1') }; }) };
 }
 function draftTags(){
   const grids = [...document.querySelectorAll('#modal-root .tag-grid[id]')]; if(!grids.length) return null;
@@ -502,7 +502,7 @@ function resumeDraft(id){
   const K = DRAFT_KINDS[d.kind]; if(!K || typeof window[K.opener] !== 'function') return;
   window[K.opener]();
   (d.fields||[]).forEach(f => { const el = document.getElementById(f.id); if(el){ if(el.type==='checkbox') el.checked = !!f.v; else el.value = f.v; el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true})); } });
-  if(d.lines && d.lines.px){ d.lines.rows.forEach(li => lineAddRow(d.lines.px, li.desc, li.qty, li.amount)); lineRecalc(d.lines.px); }
+  if(d.lines && d.lines.px){ d.lines.rows.forEach(li => lineAddRow(d.lines.px, li.desc, li.qty, li.amount, li.med)); lineRecalc(d.lines.px); }
   if(d.tags){ Object.keys(d.tags).forEach(gid => { const grid = document.getElementById(gid); if(!grid) return; const want = d.tags[gid]||[]; grid.querySelectorAll('.tag').forEach(t => t.classList.toggle('active', want.indexOf(t.dataset.s)>-1)); want.forEach(s => { if(![...grid.querySelectorAll('.tag')].some(t=>t.dataset.s===s)){ const b=document.createElement('button'); b.className='tag active'; b.type='button'; b.dataset.s=s; b.textContent=s; b.onclick=function(){ this.classList.toggle('active'); }; grid.appendChild(b); } }); }); }
   if(openDraft) openDraft.id = d.id;
 }
@@ -1815,7 +1815,7 @@ function vetModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveVet('+(v?"'"+v.id+"'":'null')+')">Save</button>'
     +(v?'<button class="btn btn-danger" onclick="deleteVet(\''+v.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  ((v&&v.lineItems)||[]).forEach(li => lineAddRow('vt', li.desc, li.qty, li.amount));
+  ((v&&v.lineItems)||[]).forEach(li => lineAddRow('vt', li.desc, li.qty, li.amount, li.med));
   lineRecalc('vt'); payToggle('vt'); markPlaceFilled('vt-clinic');
 }
 function saveVet(id){
@@ -1842,18 +1842,21 @@ function saveVet(id){
   if(gcalAccessToken) syncToGoogleCalendar();
 }
 // ── Generic itemized line-items + payment (shared by vet & grooming; px = 'gr' etc.) ──
-function lineAddRow(px, desc, qty, amount){
+function lineAddRow(px, desc, qty, amount, med){
   const wrap = document.getElementById(px+'-lines'); if(!wrap) return;
   const div = document.createElement('div');
   div.className = 'line-row';
   div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px;align-items:center';
+  const on = !!med;
   div.innerHTML = '<input class="input line-desc" style="flex:1;margin:0" placeholder="e.g. Exam, vaccine, bath" value="'+esc(desc||'')+'">'
     + '<input class="input line-qty" type="number" min="1" step="1" style="width:52px;margin:0" placeholder="Qty" value="'+esc(qty||'')+'" oninput="lineRecalc(\''+px+'\')" title="Quantity">'
     + '<input class="input line-amt" type="number" step="0.01" style="width:84px;margin:0" placeholder="Price" value="'+esc(amount||'')+'" oninput="lineRecalc(\''+px+'\')" title="Unit price (pre-tax)">'
+    + '<button type="button" class="line-med-btn" data-med="'+(on?'1':'0')+'" onclick="toggleLineMed(this)" title="Tag as medication — also lists it under Care ▸ Meds with this cost" style="width:34px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid '+(on?'var(--accent-2)':'var(--border)')+';background:'+(on?'rgba(45,212,191,.15)':'var(--bg-tertiary)')+';cursor:pointer;font-size:14px;opacity:'+(on?'1':'.55')+'">💊</button>'
     + '<button type="button" onclick="this.parentNode.remove();lineRecalc(\''+px+'\')" title="Remove" style="width:30px;height:30px;flex-shrink:0;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--danger);font-size:18px;line-height:1;cursor:pointer">×</button>';
   wrap.appendChild(div);
   lineRecalc(px);
 }
+function toggleLineMed(btn){ const on = btn.dataset.med!=='1'; btn.dataset.med = on?'1':'0'; btn.style.borderColor = on?'var(--accent-2)':'var(--border)'; btn.style.background = on?'rgba(45,212,191,.15)':'var(--bg-tertiary)'; btn.style.opacity = on?'1':'.55'; }
 function lineRecalc(px){
   const rows = [...document.querySelectorAll('#'+px+'-lines .line-row')];
   let sum = 0, any = false;
@@ -1866,10 +1869,11 @@ function lineRecalc(px){
   if(totalEl) totalEl.textContent = rows.length ? ('Total: '+money(sum)) : '';
 }
 function lineCollect(px){
-  return [...document.querySelectorAll('#'+px+'-lines .line-row')].map(r => ({ desc:r.querySelector('.line-desc').value.trim(), qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value })).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
+  return [...document.querySelectorAll('#'+px+'-lines .line-row')].map(r => { const mb=r.querySelector('.line-med-btn'); return { desc:r.querySelector('.line-desc').value.trim(), qty:r.querySelector('.line-qty').value, amount:r.querySelector('.line-amt').value, med:!!(mb && mb.dataset.med==='1') }; }).filter(li => li.desc || (li.amount!=='' && li.amount!=null));
 }
 function lineItemsTotal(items){ return (items||[]).reduce((a,li)=>{ const q=parseFloat(li.qty); const amt=parseFloat(li.amount)||0; return a + (q>0?q:1)*amt; }, 0); }
-function lineItemStr(li){ const q=parseFloat(li.qty); const t=(q>0?q:1)*(parseFloat(li.amount)||0); return li.desc+(q>1?' ×'+q:'')+': '+money(t); }
+function lineItemStr(li){ const q=parseFloat(li.qty); const t=(q>0?q:1)*(parseFloat(li.amount)||0); return li.desc+(q>1?' ×'+q:'')+(li.med?' 💊':'')+': '+money(t); }
+function lineItemCost(li){ const q=parseFloat(li.qty); return (q>0?q:1)*(parseFloat(li.amount)||0); }
 function payToggle(px){
   const w = document.getElementById(px+'-cc-wrap'); if(!w) return;
   const m = fv(px+'-paymethod');
@@ -1923,7 +1927,7 @@ function groomModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveGroom('+(g?"'"+g.id+"'":'null')+')">Save</button>'
     +(g?'<button class="btn btn-danger" onclick="deleteGroom(\''+g.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.qty, li.amount));
+  ((g&&g.lineItems)||[]).forEach(li => lineAddRow('gr', li.desc, li.qty, li.amount, li.med));
   lineRecalc('gr'); payToggle('gr'); markPlaceFilled('gr-by');
 }
 function saveGroom(id){
@@ -2926,8 +2930,15 @@ function renderGroomTab(){
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
+// Meds bought as vet-visit line items tagged 💊 — surfaced here (read-only) with their cost.
+function vetLineMeds(){
+  const out = [];
+  petArr('vetVisits').forEach(v => (v.lineItems||[]).forEach(li => { if(li.med && li.desc) out.push({ desc:li.desc, qty:parseFloat(li.qty)||1, cost:lineItemCost(li), date:v.date, vetId:v.id, reason:v.reason }); }));
+  return out.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+}
 function renderMedsTab(){
   const meds = petArr('meds');
+  const vetMeds = vetLineMeds();
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="medModal()">+ Add med / preventative</button></div>':'';
   if(meds.length){
     html += '<div class="card">'+meds.slice().sort((a,b)=>{const x=untilStr(medNextDue(a)),y=untilStr(medNextDue(b));return (x?x.days:999)-(y?y.days:999);}).map(m=>{
@@ -2938,7 +2949,12 @@ function renderMedsTab(){
       const subParts = [lastStr, m.intervalDays?'every '+esc(m.intervalDays)+'d':'', nd?'Next: '+fmtDate(nd):'', m.recordNo?'#'+esc(m.recordNo):''].filter(Boolean).join(' · ');
       return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span>'+doseChip+'</div><div style="font-size:12px;color:var(--text-secondary)">'+subParts+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
     }).join('')+'</div>';
-  } else html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders.</p></div>';
+  } else if(!vetMeds.length) html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders. Meds you buy on a vet bill (tag the line item 💊) show up here too.</p></div>';
+  if(vetMeds.length){
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('vet',18)+' From vet visits</h3>'
+      + vetMeds.map(vm => '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(vm.desc)+(vm.qty>1?' <span style="font-weight:400;color:var(--text-secondary)">×'+vm.qty+'</span>':'')+' <span class="chip-2" style="font-size:10px">bought at vet</span></div><div style="font-size:12px;color:var(--text-secondary)">'+esc(fmtDate(vm.date))+(vm.reason?' · '+esc(vm.reason):'')+' · '+money(vm.cost)+'</div></div>'+(canManage()?'<button class="btn btn-sm" onclick="vetModal(\''+vm.vetId+'\')">View visit</button>':'')+'</div>').join('')
+      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Line items tagged 💊 on a vet visit. Edit them on the visit itself.</p></div>';
+  }
   return html;
 }
 function renderIllnessTab(){
@@ -3207,7 +3223,7 @@ function enterDemo(){
       { id:'w3', petId:pid, type:'weight', dateTime:dAgo(5)+'T12:00', value:'62.5', unit:'lb', source:'manual' },
     ],
     vetVisits: [
-      { id:'v1', petId:pid, date:dAgo(55), reason:'New-adoption wellness exam', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'185.00', weight:'60', followUpDate:dAgo(-25), notes:'Healthy. Due for booster in ~4 weeks.' },
+      { id:'v1', petId:pid, date:dAgo(55), reason:'New-adoption wellness exam', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'185.00', weight:'60', followUpDate:dAgo(-25), notes:'Healthy. Due for booster in ~4 weeks.', lineItems:[{desc:'Wellness exam',qty:'1',amount:'55',med:false},{desc:'Apoquel 16mg (30 ct)',qty:'1',amount:'78',med:true},{desc:'Ear cleaner',qty:'1',amount:'22',med:true},{desc:'Nail trim',qty:'1',amount:'30',med:false}] },
       { id:'v2', petId:pid, date:dAgo(-25), reason:'Booster vaccines (upcoming)', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'', weight:'', followUpDate:'', notes:'' },
     ],
     grooming: [ { id:'g1', petId:pid, date:dAgo(20), groomer:'Soapy Paws', services:['Bath','Nail trim','De-shedding'], cost:'75.00', nextDueDate:dAgo(-40), notes:'' } ],
