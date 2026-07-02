@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.1';
+const APP_VERSION = 'v0.44.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -320,6 +320,7 @@ function addGroomService(){
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
 const RECORD_TYPES = ['Vaccination','Surgery','Test / Lab work','Dental','Microchip','Deworming','Wellness exam','X-ray / imaging','Injury','Allergy','Prescription','Other'];
 const VACCINE_TYPES = ['Modified Live (MLV)','Killed / Inactivated','Recombinant','Intranasal','Toxoid','Subunit / Conjugate'];
+const RESULT_OPTIONS = ['Normal','Abnormal','Negative','Positive','Inconclusive','Pending','Elevated','Low'];
 const TREND_METRICS = [
   { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
   { k:'potty',   label:'Potty',   icon:'potty',  auto:'bar',  hint:'Pee vs poop counts per day. A steady rhythm is healthy — sudden shifts can be an early signal.' },
@@ -814,6 +815,7 @@ function renderRecordsTab(){
       const when = fmtDate(r.date) + (r.time?' '+fmtClock(r.time):'');
       return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(r.name||r.type||'Record')+' <span class="chip-p" style="font-size:10px">'+esc(r.type||'Record')+'</span>'+vax+'</div>'
         +'<div style="font-size:12px;color:var(--text-secondary)">'+esc(when)+(meta?' · '+esc(meta):'')+'</div>'
+        +((r.testedFor||r.result)?'<div style="font-size:12px;color:var(--text-secondary)">'+[r.testedFor&&('Tested for '+r.testedFor), r.result&&('result: '+r.result)].filter(Boolean).map(esc).join(' · ')+'</div>':'')
         +(addr?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(addr)+'</div>':'')
         +(due?'<div style="font-size:12px;margin-top:3px">'+due+'</div>':'')
         +(r.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(r.notes)+'</div>':'')
@@ -844,12 +846,14 @@ function recordModal(id){
   const vetC = r ? null : (data.contacts||[]).find(c => (c.role||'').toLowerCase().indexOf('vet') > -1);
   const clinicVal = r ? (r.clinic || r.provider || '') : ((vetC&&vetC.org)||activePet()?.vetName||'');
   openModal('<h3>'+iconFor('📋',20)+' '+(r?'Edit record':'Medical record')+'</h3>'
-    +'<div class="grid-3"><div><label class="label">Type</label><select class="select" id="rc-type" onchange="toggleVaxType()">'+sel(RECORD_TYPES, r?r.type:'Vaccination')+'</select></div>'
-    +'<div><label class="label">Date</label><input class="input" type="date" id="rc-date" value="'+(r?esc(r.date||''):todayISO())+'"></div>'
-    +'<div><label class="label">Time <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" type="time" id="rc-time" value="'+(r?esc(r.time||''):'')+'"></div></div>'
-    +'<div id="rc-vax-wrap" style="display:none"><label class="label">Vaccine type'+tip('The kind of vaccine — e.g. Modified Live, Killed/Inactivated, Recombinant. Pick one or type your own.')+'</label><input class="input" id="rc-vactype" list="rc-vactype-list" autocomplete="off" value="'+(r?esc(r.vaccineType||''):'')+'" placeholder="e.g. Modified Live"><datalist id="rc-vactype-list">'+VACCINE_TYPES.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div>'
-    +'<div class="grid-2"><div><label class="label">Name / description</label><input class="input" id="rc-name" value="'+(r?esc(r.name||''):'')+'" placeholder="Rabies (3-yr), Neuter, Bloodwork…"></div>'
+    +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="rc-type" onchange="onRecordType()">'+sel(RECORD_TYPES, r?r.type:'Vaccination')+'</select></div>'
+    +'<div><label class="label">Date</label><input class="input" type="date" id="rc-date" value="'+(r?esc(r.date||''):todayISO())+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Time <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" type="time" id="rc-time" value="'+(r?esc(r.time||''):'')+'"></div>'
     +'<div><label class="label">Record #'+tip('The clinic/lab’s record, chart, invoice, or certificate number for this entry — handy for follow-ups. Optional.')+'</label><input class="input" id="rc-recordno" value="'+(r?esc(r.recordNo||''):'')+'" placeholder="e.g. chart / cert #"></div></div>'
+    +'<label class="label">Name / description</label><input class="input" id="rc-name" value="'+(r?esc(r.name||''):'')+'" placeholder="Rabies (3-yr), Neuter, Bloodwork…">'
+    +'<div id="rc-vax-wrap" style="display:none"><label class="label">Vaccine type'+tip('The kind of vaccine — e.g. Modified Live, Killed/Inactivated, Recombinant. Pick one or type your own.')+'</label><input class="input" id="rc-vactype" list="rc-vactype-list" autocomplete="off" value="'+(r?esc(r.vaccineType||''):'')+'" placeholder="e.g. Modified Live"><datalist id="rc-vactype-list">'+VACCINE_TYPES.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div>'
+    +'<div id="rc-test-wrap" style="display:none"><div class="grid-2"><div><label class="label">Tested for / condition'+tip('What was tested — e.g. Heartworm, thyroid panel, Lyme, tick-borne panel.')+'</label><input class="input" id="rc-testfor" value="'+(r?esc(r.testedFor||''):'')+'" placeholder="e.g. Heartworm"></div>'
+    +'<div><label class="label">Result'+tip('The outcome — e.g. Negative, Normal, Positive, or a measured value.')+'</label><input class="input" id="rc-result" list="rc-result-list" autocomplete="off" value="'+(r?esc(r.result||''):'')+'" placeholder="e.g. Negative"><datalist id="rc-result-list">'+RESULT_OPTIONS.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div></div></div>'
     +'<div class="grid-2"><div><label class="label">Vet / doctor'+(sug.vets.length?tip('Pick a previously used vet from the list or type a new one. Choosing a saved vet fills in its clinic, address & phone.'):'')+'</label><input class="input" id="rc-vet" list="rc-vet-list" autocomplete="off" oninput="onRecordPick()" value="'+(r?esc(r.vet||''):esc((vetC&&vetC.name)||''))+'" placeholder="'+(sug.vets.length?'Select or type a vet…':'Dr. Lee')+'"><datalist id="rc-vet-list">'+vetOpts+'</datalist></div>'
     +'<div><label class="label">Clinic'+(sug.clinics.length?tip('Pick a saved clinic or type a new one.'):'')+'</label><input class="input" id="rc-clinic" list="rc-clinic-list" autocomplete="off" oninput="onRecordPick()" value="'+esc(clinicVal)+'" placeholder="'+(sug.clinics.length?'Select or type a clinic…':'Riverside Animal Hospital')+'"><datalist id="rc-clinic-list">'+clinicOpts+'</datalist></div></div>'
     +'<label class="label">Address'+(sug.addresses.length?tip('Pick a saved address or type a new one. Address + city + state become the Google Calendar event location (tappable in Maps).'):'')+'</label><input class="input" id="rc-address" list="rc-addr-list" autocomplete="off" value="'+(r?esc(r.address||''):esc((vetC&&vetC.address)||''))+'" placeholder="123 Main St"><datalist id="rc-addr-list">'+addrOpts+'</datalist>'
@@ -862,17 +866,21 @@ function recordModal(id){
     +'<label class="label">Notes</label><input class="input" id="rc-notes" value="'+(r?esc(r.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveRecord('+(r?"'"+r.id+"'":'null')+')">Save</button>'
     +(r?'<button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">Delete</button>':'')
-    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  markPlaceFilled('rc-clinic'); toggleVaxType();
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>', {wide:true});
+  markPlaceFilled('rc-clinic'); onRecordType();
 }
-function toggleVaxType(){ const el = document.getElementById('rc-vax-wrap'); if(el) el.style.display = (fv('rc-type')==='Vaccination') ? '' : 'none'; }
+function onRecordType(){
+  const t = fv('rc-type');
+  const vax = document.getElementById('rc-vax-wrap'); if(vax) vax.style.display = (t==='Vaccination') ? '' : 'none';
+  const test = document.getElementById('rc-test-wrap'); if(test) test.style.display = (t==='Test / Lab work') ? '' : 'none';
+}
 
 function saveRecord(id){
   if(denyManage()) return;
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
-  const isVax = fv('rc-type')==='Vaccination';
-  const f = { type:fv('rc-type'), vaccineType:isVax?fv('rc-vactype'):'', name:fv('rc-name'), recordNo:fv('rc-recordno'), date:fv('rc-date'), time:fv('rc-time'), vet:fv('rc-vet'), clinic:fv('rc-clinic'), address:fv('rc-address'), city:fv('rc-city'), state:fv('rc-state'), zip:fv('rc-zip'), phone:fv('rc-phone'), cost:fv('rc-cost'), nextDue:fv('rc-nextdue'), notes:fv('rc-notes'), provider:'' };
+  const rtype = fv('rc-type'), isVax = rtype==='Vaccination', isTest = rtype==='Test / Lab work';
+  const f = { type:rtype, vaccineType:isVax?fv('rc-vactype'):'', testedFor:isTest?fv('rc-testfor'):'', result:isTest?fv('rc-result'):'', name:fv('rc-name'), recordNo:fv('rc-recordno'), date:fv('rc-date'), time:fv('rc-time'), vet:fv('rc-vet'), clinic:fv('rc-clinic'), address:fv('rc-address'), city:fv('rc-city'), state:fv('rc-state'), zip:fv('rc-zip'), phone:fv('rc-phone'), cost:fv('rc-cost'), nextDue:fv('rc-nextdue'), notes:fv('rc-notes'), provider:'' };
   if(!f.name && !f.type){ showToast('⚠️ Enter a name'); return; }
   if(!f.name) f.name = f.type;
   if(id) data.records = data.records.map(r => r.id===id ? {...r, ...f} : r);
@@ -1050,7 +1058,7 @@ async function exportXLSX(){
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
-  add('Records', ['Dog','Type','Vaccine type','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
+  add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
@@ -2117,7 +2125,7 @@ function calendarEvents(){
   petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
-  petArr('records').forEach(r => { if(r.date) ev.push({ key:'rec:'+r.id, date:r.date, time:r.time||'', icon:'📋', type:r.type||'Record', record:true, location:fullAddr(r), title:'📋 '+dn+': '+(r.name||r.type||'Record'), desc:[r.type&&'Type: '+r.type, r.vaccineType&&'Vaccine: '+r.vaccineType, r.recordNo&&'Record #: '+r.recordNo, recProvider(r)&&'Provider: '+recProvider(r), fullAddr(r)&&'Address: '+fullAddr(r), r.phone&&'Phone: '+r.phone, r.cost&&'Cost: '+money(r.cost), r.notes].filter(Boolean).join('\n'), open:"recordModal('"+r.id+"')" });
+  petArr('records').forEach(r => { if(r.date) ev.push({ key:'rec:'+r.id, date:r.date, time:r.time||'', icon:'📋', type:r.type||'Record', record:true, location:fullAddr(r), title:'📋 '+dn+': '+(r.name||r.type||'Record'), desc:[r.type&&'Type: '+r.type, r.vaccineType&&'Vaccine: '+r.vaccineType, r.testedFor&&'Tested for: '+r.testedFor, r.result&&'Result: '+r.result, r.recordNo&&'Record #: '+r.recordNo, recProvider(r)&&'Provider: '+recProvider(r), fullAddr(r)&&'Address: '+fullAddr(r), r.phone&&'Phone: '+r.phone, r.cost&&'Cost: '+money(r.cost), r.notes].filter(Boolean).join('\n'), open:"recordModal('"+r.id+"')" });
     if(r.nextDue) ev.push({ key:'recdue:'+r.id, date:r.nextDue, icon:'📋', type:(r.type||'Record')+' due', title:'📋 '+dn+': '+(r.name||r.type||'Record')+' due', desc:'', open:"recordModal('"+r.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
   petArr('customEvents').forEach(e => { if(e.date){ const ic = reminderIcon(e.evtype); ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:ic, type:e.evtype||'Reminder', location:e.location||'', title:ic+' '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); } });
@@ -2715,7 +2723,7 @@ function renderHealthTimeline(){
   petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes, open:"groomModal('"+g.id+"')" }));
   petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes, open:"illnessModal('"+e.id+"')" }));
   petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'', open:"medModal('"+m.id+"')" }); });
-  petArr('records').forEach(r => items.push({ date:r.date, icon:'📋', title:(r.type&&r.type!==r.name?r.type+': ':'')+(r.name||r.type||'Record'), sub:[r.vaccineType, recProvider(r), r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · '), notes:r.notes, open:"recordModal('"+r.id+"')" }));
+  petArr('records').forEach(r => items.push({ date:r.date, icon:'📋', title:(r.type&&r.type!==r.name?r.type+': ':'')+(r.name||r.type||'Record'), sub:[r.vaccineType, r.testedFor&&('tested for '+r.testedFor), r.result&&('result: '+r.result), recProvider(r), r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · '), notes:r.notes, open:"recordModal('"+r.id+"')" }));
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, meds and records will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
   return items.slice(0,40).map(it => '<div class="timeline-item'+(it.open&&canManage()?' clickable':'')+'"'+(it.open&&canManage()?' onclick="'+it.open+'"':'')+'><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
@@ -3173,6 +3181,7 @@ function enterDemo(){
       { id:'rc2', petId:pid, type:'Vaccination', vaccineType:'Modified Live (MLV)', name:'DHPP booster', date:dAgo(55), time:'10:30', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'40.00', nextDue:dAgo(-20), notes:'' },
       { id:'rc3', petId:pid, type:'Surgery', name:'Neuter', recordNo:'INV-33871', date:dAgo(58), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'240.00', nextDue:'', notes:'Recovered well, no complications.' },
       { id:'rc4', petId:pid, type:'Microchip', name:'HomeAgain implant', date:dAgo(58), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'', nextDue:'', notes:'Chip #985•1010•0042' },
+      { id:'rc5', petId:pid, type:'Test / Lab work', name:'Annual bloodwork', testedFor:'Heartworm (4Dx)', result:'Negative', date:dAgo(55), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'55.00', nextDue:'', notes:'' },
     ],
     inventory: [
       { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), runningLow:false, notes:'' },

@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.1**
+**Current Version: v0.44.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,12 @@ covers both.
 
 ## Version History
 
+- **v0.44.2** — Medical-record form polish:
+  - **Test / Lab work** now reveals **Tested for / condition** and **Result** fields (e.g.
+    "Heartworm → Negative"), shown on the record row, calendar, timeline, and export.
+  - **Roomier, aligned layout** — the record form is wider and uses two-per-row fields instead
+    of a cramped three-across Type/Date/Time, so values are readable and labels no longer wrap
+    out of alignment.
 - **v0.44.1** — Fixed vet clinic autofill from contacts. A clinic saved as a contact now shows
   up in the clinic dropdown and fills its address/phone whether you stored the name in the
   contact's **Name** or **Organization** field (previously only Organization worked). Applies to
