@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.37.0**
+**Current Version: v0.38.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.38.0** — Mobile + chart fixes. Fixed the **Insights weight chart** (it was blank because Profile and
+  Insights shared a canvas id — now scoped to the visible view). Fixed the **settings cog wrapping to a
+  second line** on mobile (header stays one row). Stopped modals/pages from **shifting left-right** on mobile
+  (killed stray horizontal overflow; grid columns can now shrink).
 - **v0.37.0** — Reminder types. The "Add reminder / event" form now has a **Type** dropdown (General, Vet,
   Grooming, Medication, Feeding, Walk, Supplies, Appointment, Birthday, etc.) that sets the **icon** shown for
   that reminder on the calendar grid and in the Upcoming list.
