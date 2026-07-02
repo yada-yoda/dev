@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.40.0**
+**Current Version: v0.40.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.40.1** — **ZIP code everywhere.** Every address that had City + State now also has a
+  **ZIP** field — vet visits, grooming, medical records, and contacts. ZIP flows into the
+  saved-provider autocomplete/autofill, the full address shown on cards, the Google Calendar
+  event location, contact vCards (`.vcf` postal code), and the spreadsheet/PDF exports. The
+  City/State/ZIP row sits on one line on desktop and stacks on mobile.
 - **v0.40.0** — **Medical records now capture the full provider,** matching vet visits.
   A record has **Vet / doctor** and **Clinic** fields (each with autocomplete from your saved
   vet contacts and past records), an **Address / City / State**, and a **Phone** — pick a saved
