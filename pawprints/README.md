@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.6**
+**Current Version: v0.44.7**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.44.7** — Fixed clinic autofill for contacts saved without a street address. Picking a
+  saved clinic/vet/groomer that has only a city/state/zip (or only a phone) now fills those
+  fields — previously the autofill required a street address and would fill nothing at all,
+  not even the phone.
 - **v0.44.6** — **Tag a vet-bill line item as medication.** Each itemized charge on a vet visit
   (and grooming) now has a 💊 toggle. Tagged items appear under Care → Meds in a "From vet visits"
   section with their cost, so meds you bought at the vet show up alongside your scheduled ones.

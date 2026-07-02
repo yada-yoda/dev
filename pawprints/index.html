@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.6';
+const APP_VERSION = 'v0.44.7';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1733,7 +1733,7 @@ function vetSuggestions(){
   });
   (data.contacts||[]).forEach(c => {
     if((c.role||'').toLowerCase().indexOf('vet') > -1){
-      const addr = c.address ? { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' } : null;
+      const addr = (c.address||c.city||c.state||c.zip) ? { address:c.address||'', city:c.city||'', state:c.state||'', zip:c.zip||'' } : null;
       if(c.name){ vets.add(c.name); if(c.org && !map[c.name]) map[c.name] = c.org; }
       if(c.org) clinics.add(c.org);
       else if(c.name) clinics.add(c.name); // business-only contact: the name IS the clinic
@@ -1756,11 +1756,11 @@ function fillIfEmpty(id, val){ const el = document.getElementById(id); if(el && 
 // but only when the place actually changed since the last autofill — so manual edits aren't clobbered.
 // keyElId = clinic/groomer field; prefix = field-id prefix ('rc'/'vt'/'gr'); a = {address,city,state,zip}.
 function fillPlace(keyElId, prefix, a, phone){
-  const el = document.getElementById(keyElId); if(!el || !a) return;
+  const el = document.getElementById(keyElId); if(!el || (!a && !phone)) return;
   const key = el.value;
   if(el.dataset.placeFill === key) return;
   const set = (id, v) => { const e = document.getElementById(id); if(e) e.value = v || ''; };
-  set(prefix+'-address', a.address); set(prefix+'-city', a.city); set(prefix+'-state', a.state); set(prefix+'-zip', a.zip);
+  if(a){ set(prefix+'-address', a.address); set(prefix+'-city', a.city); set(prefix+'-state', a.state); set(prefix+'-zip', a.zip); }
   if(phone) set(prefix+'-phone', phone);
   el.dataset.placeFill = key;
 }
