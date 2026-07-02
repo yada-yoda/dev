@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.43.0**
+**Current Version: v0.44.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.44.0** — **Interactive Trends chart on Insights.** A new chart you can steer: pick a
+  **metric** (Feeding, Potty as pee/poop, Walks, Weight), a **style** (Auto, Line, Bar, Area),
+  and a **range** (14 / 30 / 90 days). "Auto" chooses the best fit per metric — bars for
+  feeding/potty, area for walks, a line for weight. Built on your real logged data.
 - **v0.43.0** — Medical-record improvements + calendar sync:
   - **Vaccine type** — when the record type is *Vaccination*, a Vaccine type field appears
     (Modified Live, Killed/Inactivated, Recombinant… or type your own, e.g. "Modified Live").

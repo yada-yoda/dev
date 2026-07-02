@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.43.0';
+const APP_VERSION = 'v0.44.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -269,6 +269,7 @@ let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
 let careSubtab = 'vet';
+let trendMetric = 'feeding', trendStyle = 'auto', trendRange = 30, trendsChart = null;
 let suppliesCat = 'all';
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
@@ -319,6 +320,12 @@ function addGroomService(){
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
 const RECORD_TYPES = ['Vaccination','Surgery','Test / Lab work','Dental','Microchip','Deworming','Wellness exam','X-ray / imaging','Injury','Allergy','Prescription','Other'];
 const VACCINE_TYPES = ['Modified Live (MLV)','Killed / Inactivated','Recombinant','Intranasal','Toxoid','Subunit / Conjugate'];
+const TREND_METRICS = [
+  { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
+  { k:'potty',   label:'Potty',   icon:'potty',  auto:'bar',  hint:'Pee vs poop counts per day. A steady rhythm is healthy — sudden shifts can be an early signal.' },
+  { k:'walk',    label:'Walks',   icon:'walk',   auto:'area', hint:'Total walk minutes per day.' },
+  { k:'weight',  label:'Weight',  icon:'weight', auto:'line', hint:'Weigh-ins over time. Gaps are normal — the line connects your recorded points.' }
+];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
 const CC_BRANDS = ['Visa','Mastercard','Amex','Discover','Other'];
@@ -2418,6 +2425,7 @@ function applyTheme(t){
   const btn = document.getElementById('theme-toggle'); if(btn) btn.textContent = t === 'light' ? '☀️' : '🌙';
   const meta = document.querySelector('meta[name="theme-color"]'); if(meta) meta.setAttribute('content', t === 'light' ? '#ffffff' : '#0d1117');
   if(weightChart){ try { weightChart.destroy(); } catch(e){} weightChart = null; maybeDrawWeightChart(); }
+  if(trendsChart){ try { trendsChart.destroy(); } catch(e){} trendsChart = null; drawTrendChart(); }
 }
 function toggleTheme(){
   const t = currentTheme() === 'light' ? 'dark' : 'light';
@@ -2443,6 +2451,7 @@ function render(){
   document.getElementById('view-activity').innerHTML = renderActivityPage();
   if(currentView==='settings') document.getElementById('view-settings').innerHTML = settingsPageHTML();
   if(currentView === 'profile' || currentView === 'insights') maybeDrawWeightChart();
+  if(currentView === 'insights') drawTrendChart();
   if(currentView === 'calendar' && gcalAccessToken && (data.settings.gcalCalendarId || gcalChoosing) && !window._gcalCalendars) loadCalendarList();
 }
 
@@ -2987,9 +2996,17 @@ function renderInsights(){
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'walktime7\')"><div class="stat-value" style="color:var(--accent-2)">'+walkMins+'<span style="font-size:14px">m</span></div><div class="stat-label">Walk time (7d)</div></div>'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'avgwalk\')"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk (7d)</div></div>'
     + '</div>';
-  // weight trend
-  const weights = petLogs('weight').filter(l=>num(l.value)!=null);
-  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
+  // Trends — selectable chart (feeding / potty / walks / weight)
+  const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
+  const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
+  const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
+  const rangeBtns = [['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
+  html += '<div class="card"><h3 class="section-title">'+svgIcon('insights',18)+' Trends</h3>'
+    + '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'
+    + '<div style="height:260px"><canvas class="trend-chart"></canvas></div>'
+    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+TREND_METRICS.find(m=>m.k===trendMetric).hint+'</p>'
+    + '</div>';
   // spend breakdown
   if(spendTotal>0){
     const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
@@ -3067,6 +3084,49 @@ function maybeDrawWeightChart(){
       data:{ labels:weights.map(w=>fmtDate(w.dateTime)), datasets:[{ label:'Weight ('+(weights[0].unit||'lb')+')', data:weights.map(w=>num(w.value)), borderColor:lineCol, backgroundColor:'rgba(124,58,237,.12)', tension:.3, fill:true, pointRadius:4, pointBackgroundColor:lineCol }] },
       options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{color:txtCol,maxTicksLimit:6},grid:{color:gridCol}}, y:{ticks:{color:txtCol},grid:{color:gridCol}} } }
     });
+  }).catch(()=>{});
+}
+
+// ── Insights "Trends" chart (selectable metric / style / range) ──
+function setTrend(kind, val){ if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=+val; render(); }
+function shortDay(iso){ const p=(iso||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : iso; }
+function hexA(h, a){ h=(h||'').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); if(isNaN(n)) return h; return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
+function trendDays(n){ const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(now.getTime()-i*86400000); out.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`); } return out; }
+function trendData(){
+  const days=trendDays(trendRange), idx={}; days.forEach((d,i)=>idx[d]=i);
+  const css=getComputedStyle(document.documentElement), C=(n,f)=>css.getPropertyValue(n).trim()||f;
+  const teal=C('--accent-2','#2dd4bf'), orange=C('--accent','#f4a261'), purple=C('--accent-purple','#a371f7');
+  const meta=TREND_METRICS.find(m=>m.k===trendMetric)||TREND_METRICS[0];
+  let datasets=[];
+  if(trendMetric==='feeding'){
+    const a=days.map(()=>0); petLogs('feed').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx && num(l.amount)!=null) a[idx[d]]+=num(l.amount); });
+    datasets=[{label:'Amount fed',data:a,color:teal}];
+  } else if(trendMetric==='potty'){
+    const pee=days.map(()=>0), poop=days.map(()=>0);
+    const isPee=p=>{const r=p.result||'';return r==='Pee'||r==='Both';}, isPoop=p=>{const r=p.result||'';return r==='Poop'||r==='Both'||!!(p.stool&&String(p.stool).trim());};
+    petLogs('potty').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx){ if(isPee(l))pee[idx[d]]++; if(isPoop(l))poop[idx[d]]++; } });
+    datasets=[{label:'Pee',data:pee,color:teal},{label:'Poop',data:poop,color:orange}];
+  } else if(trendMetric==='walk'){
+    const a=days.map(()=>0); petLogs('walk').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx && num(l.durationMin)!=null) a[idx[d]]+=num(l.durationMin); });
+    datasets=[{label:'Walk minutes',data:a,color:purple}];
+  } else {
+    const a=days.map(()=>null); petLogs('weight').filter(l=>num(l.value)!=null).sort((x,y)=>new Date(x.dateTime)-new Date(y.dateTime)).forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx) a[idx[d]]=num(l.value); });
+    datasets=[{label:'Weight',data:a,color:orange}];
+  }
+  return { days, datasets, auto:meta.auto };
+}
+function drawTrendChart(){
+  const view=document.getElementById('view-'+currentView); if(!view) return;
+  if(!view.querySelector('.trend-chart')) return;
+  loadChart().then(()=>{
+    const v2=document.getElementById('view-'+currentView), c2=v2?v2.querySelector('.trend-chart'):null; if(!c2) return;
+    if(trendsChart){ try{trendsChart.destroy();}catch(e){} trendsChart=null; }
+    const {days,datasets,auto}=trendData();
+    const style=trendStyle==='auto'?auto:trendStyle;
+    const chartType=style==='bar'?'bar':'line', fill=style==='area';
+    const css=getComputedStyle(document.documentElement), txt=css.getPropertyValue('--text-secondary').trim()||'#8b949e', grid=css.getPropertyValue('--border').trim()||'#30363d';
+    const ds=datasets.map(d=>({ label:d.label, data:d.data, borderColor:d.color, backgroundColor: chartType==='bar'?d.color:hexA(d.color,.15), tension:.3, fill:fill, spanGaps:true, borderWidth:2, pointRadius: trendMetric==='weight'?3:0, pointBackgroundColor:d.color, borderRadius: chartType==='bar'?3:0, maxBarThickness:22 }));
+    trendsChart=new Chart(c2.getContext('2d'), { type:chartType, data:{ labels:days.map(shortDay), datasets:ds }, options:{ responsive:true, maintainAspectRatio:false, interaction:{intersect:false,mode:'index'}, plugins:{legend:{display:datasets.length>1, labels:{color:txt,boxWidth:12}}}, scales:{ x:{ticks:{color:txt,maxTicksLimit:7,autoSkip:true},grid:{display:false}}, y:{beginAtZero:trendMetric!=='weight', ticks:{color:txt},grid:{color:grid}} } } });
   }).catch(()=>{});
 }
 
