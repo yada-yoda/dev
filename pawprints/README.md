@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.39.0**
+**Current Version: v0.39.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.39.1** — Mobile fix: in Insights → **Popular spots**, a long location name (e.g.
+  "Near Garage Rear Service Door") no longer pushes the pee/poop counts onto their own line.
+  The name now wraps within its column and the 💧/💩 chips stay pinned to the right, aligned
+  across every row.
 - **v0.39.0** — **Medical records.** New **Records** tab under Care for the dog's history —
   vaccinations, surgery, lab work, dental, microchip, deworming, exams, injuries and more.
   Each record has a type, date, provider, cost, notes, and an optional **"next due"** date
