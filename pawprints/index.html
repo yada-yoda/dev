@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.2';
+const APP_VERSION = 'v0.44.3';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1057,7 +1057,7 @@ async function exportXLSX(){
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
-  add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
+  add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
@@ -1922,16 +1922,22 @@ function medModal(id){
   const m = id ? data.meds.find(x=>x.id===id) : null;
   if(!m) draftInit('med');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  const byOpts = ['You', ...vetSuggestions().vets].map(x=>'<option value="'+esc(x)+'"></option>').join('');
   openModal('<h3>💊 '+(m?'Edit med':'Med / Preventative')+'</h3>'
     +'<label class="label">Name</label><input class="input" id="md-name" value="'+(m?esc(m.name||''):'')+'" placeholder="Heartgard, NexGard, Rabies…">'
     +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="md-kind">'+sel(MED_KINDS, m?m.kind:'Heartworm')+'</select></div>'
-    +'<div><label class="label">Repeat every (days)</label><input class="input" type="number" id="md-interval" value="'+(m?esc(m.intervalDays||''):'30')+'" placeholder="30"></div></div>'
+    +'<div><label class="label">Dose <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" id="md-dose" value="'+(m?esc(m.dose||''):'')+'" placeholder="1 tablet · 0.5 mL · 68 mg"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Repeat every (days)'+tip('How often it recurs — the next-due date is figured from Last given + this many days.')+'</label><input class="input" type="number" id="md-interval" value="'+(m?esc(m.intervalDays||''):'30')+'" placeholder="30"></div>'
+    +'<div><label class="label">Given by'+tip('Who administered it — you, or a vet/clinic. Pick a saved vet or type a name.')+'</label><input class="input" id="md-by" list="md-by-list" autocomplete="off" value="'+(m?esc(m.givenBy||''):'You')+'" placeholder="You / Dr. Lee"><datalist id="md-by-list">'+byOpts+'</datalist></div></div>'
     +'<div class="grid-2"><div><label class="label">Last given</label><input class="input" type="date" id="md-last" value="'+(m?esc(m.lastGiven||''):todayISO())+'"></div>'
-    +'<div><label class="label">Next due (auto if blank)</label><input class="input" type="date" id="md-next" value="'+(m?esc(m.nextDue||''):'')+'"></div></div>'
+    +'<div><label class="label">Time <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" type="time" id="md-time" value="'+(m?esc(m.time||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Next due <span style="font-weight:400;color:var(--text-secondary)">(auto if blank)</span></label><input class="input" type="date" id="md-next" value="'+(m?esc(m.nextDue||''):'')+'"></div>'
+    +'<div><label class="label">Record #'+tip('If a vet gave this dose, note their record/invoice number. For a full vet-visit medical entry, the Records tab is the better home — see the note below.')+'</label><input class="input" id="md-recordno" value="'+(m?esc(m.recordNo||''):'')+'" placeholder="optional, if vet-given"></div></div>'
     +'<label class="label">Notes</label><input class="input" id="md-notes" value="'+(m?esc(m.notes||''):'')+'">'
+    +'<p style="font-size:11px;color:var(--text-secondary);margin:2px 0 12px">Use this for anything on a repeating schedule (heartworm, flea &amp; tick, supplements). A one-time vet-given treatment or vaccine fits better under <strong>Care → Records</strong>.</p>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveMed('+(m?"'"+m.id+"'":'null')+')">Save</button>'
     +(m?'<button class="btn btn-danger" onclick="deleteMed(\''+m.id+'\')">Delete</button>':'')
-    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>', {wide:true});
 }
 function medNextDue(m){
   if(m.nextDue) return m.nextDue;
@@ -1942,17 +1948,19 @@ function saveMed(id){
   if(denyManage()) return;
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
-  const f = { name:fv('md-name'), kind:fv('md-kind'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), nextDue:fv('md-next'), notes:fv('md-notes') };
+  const f = { name:fv('md-name'), kind:fv('md-kind'), dose:fv('md-dose'), givenBy:fv('md-by'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), time:fv('md-time'), nextDue:fv('md-next'), recordNo:fv('md-recordno'), notes:fv('md-notes') };
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
   if(id) data.meds = data.meds.map(m => m.id===id ? {...m, ...f} : m);
   else data.meds.unshift({ id:genId(), petId:data.activePetId, ...f });
   logChange(id?'edited':'added','medication', [f.name, f.kind].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('💊 Saved');
+  if(gcalAccessToken) syncToGoogleCalendar();
 }
 function giveMedNow(id){
   if(denyManage()) return;
   const m = data.meds.find(x=>x.id===id); if(!m) return;
-  m.lastGiven = todayISO(); m.nextDue = '';
+  const now = new Date();
+  m.lastGiven = todayISO(); m.nextDue = ''; m.time = pad(now.getHours())+':'+pad(now.getMinutes()); if(!m.givenBy) m.givenBy = 'You';
   logChange('marked','medication given', m.name||'');
   save(); showToast('✅ Marked given today');
 }
@@ -2124,7 +2132,7 @@ function calendarEvents(){
     if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
   petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
-  petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
+  petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, time:m.time||'', icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:[m.dose&&'Dose: '+m.dose, m.givenBy&&'Given by: '+m.givenBy, m.notes].filter(Boolean).join('\n'), open:"medModal('"+m.id+"')" }); });
   petArr('records').forEach(r => { if(r.date) ev.push({ key:'rec:'+r.id, date:r.date, time:r.time||'', icon:'📋', type:r.type||'Record', record:true, location:fullAddr(r), title:'📋 '+dn+': '+(r.name||r.type||'Record'), desc:[r.type&&'Type: '+r.type, r.vaccineType&&'Vaccine: '+r.vaccineType, r.testedFor&&'Tested for: '+r.testedFor, r.result&&'Result: '+r.result, r.recordNo&&'Record #: '+r.recordNo, recProvider(r)&&'Provider: '+recProvider(r), fullAddr(r)&&'Address: '+fullAddr(r), r.phone&&'Phone: '+r.phone, r.cost&&'Cost: '+money(r.cost), r.notes].filter(Boolean).join('\n'), open:"recordModal('"+r.id+"')" });
     if(r.nextDue) ev.push({ key:'recdue:'+r.id, date:r.nextDue, icon:'📋', type:(r.type||'Record')+' due', title:'📋 '+dn+': '+(r.name||r.type||'Record')+' due', desc:'', open:"recordModal('"+r.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
@@ -2722,7 +2730,7 @@ function renderHealthTimeline(){
   petArr('vetVisits').forEach(v => items.push({ date:v.date, icon:'🏥', title:v.reason||'Vet visit', sub:[v.vet,v.clinic,v.weight?v.weight+(activePet().weightUnit||'lb'):'',money(v.cost)].filter(Boolean).join(' · '), notes:v.notes, open:"vetModal('"+v.id+"')" }));
   petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes, open:"groomModal('"+g.id+"')" }));
   petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes, open:"illnessModal('"+e.id+"')" }));
-  petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'', open:"medModal('"+m.id+"')" }); });
+  petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:[m.kind, m.dose, m.givenBy&&'by '+m.givenBy].filter(Boolean).join(' · '), notes:'', open:"medModal('"+m.id+"')" }); });
   petArr('records').forEach(r => items.push({ date:r.date, icon:'📋', title:(r.type&&r.type!==r.name?r.type+': ':'')+(r.name||r.type||'Record'), sub:[r.vaccineType, r.testedFor&&('tested for '+r.testedFor), r.result&&('result: '+r.result), recProvider(r), r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · '), notes:r.notes, open:"recordModal('"+r.id+"')" }));
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, meds and records will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
@@ -2899,7 +2907,10 @@ function renderMedsTab(){
     html += '<div class="card">'+meds.slice().sort((a,b)=>{const x=untilStr(medNextDue(a)),y=untilStr(medNextDue(b));return (x?x.days:999)-(y?y.days:999);}).map(m=>{
       const nd = medNextDue(m), u = nd?untilStr(nd):null;
       const status = u ? (u.past?'<span style="color:var(--danger);font-weight:600">overdue '+u.text+'</span>':'<span style="color:'+(u.days<=7?'var(--warning)':'var(--success)')+'">due '+u.text+'</span>') : '<span style="color:var(--text-secondary)">no schedule</span>';
-      return '<div class="entry-row"><div style="flex:1"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span></div><div style="font-size:12px;color:var(--text-secondary)">'+(m.lastGiven?'Last: '+fmtDate(m.lastGiven):'')+(m.intervalDays?' · every '+esc(m.intervalDays)+'d':'')+' · '+(nd?'Next: '+fmtDate(nd):'')+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
+      const doseChip = m.dose ? ' <span class="chip-2" style="font-size:10px">'+esc(m.dose)+'</span>' : '';
+      const lastStr = m.lastGiven ? 'Last: '+fmtDate(m.lastGiven)+(m.time?' '+fmtClock(m.time):'')+(m.givenBy?' by '+esc(m.givenBy):'') : '';
+      const subParts = [lastStr, m.intervalDays?'every '+esc(m.intervalDays)+'d':'', nd?'Next: '+fmtDate(nd):'', m.recordNo?'#'+esc(m.recordNo):''].filter(Boolean).join(' · ');
+      return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span>'+doseChip+'</div><div style="font-size:12px;color:var(--text-secondary)">'+subParts+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
     }).join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders.</p></div>';
   return html;
@@ -3173,8 +3184,8 @@ function enterDemo(){
     grooming: [ { id:'g1', petId:pid, date:dAgo(20), groomer:'Soapy Paws', services:['Bath','Nail trim','De-shedding'], cost:'75.00', nextDueDate:dAgo(-40), notes:'' } ],
     illnesses: [ { id:'i1', petId:pid, start:dAgo(35), recovery:dAgo(31), symptoms:['Diarrhea','Loss of Appetite'], severity:'Mild', diagnosis:'Diet adjustment', treatment:'Bland diet 3 days', notes:'Settled after switching food.' } ],
     meds: [
-      { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', intervalDays:'30', lastGiven:dAgo(22), nextDue:'', notes:'' },
-      { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', intervalDays:'30', lastGiven:dAgo(28), nextDue:'', notes:'' },
+      { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', dose:'1 chew (51-100 lb)', givenBy:'You', intervalDays:'30', lastGiven:dAgo(22), time:'08:00', nextDue:'', notes:'' },
+      { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', dose:'1 chew', givenBy:'You', intervalDays:'30', lastGiven:dAgo(28), time:'08:05', nextDue:'', notes:'' },
     ],
     records: [
       { id:'rc1', petId:pid, type:'Vaccination', vaccineType:'Killed / Inactivated', name:'Rabies (3-year)', recordNo:'RB-77213', date:dAgo(55), time:'10:30', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'32.00', nextDue:dAgo(-1040), notes:'Tag #RB-77213' },

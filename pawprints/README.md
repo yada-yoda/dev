@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.2**
+**Current Version: v0.44.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.44.3** — Richer Med / Preventative form: **Dose**, **Given by** (you or a saved vet),
+  **Time**, and an optional **Record #** (for a vet-given dose), alongside the existing repeat
+  schedule. "Gave it" now stamps the time. These show on the med row, health timeline, calendar
+  reminder, and export. A note in the form clarifies the split: recurring items live here; a
+  one-time vet-given treatment or vaccine belongs under Care → Records.
 - **v0.44.2** — Medical-record form polish:
   - **Test / Lab work** now reveals **Tested for / condition** and **Result** fields (e.g.
     "Heartworm → Negative"), shown on the record row, calendar, timeline, and export.
