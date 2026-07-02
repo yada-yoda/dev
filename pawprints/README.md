@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.40.1**
+**Current Version: v0.41.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,17 @@ covers both.
 
 ## Version History
 
+- **v0.41.0** — Three profile & insights improvements:
+  - **Origin now has a full address.** The "where you got your dog" section gained Address,
+    City, State, ZIP and Phone fields (same structure as vet/grooming/contacts), replacing the
+    old single "Where" line. Existing entries still display via a fallback.
+  - **Export a dog's PDF from the profile card.** A new **Export PDF** button next to "Share
+    info card" saves a one-dog report (profile, weight history, vet visits, grooming, meds,
+    records, supplies, recent activity) — the same polished layout as the full export, scoped
+    to that dog.
+  - **Insights "Popular spots" now line up.** The pee/poop counts are set in a fixed-width
+    monospace column so both icon groups align cleanly down the list, on desktop and mobile,
+    even with long spot names or double-digit counts.
 - **v0.40.1** — **ZIP code everywhere.** Every address that had City + State now also has a
   **ZIP** field — vet visits, grooming, medical records, and contacts. ZIP flows into the
   saved-provider autocomplete/autofill, the full address shown on cards, the Google Calendar

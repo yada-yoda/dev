@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.40.1';
+const APP_VERSION = 'v0.41.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1024,8 +1024,8 @@ async function exportXLSX(){
   const nm = (pid) => { const p = data.pets.find(x=>x.id===pid); return p ? p.name : ''; };
   const clean = (v) => v == null ? '' : v;
   const add = (title, header, rows) => { const ws = XLSX.utils.aoa_to_sheet([header, ...rows]); XLSX.utils.book_append_sheet(wb, ws, title.slice(0,31)); };
-  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Gotcha day','Color','Weight unit','Microchip','License','How acquired','From','Location','Fee/Price','Source contact','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
-    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,p.originLocation,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
+  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Gotcha day','Color','Weight unit','Microchip','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
+    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
@@ -1040,8 +1040,10 @@ async function exportXLSX(){
   try { XLSX.writeFile(wb, 'pawprints-'+todayISO()+'.xlsx'); showToast('✅ Spreadsheet saved'); } catch(e){ showToast('⚠️ Could not save spreadsheet'); }
 }
 
-async function exportPDF(){
+async function exportPDF(onlyPetId){
   if(!data.pets.length){ promptAddDog(); return; }
+  const pets = onlyPetId ? data.pets.filter(p=>p.id===onlyPetId) : data.pets;
+  if(!pets.length){ showToast('⚠️ Dog not found'); return; }
   showToast('⏳ Building PDF report…');
   try { await loadPdfLibs(); } catch(e){ showToast('⚠️ PDF library failed to load'); return; }
   const { jsPDF } = window.jspdf;
@@ -1053,7 +1055,7 @@ async function exportPDF(){
   const table = (head, body, y) => { if(!body.length) return y; doc.autoTable({ startY:y, head:[head], body, theme:'striped', margin:{left:M,right:M}, headStyles:{fillColor:ACCENT,textColor:255,fontSize:9,fontStyle:'bold'}, bodyStyles:{fontSize:8.5,textColor:DARK}, alternateRowStyles:{fillColor:STRIPE}, styles:{cellPadding:4,overflow:'linebreak',lineColor:[224,228,232],lineWidth:.5} }); return doc.lastAutoTable.finalY + 18; };
   const dash = '—';
 
-  data.pets.forEach((p, idx) => {
+  pets.forEach((p, idx) => {
     if(idx > 0) doc.addPage();
     doc.setFillColor(...ACCENT); doc.rect(0,0,pageW,7,'F');
     let y = 54;
@@ -1073,7 +1075,8 @@ async function exportPDF(){
     if(p.fixed) facts.push(['Spayed / Neutered', p.fixed+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
     if(p.microchip) facts.push(['Microchip', String(p.microchip)]);
     if(p.license) facts.push(['License', String(p.license)]);
-    if(p.originType || p.originFrom) facts.push(['Origin', [p.originType, p.originFrom?('from '+p.originFrom):'', p.originLocation].filter(Boolean).join('  ·  ')]);
+    if(p.originType || p.originFrom) facts.push(['Origin', [p.originType, p.originFrom?('from '+p.originFrom):'', originAddr(p)].filter(Boolean).join('  ·  ')]);
+    if(p.originPhone) facts.push(['Source phone', String(p.originPhone)]);
     if(p.originCost) facts.push(['Adoption fee / price', money(p.originCost)]);
     if(p.previousName) facts.push(['Previous name', String(p.previousName)]);
     if(p.registrationNo || p.registeredName) facts.push(['Registration', [p.registrationNo, p.registeredName].filter(Boolean).join('  ·  ')]);
@@ -1116,7 +1119,8 @@ async function exportPDF(){
   const n = doc.internal.getNumberOfPages();
   for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('PawPrints '+APP_VERSION, M, pageH-22); doc.text('Page '+i+' of '+n, pageW-M, pageH-22, {align:'right'}); }
 
-  doc.save('pawprints-report-'+todayISO()+'.pdf');
+  const oneP = onlyPetId ? pets[0] : null;
+  doc.save('pawprints-'+(oneP?safeName(oneP.name||'dog')+'-':'report-')+todayISO()+'.pdf');
   showToast('✅ PDF report saved');
 }
 
@@ -1149,9 +1153,13 @@ function petModal(id){
     +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em">Origin'+tip('How and where you got your dog — handy for vet/registration records. All optional. The date is the Adoption / Gotcha Day above.')+'</div>'
     +'<label class="label">How you got your dog</label><select class="select" id="p-origintype"><option value="">—</option>'+sel(ORIGIN_TYPES, p?p.originType:'')+'</select>'
     +'<div class="grid-2"><div><label class="label">From / source'+tip('The shelter, rescue, breeder, pet store, or person you got them from.')+'</label><input class="input" id="p-originfrom" value="'+(p?esc(p.originFrom||''):'')+'" placeholder="e.g. Springfield Humane Society"></div>'
-    +'<div><label class="label">Where (city, state)</label><input class="input" id="p-originloc" value="'+(p?esc(p.originLocation||''):'')+'" placeholder="Springfield, IL"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Adoption fee / price</label><input class="input" type="number" step="0.01" id="p-origincost" value="'+(p?esc(p.originCost||''):'')+'" placeholder="0.00"></div>'
-    +'<div><label class="label">Source contact'+tip('Phone, email, or website of the shelter / breeder / seller — useful to keep on file.')+'</label><input class="input" id="p-origincontact" value="'+(p?esc(p.originContact||''):'')+'"></div></div>'
+    +'<div><label class="label">Adoption fee / price</label><input class="input" type="number" step="0.01" id="p-origincost" value="'+(p?esc(p.originCost||''):'')+'" placeholder="0.00"></div></div>'
+    +'<label class="label">Address</label><input class="input" id="p-originaddr" value="'+(p?esc(p.originAddress||''):'')+'" placeholder="123 Main St">'
+    +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="p-origincity" value="'+(p?esc(p.originCity||''):'')+'" placeholder="City"></div>'
+    +'<div><label class="label">State</label><input class="input" id="p-originstate" value="'+(p?esc(p.originState||''):'')+'" placeholder="ST"></div>'
+    +'<div><label class="label">ZIP</label><input class="input" id="p-originzip" inputmode="numeric" value="'+(p?esc(p.originZip||''):'')+'" placeholder="ZIP"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="p-originphone" value="'+(p?esc(p.originPhone||''):'')+'" placeholder="(555) 012-3456"></div>'
+    +'<div><label class="label">Other contact'+tip('Email or website of the shelter / breeder / seller — useful to keep on file.')+'</label><input class="input" id="p-origincontact" value="'+(p?esc(p.originContact||''):'')+'" placeholder="email or website"></div></div>'
     +'<div class="grid-2"><div><label class="label">Previous name'+tip('Their name before you, if they had one (e.g. a shelter name).')+'</label><input class="input" id="p-prevname" value="'+(p?esc(p.previousName||''):'')+'"></div>'
     +'<div><label class="label">Registration #'+tip('AKC or other registry number, for purebred / papered dogs. Optional.')+'</label><input class="input" id="p-regno" value="'+(p?esc(p.registrationNo||''):'')+'"></div></div>'
     +'<label class="label">Registered / papered name'+tip('The official registered name on the papers, if different from their everyday name.')+'</label><input class="input" id="p-regname" value="'+(p?esc(p.registeredName||''):'')+'" placeholder="optional">'
@@ -1201,7 +1209,7 @@ function savePet(id){
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'),
     gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
-    license:fv('p-license'), originType:fv('p-origintype'), originFrom:fv('p-originfrom'), originLocation:fv('p-originloc'), originCost:fv('p-origincost'), originContact:fv('p-origincontact'), previousName:fv('p-prevname'), registrationNo:fv('p-regno'), registeredName:fv('p-regname'),
+    license:fv('p-license'), originType:fv('p-origintype'), originFrom:fv('p-originfrom'), originAddress:fv('p-originaddr'), originCity:fv('p-origincity'), originState:fv('p-originstate'), originZip:fv('p-originzip'), originPhone:fv('p-originphone'), originCost:fv('p-origincost'), originContact:fv('p-origincontact'), previousName:fv('p-prevname'), registrationNo:fv('p-regno'), registeredName:fv('p-regname'),
     vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), vetEmail:fv('p-vetemail'),
     vet2Name:fv('p-vet2name'), vet2Doctor:fv('p-vet2doctor'), vet2Phone:fv('p-vet2phone'), vet2Email:fv('p-vet2email'), notes:fv('p-notes') };
   let pid = id;
@@ -1674,6 +1682,8 @@ function vetSuggestions(){
 function fullAddr(r){ const sz = [r.state, r.zip].filter(Boolean).join(' '); const cs = [r.city, sz].filter(Boolean).join(', '); return [r.address, cs].filter(Boolean).join(', '); }
 // Records store vet/clinic separately (like vet visits); r.provider is legacy single-field data.
 function recProvider(r){ return [r.vet, r.clinic].filter(Boolean).join(' · ') || r.provider || ''; }
+// Origin source address, structured fields with legacy originLocation ("City, ST") fallback.
+function originAddr(p){ return fullAddr({address:p.originAddress, city:p.originCity, state:p.originState, zip:p.originZip}) || p.originLocation || ''; }
 function fillIfEmpty(id, val){ const el = document.getElementById(id); if(el && !el.value && val) el.value = val; }
 function onVetPick(){
   const sug = vetSuggestions();
@@ -2565,7 +2575,8 @@ function renderProfile(){
   if(p.fixed) facts.push(['Spayed / Neutered', esc(p.fixed)+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
   if(p.microchip) facts.push(['Microchip', esc(p.microchip)]);
   if(p.license) facts.push(['License', esc(p.license)]);
-  if(p.originType || p.originFrom) facts.push(['Origin', [p.originType?esc(p.originType):'', p.originFrom?('from '+esc(p.originFrom)):'', p.originLocation?esc(p.originLocation):''].filter(Boolean).join(' · ')]);
+  if(p.originType || p.originFrom) facts.push(['Origin', [p.originType?esc(p.originType):'', p.originFrom?('from '+esc(p.originFrom)):'', originAddr(p)?esc(originAddr(p)):''].filter(Boolean).join(' · ')]);
+  if(p.originPhone) facts.push(['Source phone', esc(p.originPhone)]);
   if(p.originCost) facts.push(['Adoption fee / price', money(p.originCost)]);
   if(p.previousName) facts.push(['Previous name', esc(p.previousName)]);
   if(p.registrationNo || p.registeredName) facts.push(['Registration', [p.registrationNo?esc(p.registrationNo):'', p.registeredName?('“'+esc(p.registeredName)+'”'):''].filter(Boolean).join(' · ')]);
@@ -2574,7 +2585,7 @@ function renderProfile(){
   if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor?esc(p.vet2Doctor):'', p.vet2Name?esc(p.vet2Name):'', p.vet2Phone?esc(p.vet2Phone):'', p.vet2Email?esc(p.vet2Email):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
-  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">'+svgIcon('weight',15)+' Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">'+svgIcon('share',15)+' Share '+esc(p.name)+'’s info card</button></div>';
+  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">'+svgIcon('weight',15)+' Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">'+svgIcon('share',15)+' Share '+esc(p.name)+'’s info card</button><button class="btn btn-sm" onclick="exportPDF(\''+p.id+'\')">'+svgIcon('download',15)+' Export PDF</button></div>';
   html += '</div>';
   // weight chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
@@ -2961,12 +2972,15 @@ function renderInsights(){
       spots[place].total++;
     });
     const spotList = Object.entries(spots).sort((a,b)=>b[1].total-a[1].total);
+    // Reserve a fixed width for the count (in '0'-widths) so pee/poop chips line up as columns
+    // regardless of digit widths (DM Sans lacks tabular figures, so "0" is wider than "1").
+    const spotDigits = Math.max(1, ...spotList.flatMap(([,c])=>[c.pee,c.poop]).map(n=>String(n).length));
     html += '<div class="card"><h3 class="section-title">'+svgIcon('potty',18)+' Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\''+esc(k)+'\')">'+esc(k)+': '+v+'</span>').join('')+'</div>'
       + '<div class="grid-2"><div class="timing-box" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
       + '<div class="timing-box" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
       + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>last 30 days</strong> ('+pee30+' pee'+(pee30===1?'':'s')+', '+poop30+' poop'+(poop30===1?'':'s')+'). A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
       + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
-      + spotList.map(([place, c]) => '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px;flex-shrink:0"><span class="chip-2" style="cursor:pointer" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧 '+c.pee+'</span><span class="chip" style="cursor:pointer" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩 '+c.poop+'</span></span></div>').join('')
+      + spotList.map(([place, c]) => '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px;flex-shrink:0"><span class="chip-2" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.pee+'</span></span><span class="chip" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.poop+'</span></span></span></div>').join('')
       + '</div>';
   }
   if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
@@ -3015,7 +3029,7 @@ function enterDemo(){
   const dAgo = (n) => { const d=new Date(Date.now()-n*86400000); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
   data = {
     activePetId: pid,
-    pets: [{ id:pid, name:'Biscuit', photo:'', breed:'Golden Retriever mix', sex:'Male (neutered)', birthday:dAgo(420), gotchaDay:dAgo(60), color:'Golden', weightUnit:'lb', microchip:'985•1010•0042', license:'CTY-2291', vetName:'Riverside Animal Hospital', vetPhone:'(555) 012-3456', notes:'Loves tennis balls. Slightly chicken-sensitive.' }],
+    pets: [{ id:pid, name:'Biscuit', photo:'', breed:'Golden Retriever mix', sex:'Male (neutered)', birthday:dAgo(420), gotchaDay:dAgo(60), color:'Golden', weightUnit:'lb', microchip:'985•1010•0042', license:'CTY-2291', originType:'Adopted (shelter / rescue)', originFrom:'Springfield Humane Society', originAddress:'150 Shelter Way', originCity:'Springfield', originState:'IL', originZip:'62703', originPhone:'(555) 340-7788', originCost:'145.00', vetName:'Riverside Animal Hospital', vetPhone:'(555) 012-3456', notes:'Loves tennis balls. Slightly chicken-sensitive.' }],
     logs: [
       { id:'l1', petId:pid, type:'feed', dateTime:h(2), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
       { id:'l2', petId:pid, type:'feed', dateTime:h(11), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
