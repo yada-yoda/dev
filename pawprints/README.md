@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.42.2**
+**Current Version: v0.43.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,16 @@ covers both.
 
 ## Version History
 
+- **v0.43.0** — Medical-record improvements + calendar sync:
+  - **Vaccine type** — when the record type is *Vaccination*, a Vaccine type field appears
+    (Modified Live, Killed/Inactivated, Recombinant… or type your own, e.g. "Modified Live").
+  - **Time** — records now have an optional time (like vet visits), so timed entries become a
+    1-hour block on the calendar instead of all-day.
+  - **Change history in the Log tab** — a new button opens the full activity log, so you can see
+    when each record, vet visit, etc. was added or edited, and by whom.
+  - **Auto-sync to Google Calendar** — saving a medical record, vet visit, or grooming now pushes
+    it (and its reminders) to Google Calendar automatically when connected, the same way custom
+    reminders already did. Past and future records + their "next due" dates all sync.
 - **v0.42.2** — Fixed clinic/vet autofill. Picking a saved **clinic** (or groomer) from the
   dropdown now fills in its address and phone — and **switching** to a different one updates
   the fields instead of keeping the first one's details. Manual edits you make afterward are
