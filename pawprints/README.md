@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.41.0**
+**Current Version: v0.42.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,14 @@ covers both.
 
 ## Version History
 
+- **v0.42.0** — More profile detail for adopted & chipped dogs:
+  - **Shelter / rescue details.** When "Adopted (shelter / rescue)" is the origin, the profile
+    reveals extra fields — **ARN #** (Animal Record Number), **Animal ID**, **Intake date**, and
+    **Rescue / transferred from**. They appear on the profile card, PDF, and spreadsheet.
+  - **Microchip type / registry.** Next to the microchip number, record the brand/registry
+    (HomeAgain, AVID, 24Petwatch, ISO…) so you know where to keep your contact info current.
+  - **Estimated birthday.** A checkbox by Birthday marks the date as estimated (common for
+    shelter dogs) — the age then shows with a "~" (e.g. "~1y 1mo") everywhere it appears.
 - **v0.41.0** — Three profile & insights improvements:
   - **Origin now has a full address.** The "where you got your dog" section gained Address,
     City, State, ZIP and Phone fields (same structure as vet/grooming/contacts), replacing the

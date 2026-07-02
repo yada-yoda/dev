@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.41.0';
+const APP_VERSION = 'v0.42.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -335,6 +335,7 @@ const SEVERITY = ['Mild','Moderate','Severe'];
 const SEXES = ['Male','Female','Unknown'];
 const FIXED_STATUS = ['Spayed / Neutered','Not fixed (intact)','Unknown'];
 const ORIGIN_TYPES = ['Adopted (shelter / rescue)','Purchased (breeder)','Purchased (pet store)','Rehomed to you','Found / stray','Gift','Bred (own litter)','Other'];
+const MICROCHIP_TYPES = ['HomeAgain','AVID','24Petwatch','Michelson Found Animals','Datamars','PetLink','AKC Reunite','ISO (FDX-B, 15-digit)','125 kHz (AVID/non-ISO)','Other'];
 const CONTACT_ROLES = ['Vet','Emergency Vet','Emergency Contact','Groomer','Pet Sitter','Boarding / Daycare','Trainer','Pharmacy','Walker','Other'];
 const SHARE_ROLES = ['Family','Partner / Spouse','Helper','Sitter','Dog walker','Friend','Other'];
 const SHARE_ACCESS = [
@@ -381,16 +382,17 @@ function untilStr(dt){
   let s = d > 0 ? d + 'd' : h + 'h';
   return { past, text: past ? s + ' ago' : 'in ' + s, days: Math.round(diff/86400000) };
 }
-function ageStr(birthday){
+function ageStr(birthday, est){
   if(!birthday) return null;
   const b = new Date(dateSafe(birthday)), now = new Date();
   let months = (now.getFullYear()-b.getFullYear())*12 + (now.getMonth()-b.getMonth());
   if(now.getDate() < b.getDate()) months--;
   if(months < 0) return null;
   const y = Math.floor(months/12), m = months%12;
-  if(y === 0) return m + (m===1?' month':' months');
-  if(m === 0) return y + (y===1?' year':' years');
-  return y + 'y ' + m + 'mo';
+  const pre = est ? '~' : '';
+  if(y === 0) return pre + m + (m===1?' month':' months');
+  if(m === 0) return pre + y + (y===1?' year':' years');
+  return pre + y + 'y ' + m + 'mo';
 }
 function showToast(msg){
   const el = document.getElementById('toast');
@@ -1024,8 +1026,8 @@ async function exportXLSX(){
   const nm = (pid) => { const p = data.pets.find(x=>x.id===pid); return p ? p.name : ''; };
   const clean = (v) => v == null ? '' : v;
   const add = (title, header, rows) => { const ws = XLSX.utils.aoa_to_sheet([header, ...rows]); XLSX.utils.book_append_sheet(wb, ws, title.slice(0,31)); };
-  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Gotcha day','Color','Weight unit','Microchip','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
-    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,p.gotchaDay,p.color,p.weightUnit,p.microchip,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
+  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Birthday estimated','Gotcha day','Color','Weight unit','Microchip','Microchip type','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Shelter ARN #','Animal ID','Shelter intake','Transferred from','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
+    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,(p.birthdayEstimated?'Yes':''),p.gotchaDay,p.color,p.weightUnit,p.microchip,p.microchipType,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.originArn,p.originAnimalId,p.originIntakeDate,p.originTransferFrom,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
@@ -1069,13 +1071,16 @@ async function exportPDF(onlyPetId){
 
     const w = weightsFor(p.id)[0];
     const facts = [];
-    if(p.birthday) facts.push(['Age', (ageStr(p.birthday)||dash)+' (born '+fmtDate(p.birthday)+')']);
+    if(p.birthday) facts.push(['Age', (ageStr(p.birthday, p.birthdayEstimated)||dash)+' ('+(p.birthdayEstimated?'est. born ':'born ')+fmtDate(p.birthday)+')']);
     if(p.gotchaDay) facts.push(['Adoption / Gotcha day', fmtDate(p.gotchaDay)]);
     if(w) facts.push(['Current weight', w.value+' '+(w.unit||'lb')+' (as of '+fmtDate(w.dateTime)+')']);
     if(p.fixed) facts.push(['Spayed / Neutered', p.fixed+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
-    if(p.microchip) facts.push(['Microchip', String(p.microchip)]);
+    if(p.microchip) facts.push(['Microchip', String(p.microchip)+(p.microchipType?'  ·  '+p.microchipType:'')]);
     if(p.license) facts.push(['License', String(p.license)]);
     if(p.originType || p.originFrom) facts.push(['Origin', [p.originType, p.originFrom?('from '+p.originFrom):'', originAddr(p)].filter(Boolean).join('  ·  ')]);
+    if(p.originArn || p.originAnimalId) facts.push(['Shelter ID', [p.originArn?('ARN '+p.originArn):'', p.originAnimalId?('Animal ID '+p.originAnimalId):''].filter(Boolean).join('  ·  ')]);
+    if(p.originIntakeDate) facts.push(['Shelter intake', fmtDate(p.originIntakeDate)]);
+    if(p.originTransferFrom) facts.push(['Transferred from', String(p.originTransferFrom)]);
     if(p.originPhone) facts.push(['Source phone', String(p.originPhone)]);
     if(p.originCost) facts.push(['Adoption fee / price', money(p.originCost)]);
     if(p.previousName) facts.push(['Previous name', String(p.previousName)]);
@@ -1145,13 +1150,14 @@ function petModal(id){
     +'<div><label class="label">Sex</label><select class="select" id="p-sex"><option value="">—</option>'+sel(SEXES, p?p.sex:'')+'</select></div></div>'
     +'<div class="grid-2"><div><label class="label">Spayed / Neutered'+tip('Whether your dog is fixed. "Spayed" = female, "neutered" = male — this one field covers both.')+'</label><select class="select" id="p-fixed"><option value="">—</option>'+sel(FIXED_STATUS, p?p.fixed:'')+'</select></div>'
     +'<div><label class="label">Date fixed (optional)</label><input class="input" type="date" id="p-fixeddate" value="'+(p?esc(p.fixedDate||''):'')+'"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Birthday</label><input class="input" type="date" id="p-birthday" value="'+(p?esc(p.birthday||''):'')+'"></div>'
+    +'<div class="grid-2"><div><label class="label">Birthday</label><input class="input" type="date" id="p-birthday" value="'+(p?esc(p.birthday||''):'')+'" style="margin-bottom:4px">'
+    +'<label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-secondary);cursor:pointer;text-transform:none;letter-spacing:0;font-weight:400"><input type="checkbox" id="p-birthday-est" style="width:auto;margin:0"'+(p&&p.birthdayEstimated?' checked':'')+'> Estimated — exact date unknown (e.g. adopted)</label></div>'
     +'<div><label class="label">Adoption / Gotcha Day</label><input class="input" type="date" id="p-gotcha" value="'+(p?esc(p.gotchaDay||''):'')+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Current weight'+tip('The dog’s weight today (or most recent). Saving this starts the weight history — update it any time to track changes.')+'</label><input class="input" type="number" step="0.1" id="p-weight" value="'+(p?esc((weightsFor(p.id)[0]||{}).value||''):'')+'" placeholder="e.g. 42.5"></div>'
     +'<div><label class="label">Weight unit'+tip('Pounds (lb) or kilograms (kg) — used everywhere weight is shown.')+'</label><select class="select" id="p-wunit"><option value="lb"'+(p&&p.weightUnit==='lb'?' selected':'')+'>lb</option><option value="kg"'+(p&&p.weightUnit==='kg'?' selected':'')+'>kg</option></select></div></div>'
     +'<label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="e.g. Black & grey with white chest">'
     +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em">Origin'+tip('How and where you got your dog — handy for vet/registration records. All optional. The date is the Adoption / Gotcha Day above.')+'</div>'
-    +'<label class="label">How you got your dog</label><select class="select" id="p-origintype"><option value="">—</option>'+sel(ORIGIN_TYPES, p?p.originType:'')+'</select>'
+    +'<label class="label">How you got your dog</label><select class="select" id="p-origintype" onchange="toggleShelterFields()"><option value="">—</option>'+sel(ORIGIN_TYPES, p?p.originType:'')+'</select>'
     +'<div class="grid-2"><div><label class="label">From / source'+tip('The shelter, rescue, breeder, pet store, or person you got them from.')+'</label><input class="input" id="p-originfrom" value="'+(p?esc(p.originFrom||''):'')+'" placeholder="e.g. Springfield Humane Society"></div>'
     +'<div><label class="label">Adoption fee / price</label><input class="input" type="number" step="0.01" id="p-origincost" value="'+(p?esc(p.originCost||''):'')+'" placeholder="0.00"></div></div>'
     +'<label class="label">Address</label><input class="input" id="p-originaddr" value="'+(p?esc(p.originAddress||''):'')+'" placeholder="123 Main St">'
@@ -1160,11 +1166,19 @@ function petModal(id){
     +'<div><label class="label">ZIP</label><input class="input" id="p-originzip" inputmode="numeric" value="'+(p?esc(p.originZip||''):'')+'" placeholder="ZIP"></div></div>'
     +'<div class="grid-2"><div><label class="label">Phone</label><input class="input" type="tel" id="p-originphone" value="'+(p?esc(p.originPhone||''):'')+'" placeholder="(555) 012-3456"></div>'
     +'<div><label class="label">Other contact'+tip('Email or website of the shelter / breeder / seller — useful to keep on file.')+'</label><input class="input" id="p-origincontact" value="'+(p?esc(p.originContact||''):'')+'" placeholder="email or website"></div></div>'
+    +'<div id="p-shelter-wrap" style="display:none">'
+    +'<div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin:2px 0 4px;text-transform:uppercase;letter-spacing:.05em">Shelter / rescue details</div>'
+    +'<div class="grid-2"><div><label class="label">ARN #'+tip('Animal Record Number — the shelter/rescue’s case or record number for your dog, on the adoption paperwork.')+'</label><input class="input" id="p-arn" value="'+(p?esc(p.originArn||''):'')+'" placeholder="e.g. A1234567"></div>'
+    +'<div><label class="label">Animal ID'+tip('The shelter’s internal animal ID (sometimes the same as the ARN, sometimes different).')+'</label><input class="input" id="p-animalid" value="'+(p?esc(p.originAnimalId||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Intake date'+tip('When the shelter/rescue took your dog in, if known.')+'</label><input class="input" type="date" id="p-intakedate" value="'+(p?esc(p.originIntakeDate||''):'')+'"></div>'
+    +'<div><label class="label">Rescue / transferred from'+tip('If the shelter took your dog from another rescue, shelter, or transport partner, note it here.')+'</label><input class="input" id="p-transferfrom" value="'+(p?esc(p.originTransferFrom||''):'')+'" placeholder="optional"></div></div>'
+    +'</div>'
     +'<div class="grid-2"><div><label class="label">Previous name'+tip('Their name before you, if they had one (e.g. a shelter name).')+'</label><input class="input" id="p-prevname" value="'+(p?esc(p.previousName||''):'')+'"></div>'
     +'<div><label class="label">Registration #'+tip('AKC or other registry number, for purebred / papered dogs. Optional.')+'</label><input class="input" id="p-regno" value="'+(p?esc(p.registrationNo||''):'')+'"></div></div>'
     +'<label class="label">Registered / papered name'+tip('The official registered name on the papers, if different from their everyday name.')+'</label><input class="input" id="p-regname" value="'+(p?esc(p.registeredName||''):'')+'" placeholder="optional">'
     +'<div class="grid-2"><div><label class="label">Microchip #'+tip('The ID number on your dog’s implanted microchip — from the vet or the registry paperwork. Optional.')+'</label><input class="input" id="p-chip" value="'+(p?esc(p.microchip||''):'')+'"></div>'
-    +'<div><label class="label">License #'+tip('Your city or county pet license / registration number, usually on the dog’s tag or licensing paperwork. Optional.')+'</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'"></div></div>'
+    +'<div><label class="label">Microchip type / registry'+tip('The chip brand or registry the number is enrolled with (HomeAgain, AVID, 24Petwatch…) — helps you know where to update your contact info. Pick one or type your own.')+'</label><input class="input" id="p-chiptype" list="p-chiptype-list" autocomplete="off" value="'+(p?esc(p.microchipType||''):'')+'" placeholder="e.g. HomeAgain"><datalist id="p-chiptype-list">'+MICROCHIP_TYPES.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist></div></div>'
+    +'<label class="label">License #'+tip('Your city or county pet license / registration number, usually on the dog’s tag or licensing paperwork. Optional.')+'</label><input class="input" id="p-license" value="'+(p?esc(p.license||''):'')+'">'
     +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:6px 0 4px;text-transform:uppercase;letter-spacing:.05em">Primary vet</div>'
     +'<div class="grid-2"><div><label class="label">Vet / Clinic'+tip('The animal hospital or clinic your dog goes to.')+'</label><input class="input" id="p-vetname" value="'+(p?esc(p.vetName||''):'')+'" placeholder="Riverside Animal Hospital"></div>'
     +'<div><label class="label">Vet (doctor)'+tip('The specific veterinarian your dog usually sees, if you have one. Optional.')+'</label><input class="input" id="p-vetdoctor" value="'+(p?esc(p.vetDoctor||''):'')+'" placeholder="Dr. Patel"></div></div>'
@@ -1180,6 +1194,12 @@ function petModal(id){
     +(p?'<button class="btn btn-danger" style="white-space:nowrap" onclick="deletePet(\''+p.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>'
   , {wide:true});
+  toggleShelterFields();
+}
+function toggleShelterFields(){
+  const t = (fv('p-origintype')||'').toLowerCase();
+  const el = document.getElementById('p-shelter-wrap');
+  if(el) el.style.display = /adopt|shelter|rescue/.test(t) ? '' : 'none';
 }
 function handlePhoto(evt){
   const f = evt.target.files[0]; if(!f) return;
@@ -1207,9 +1227,9 @@ function savePet(id){
   draftCommit();
   const name = fv('p-name').trim();
   if(!name){ showToast('⚠️ Enter a name'); return; }
-  const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'),
-    gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'),
-    license:fv('p-license'), originType:fv('p-origintype'), originFrom:fv('p-originfrom'), originAddress:fv('p-originaddr'), originCity:fv('p-origincity'), originState:fv('p-originstate'), originZip:fv('p-originzip'), originPhone:fv('p-originphone'), originCost:fv('p-origincost'), originContact:fv('p-origincontact'), previousName:fv('p-prevname'), registrationNo:fv('p-regno'), registeredName:fv('p-regname'),
+  const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'), birthdayEstimated:!!(document.getElementById('p-birthday-est')||{}).checked,
+    gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'), microchipType:fv('p-chiptype'),
+    license:fv('p-license'), originType:fv('p-origintype'), originFrom:fv('p-originfrom'), originAddress:fv('p-originaddr'), originCity:fv('p-origincity'), originState:fv('p-originstate'), originZip:fv('p-originzip'), originPhone:fv('p-originphone'), originCost:fv('p-origincost'), originContact:fv('p-origincontact'), originArn:fv('p-arn'), originAnimalId:fv('p-animalid'), originIntakeDate:fv('p-intakedate'), originTransferFrom:fv('p-transferfrom'), previousName:fv('p-prevname'), registrationNo:fv('p-regno'), registeredName:fv('p-regname'),
     vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), vetEmail:fv('p-vetemail'),
     vet2Name:fv('p-vet2name'), vet2Doctor:fv('p-vet2doctor'), vet2Phone:fv('p-vet2phone'), vet2Email:fv('p-vet2email'), notes:fv('p-notes') };
   let pid = id;
@@ -2033,7 +2053,7 @@ async function shareDogCard(){
   const p = activePet(); if(!p) return;
   const w = latestWeight();
   const vet = (data.contacts.find(c=>c.role==='Vet')) || (p.vetName?{org:p.vetName,phone:p.vetPhone}:null);
-  const note = [p.breed, ageStr(p.birthday), w?('Weight '+w.value+' '+(w.unit||'lb')):'', p.color, p.microchip?'Microchip '+p.microchip:'', p.license?'License '+p.license:'', vet?('Vet: '+(vet.org||vet.name||'')+(vet.phone?' '+vet.phone:'')):'', p.notes].filter(Boolean).join(' · ');
+  const note = [p.breed, ageStr(p.birthday, p.birthdayEstimated), w?('Weight '+w.value+' '+(w.unit||'lb')):'', p.color, p.microchip?'Microchip '+p.microchip:'', p.license?'License '+p.license:'', vet?('Vet: '+(vet.org||vet.name||'')+(vet.phone?' '+vet.phone:'')):'', p.notes].filter(Boolean).join(' · ');
   const lines = ['BEGIN:VCARD','VERSION:3.0','FN:'+vcEsc(p.name+' (dog)'),'ORG:'+vcEsc('Dog'+(p.breed?' — '+p.breed:'')),'TITLE:Dog'];
   if(vet && vet.phone) lines.push('TEL;TYPE=WORK,VOICE:'+vcEsc(vet.phone));
   if(note) lines.push('NOTE:'+vcEsc(note));
@@ -2350,7 +2370,7 @@ function updateHeader(){
   if(p && p.photo){ logo.outerHTML = '<img id="header-logo" class="pet-photo" src="'+p.photo+'" alt="">'; }
   else { const cur = document.getElementById('header-logo'); if(cur.tagName==='IMG'){ cur.outerHTML = '<div id="header-logo" class="logo">🐾</div>'; } else cur.textContent = p?(p.emoji||'🐾'):'🐾'; }
   document.getElementById('header-title').textContent = p ? p.name : 'PawPrints';
-  document.getElementById('header-sub').innerHTML = (p ? (ageStr(p.birthday)?esc(ageStr(p.birthday))+' · ':'') + esc(p.breed||'Feed · Walk · Care') : 'Feed · Walk · Care') + ' <span style="color:var(--accent);font-family:\'JetBrains Mono\',monospace;font-weight:500">'+APP_VERSION+'</span>';
+  document.getElementById('header-sub').innerHTML = (p ? (ageStr(p.birthday, p.birthdayEstimated)?esc(ageStr(p.birthday, p.birthdayEstimated))+' · ':'') + esc(p.breed||'Feed · Walk · Care') : 'Feed · Walk · Care') + ' <span style="color:var(--accent);font-family:\'JetBrains Mono\',monospace;font-weight:500">'+APP_VERSION+'</span>';
   // pet selector
   const selEl = document.getElementById('pet-select');
   if(data.pets.length){
@@ -2423,7 +2443,7 @@ function renderToday(){
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)">':'<div class="logo" style="width:64px;height:64px;font-size:32px">🐾</div>')
     + '<div style="flex:1;min-width:140px"><div style="font-size:20px;font-weight:700">'+esc(p.name)+'</div>'
-    + '<div style="font-size:13px;color:var(--text-secondary)">'+[ageStr(p.birthday), p.breed, w?(esc(w.value)+' '+esc(w.unit||'lb')):null].filter(Boolean).map(esc).join(' · ')+'</div></div>'
+    + '<div style="font-size:13px;color:var(--text-secondary)">'+[ageStr(p.birthday, p.birthdayEstimated), p.breed, w?(esc(w.value)+' '+esc(w.unit||'lb')):null].filter(Boolean).map(esc).join(' · ')+'</div></div>'
     + '<button class="btn btn-sm" onclick="switchView(\'profile\')">Profile</button></div>';
   // quick log (hidden for view-only access)
   if(canLog()) html += '<div class="card"><h3 class="section-title">Quick log</h3><div class="quick-grid">'
@@ -2569,13 +2589,15 @@ function renderProfile(){
     + (canManage()?'<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">'+svgIcon('edit',15)+' Edit</button>':'')+'</div>';
   // key facts grid
   const facts = [];
-  if(p.birthday) facts.push(['Age', ageStr(p.birthday)+' (born '+fmtDate(p.birthday)+')']);
+  if(p.birthday) facts.push(['Age', ageStr(p.birthday, p.birthdayEstimated)+' ('+(p.birthdayEstimated?'est. born ':'born ')+fmtDate(p.birthday)+')']);
   if(p.gotchaDay){ const u = untilStr(p.gotchaDay); facts.push(['Gotcha Day', fmtDate(p.gotchaDay)+(u&&u.past?' · '+u.text.replace(' ago',' with you'):'')]); }
   if(w) facts.push(['Current weight', esc(w.value)+' '+esc(w.unit||'lb')+' ('+fmtDate(w.dateTime)+')']);
   if(p.fixed) facts.push(['Spayed / Neutered', esc(p.fixed)+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
-  if(p.microchip) facts.push(['Microchip', esc(p.microchip)]);
+  if(p.microchip) facts.push(['Microchip', esc(p.microchip)+(p.microchipType?' · '+esc(p.microchipType):'')]);
   if(p.license) facts.push(['License', esc(p.license)]);
   if(p.originType || p.originFrom) facts.push(['Origin', [p.originType?esc(p.originType):'', p.originFrom?('from '+esc(p.originFrom)):'', originAddr(p)?esc(originAddr(p)):''].filter(Boolean).join(' · ')]);
+  if(p.originArn || p.originAnimalId) facts.push(['Shelter ID', [p.originArn?('ARN '+esc(p.originArn)):'', p.originAnimalId?('Animal ID '+esc(p.originAnimalId)):''].filter(Boolean).join(' · ')]);
+  if(p.originIntakeDate) facts.push(['Shelter intake', fmtDate(p.originIntakeDate)]);
   if(p.originPhone) facts.push(['Source phone', esc(p.originPhone)]);
   if(p.originCost) facts.push(['Adoption fee / price', money(p.originCost)]);
   if(p.previousName) facts.push(['Previous name', esc(p.previousName)]);
@@ -3029,7 +3051,7 @@ function enterDemo(){
   const dAgo = (n) => { const d=new Date(Date.now()-n*86400000); return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; };
   data = {
     activePetId: pid,
-    pets: [{ id:pid, name:'Biscuit', photo:'', breed:'Golden Retriever mix', sex:'Male (neutered)', birthday:dAgo(420), gotchaDay:dAgo(60), color:'Golden', weightUnit:'lb', microchip:'985•1010•0042', license:'CTY-2291', originType:'Adopted (shelter / rescue)', originFrom:'Springfield Humane Society', originAddress:'150 Shelter Way', originCity:'Springfield', originState:'IL', originZip:'62703', originPhone:'(555) 340-7788', originCost:'145.00', vetName:'Riverside Animal Hospital', vetPhone:'(555) 012-3456', notes:'Loves tennis balls. Slightly chicken-sensitive.' }],
+    pets: [{ id:pid, name:'Biscuit', photo:'', breed:'Golden Retriever mix', sex:'Male (neutered)', birthday:dAgo(420), gotchaDay:dAgo(60), color:'Golden', weightUnit:'lb', birthdayEstimated:true, microchip:'985•1010•0042', microchipType:'HomeAgain', license:'CTY-2291', originType:'Adopted (shelter / rescue)', originFrom:'Springfield Humane Society', originAddress:'150 Shelter Way', originCity:'Springfield', originState:'IL', originZip:'62703', originPhone:'(555) 340-7788', originCost:'145.00', originArn:'A1180042', originAnimalId:'SHS-24-0311', originIntakeDate:dAgo(78), originTransferFrom:'Rural County Animal Control', vetName:'Riverside Animal Hospital', vetPhone:'(555) 012-3456', notes:'Loves tennis balls. Slightly chicken-sensitive.' }],
     logs: [
       { id:'l1', petId:pid, type:'feed', dateTime:h(2), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
       { id:'l2', petId:pid, type:'feed', dateTime:h(11), foodType:'Dry kibble', amount:'1.5', unit:'cups', notes:'' },
