@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.38.0**
+**Current Version: v0.39.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.39.0** — **Medical records.** New **Records** tab under Care for the dog's history —
+  vaccinations, surgery, lab work, dental, microchip, deworming, exams, injuries and more.
+  Each record has a type, date, provider, cost, notes, and an optional **"next due"** date
+  (e.g. a booster) that surfaces in **reminders** and on the **calendar**. Records also flow
+  into the Profile **health timeline** and the spreadsheet export (new *Records* sheet).
 - **v0.38.0** — Mobile + chart fixes. Fixed the **Insights weight chart** (it was blank because Profile and
   Insights shared a canvas id — now scoped to the visible view). Fixed the **settings cog wrapping to a
   second line** on mobile (header stays one row). Stopped modals/pages from **shifting left-right** on mobile

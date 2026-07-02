@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.38.0';
+const APP_VERSION = 'v0.39.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -236,6 +236,7 @@ const ICONS = {
   vet:{ vb:'0 -960 960 960', d:'M140-80q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h180v-100q0-24 18-42t42-18h200q24 0 42 18t18 42v100h180q24 0 42 18t18 42v520q0 24-18 42t-42 18H140Zm0-60h680v-520H140v520Zm240-580h200v-100H380v100ZM140-140v-520 520Zm310-230v120h60v-120h120v-60H510v-120h-60v120H330v60h120Z' },
   groom:{ vb:'0 -960 960 960', d:'M782-114 481-415 364-298q11 17 13.5 33t2.5 35q0 64-43 107T230-80q-64 0-107-43T80-230q0-64 43-107t107-43q18 0 35.5 5t36.5 15l116-116-118-118q-17 8-34.5 11t-35.5 3q-64 0-107-43T80-730q0-64 43-107t107-43q64 0 107 43t43 107q0 19-2.5 36T367-662l514 514v34h-99ZM599-527l-66-66 249-249h99v33L599-527ZM294-666q26-26 26-64t-26-64q-26-26-64-26t-64 26q-26 26-26 64t26 64q26 26 64 26t64-26Zm202.5 203.5Q502-468 502-476t-5.5-13.5Q491-495 483-495t-13.5 5.5Q464-484 464-476t5.5 13.5Q475-457 483-457t13.5-5.5ZM294-166q26-26 26-64t-26-64q-26-26-64-26t-64 26q-26 26-26 64t26 64q26 26 64 26t64-26Z' },
   meds:{ vb:'0 -960 960 960', d:'M440-269h79v-111h114v-80H519v-111h-79v111H327v80h113v111ZM260-120q-24.75 0-42.37-17.63Q200-155.25 200-180v-479q0-24.75 17.63-42.38Q235.25-719 260-719h440q24.75 0 42.38 17.62Q760-683.75 760-659v479q0 24.75-17.62 42.37Q724.75-120 700-120H260Zm0-60h440v-479H260v479Zm-20-600v-60h481v60H240Zm20 121v479-479Z' },
+  records:{ vb:'0 -960 960 960', d:'M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h168q13-36 43.5-58t68.5-22q38 0 68.5 22t43.5 58h168q33 0 56.5 23.5T840-760v560q0 33-23.5 56.5T760-120H200Zm0-80h560v-560h-80v120H280v-120h-80v560Zm280-560q17 0 28.5-11.5T520-800q0-17-11.5-28.5T480-840q-17 0-28.5 11.5T440-800q0 17 11.5 28.5T480-760ZM280-360h280v-60H280v60Zm0-160h400v-60H280v60Z' },
   illness:{ vb:'0 -960 960 960', d:'M85-545q23-143 134.5-239T480-880q75 0 141 25.5T740-784q-10 17-16.5 30.5T713-728q-46-43-105.5-67.5T480-820q-112 0-199 64T159-592q-22 5-41 16.5T85-545ZM480-80q-149 0-260.5-96.5T85-416q13 20 32 32t42 17q35 100 122.5 163.5T480-140q142 0 241-99.5T820-480q0-17-2-34t-5-34q7 2 13.5 2.5t13.5.5q9 0 17.5-1t16.5-3q3 17 4.5 34t1.5 35q0 82-31.5 155T763-197.5q-54 54.5-127 86T480-80ZM336-503l77-77-78-78-35 35 43 42-43 43 36 35Zm451-124q-22-22-22-53 0-26 13.5-54t61.5-97q48 69 61.5 97t13.5 54q0 31-22 53t-53 22q-31 0-53-22ZM625-502l36-36-43-43 42-42-35-35-78 78 78 78Zm-145 85q-26 0-51 6t-48 18l-146-84q0-16-7-29.5T208-528q-20-11-42-5.5T132-508q-11 20-5 42t26 34q14 8 28.5 7t28.5-9l125 73q-18 17-32.5 37T278-280h53q22-42 62.5-65t87.5-23q47 0 86.5 23t62.5 65h52q-25-62-80-99.5T480-417Zm0-63Z' },
   followups:{ vb:'0 -960 960 960', d:'M566-80v-60h214v-430H180v220h-60v-410q0-24 18-42t42-18h65v-60h65v60h340v-60h65v60h65q24 0 42 18t18 42v620q0 24-18 42t-42 18H566ZM320-14l-42-42 113-114H50v-60h341L278-344l42-42 186 186L320-14ZM180-630h600v-130H180v130Zm0 0v-130 130Z' },
   link:{ vb:'0 -960 960 960', d:'M450-280H280q-83 0-141.5-58.5T80-480q0-83 58.5-141.5T280-680h170v60H280q-58.33 0-99.17 40.76-40.83 40.77-40.83 99Q140-422 180.83-381q40.84 41 99.17 41h170v60ZM325-450v-60h310v60H325Zm185 170v-60h170q58.33 0 99.17-40.76 40.83-40.77 40.83-99Q820-538 779.17-579q-40.84-41-99.17-41H510v-60h170q83 0 141.5 58.5T880-480q0 83-58.5 141.5T680-280H510Z' },
@@ -248,7 +249,7 @@ const ICONS = {
   call:{ vb:'0 -960 960 960', d:'M795-120q-116 0-236.5-56T335-335Q232-438 176-558.5T120-795q0-19.29 12.86-32.14Q145.71-840 165-840h140q14 0 24 10t14 25l26.93 125.64Q372-665 369.5-653.5t-10.73 19.73L259-533q26 44 55 82t64 72q37 38 78 69.5t86 55.5l95-98q10-11 23.15-15 13.15-4 25.85-2l119 26q15 4 25 16.04 10 12.05 10 26.96v135q0 19.29-12.86 32.14Q814.29-120 795-120ZM229-588l81-82-23-110H180q2 42 13.5 88.5T229-588Zm369 363q41 19 89 31t93 14v-107l-103-21-79 83ZM229-588Zm369 363Z' },
   share:{ vb:'0 -960 960 960', d:'M686-80q-47.5 0-80.75-33.25T572-194q0-8 5-34L278-403q-16.28 17.34-37.64 27.17Q219-366 194-366q-47.5 0-80.75-33T80-480q0-48 33.25-81T194-594q24 0 45 9.3 21 9.29 37 25.7l301-173q-2-8-3.5-16.5T572-766q0-47.5 33.25-80.75T686-880q47.5 0 80.75 33.25T800-766q0 47.5-33.25 80.75T686-652q-23.27 0-43.64-9Q622-670 606-685L302-516q3 8 4.5 17.5t1.5 18q0 8.5-1 16t-3 15.5l303 173q16-15 36.09-23.5 20.1-8.5 43.07-8.5Q734-308 767-274.75T800-194q0 47.5-33.25 80.75T686-80Zm.04-60q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5Zm-492-286q22.96 0 38.46-15.54 15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5ZM724.5-727.54q15.5-15.53 15.5-38.5 0-22.96-15.54-38.46-15.53-15.5-38.5-15.5-22.96 0-38.46 15.54-15.5 15.53-15.5 38.5 0 22.96 15.54 38.46 15.53 15.5 38.5 15.5 22.96 0 38.46-15.54ZM686-194ZM194-480Zm492-286Z' },
 };
-const EMOJI_ICON = { '💊':'meds','🏥':'vet','✂️':'groom','🤒':'illness','🛒':'supplies','📅':'calendar','📌':'followups','🍖':'fed','🦮':'walk','🚪':'potty','⚖️':'weight','📝':'log' };
+const EMOJI_ICON = { '💊':'meds','🏥':'vet','✂️':'groom','🤒':'illness','🛒':'supplies','📅':'calendar','📌':'followups','🍖':'fed','🦮':'walk','🚪':'potty','⚖️':'weight','📝':'log','📋':'records' };
 // Reminder/event types → the icon shown on the calendar & Upcoming list.
 const REMINDER_TYPES = [
   { label:'General', emoji:'📌' }, { label:'Vet', emoji:'🏥' }, { label:'Grooming', emoji:'✂️' },
@@ -263,7 +264,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], records:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -316,6 +317,7 @@ function addGroomService(){
   input.value=''; input.focus();
 }
 const MED_KINDS = ['Heartworm','Flea & Tick','Vaccine','Dewormer','Prescription','Supplement','Other'];
+const RECORD_TYPES = ['Vaccination','Surgery','Test / Lab work','Dental','Microchip','Deworming','Wellness exam','X-ray / imaging','Injury','Allergy','Prescription','Other'];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
 const CC_BRANDS = ['Visa','Mastercard','Amex','Discover','Other'];
@@ -436,6 +438,7 @@ const DRAFT_KINDS = {
   vet:     { opener:'vetModal',     section:'care',     name:'Vet visit', label:['vt-reason'] },
   groom:   { opener:'groomModal',   section:'care',     name:'Grooming',  label:['gr-by'] },
   med:     { opener:'medModal',     section:'care',     name:'Med',       label:['md-name'] },
+  record:  { opener:'recordModal',  section:'care',     name:'Record',    label:['rc-name'] },
   illness: { opener:'illnessModal', section:'care',     name:'Illness',   label:['il-dx','il-treat'] },
   supply:  { opener:'invModal',     section:'supplies', name:'Supply',    label:['iv-name'] },
   contact: { opener:'contactModal', section:'profile',  name:'Contact',   label:['ct-name','ct-org'] },
@@ -575,7 +578,7 @@ async function loadFromFirestore(){
         return;
       }
       // Own data — merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','inventory','contacts','customEvents','journal','drafts','auditLog'].forEach(k => {
+      ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','auditLog'].forEach(k => {
         const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
         data[k] = [...remote, ...localOnly];
       });
@@ -786,6 +789,57 @@ function exportHistoryCSV(){
 function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+
+// ── Medical records (vaccinations, surgeries, tests, etc.) ─────────
+function renderRecordsTab(){
+  const recs = petArr('records').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:320px" onclick="recordModal()">+ Add medical record</button></div>':'';
+  if(recs.length){
+    html += '<div class="card">'+recs.map(r=>{
+      const nd = r.nextDue ? untilStr(r.nextDue) : null;
+      const due = nd ? (nd.past ? '<span style="color:var(--danger);font-weight:600">due again '+nd.text+'</span>' : '<span style="color:'+(nd.days<=30?'var(--warning)':'var(--text-secondary)')+'">due again '+nd.text+'</span>') : '';
+      const meta = [r.provider, r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · ');
+      return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(r.name||r.type||'Record')+' <span class="chip-p" style="font-size:10px">'+esc(r.type||'Record')+'</span></div>'
+        +'<div style="font-size:12px;color:var(--text-secondary)">'+esc(fmtDate(r.date))+(meta?' · '+esc(meta):'')+'</div>'
+        +(due?'<div style="font-size:12px;margin-top:3px">'+due+'</div>':'')
+        +(r.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(r.notes)+'</div>':'')
+        +'</div>'+(canManage()?'<button class="btn btn-sm" onclick="recordModal(\''+r.id+'\')">Edit</button>':'')+'</div>';
+    }).join('')+'</div>';
+  } else html += '<div class="card empty"><div class="ico">'+svgIcon('records',46)+'</div><p style="color:var(--text-secondary)">Keep a history of vaccinations, surgeries, lab work, dental, microchip and more. Add a "next due" date on a vaccine and it shows up in reminders and on the calendar.</p></div>';
+  return html;
+}
+
+function recordModal(id){
+  const r = id ? data.records.find(x=>x.id===id) : null;
+  if(!r) draftInit('record');
+  const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
+  openModal('<h3>'+iconFor('📋',20)+' '+(r?'Edit record':'Medical record')+'</h3>'
+    +'<div class="grid-2"><div><label class="label">Type</label><select class="select" id="rc-type">'+sel(RECORD_TYPES, r?r.type:'Vaccination')+'</select></div>'
+    +'<div><label class="label">Date</label><input class="input" type="date" id="rc-date" value="'+(r?esc(r.date||''):todayISO())+'"></div></div>'
+    +'<label class="label">Name / description</label><input class="input" id="rc-name" value="'+(r?esc(r.name||''):'')+'" placeholder="Rabies (3-yr), Neuter, Bloodwork…">'
+    +'<div class="grid-2"><div><label class="label">Provider / vet</label><input class="input" id="rc-provider" value="'+(r?esc(r.provider||''):'')+'" placeholder="Clinic or vet"></div>'
+    +'<div><label class="label">Cost <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" type="number" step="0.01" id="rc-cost" value="'+(r?esc(r.cost||''):'')+'" placeholder="0.00"></div></div>'
+    +'<label class="label">Next due <span style="font-weight:400;color:var(--text-secondary)">(optional — e.g. booster date)</span></label><input class="input" type="date" id="rc-nextdue" value="'+(r?esc(r.nextDue||''):'')+'">'
+    +'<label class="label">Notes</label><input class="input" id="rc-notes" value="'+(r?esc(r.notes||''):'')+'">'
+    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveRecord('+(r?"'"+r.id+"'":'null')+')">Save</button>'
+    +(r?'<button class="btn btn-danger" onclick="deleteRecord(\''+r.id+'\')">Delete</button>':'')
+    +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+}
+
+function saveRecord(id){
+  if(denyManage()) return;
+  draftCommit();
+  if(!activePet()){ promptAddDog(); return; }
+  const f = { type:fv('rc-type'), name:fv('rc-name'), date:fv('rc-date'), provider:fv('rc-provider'), cost:fv('rc-cost'), nextDue:fv('rc-nextdue'), notes:fv('rc-notes') };
+  if(!f.name && !f.type){ showToast('⚠️ Enter a name'); return; }
+  if(!f.name) f.name = f.type;
+  if(id) data.records = data.records.map(r => r.id===id ? {...r, ...f} : r);
+  else data.records.unshift({ id:genId(), petId:data.activePetId, ...f });
+  logChange(id?'edited':'added','record', [f.type, f.name].filter(Boolean).join(' · '));
+  closeModal(); save(); showToast('📋 Saved');
+}
+
+function deleteRecord(id){ if(denyManage()) return; const r=data.records.find(x=>x.id===id); data.records=data.records.filter(x=>x.id!==id); if(r) logChange('deleted','record',[r.type,r.name].filter(Boolean).join(' · ')); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
 function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
@@ -793,11 +847,11 @@ function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(
 // Settings is a full page (view-settings). The gear + other callers just navigate to it.
 function settingsModal(){ switchView('settings'); }
 function settingsPageHTML(){
-  const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.inventory.length + data.contacts.length;
+  const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.records.length + data.inventory.length + data.contacts.length;
   return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><button class="btn btn-sm" onclick="switchView(settingsReturnView)">← Back</button><h2 style="font-size:20px;font-weight:700;margin:0">⚙️ Settings &amp; Data</h2></div>'
     + '<div class="card"><div class="label" style="margin-top:0">Appearance</div><button class="btn" onclick="toggleTheme();settingsModal()">'+(currentTheme()==='light'?'☀️ Light mode — switch to dark':'🌙 Dark mode — switch to light')+'</button></div>'
     + '<div class="card"><div class="label" style="margin-top:0">Backup &amp; export</div>'
-      + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, illness, supplies, contacts) plus photos &amp; settings.</p>'
+      + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, records, illness, supplies, contacts) plus photos &amp; settings.</p>'
       + '<div style="display:flex;flex-direction:column;gap:8px">'
         + '<button class="btn" onclick="exportJSON()">💾 Export backup (.json)</button>'
         + '<button class="btn" onclick="document.getElementById(\'import-file\').click()">📂 Import / restore backup (.json)</button>'
@@ -953,6 +1007,7 @@ async function exportXLSX(){
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Every (days)','Last given','Next due','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,m.intervalDays,m.lastGiven,medNextDue(m),m.notes].map(clean)));
+  add('Records', ['Dog','Type','Name','Date','Provider','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,r.name,r.date,r.provider,r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
@@ -1955,6 +2010,8 @@ function calendarEvents(){
   petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:m.notes||'', open:"medModal('"+m.id+"')" }); });
+  petArr('records').forEach(r => { if(r.date) ev.push({ key:'rec:'+r.id, date:r.date, icon:'📋', type:r.type||'Record', record:true, title:'📋 '+dn+': '+(r.name||r.type||'Record'), desc:[r.type&&'Type: '+r.type, r.provider&&'Provider: '+r.provider, r.cost&&'Cost: '+money(r.cost), r.notes].filter(Boolean).join('\n'), open:"recordModal('"+r.id+"')" });
+    if(r.nextDue) ev.push({ key:'recdue:'+r.id, date:r.nextDue, icon:'📋', type:(r.type||'Record')+' due', title:'📋 '+dn+': '+(r.name||r.type||'Record')+' due', desc:'', open:"recordModal('"+r.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
   petArr('customEvents').forEach(e => { if(e.date){ const ic = reminderIcon(e.evtype); ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:ic, type:e.evtype||'Reminder', location:e.location||'', title:ic+' '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); } });
   // birthday + gotcha day (recurring annual, shown for current year)
@@ -2176,6 +2233,7 @@ function getReminders(){
     if(g.date && g.date > todayK){ const u = untilStr(g.date); if(u && u.days <= 30) out.push({ icon:'✂️', text:'Grooming '+u.text+(g.services&&g.services.length?' · '+g.services.join(', '):''), over:false, sort:u.days }); }
     if(g.nextDueDate){ const u = untilStr(g.nextDueDate); if(u && u.days <= 14) out.push({ icon:'✂️', text:'Grooming '+(u.past?'overdue ('+u.text+')':'due '+u.text), over:u.past, sort:u.days }); }
   });
+  petArr('records').forEach(r => { if(r.nextDue){ const u = untilStr(r.nextDue); if(u && u.days <= 30) out.push({ icon:'📋', text:(r.name||r.type||'Record')+' '+(u.past?'due again ('+u.text+')':'due again '+u.text), over:u.past, sort:u.days }); } });
   petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));
   return out.sort((a,b)=>a.sort-b.sort);
 }
@@ -2545,7 +2603,8 @@ function renderHealthTimeline(){
   petArr('grooming').forEach(g => items.push({ date:g.date, icon:'✂️', title:'Grooming'+(g.services&&g.services.length?': '+g.services.join(', '):''), sub:[g.groomer,money(g.cost)].filter(Boolean).join(' · '), notes:g.notes, open:"groomModal('"+g.id+"')" }));
   petArr('illnesses').forEach(e => items.push({ date:e.start, icon:'🤒', title:e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'Illness', sub:[e.severity, e.recovery?'recovered '+fmtDate(e.recovery):'ongoing'].filter(Boolean).join(' · '), notes:e.notes, open:"illnessModal('"+e.id+"')" }));
   petArr('meds').forEach(m => { if(m.lastGiven) items.push({ date:m.lastGiven, icon:'💊', title:m.name+' given', sub:m.kind, notes:'', open:"medModal('"+m.id+"')" }); });
-  if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, and meds will appear here as a history.</p>';
+  petArr('records').forEach(r => items.push({ date:r.date, icon:'📋', title:(r.type&&r.type!==r.name?r.type+': ':'')+(r.name||r.type||'Record'), sub:[r.provider, r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · '), notes:r.notes, open:"recordModal('"+r.id+"')" }));
+  if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, meds and records will appear here as a history.</p>';
   items.sort((a,b)=> new Date(dateSafe(b.date||'1970-01-01')) - new Date(dateSafe(a.date||'1970-01-01')));
   return items.slice(0,40).map(it => '<div class="timeline-item'+(it.open&&canManage()?' clickable':'')+'"'+(it.open&&canManage()?' onclick="'+it.open+'"':'')+'><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
 }
@@ -2661,12 +2720,13 @@ function renderCalendar(){
 // ── CARE ──
 function renderCare(){
   if(!activePet()) return emptyState();
-  const tabs = [['vet','Vet','vet'],['grooming','Grooming','groom'],['meds','Meds','meds'],['illness','Illness','illness']];
+  const tabs = [['vet','Vet','vet'],['grooming','Grooming','groom'],['meds','Meds','meds'],['records','Records','records'],['illness','Illness','illness']];
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Care</h2>'+draftStrip('care');
   html += '<div class="subtab">'+tabs.map(([k,l,ic])=>'<button class="'+(careSubtab===k?'active':'')+'" onclick="setCareSubtab(\''+k+'\')">'+svgIcon(ic,16)+' '+l+'</button>').join('')+'</div>';
   if(careSubtab==='vet') html += renderVetTab();
   else if(careSubtab==='grooming') html += renderGroomTab();
   else if(careSubtab==='meds') html += renderMedsTab();
+  else if(careSubtab==='records') html += renderRecordsTab();
   else html += renderIllnessTab();
   return html;
 }
@@ -2941,6 +3001,12 @@ function enterDemo(){
     meds: [
       { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', intervalDays:'30', lastGiven:dAgo(22), nextDue:'', notes:'' },
       { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', intervalDays:'30', lastGiven:dAgo(28), nextDue:'', notes:'' },
+    ],
+    records: [
+      { id:'rc1', petId:pid, type:'Vaccination', name:'Rabies (3-year)', date:dAgo(55), provider:'Riverside Animal Hospital', cost:'32.00', nextDue:dAgo(-1040), notes:'Tag #RB-77213' },
+      { id:'rc2', petId:pid, type:'Vaccination', name:'DHPP booster', date:dAgo(55), provider:'Riverside Animal Hospital', cost:'40.00', nextDue:dAgo(-20), notes:'' },
+      { id:'rc3', petId:pid, type:'Surgery', name:'Neuter', date:dAgo(58), provider:'Riverside Animal Hospital', cost:'240.00', nextDue:'', notes:'Recovered well, no complications.' },
+      { id:'rc4', petId:pid, type:'Microchip', name:'HomeAgain implant', date:dAgo(58), provider:'Riverside Animal Hospital', cost:'', nextDue:'', notes:'Chip #985•1010•0042' },
     ],
     inventory: [
       { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), runningLow:false, notes:'' },
