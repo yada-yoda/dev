@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.8**
+**Current Version: v0.44.9**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.44.9** — Review pass — closed two gaps: the exported PDF report now includes a **Medical
+  records** section (vaccinations, surgeries, tests, etc., with type/detail/provider/cost/next-due),
+  and a line item tagged 💊 on a **grooming** visit (not just vet) now shows in Care → Meds too.
 - **v0.44.8** — Changing an option on the Trends chart no longer re-renders (and flickers) the
   Weight trend chart above it. The Trends controls and chart now refresh on their own.
 - **v0.44.7** — Fixed clinic autofill for contacts saved without a street address. Picking a

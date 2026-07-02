@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.8';
+const APP_VERSION = 'v0.44.9';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1140,6 +1140,12 @@ async function exportPDF(onlyPetId){
 
     const vets = recordsFor('vetVisits', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date)+(v.time?' '+fmtClock(v.time):''), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, v.followUpDate?(fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):'')):dash, v.notes||'']), y); }
+
+    const recs = recordsFor('records', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    if(recs.length){ y = heading('Medical records', y); y = table(['Date','Type','Name','Detail','Provider','Cost','Next due'], recs.map(r=>{
+      const detail = r.vaccineType || [r.testedFor, r.result].filter(Boolean).join(' → ') || (r.recordNo?'#'+r.recordNo:'') || '';
+      return [fmtDate(r.date)+(r.time?' '+fmtClock(r.time):''), r.type||dash, r.name||dash, detail||dash, recProvider(r)||dash, r.cost?money(r.cost):dash, r.nextDue?fmtDate(r.nextDue):dash];
+    }), y); }
 
     const grm = recordsFor('grooming', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(grm.length){ y = heading('Grooming', y); y = table(['Date','Services','Groomer','Cost','Next due'], grm.map(g=>[fmtDate(g.date), (g.services||[]).join(', ')||dash, g.groomer||dash, g.cost?money(g.cost):dash, g.nextDueDate?fmtDate(g.nextDueDate):dash]), y); }
@@ -2930,10 +2936,11 @@ function renderGroomTab(){
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
-// Meds bought as vet-visit line items tagged 💊 — surfaced here (read-only) with their cost.
+// Meds bought as vet-visit / grooming line items tagged 💊 — surfaced here (read-only) with cost.
 function vetLineMeds(){
   const out = [];
-  petArr('vetVisits').forEach(v => (v.lineItems||[]).forEach(li => { if(li.med && li.desc) out.push({ desc:li.desc, qty:parseFloat(li.qty)||1, cost:lineItemCost(li), date:v.date, vetId:v.id, reason:v.reason }); }));
+  petArr('vetVisits').forEach(v => (v.lineItems||[]).forEach(li => { if(li.med && li.desc) out.push({ desc:li.desc, qty:parseFloat(li.qty)||1, cost:lineItemCost(li), date:v.date, label:v.reason||'Vet visit', open:"vetModal('"+v.id+"')" }); }));
+  petArr('grooming').forEach(g => (g.lineItems||[]).forEach(li => { if(li.med && li.desc) out.push({ desc:li.desc, qty:parseFloat(li.qty)||1, cost:lineItemCost(li), date:g.date, label:'Grooming', open:"groomModal('"+g.id+"')" }); }));
   return out.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
 }
 function renderMedsTab(){
@@ -2951,9 +2958,9 @@ function renderMedsTab(){
     }).join('')+'</div>';
   } else if(!vetMeds.length) html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders. Meds you buy on a vet bill (tag the line item 💊) show up here too.</p></div>';
   if(vetMeds.length){
-    html += '<div class="card"><h3 class="section-title">'+svgIcon('vet',18)+' From vet visits</h3>'
-      + vetMeds.map(vm => '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(vm.desc)+(vm.qty>1?' <span style="font-weight:400;color:var(--text-secondary)">×'+vm.qty+'</span>':'')+' <span class="chip-2" style="font-size:10px">bought at vet</span></div><div style="font-size:12px;color:var(--text-secondary)">'+esc(fmtDate(vm.date))+(vm.reason?' · '+esc(vm.reason):'')+' · '+money(vm.cost)+'</div></div>'+(canManage()?'<button class="btn btn-sm" onclick="vetModal(\''+vm.vetId+'\')">View visit</button>':'')+'</div>').join('')
-      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Line items tagged 💊 on a vet visit. Edit them on the visit itself.</p></div>';
+    html += '<div class="card"><h3 class="section-title">'+svgIcon('vet',18)+' From vet &amp; grooming visits</h3>'
+      + vetMeds.map(vm => '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(vm.desc)+(vm.qty>1?' <span style="font-weight:400;color:var(--text-secondary)">×'+vm.qty+'</span>':'')+' <span class="chip-2" style="font-size:10px">bought at visit</span></div><div style="font-size:12px;color:var(--text-secondary)">'+esc(fmtDate(vm.date))+(vm.label?' · '+esc(vm.label):'')+' · '+money(vm.cost)+'</div></div>'+(canManage()?'<button class="btn btn-sm" onclick="'+vm.open+'">View visit</button>':'')+'</div>').join('')
+      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Line items tagged 💊 on a vet visit or grooming. Edit them on the visit itself.</p></div>';
   }
   return html;
 }
