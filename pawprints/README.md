@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.39.1**
+**Current Version: v0.40.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,13 @@ covers both.
 
 ## Version History
 
+- **v0.40.0** — **Medical records now capture the full provider,** matching vet visits.
+  A record has **Vet / doctor** and **Clinic** fields (each with autocomplete from your saved
+  vet contacts and past records), an **Address / City / State**, and a **Phone** — pick a saved
+  vet and the clinic, address and phone fill in automatically. Each record row gets a one-tap
+  **Call** button, the address flows into the Google Calendar event location (tappable in Maps),
+  and the spreadsheet export gains Vet / Clinic / Address / Phone columns. Older records that
+  only had a single provider name still display correctly.
 - **v0.39.1** — Mobile fix: in Insights → **Popular spots**, a long location name (e.g.
   "Near Garage Rear Service Door") no longer pushes the pee/poop counts onto their own line.
   The name now wraps within its column and the 💧/💩 chips stay pinned to the right, aligned
