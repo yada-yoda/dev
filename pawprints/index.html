@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.3';
+const APP_VERSION = 'v0.44.4';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -365,6 +365,18 @@ const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-US', { month:'shor
 const fmtTime = (d) => d ? new Date(d).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' }) : '—';
 // "14:30" → "2:30 PM" (for time-only fields like appointment time)
 function fmtClock(t){ if(!t) return ''; const parts = String(t).split(':'); const h = parseInt(parts[0],10), m = parseInt(parts[1]||'0',10); if(isNaN(h)) return t; const ap = h>=12?'PM':'AM'; return (((h+11)%12)+1)+':'+String(isNaN(m)?0:m).padStart(2,'0')+' '+ap; }
+// Time zone — logged times are wall-clock; this labels them (on PDFs, exports) and sets the
+// Google Calendar event zone. Defaults to Central (Chicago) until changed in Settings.
+const TIMEZONES = [
+  ['America/New_York','Eastern — New York'], ['America/Chicago','Central — Chicago'],
+  ['America/Denver','Mountain — Denver'], ['America/Phoenix','Mountain (no DST) — Phoenix'],
+  ['America/Los_Angeles','Pacific — Los Angeles'], ['America/Anchorage','Alaska — Anchorage'],
+  ['Pacific/Honolulu','Hawaii — Honolulu'], ['America/Toronto','Eastern — Toronto'],
+  ['America/Halifax','Atlantic — Halifax'], ['UTC','UTC']
+];
+function appTimezone(){ return (data.settings && data.settings.timezone) || 'America/Chicago'; }
+function tzAbbr(tz){ try { const parts = new Intl.DateTimeFormat('en-US',{ timeZone:tz||appTimezone(), timeZoneName:'short' }).formatToParts(new Date()); const p = parts.find(x=>x.type==='timeZoneName'); return p ? p.value : ''; } catch(e){ return ''; } }
+function tzLabel(){ const tz = appTimezone(); const friendly = (TIMEZONES.find(t=>t[0]===tz)||[])[1]; const abbr = tzAbbr(tz); return (friendly || tz) + (abbr ? ' ('+abbr+')' : ''); }
 const money = (n) => { const v = parseFloat(n); return isNaN(v) ? '' : '$' + v.toFixed(2); };
 const num = (n) => { const v = parseFloat(n); return isNaN(v) ? null : v; };
 // Treat a bare YYYY-MM-DD as local noon so it doesn't shift a day across timezones
@@ -927,6 +939,7 @@ function refreshSettingsSection(id, htmlFn, focusId){
 function settingsListsHTML(){
   const s = data.settings || {};
   let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Time zone'+tip('The time zone your logged times are in. Shown on exported PDFs and used for Google Calendar events. Defaults to Central (Chicago).')+'</label><select class="select" id="tz-select" onchange="saveTimezone()" style="margin-bottom:0">'+TIMEZONES.map(t=>'<option value="'+esc(t[0])+'"'+(appTimezone()===t[0]?' selected':'')+'>'+esc(t[1])+'</option>').join('')+'</select><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Times you log are shown in '+esc(tzLabel())+'.</div></div>';
   h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
   if((s.homeZip||'').trim()){
     const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
@@ -970,6 +983,12 @@ function removeListItem(kind, idx){
   const m = LIST_KINDS[kind]; if(!m) return;
   data.settings[m.key] = (data.settings[m.key]||[]).filter((_,i)=>i!==idx);
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+}
+function saveTimezone(){
+  if(denyManage()) return;
+  data.settings = data.settings || {};
+  data.settings.timezone = fv('tz-select') || 'America/Chicago';
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML); showToast('🕐 Time zone saved');
 }
 function saveHomeZip(){
   if(denyManage()) return;
@@ -1147,7 +1166,7 @@ async function exportPDF(onlyPetId){
   }
 
   const n = doc.internal.getNumberOfPages();
-  for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('PawPrints '+APP_VERSION, M, pageH-22); doc.text('Page '+i+' of '+n, pageW-M, pageH-22, {align:'right'}); }
+  for(let i=1;i<=n;i++){ doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('PawPrints '+APP_VERSION, M, pageH-22); doc.text('Times shown in '+tzLabel(), pageW/2, pageH-22, {align:'center'}); doc.text('Page '+i+' of '+n, pageW-M, pageH-22, {align:'right'}); }
 
   const oneP = onlyPetId ? pets[0] : null;
   doc.save('pawprints-'+(oneP?safeName(oneP.name||'dog')+'-':'report-')+todayISO()+'.pdf');
@@ -2264,7 +2283,7 @@ async function syncToGoogleCalendar(){
   let ok = 0, fail = 0;
   data.gcalEvents = data.gcalEvents || {};
   for(const e of events){
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const tz = appTimezone();
     let body;
     if(e.time){
       // Timed event: 1-hour block at the given time.

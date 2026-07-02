@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.3**
+**Current Version: v0.44.4**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.44.4** — **Time zone setting.** A new Time zone picker in Settings (defaults to Central —
+  Chicago) labels the times you log. Exported PDFs now footer every page with "Times shown in
+  &lt;zone&gt;" so records are unambiguous, and Google Calendar events use the chosen zone.
 - **v0.44.3** — Richer Med / Preventative form: **Dose**, **Given by** (you or a saved vet),
   **Time**, and an optional **Record #** (for a vet-given dose), alongside the existing repeat
   schedule. "Gave it" now stamps the time. These show on the med row, health timeline, calendar
