@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.7**
+**Current Version: v0.44.8**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.44.8** — Changing an option on the Trends chart no longer re-renders (and flickers) the
+  Weight trend chart above it. The Trends controls and chart now refresh on their own.
 - **v0.44.7** — Fixed clinic autofill for contacts saved without a street address. Picking a
   saved clinic/vet/groomer that has only a city/state/zip (or only a phone) now fills those
   fields — previously the autofill required a street address and would fill nothing at all,

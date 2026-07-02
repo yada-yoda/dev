@@ -210,7 +210,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.7';
+const APP_VERSION = 'v0.44.8';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3063,16 +3063,12 @@ function renderInsights(){
   // Weight trend — the original dedicated chart, kept above the selectable Trends chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
   if(weights.length>=2) html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
-  // Trends — selectable chart (feeding / potty / walks / weight)
-  const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
-  const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
-  const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
-  const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
+  // Trends — selectable chart (feeding / potty / walks / weight). Controls live in their own
+  // container so changing an option refreshes only this chart, not the weight chart above.
   html += '<div class="card"><h3 class="section-title">'+svgIcon('insights',18)+' Trends</h3>'
-    + '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'
+    + '<div id="trend-controls">'+trendControlsHTML()+'</div>'
     + '<div style="height:260px"><canvas class="trend-chart"></canvas></div>'
-    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+TREND_METRICS.find(m=>m.k===trendMetric).hint+'</p>'
+    + '<p id="trend-hint" style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+esc(TREND_METRICS.find(m=>m.k===trendMetric).hint)+'</p>'
     + '</div>';
   // spend breakdown
   if(spendTotal>0){
@@ -3155,7 +3151,21 @@ function maybeDrawWeightChart(){
 }
 
 // ── Insights "Trends" chart (selectable metric / style / range) ──
-function setTrend(kind, val){ if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=+val; render(); }
+function trendControlsHTML(){
+  const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
+  const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
+  const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
+  const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
+  return '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>';
+}
+function setTrend(kind, val){
+  if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=+val;
+  // Refresh only the Trends controls + its chart — leave the weight chart above untouched.
+  const c = document.getElementById('trend-controls'); if(c) c.innerHTML = trendControlsHTML();
+  const h = document.getElementById('trend-hint'); if(h) h.textContent = (TREND_METRICS.find(m=>m.k===trendMetric)||{}).hint || '';
+  drawTrendChart();
+}
 function shortDay(iso){ const p=(iso||'').split('-'); return p.length===3 ? (+p[1])+'/'+(+p[2]) : iso; }
 function hexA(h, a){ h=(h||'').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); if(isNaN(n)) return h; return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
 function trendDays(n){ const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(now.getTime()-i*86400000); out.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`); } return out; }
