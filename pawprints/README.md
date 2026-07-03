@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.46.0**
+**Current Version: v0.47.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,14 @@ covers both.
 
 ## Version History
 
+- **v0.47.0** — Feeding-goal redesign + badge prestige:
+  - The daily feeding progress moved out of the "Last fed" card (which was stretching the other
+    status cards) into a **clean full-width strip under the status row** — "Fed today · 1 / 2 cups"
+    with a bar, and a tooltip pointing you to set the goal in Settings.
+  - **Prestige** — every 1,000 miles walked earns a prestige level. Past 1,000, badges gain an
+    escalating shine: a coloured glow and a ★-level star, a gentle pulse at higher levels, and an
+    aura beyond that. Colours cycle through the tiers, so it scales indefinitely. Shown on Insights
+    (banner + next-prestige progress) and Today, with a "Prestige N reached" toast.
 - **v0.46.0** — **Walking milestone badges.** Every mile you log on walks now earns your dog
   badges across five tiers (bronze → silver → gold → teal → legendary purple) — 17 milestones
   from "First Steps" (1 mi) to "Legend of the Leash" (1,000 mi), denser in the early range.

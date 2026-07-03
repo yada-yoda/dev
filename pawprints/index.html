@@ -123,6 +123,9 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .subtab button.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:600}
 .toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:300;box-shadow:0 8px 32px var(--shadow);animation:fadeIn .3s ease;max-width:calc(100% - 32px);text-align:center}
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes prestigeGlow{0%,100%{box-shadow:0 0 var(--pglow,8px) var(--pcol,#f4a261)}50%{box-shadow:0 0 calc(var(--pglow,8px) * 2.1) var(--pcol,#f4a261)}}
+.prestige-pulse{animation:prestigeGlow 2.6s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.prestige-pulse{animation:none}}
 .hidden{display:none !important}
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
@@ -215,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.46.0';
+const APP_VERSION = 'v0.47.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -353,16 +356,25 @@ function totalWalkMiles(){ return petLogs('walk').reduce((s,w)=> s + (num(w.dist
 function walkBadgesEarned(mi){ return WALK_BADGES.filter(b=> mi >= b.mi); }
 function nextWalkBadge(mi){ return WALK_BADGES.find(b=> mi < b.mi) || null; }
 // Announce newly-earned badges. First run per dog seeds silently (no retroactive toast for past miles).
+// Prestige: every full 1,000 miles = one prestige level. Effects escalate and are scalable —
+// color cycles through the tiers, glow grows, and a pulse/aura kicks in at higher levels.
+const PRESTIGE_COLORS = ['#b5793f','#9fb0c0','#f4a261','#2dd4bf','#a371f7'];
+function prestigeLevel(mi){ return Math.floor((mi||0) / 1000); }
+function prestigeColor(P){ return PRESTIGE_COLORS[((P-1) % PRESTIGE_COLORS.length + PRESTIGE_COLORS.length) % PRESTIGE_COLORS.length]; }
+function prestigeFx(P){ if(P<1) return null; return { col:prestigeColor(P), glow:Math.min(6+P*4, 26), pulse:P>=3, aura:P>=5 }; }
 function checkWalkBadges(announce){
   const p = activePet(); if(!p) return;
-  const mi = totalWalkMiles();
-  if(!p.badgesSeen){ p.badgesSeen = walkBadgesEarned(mi).map(b=>b.mi); save(false); return; }
+  const mi = totalWalkMiles(), P = prestigeLevel(mi);
+  if(!p.badgesSeen){ p.badgesSeen = walkBadgesEarned(mi).map(b=>b.mi); p.prestige = P; save(false); return; }
   const newly = walkBadgesEarned(mi).filter(b=> p.badgesSeen.indexOf(b.mi) < 0);
-  if(newly.length){
-    newly.forEach(b=> p.badgesSeen.push(b.mi));
-    save(false);
-    if(announce){ const top = newly[newly.length-1]; showToast('🎉 Badge unlocked — '+top.name+' ('+fmtMi(top.mi)+' mi)'); }
-  }
+  const prevP = p.prestige || 0;
+  let msg = '';
+  if(P > prevP) msg = '🌟 Prestige '+P+' reached — '+fmtMi(mi)+' miles walked!';
+  else if(newly.length){ const top = newly[newly.length-1]; msg = '🎉 Badge unlocked — '+top.name+' ('+fmtMi(top.mi)+' mi)'; }
+  if(newly.length) newly.forEach(b=> p.badgesSeen.push(b.mi));
+  if(P > prevP) p.prestige = P;
+  if(newly.length || P > prevP) save(false);
+  if(announce && msg) showToast(msg);
 }
 const TREND_METRICS = [
   { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
@@ -2575,19 +2587,22 @@ function statusCard(label, icon, dt, overdueHrs, extra){
     +(extra||'')+'</div>';
 }
 // Sum today's feeding amounts vs the goal → a mini progress block for the Last fed card.
-function fedTodayExtra(){
+// Full-width "fed today vs goal" strip shown under the status cards (keeps the 4 cards uniform).
+function renderFeedingStrip(){
   const todayKey = todayISO();
   const amt = petLogs('feed').filter(f => f.dateTime && f.dateTime.slice(0,10)===todayKey).reduce((s,f)=> s + (num(f.amount)||0), 0);
   const goal = num((data.settings||{}).feedGoal), unit = ((data.settings||{}).feedGoalUnit || 'cups');
+  if(amt<=0 && !(goal && goal>0)) return '';
   const fmt = n => (Math.round(n*100)/100).toString();
+  const goalTip = tip('Set a daily feeding goal in Settings → Lists & preferences to track progress toward it here.');
+  const head = '<span style="font-size:12px;color:var(--text-secondary);display:inline-flex;align-items:center;gap:5px">'+svgIcon('fed',14)+' Fed today'+goalTip+'</span>';
   if(goal && goal>0){
     const pct = Math.min(100, Math.round(amt/goal*100)), met = amt >= goal;
-    return '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:7px">'
-      + '<div style="font-size:11px;display:flex;justify-content:space-between;align-items:baseline"><span style="color:var(--text-secondary)">Today</span><span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;color:'+(met?'var(--success)':'var(--text-primary)')+'">'+fmt(amt)+' / '+fmt(goal)+' '+esc(unit)+'</span></div>'
-      + '<div style="height:6px;background:var(--bg-input);border-radius:4px;overflow:hidden;margin-top:4px"><div style="height:100%;width:'+pct+'%;background:'+(met?'var(--success)':'var(--accent)')+';border-radius:4px;transition:width .3s"></div></div></div>';
+    return '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'
+      + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:15px;color:'+(met?'var(--success)':'var(--text-primary)')+'">'+fmt(amt)+' / '+fmt(goal)+' '+esc(unit)+(met?' ✓':'')+'</span></div>'
+      + '<div style="height:9px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(met?'var(--success)':'linear-gradient(90deg,var(--accent),var(--accent-2))')+';border-radius:5px;transition:width .3s"></div></div></div>';
   }
-  if(amt>0) return '<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:7px;font-size:11px;color:var(--text-secondary)">Today: <strong style="color:var(--text-primary);font-family:\'JetBrains Mono\',monospace">'+fmt(amt)+' '+esc(unit)+'</strong></div>';
-  return '';
+  return '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:baseline">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:15px">'+fmt(amt)+' '+esc(unit)+'</span></div>';
 }
 function renderToday(){
   if(!activePet()) return emptyState();
@@ -2619,11 +2634,11 @@ function renderToday(){
     + '</div></div>';
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
-    + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12,fedTodayExtra())
+    + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)
     + statusCard('Water refilled',svgIcon('water',16),water?water.dateTime:null,null)
     + statusCard('Last potty',svgIcon('potty',16),potty?potty.dateTime:null,8)
     + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
-    + '</div></div>';
+    + '</div>' + renderFeedingStrip() + '</div>';
   // next walking badge
   html += renderNextBadgeToday();
   // reminders
@@ -3122,37 +3137,61 @@ function encArg(s){ return encodeURIComponent(s).replace(/'/g,'%27'); }
 // Full walking-milestone badge grid (Insights).
 function renderBadgesCard(){
   const mi = totalWalkMiles(), earned = walkBadgesEarned(mi), next = nextWalkBadge(mi);
+  const P = prestigeLevel(mi), fx = prestigeFx(P);
+  // prestige banner
+  let banner = '';
+  if(fx){
+    banner = '<div class="'+(fx.pulse?'prestige-pulse':'')+'" style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:11px 14px;border-radius:14px;background:linear-gradient(135deg,'+fx.col+'22,'+fx.col+'08);border:1px solid '+fx.col+'66;'+(fx.pulse?'--pglow:'+Math.round(fx.glow*.7)+'px;--pcol:'+fx.col+';':'')+'">'
+      + '<div style="width:44px;height:44px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:23px;background:radial-gradient(circle at 50% 38%,'+fx.col+'55,'+fx.col+'11);border:2px solid '+fx.col+'">'+(fx.aura?'🌟':'⭐')+'</div>'
+      + '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:15px;color:'+fx.col+'">Prestige '+P+'</div><div style="font-size:12px;color:var(--text-secondary)">Every 1,000 miles earns a prestige — your badges shine brighter each level.</div></div></div>';
+  }
+  // next-up progress (next badge, or next prestige once all badges are earned)
   let prog;
   if(next){
     const prev = earned.length ? earned[earned.length-1].mi : 0;
     const pct = Math.max(0, Math.min(100, next.mi>prev ? (mi-prev)/(next.mi-prev)*100 : 0));
     prog = '<div style="font-size:12px;color:var(--text-secondary);margin:2px 0 6px">Next: <strong style="color:var(--text-primary)">'+esc(next.name)+'</strong> at '+fmtMi(next.mi)+' mi · '+fmtMi(Math.max(0,next.mi-mi))+' mi to go</div>'
       + '<div style="height:8px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden;margin-bottom:14px"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:5px;transition:width .3s"></div></div>';
-  } else prog = '<div style="font-size:12px;color:var(--accent-2);margin:2px 0 14px">🏆 All milestones unlocked — legend!</div>';
+  } else {
+    const into = mi - P*1000, pct = Math.min(100, into/1000*100), nx = (P+1)*1000, col = prestigeColor(P+1);
+    prog = '<div style="font-size:12px;color:var(--text-secondary);margin:2px 0 6px">Next: <strong style="color:'+col+'">Prestige '+(P+1)+'</strong> at '+fmtMi(nx)+' mi · '+fmtMi(nx-mi)+' mi to go</div>'
+      + '<div style="height:8px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden;margin-bottom:14px"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,'+prestigeColor(P)+','+col+');border-radius:5px;transition:width .3s"></div></div>';
+  }
   const grid = WALK_BADGES.map(b=>{
     const on = mi >= b.mi, tc = BADGE_TIERS[b.tier];
+    let med, star = '', pulseCls = '';
+    if(on){
+      let shadow = '0 0 0 3px '+tc+'22';
+      if(fx){ shadow += ',0 0 '+fx.glow+'px '+fx.col+'99'; star = '<span style="position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:'+fx.col+';color:#0d1117;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-tertiary);font-family:JetBrains Mono,monospace">★'+P+'</span>'; if(fx.pulse) pulseCls = ' prestige-pulse'; }
+      med = 'position:relative;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:'+shadow+';'+(fx&&fx.pulse?'--pglow:'+fx.glow+'px;--pcol:'+fx.col+';':'');
+    } else med = 'position:relative;background:var(--bg-input);border:2px dashed var(--border)';
     return '<div title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(on?'':' (locked)')+'\n'+esc(b.blurb)+'" style="text-align:center;padding:12px 6px;border:1px solid '+(on?tc+'66':'var(--border)')+';border-radius:14px;background:var(--bg-tertiary)">'
-      + '<div style="width:54px;height:54px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:25px;'+(on?'background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:0 0 0 3px '+tc+'22':'background:var(--bg-input);border:2px dashed var(--border)')+'">'+(on?b.icon:'<span style="filter:grayscale(1);opacity:.35">'+b.icon+'</span>')+'</div>'
+      + '<div class="'+pulseCls.trim()+'" style="width:54px;height:54px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:25px;'+med+'">'+(on?b.icon:'<span style="filter:grayscale(1);opacity:.35">'+b.icon+'</span>')+star+'</div>'
       + '<div style="font-size:12px;font-weight:600;line-height:1.2'+(on?'':';color:var(--text-secondary)')+'">'+esc(b.name)+'</div>'
       + '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:'+(on?tc:'var(--text-secondary)')+'">'+fmtMi(b.mi)+' mi</div></div>';
   }).join('');
   return '<div class="card"><h3 class="section-title">'+svgIcon('walk',18)+' Walking milestones</h3>'
-    + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex-wrap:wrap;gap:8px"><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:700">'+fmtMi(mi)+' <span style="font-size:13px;color:var(--text-secondary);font-family:DM Sans,sans-serif;font-weight:400">mi walked</span></div><div style="font-size:12px;color:var(--text-secondary)"><strong style="color:var(--text-primary)">'+earned.length+'</strong> of '+WALK_BADGES.length+' badges</div></div>'
-    + prog
+    + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex-wrap:wrap;gap:8px"><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:700">'+fmtMi(mi)+' <span style="font-size:13px;color:var(--text-secondary);font-family:DM Sans,sans-serif;font-weight:400">mi walked</span></div><div style="font-size:12px;color:var(--text-secondary)">'+(fx?'<strong style="color:'+fx.col+'">Prestige '+P+'</strong> · ':'')+'<strong style="color:var(--text-primary)">'+earned.length+'</strong> of '+WALK_BADGES.length+' badges</div></div>'
+    + banner + prog
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:10px">'+grid+'</div></div>';
 }
 // Compact next-badge card (Today).
 function renderNextBadgeToday(){
   if(!petLogs('walk').length) return '';
   const mi = totalWalkMiles(), earned = walkBadgesEarned(mi), next = nextWalkBadge(mi);
-  const tc = next ? BADGE_TIERS[next.tier] : BADGE_TIERS.purple;
-  const prev = earned.length ? earned[earned.length-1].mi : 0;
-  const pct = next ? Math.max(0,Math.min(100,(mi-prev)/(next.mi-prev)*100)) : 100;
-  const icon = next ? next.icon : '👑', topEarned = earned[earned.length-1];
+  const P = prestigeLevel(mi), fx = prestigeFx(P);
+  let label, name, toGo, icon, tc, pct;
+  if(next){
+    label = 'Next walking badge'; name = next.name; toGo = fmtMi(Math.max(0,next.mi-mi))+' mi to go'; icon = next.icon; tc = BADGE_TIERS[next.tier];
+    const prev = earned.length ? earned[earned.length-1].mi : 0; pct = Math.max(0,Math.min(100,(mi-prev)/(next.mi-prev)*100));
+  } else {
+    const nx = (P+1)*1000; label = 'Next prestige'; name = 'Prestige '+(P+1); toGo = fmtMi(nx-mi)+' mi to go'; icon = fx&&fx.aura?'🌟':'⭐'; tc = prestigeColor(P+1); pct = Math.min(100,(mi-P*1000)/1000*100);
+  }
+  const pulseCls = (fx&&fx.pulse)?' prestige-pulse':'';
   return '<div class="card" onclick="switchView(\'insights\')" style="cursor:pointer"><div style="display:flex;align-items:center;gap:14px">'
-    + '<div style="width:52px;height:52px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+'">'+icon+'</div>'
-    + '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text-secondary)">'+(next?'Next walking badge':'Top badge earned')+'</div>'
-    + '<div style="font-weight:700;font-size:15px">'+esc(next?next.name:(topEarned?topEarned.name:'—'))+(next?' <span style="font-weight:400;color:var(--text-secondary);font-size:12px">· '+fmtMi(Math.max(0,next.mi-mi))+' mi to go</span>':'')+'</div>'
+    + '<div class="'+pulseCls.trim()+'" style="width:52px;height:52px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';'+(fx&&fx.pulse?'--pglow:'+fx.glow+'px;--pcol:'+fx.col+';':'')+'">'+icon+'</div>'
+    + '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text-secondary)">'+label+(fx?' · <span style="color:'+fx.col+'">Prestige '+P+'</span>':'')+'</div>'
+    + '<div style="font-weight:700;font-size:15px">'+esc(name)+' <span style="font-weight:400;color:var(--text-secondary);font-size:12px">· '+toGo+'</span></div>'
     + '<div style="height:7px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden;margin-top:6px"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:5px"></div></div></div>'
     + '<div style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary);flex-shrink:0">'+earned.length+'/'+WALK_BADGES.length+'</div></div></div>';
 }
