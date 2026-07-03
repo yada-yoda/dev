@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.2.0 — Phase 1: data layer, Settings & Accounts
+- Client data store with Firestore persistence (debounced) and forward-compatible
+  seeding of sensible defaults on first run.
+- **Settings**: manage people (you/joint/others), income & expense category groups
+  with subcategories, and catalogs of institutions, reward programs, and gift-card
+  types — all pre-seeded with generic options and fully user-extensible.
+- **Accounts**: full add/edit/remove with institution (autocomplete from catalog),
+  type (incl. CD/brokerage/retirement), last-4, owner, active/auto-pay/rewards
+  flags, notes, and CD term/APY/maturity fields shown for CD accounts.
+- Shared modal (no backdrop-close, top-right ✕) and top-center toast system.
+- SemVer now shown in the browser tab title alongside the sidebar.
+
+_Why:_ establishes the data foundation and the two setup screens every later phase
+depends on (categories and accounts are referenced by income, expenses, and more).
+
 ### v0.1.2 — Owner lock
 - Locked access to the owner's Firebase UID in both `firestore.rules` and the
   client gate. The setup banner clears once the signed-in user is the owner.
@@ -79,7 +94,7 @@ any financial data or features are built.
 | Phase | Focus |
 |------:|-------|
 | 0 | Auth & app shell ✅ |
-| 1 | Data layer, Settings, categories, accounts |
+| 1 | Data layer, Settings, categories, accounts ✅ |
 | 2 | Income tracker + Annual Grid |
 | 3 | Expenses & subscriptions |
 | 4 | Paychecks |
