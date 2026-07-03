@@ -45,6 +45,10 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.1 — Alphabetized institution picker
+- The bank/broker list in the account form is now sorted alphabetically so it's
+  easier to scan.
+
 ### v0.3.0 — Phase 2: Income tracker + Annual Grid
 - Per-year data documents (`finance/{uid}/years/{yyyy}`) loaded on demand and
   persisted (debounced), with the year driven by the top-bar year selector.

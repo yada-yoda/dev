@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.0';
+const VERSION = '0.3.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -461,7 +461,8 @@ function accountModal(existing) {
   const body = el('div', 'form-grid');
 
   const dl = el('datalist'); dl.id = 'inst-list';
-  s.catalog.institutions.forEach(i => { const o = el('option'); o.value = i.name; dl.appendChild(o); });
+  s.catalog.institutions.slice().sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(i => { const o = el('option'); o.value = i.name; dl.appendChild(o); });
   body.appendChild(dl);
 
   const fName = input(a.name || '', { placeholder: 'e.g. Everyday Checking' });
