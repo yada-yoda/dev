@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.3**
+**Current Version: v0.47.4**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.47.4** — Connecting Google Calendar now does an **initial full sync automatically** — right
+  after you create (or pick) the calendar, all existing past and future events are pushed, so you
+  don't have to hit "Sync schedule" yourself the first time. Re-syncs still update the same events
+  (no duplicates), and new/edited items keep auto-syncing on save.
 - **v0.47.3** — Two small polish touches: the dog's **latest walking badge** now shows as a small
   medallion next to their name on the Profile tab, and on Today the **"Fed today" progress and the
   "next walking badge" bar sit side by side** instead of stacked.
