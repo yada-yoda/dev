@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.5 — Field tooltips & personalized "Me" tag
+- Added ⓘ tooltips to every field in the income and account forms explaining
+  what each is for (e.g. why income asks which account: to see income by
+  account, like dividends per broker).
+- The default "you" person is now labeled "Me (<your first name>)", taken from
+  your Google account. Rename it (or any person/institution/reward) by clicking
+  its name in Settings; the label updates everywhere it's used.
+
 ### v0.3.4 — Sortable tables, flag tooltips & configurable defaults
 - Account table columns are now sortable by clicking the header (toggles asc/desc,
   with a caret on the active column) — via a reusable sortable-table helper.

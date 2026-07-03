@@ -64,8 +64,11 @@ function defaults() {
       // which flags start checked when adding a NEW account
       accountDefaults: { active: true, usedForIncome: false, usedForExpenses: false, usedForAutopay: false, rewardsCard: false }
     },
+    // The "self" person is renamed at runtime to "Me (<Google first name>)" —
+    // the real name is never hard-coded here (public repo); it comes from the
+    // signed-in account and lives only in the user's private data.
     persons: [
-      { id: mkId('p'), name: 'You' },
+      { id: mkId('p'), name: 'Me', self: true },
       { id: mkId('p'), name: 'Joint' }
     ],
     incomeCategories: seedGroups(SEED_INCOME_GROUPS),
@@ -163,8 +166,20 @@ window.cloverStore = {
 
   // --- persons ---
   addPerson(name) { state.persons.push({ id: mkId('p'), name: name.trim() }); scheduleSave(); notify(); },
-  renamePerson(id, name) { const p = state.persons.find(x => x.id === id); if (p) { p.name = name.trim(); scheduleSave(); notify(); } },
+  renamePerson(id, name) { const p = state.persons.find(x => x.id === id); if (p) { p.name = name.trim(); if (p.self) p.selfNamed = true; scheduleSave(); notify(); } },
   removePerson(id) { state.persons = state.persons.filter(x => x.id !== id); scheduleSave(); notify(); },
+  // Auto-label the self person "Me (<first name>)" from the Google display name,
+  // unless the user has already renamed it. Called once after load with the
+  // signed-in account's displayName. Never hard-codes a real name.
+  setSelfNameFromDisplay(displayName) {
+    const self = state.persons.find(p => p.self) || state.persons[0];
+    if (!self || self.selfNamed) return;
+    if (self.name === 'Me' || self.name === 'You') {
+      const first = (displayName || '').trim().split(/\s+/)[0];
+      const next = first ? ('Me (' + first + ')') : 'Me';
+      if (next !== self.name) { self.name = next; scheduleSave(); notify(); }
+    }
+  },
 
   // --- categories (kind = 'income' | 'expense') ---
   _cats(kind) { return kind === 'income' ? state.incomeCategories : state.expenseCategories; },
@@ -180,6 +195,7 @@ window.cloverStore = {
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },
+  renameCatalog(list, id, name) { const it = state.catalog[list].find(x => x.id === id); if (it) { it.name = name.trim(); scheduleSave(); notify(); } },
   removeCatalog(list, id) { state.catalog[list] = state.catalog[list].filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- accounts ---

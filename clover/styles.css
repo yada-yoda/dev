@@ -232,6 +232,8 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--surface-2); border: 1px solid var(--border);
   font-size: 13px; color: var(--text);
 }
+.chip-name.editable { cursor: pointer; }
+.chip-name.editable:hover { color: var(--accent-hover); text-decoration: underline; }
 .chip-x {
   display: inline-flex; align-items: center; justify-content: center;
   width: 18px; height: 18px; border-radius: 50%;

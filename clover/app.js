@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.4';
+const VERSION = '0.3.5';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -77,7 +77,8 @@ function renderAuthState() {
     document.getElementById('user-name').textContent = currentUser.displayName || currentUser.email || '';
     // Load the owner's data once (store notifies -> re-render on completion).
     if (window.cloverStore && ownerState() === 'owner' && !window.cloverStore.isLoaded()) {
-      window.cloverStore.load(currentUser.uid);
+      window.cloverStore.load(currentUser.uid).then(() =>
+        window.cloverStore.setSelfNameFromDisplay(currentUser.displayName || currentUser.email || ''));
     }
     routeTo(location.hash.slice(1) || DEFAULT_ROUTE);
   } else {
@@ -270,7 +271,12 @@ function friendlyAuthError(e) {
 // Small DOM helpers
 // ============================================================
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
-function field(label, node) { const w = el('label', 'field'); w.appendChild(el('span', null, label)); w.appendChild(node); return w; }
+function field(label, node, hint) {
+  const w = el('label', 'field');
+  const lab = el('span', null, label);
+  if (hint) { const i = el('span', 'info', 'ⓘ'); i.title = hint; lab.appendChild(document.createTextNode(' ')); lab.appendChild(i); }
+  w.appendChild(lab); w.appendChild(node); return w;
+}
 function input(value = '', attrs = {}) {
   const i = document.createElement('input');
   i.type = attrs.type || 'text'; i.value = value;
@@ -383,16 +389,16 @@ function confirmRemove(name, onYes) {
 function renderSettings(view) {
   const store = window.cloverStore, s = store.state;
   const grid = el('div', 'settings-grid');
-  grid.appendChild(simpleListCard('People', 'Who money belongs to — you, joint, or others', s.persons,
-    { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id) }));
+  grid.appendChild(simpleListCard('People', 'Who money belongs to — you, joint, or others. Click a name to rename.', s.persons,
+    { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id), onRename: (id, v) => store.renamePerson(id, v) }));
   grid.appendChild(categoryCard('income', s.incomeCategories));
   grid.appendChild(categoryCard('expense', s.expenseCategories));
   grid.appendChild(simpleListCard('Institutions', 'Banks, brokers & card issuers used by accounts', s.catalog.institutions,
-    { addLabel: 'Add institution', onAdd: v => store.addCatalog('institutions', v), onRemove: id => store.removeCatalog('institutions', id) }));
+    { addLabel: 'Add institution', onAdd: v => store.addCatalog('institutions', v), onRemove: id => store.removeCatalog('institutions', id), onRename: (id, v) => store.renameCatalog('institutions', id, v) }));
   grid.appendChild(simpleListCard('Reward programs', 'Cashback & rewards sources', s.catalog.rewardPrograms,
-    { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id) }));
+    { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id), onRename: (id, v) => store.renameCatalog('rewardPrograms', id, v) }));
   grid.appendChild(simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
-    { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id) }));
+    { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
   grid.appendChild(accountDefaultsCard());
   view.appendChild(grid);
 }
@@ -426,13 +432,16 @@ function sectionHead(title, subtitle, onAdd) {
   return h;
 }
 
-function simpleListCard(title, subtitle, items, { addLabel, onAdd, onRemove }) {
+function simpleListCard(title, subtitle, items, { addLabel, onAdd, onRemove, onRename }) {
   const card = el('div', 'card');
   card.appendChild(sectionHead(title, subtitle, () => promptText(addLabel || 'Add', '', onAdd)));
   const list = el('div', 'chip-list');
   if (!items.length) list.appendChild(el('div', 'muted', 'Nothing yet.'));
   items.forEach(it => {
-    const chip = el('div', 'chip', it.name);
+    const chip = el('div', 'chip');
+    const name = el('span', 'chip-name', it.name);
+    if (onRename) { name.classList.add('editable'); name.title = 'Click to rename'; name.addEventListener('click', () => promptText('Rename', it.name, v => onRename(it.id, v))); }
+    chip.appendChild(name);
     const x = el('button', 'chip-x', '✕'); x.title = 'Remove';
     x.addEventListener('click', () => confirmRemove(it.name, () => onRemove(it.id)));
     chip.appendChild(x); list.appendChild(chip);
@@ -564,15 +573,17 @@ function accountModal(existing) {
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
   const fMat = input(a.cdMaturity || '', { type: 'date' });
   const cdWrap = el('div', 'cd-fields');
-  cdWrap.appendChild(field('CD term', fTerm)); cdWrap.appendChild(field('APY %', fApy)); cdWrap.appendChild(field('Maturity date', fMat));
+  cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD — e.g. "12 months".'));
+  cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
+  cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
   const syncCd = () => { cdWrap.style.display = fType.value === 'CD' ? '' : 'none'; };
   fType.addEventListener('change', syncCd);
 
-  body.appendChild(field('Name', fName));
-  body.appendChild(field('Institution', fInst));
-  body.appendChild(field('Type', fType));
-  body.appendChild(field('Last 4', fLast4));
-  body.appendChild(field('Owner', fOwner));
+  body.appendChild(field('Name', fName, 'A label for this account that makes sense to you — e.g. "Everyday Checking" or "Roth IRA".'));
+  body.appendChild(field('Institution', fInst, 'The bank, broker, or card issuer. Pick from the list or type your own; manage the list in Settings.'));
+  body.appendChild(field('Type', fType, 'What kind of account this is. Choosing CD reveals term/APY/maturity fields.'));
+  body.appendChild(field('Last 4', fLast4, 'The last four digits of the account or card number, to tell similar accounts apart.'));
+  body.appendChild(field('Owner', fOwner, 'Who this account belongs to — you, joint, or another person you track.'));
   const prevField = field('Continues account (rollover)', fPrev);
   prevField.appendChild(el('span', 'field-hint', 'If this replaced an older account — e.g. a CD that matured and got a new number — link it here to keep the history together.'));
   body.appendChild(prevField);
@@ -776,8 +787,8 @@ function incomeModal(existing) {
   const fExpected = input(e.expectedDate || '', { type: 'date' });
   const fVia = input(e.receivedVia || '', { placeholder: 'e.g. Direct Deposit, PayPal', list: 'via-list' });
   const fTax = select([{ value: 'unknown', label: 'Unknown' }, { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], e.taxable || 'unknown');
-  const cReinv = checkbox('Reinvested', e.reinvested);
-  const cPaid = checkbox('Paid out', e.paidOut);
+  const cReinv = checkbox('Reinvested', e.reinvested, 'Dividends/interest automatically reinvested rather than paid out as cash.');
+  const cPaid = checkbox('Paid out', e.paidOut, 'You received this as cash, rather than reinvested or still accruing.');
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   const fSym = input(e.symbol || '', { placeholder: 'e.g. AAPL' });
@@ -785,27 +796,35 @@ function incomeModal(existing) {
   const fQty = input(e.qty != null ? e.qty : '', { type: 'number', placeholder: 'shares' }); fQty.step = 'any';
   const fPrice = input(e.price != null ? e.price : '', { type: 'number', placeholder: 'price' }); fPrice.step = '0.01';
   const divWrap = el('div', 'div-fields');
-  divWrap.appendChild(field('Symbol', fSym)); divWrap.appendChild(field('Action', fAction));
-  divWrap.appendChild(field('Qty', fQty)); divWrap.appendChild(field('Price', fPrice));
+  divWrap.appendChild(field('Symbol', fSym, 'The stock/fund ticker this dividend came from.'));
+  divWrap.appendChild(field('Action', fAction, 'The dividend type as your broker labels it — e.g. Qualified Dividend, Cash Dividend, Reinvest.'));
+  divWrap.appendChild(field('Qty', fQty, 'Shares involved, if reinvested.'));
+  divWrap.appendChild(field('Price', fPrice, 'Share price at reinvestment, if applicable.'));
   const syncDiv = () => { const g = s.incomeCategories.find(c => c.id === fCat.value); divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none'; };
   fCat.addEventListener('change', () => { rebuildSubs(); syncDiv(); });
   rebuildSubs(); syncDiv();
 
-  body.appendChild(field('Date', fDate));
-  body.appendChild(field('Category', fCat));
-  body.appendChild(field('Source (subcategory)', fSub));
-  body.appendChild(field('Account', fAcct));
-  body.appendChild(field('Person', fPerson));
-  const amtRow = el('div', 'two-col'); amtRow.appendChild(field('Gross amount', fGross)); amtRow.appendChild(field('Net (optional)', fNet)); body.appendChild(amtRow);
-  const stRow = el('div', 'two-col'); stRow.appendChild(field('Status', fStatus)); stRow.appendChild(field('Expected date', fExpected)); body.appendChild(stRow);
-  body.appendChild(field('Received via', fVia));
+  body.appendChild(field('Date', fDate, 'When you received this money. For pending items, the date you expect it.'));
+  body.appendChild(field('Category', fCat, 'The type of income — e.g. Wages, Dividends, Interest, Rewards. Manage the list in Settings.'));
+  body.appendChild(field('Source (subcategory)', fSub, 'A more specific source within the category — e.g. a particular broker or bank. Add these under the category in Settings.'));
+  body.appendChild(field('Account', fAcct, 'Which of your accounts the money went INTO — e.g. the bank or broker that received it. Optional, but lets you see income by account (like dividends per broker, or interest per bank).'));
+  body.appendChild(field('Person', fPerson, 'Who this income belongs to — you, joint, or another person you track.'));
+  const amtRow = el('div', 'two-col');
+  amtRow.appendChild(field('Gross amount', fGross, 'The full amount before any taxes or withholding.'));
+  amtRow.appendChild(field('Net (optional)', fNet, 'The amount actually received after taxes/withholding, if it differs from gross.'));
+  body.appendChild(amtRow);
+  const stRow = el('div', 'two-col');
+  stRow.appendChild(field('Status', fStatus, 'Received = money is in hand and counts toward totals. Pending = expected but not yet received (tracked, but left out of grid totals).'));
+  stRow.appendChild(field('Expected date', fExpected, 'For pending income, when you expect it to arrive.'));
+  body.appendChild(stRow);
+  body.appendChild(field('Received via', fVia, 'How the money arrived — e.g. Direct Deposit, PayPal, Venmo, check.'));
   const tRow = el('div', 'two-col');
-  tRow.appendChild(field('Taxable', fTax));
+  tRow.appendChild(field('Taxable', fTax, 'Whether this income is taxable, if you know. Use Unknown if unsure.'));
   const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cReinv); flagsWrap.appendChild(cPaid);
   tRow.appendChild(field('Flags', flagsWrap));
   body.appendChild(tRow);
   body.appendChild(divWrap);
-  body.appendChild(field('Notes', fNotes));
+  body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this entry.'));
 
   openModal({
     title: existing ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
