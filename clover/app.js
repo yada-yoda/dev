@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.8.0';
+const VERSION = '0.8.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -125,8 +125,9 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (P1-6 + P7 reports).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports };
+// Feature views (P1-6 + P7 reports & calendar).
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports, calendar: renderCalendar };
+let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -2060,5 +2061,101 @@ function yoyOverview(store) {
     tb.appendChild(tr);
   });
   table.appendChild(tb); wrap.appendChild(table); card.appendChild(wrap);
+  return card;
+}
+
+// ============================================================
+// Calendar — Phase 7 (part 2)
+// ============================================================
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+function dateInMonth(iso, year, month) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); if (!m) return null;
+  if (+m[1] !== year || (+m[2] - 1) !== month) return null;
+  return +m[3];
+}
+function calendarEvents(store, year, month) {
+  const events = [];
+  const yd = store.yearData(year);
+  (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
+  store.state.recurring.filter(isSubActive).forEach(r => { const d = dateInMonth(r.renewalDate, year, month); if (d) events.push({ day: d, type: 'Bill', label: r.name + ' renews · ' + money(Number(r.amount) || 0), tone: 'amber' }); });
+  store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => { const d = dateInMonth(a.cdMaturity, year, month); if (d) events.push({ day: d, type: 'CD matures', label: a.name + (a.last4 ? ' ••' + a.last4 : '') + ' matures', tone: 'blue' }); });
+  return events;
+}
+
+function calShift(delta) {
+  let { year, month } = calCursor;
+  month += delta;
+  if (month < 0) { month = 11; year--; }
+  if (month > 11) { month = 0; year++; }
+  calCursor = { year, month };
+  renderView(currentRoute);
+}
+
+function renderCalendar(view) {
+  const store = window.cloverStore;
+  if (!calCursor) { const t = new Date(); calCursor = { year: t.getFullYear(), month: t.getMonth() }; }
+  const { year, month } = calCursor;
+  if (!store.isYearLoaded(year)) { view.appendChild(loadingPanel()); store.loadYear(year); return; }
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Calendar'));
+  left.appendChild(el('p', 'muted', 'Paychecks, bill renewals, and CD maturities'));
+  head.appendChild(left);
+  const nav = el('div', 'head-actions');
+  const prev = el('button', 'btn-ghost', '‹'); prev.addEventListener('click', () => calShift(-1));
+  const lbl = el('span', 'cal-month', MONTH_NAMES[month] + ' ' + year);
+  const next = el('button', 'btn-ghost', '›'); next.addEventListener('click', () => calShift(1));
+  const today = el('button', 'btn-ghost', 'Today'); today.addEventListener('click', () => { const t = new Date(); calCursor = { year: t.getFullYear(), month: t.getMonth() }; renderView(currentRoute); });
+  nav.appendChild(prev); nav.appendChild(lbl); nav.appendChild(next); nav.appendChild(today);
+  head.appendChild(nav);
+  view.appendChild(head);
+
+  const events = calendarEvents(store, year, month);
+  view.appendChild(calendarGrid(year, month, events));
+  view.appendChild(calendarAgenda(events, month));
+}
+
+function calendarGrid(year, month, events) {
+  const card = el('div', 'card cal-card');
+  const grid = el('div', 'cal-grid');
+  DOW.forEach(d => grid.appendChild(el('div', 'cal-dow', d)));
+  const first = new Date(year, month, 1).getDay();
+  const dim = new Date(year, month + 1, 0).getDate();
+  const today = new Date();
+  const isCur = today.getFullYear() === year && today.getMonth() === month;
+  for (let i = 0; i < first; i++) grid.appendChild(el('div', 'cal-cell empty'));
+  for (let day = 1; day <= dim; day++) {
+    const cell = el('div', 'cal-cell');
+    if (isCur && today.getDate() === day) cell.classList.add('cal-today');
+    cell.appendChild(el('div', 'cal-day', String(day)));
+    const dayEvents = events.filter(e => e.day === day);
+    if (dayEvents.length) {
+      const dots = el('div', 'cal-dots');
+      dayEvents.slice(0, 4).forEach(e => dots.appendChild(el('span', 'cal-dot ' + e.tone)));
+      cell.appendChild(dots);
+      dayEvents.slice(0, 3).forEach(e => { const chip = el('div', 'cal-event ' + e.tone, e.label); chip.title = e.label; cell.appendChild(chip); });
+      if (dayEvents.length > 3) cell.appendChild(el('div', 'cal-more', '+' + (dayEvents.length - 3) + ' more'));
+    }
+    grid.appendChild(cell);
+  }
+  card.appendChild(grid);
+  return card;
+}
+
+function calendarAgenda(events, month) {
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', MONTH_NAMES[month] + ' schedule'));
+  if (!events.length) { card.appendChild(el('div', 'muted', 'Nothing scheduled this month.')); return card; }
+  const list = el('div', 'mini-list');
+  events.slice().sort((a, b) => a.day - b.day).forEach(e => {
+    const row = el('div', 'mini-row');
+    row.appendChild(el('span', null, MONTHS[month] + ' ' + e.day + ' · ' + e.label));
+    row.appendChild(badge(e.type, e.tone === 'green' ? 'green' : e.tone === 'amber' ? 'amber' : ''));
+    list.appendChild(row);
+  });
+  card.appendChild(list);
   return card;
 }

@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.8.1 — Phase 7 (part 2): Calendar
+- New Calendar view: a month grid plus an agenda list showing paychecks, bill/
+  subscription renewals, and CD maturities, colour-coded, with month navigation
+  and a "Today" jump. Today is highlighted; on mobile, days show compact dots.
+
 ### v0.8.0 — Phase 7 (part 1): Reports
 - New Reports page with a chart gallery for the selected year: income vs expenses
   by month, net cashflow, wages gross vs net, and doughnuts for income by category,
@@ -263,6 +268,6 @@ any financial data or features are built.
 | 4 | Paychecks ✅ |
 | 5 | Credit scores & savings rates ✅ |
 | 6 | Dashboard ✅ |
-| 7 | Reports ✅ · calendar (in progress) |
+| 7 | Reports & calendar ✅ |
 | 8 | Import / export |
 | 9 | Polish, mobile, security review → v1.0.0 |
