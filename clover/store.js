@@ -83,9 +83,12 @@ function withDefaults(data) {
   return s;
 }
 
-const state = { _uid: null, _loaded: false, _dirty: false };
+const state = { _uid: null, _loaded: false, _dirty: false, years: {}, _yearLoading: {} };
 const subscribers = new Set();
 let saveTimer = null;
+const yearSaveTimers = {};
+
+function emptyYear() { return { income: [], paychecks: [], expensePayments: [], importBatches: [] }; }
 
 function notify() { subscribers.forEach(cb => { try { cb(); } catch (e) { console.error(e); } }); }
 
@@ -183,6 +186,55 @@ window.cloverStore = {
   },
   removeAccount(id) { state.accounts = state.accounts.filter(a => a.id !== id); scheduleSave(); notify(); },
 
+  // --- per-year documents (income, paychecks, expensePayments, importBatches) ---
+  isYearLoaded(y) { return !!state.years[String(y)]; },
+  yearData(y) { return state.years[String(y)] || emptyYear(); },
+  loadYear(y) {
+    y = String(y);
+    if (state.years[y]) return Promise.resolve(state.years[y]);
+    if (state._yearLoading[y]) return state._yearLoading[y];
+    state._yearLoading[y] = (async () => {
+      let data = null;
+      if (state._uid) { try { data = await window.cloverData.getYear(state._uid, y); } catch (e) { console.warn('year load failed:', e); } }
+      state.years[y] = Object.assign(emptyYear(), data || {});
+      delete state._yearLoading[y];
+      notify();
+      return state.years[y];
+    })();
+    return state._yearLoading[y];
+  },
+  scheduleSaveYear(y) {
+    y = String(y);
+    if (!state._uid) return;
+    clearTimeout(yearSaveTimers[y]);
+    yearSaveTimers[y] = setTimeout(() => this.flushYear(y), 600);
+  },
+  async flushYear(y) {
+    y = String(y);
+    const d = state.years[y];
+    if (!state._uid || !d) return;
+    try { await window.cloverData.saveYear(state._uid, y, d); }
+    catch (e) { console.warn('year save failed:', e); window.cloverToast && window.cloverToast('⚠️ Couldn’t save — will retry', 'warn'); }
+  },
+
+  // --- income ---
+  saveIncome(y, entry) {
+    const d = state.years[String(y)]; if (!d) return null;
+    if (entry.id) { const i = d.income.findIndex(x => x.id === entry.id); if (i >= 0) d.income[i] = entry; else d.income.push(entry); }
+    else { entry.id = mkId('inc'); d.income.push(entry); }
+    this.scheduleSaveYear(y); notify(); return entry;
+  },
+  removeIncome(y, id) { const d = state.years[String(y)]; if (!d) return; d.income = d.income.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
+
+  // --- lookups ---
   personName(id) { const p = state.persons.find(x => x.id === id); return p ? p.name : '—'; },
+  incomeGroup(id) { return state.incomeCategories.find(c => c.id === id) || null; },
+  incomeGroupName(id) { const g = this.incomeGroup(id); return g ? g.name : '—'; },
+  subName(kind, catId, subId) {
+    const cats = kind === 'income' ? state.incomeCategories : state.expenseCategories;
+    const g = cats.find(c => c.id === catId); if (!g) return '';
+    const s = g.subs.find(x => x.id === subId); return s ? s.name : '';
+  },
+  accountName(id) { const a = state.accounts.find(x => x.id === id); return a ? a.name : ''; },
   flush
 };

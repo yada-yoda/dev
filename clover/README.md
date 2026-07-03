@@ -45,6 +45,24 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.0 — Phase 2: Income tracker + Annual Grid
+- Per-year data documents (`finance/{uid}/years/{yyyy}`) loaded on demand and
+  persisted (debounced), with the year driven by the top-bar year selector.
+- **Annual Grid** — the spreadsheet-style view: income category groups × Jan–Dec
+  plus Total YTD and Average, collapsible to per-subcategory rows, with a grand
+  total row. Averages divide by months that have data (matching the sheets).
+- **List view** — sortable transaction table filtered by month (top-bar) and
+  category, with gross/net, account, person, and status.
+- **Add/edit income** modal: date, category → dependent subcategory, account,
+  person, gross/net, status (received or pending/expected), expected date,
+  received-via, taxable, reinvested/paid-out flags, notes, and optional
+  symbol-level dividend detail (symbol/action/qty/price) shown for dividends.
+- Pending/expected income is tracked but excluded from grid totals (actuals only).
+
+_Why:_ this is the first section that directly replaces a spreadsheet — the
+Annual Grid mirrors the income sheet while the entry form captures every field
+the sheets tracked.
+
 ### v0.2.0 — Phase 1: data layer, Settings & Accounts
 - Client data store with Firestore persistence (debounced) and forward-compatible
   seeding of sensible defaults on first run.
@@ -95,7 +113,7 @@ any financial data or features are built.
 |------:|-------|
 | 0 | Auth & app shell ✅ |
 | 1 | Data layer, Settings, categories, accounts ✅ |
-| 2 | Income tracker + Annual Grid |
+| 2 | Income tracker + Annual Grid ✅ |
 | 3 | Expenses & subscriptions |
 | 4 | Paychecks |
 | 5 | Credit scores & savings rates |

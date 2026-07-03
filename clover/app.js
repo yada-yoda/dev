@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.2.0';
+const VERSION = '0.3.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -34,6 +34,11 @@ const DEFAULT_ROUTE = 'dashboard';
 let currentUser = null;
 let currentRoute = null;
 let storeReady = false;
+let activeYear = new Date().getFullYear();
+let activeMonth = 0;                 // 0 = All months
+let incomeTab = 'grid';             // 'grid' | 'list'
+let incomeCatFilter = 'all';
+const expandedIncomeGroups = new Set();
 
 // ---------- boot ----------
 document.getElementById('ver').textContent = VERSION;
@@ -108,8 +113,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views built in Phase 1.
-const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts };
+// Feature views (Phase 1: settings, accounts; Phase 2: income).
+const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -205,8 +210,15 @@ function buildPeriodSelectors() {
   const months = ['All','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   months.forEach((m, i) => {
     const o = document.createElement('option'); o.value = i; o.textContent = m;
-    if (i === now.getMonth() + 1) o.selected = true; mSel.appendChild(o);
+    if (i === 0) o.selected = true; mSel.appendChild(o);   // default to All
   });
+  activeYear = +ySel.value; activeMonth = +mSel.value;
+}
+
+function onPeriodChange() {
+  activeYear = +document.getElementById('sel-year').value;
+  activeMonth = +document.getElementById('sel-month').value;
+  if (currentRoute) renderView(currentRoute);
 }
 
 // ---------- chrome wiring ----------
@@ -224,6 +236,8 @@ function wireChrome() {
   document.getElementById('btn-signout').addEventListener('click', () => window.cloverAuth.signOut());
   document.getElementById('menu-btn').addEventListener('click', toggleDrawer);
   document.getElementById('sidebar-backdrop').addEventListener('click', closeDrawer);
+  document.getElementById('sel-year').addEventListener('change', onPeriodChange);
+  document.getElementById('sel-month').addEventListener('change', onPeriodChange);
 }
 
 function toggleDrawer() {
@@ -496,6 +510,220 @@ function accountModal(existing) {
       });
       store.saveAccount(acc);
       toast(existing ? 'Account updated' : 'Account added');
+    }
+  });
+}
+
+// ============================================================
+// Income view (Annual Grid + List) — Phase 2
+// ============================================================
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function money(n) { n = Number(n) || 0; if (!n) return '–'; return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function monthIdx(iso) { if (!iso) return -1; const m = /^(\d{4})-(\d{2})/.exec(iso); return m ? (+m[2] - 1) : -1; }
+function amountOf(e) { return Number(e.gross) || 0; }
+function countable(e) { return e.status !== 'pending'; }   // pending income excluded from totals
+function avgOf(monthly) { const nz = monthly.filter(v => v > 0).length; const sum = monthly.reduce((a, b) => a + b, 0); return nz ? sum / nz : 0; }
+function numCell(v, strong) { const td = el('td', 'num' + (v ? '' : ' zero') + (strong ? ' strong' : '')); td.textContent = money(v); return td; }
+function todayISO() { const d = new Date(); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function fmtDate(iso) { if (!iso) return '—'; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso; return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+function labelWrap(label, node) { const w = el('label', 'inline-field'); w.appendChild(el('span', null, label)); w.appendChild(node); return w; }
+
+function renderIncome(view) {
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+  const data = store.yearData(activeYear);
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Income · ' + activeYear));
+  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0);
+  const n = data.income.length;
+  left.appendChild(el('p', 'muted', money(received) + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies')));
+  head.appendChild(left);
+
+  const right = el('div', 'head-actions');
+  const tabs = el('div', 'tabs');
+  [['grid', 'Annual grid'], ['list', 'List']].forEach(([t, label]) => {
+    const b = el('button', 'tab' + (incomeTab === t ? ' active' : ''), label);
+    b.addEventListener('click', () => { incomeTab = t; renderView(currentRoute); });
+    tabs.appendChild(b);
+  });
+  right.appendChild(tabs);
+  const add = el('button', 'btn-primary', '+ Add income'); add.addEventListener('click', () => incomeModal(null));
+  right.appendChild(add);
+  head.appendChild(right);
+  view.appendChild(head);
+
+  view.appendChild(incomeTab === 'grid' ? incomeGrid(data) : incomeList(data));
+}
+
+function incomeGrid(data) {
+  const store = window.cloverStore, groups = store.state.incomeCategories;
+  const entries = data.income.filter(countable);
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table grid-table');
+  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num">Avg</th></tr></thead>';
+  const tb = el('tbody');
+  const grand = new Array(12).fill(0);
+
+  const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += amountOf(e); }); return m; };
+  const addRow = (cls, label, monthly, onClick, caret) => {
+    const tr = el('tr', cls);
+    const c0 = el('td', cls === 'sub-row' ? 'sub-name' : 'grp-name');
+    if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
+    else c0.textContent = label;
+    if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
+    tr.appendChild(c0);
+    monthly.forEach(v => tr.appendChild(numCell(v)));
+    tr.appendChild(numCell(monthly.reduce((a, b) => a + b, 0), true));
+    tr.appendChild(numCell(avgOf(monthly), true));
+    return tr;
+  };
+
+  groups.forEach(g => {
+    const gEntries = entries.filter(e => e.categoryId === g.id);
+    const monthly = monthsFor(gEntries);
+    monthly.forEach((v, i) => grand[i] += v);
+    const open = expandedIncomeGroups.has(g.id);
+    tb.appendChild(addRow('grp-row', g.name, monthly,
+      () => { open ? expandedIncomeGroups.delete(g.id) : expandedIncomeGroups.add(g.id); renderView(currentRoute); },
+      open ? '▾' : '▸'));
+    if (open) {
+      g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
+      const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
+      if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+    }
+  });
+
+  const gtr = el('tr', 'total-row');
+  gtr.appendChild(el('td', 'grp-name', 'Total income'));
+  grand.forEach(v => gtr.appendChild(numCell(v)));
+  gtr.appendChild(numCell(grand.reduce((a, b) => a + b, 0), true));
+  gtr.appendChild(numCell(avgOf(grand), true));
+  tb.appendChild(gtr);
+
+  table.appendChild(tb); card.appendChild(table);
+  return card;
+}
+
+function incomeList(data) {
+  const store = window.cloverStore;
+  let rows = data.income.slice();
+  if (activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
+  if (incomeCatFilter !== 'all') rows = rows.filter(e => e.categoryId === incomeCatFilter);
+  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const wrap = el('div');
+  const bar = el('div', 'filter-bar');
+  const catSel = select([{ value: 'all', label: 'All categories' }].concat(store.state.incomeCategories.map(c => ({ value: c.id, label: c.name }))), incomeCatFilter);
+  catSel.addEventListener('change', () => { incomeCatFilter = catSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Category', catSel));
+  bar.appendChild(el('div', 'muted', rows.length + ' shown' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  wrap.appendChild(bar);
+
+  if (!rows.length) {
+    wrap.appendChild(emptyState('No income entries', 'Add income for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '.', '+ Add income', () => incomeModal(null)));
+    return wrap;
+  }
+
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th class="num">Gross</th><th class="num">Net</th><th>Person</th><th>Status</th><th></th></tr></thead>';
+  const tb = el('tbody');
+  rows.forEach(e => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(e.date)));
+    tr.appendChild(el('td', null, store.incomeGroupName(e.categoryId)));
+    tr.appendChild(el('td', null, store.subName('income', e.categoryId, e.subId) || '—'));
+    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
+    tr.appendChild(numCell(amountOf(e), true));
+    tr.appendChild(numCell(Number(e.net) || 0));
+    tr.appendChild(el('td', null, store.personName(e.personId)));
+    const stTd = el('td'); stTd.appendChild(e.status === 'pending' ? badge('Pending', 'amber') : badge('Received', 'green')); tr.appendChild(stTd);
+    const act = el('td', 'row-actions');
+    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => incomeModal(e));
+    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.incomeGroupName(e.categoryId), () => store.removeIncome(activeYear, e.id)));
+    act.appendChild(edit); act.appendChild(del); tr.appendChild(act);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
+  return wrap;
+}
+
+function incomeModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const e = existing ? Object.assign({}, existing) : { status: 'received', taxable: 'unknown', date: todayISO() };
+  const body = el('div', 'form-grid');
+
+  const via = el('datalist'); via.id = 'via-list';
+  ['Direct Deposit', 'PayPal', 'Venmo', 'Check', 'Bank transfer', 'Cash', 'Statement credit', 'Reinvested'].forEach(v => { const o = el('option'); o.value = v; via.appendChild(o); });
+  body.appendChild(via);
+
+  const fDate = input(e.date || todayISO(), { type: 'date' });
+  const fCat = select([{ value: '', label: '— Select —' }].concat(s.incomeCategories.map(c => ({ value: c.id, label: c.name }))), e.categoryId || '');
+  const fSub = select([{ value: '', label: '—' }], e.subId || '');
+  const rebuildSubs = () => {
+    const g = s.incomeCategories.find(c => c.id === fCat.value);
+    const opts = [{ value: '', label: '—' }].concat((g ? g.subs : []).map(x => ({ value: x.id, label: x.name })));
+    fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); });
+    if (e.subId) fSub.value = e.subId;
+  };
+  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), e.accountId || '');
+  const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
+  const fGross = input(e.gross != null ? e.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
+  const fNet = input(e.net != null ? e.net : '', { type: 'number', placeholder: 'optional' }); fNet.step = '0.01';
+  const fStatus = select([{ value: 'received', label: 'Received' }, { value: 'pending', label: 'Pending / expected' }], e.status || 'received');
+  const fExpected = input(e.expectedDate || '', { type: 'date' });
+  const fVia = input(e.receivedVia || '', { placeholder: 'e.g. Direct Deposit, PayPal', list: 'via-list' });
+  const fTax = select([{ value: 'unknown', label: 'Unknown' }, { value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }], e.taxable || 'unknown');
+  const cReinv = checkbox('Reinvested', e.reinvested);
+  const cPaid = checkbox('Paid out', e.paidOut);
+  const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+
+  const fSym = input(e.symbol || '', { placeholder: 'e.g. AAPL' });
+  const fAction = input(e.action || '', { placeholder: 'e.g. Qualified Dividend' });
+  const fQty = input(e.qty != null ? e.qty : '', { type: 'number', placeholder: 'shares' }); fQty.step = 'any';
+  const fPrice = input(e.price != null ? e.price : '', { type: 'number', placeholder: 'price' }); fPrice.step = '0.01';
+  const divWrap = el('div', 'div-fields');
+  divWrap.appendChild(field('Symbol', fSym)); divWrap.appendChild(field('Action', fAction));
+  divWrap.appendChild(field('Qty', fQty)); divWrap.appendChild(field('Price', fPrice));
+  const syncDiv = () => { const g = s.incomeCategories.find(c => c.id === fCat.value); divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none'; };
+  fCat.addEventListener('change', () => { rebuildSubs(); syncDiv(); });
+  rebuildSubs(); syncDiv();
+
+  body.appendChild(field('Date', fDate));
+  body.appendChild(field('Category', fCat));
+  body.appendChild(field('Source (subcategory)', fSub));
+  body.appendChild(field('Account', fAcct));
+  body.appendChild(field('Person', fPerson));
+  const amtRow = el('div', 'two-col'); amtRow.appendChild(field('Gross amount', fGross)); amtRow.appendChild(field('Net (optional)', fNet)); body.appendChild(amtRow);
+  const stRow = el('div', 'two-col'); stRow.appendChild(field('Status', fStatus)); stRow.appendChild(field('Expected date', fExpected)); body.appendChild(stRow);
+  body.appendChild(field('Received via', fVia));
+  const tRow = el('div', 'two-col');
+  tRow.appendChild(field('Taxable', fTax));
+  const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cReinv); flagsWrap.appendChild(cPaid);
+  tRow.appendChild(field('Flags', flagsWrap));
+  body.appendChild(tRow);
+  body.appendChild(divWrap);
+  body.appendChild(field('Notes', fNotes));
+
+  openModal({
+    title: existing ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
+      const gross = parseFloat(fGross.value);
+      if (isNaN(gross)) { toast('Gross amount is required', 'warn'); fGross.focus(); return false; }
+      const entry = Object.assign(e, {
+        date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
+        accountId: fAcct.value || '', personId: fPerson.value, gross,
+        net: fNet.value === '' ? null : parseFloat(fNet.value), status: fStatus.value,
+        expectedDate: fExpected.value || '', receivedVia: fVia.value.trim(), taxable: fTax.value,
+        reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
+        symbol: fSym.value.trim(), action: fAction.value.trim(),
+        qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value)
+      });
+      store.saveIncome(activeYear, entry);
+      toast(existing ? 'Income updated' : 'Income added');
     }
   });
 }

@@ -331,9 +331,35 @@ button { font-family: inherit; cursor: pointer; }
 .toast:not(.out) { opacity: 1; transform: translateY(0); }
 .toast.out { opacity: 0; transform: translateY(-8px); }
 
+/* ---------- Income: tabs, annual grid, filters ---------- */
+.head-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.tabs { display: inline-flex; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+.tab { border: none; background: transparent; padding: 6px 12px; border-radius: 6px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.tab.active { background: var(--surface); color: var(--accent-hover); box-shadow: var(--shadow-sm); }
+.tab:hover:not(.active) { color: var(--text); }
+
+.data-table th.num, .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.data-table td.zero { color: var(--text-faint); }
+.data-table td.strong { font-weight: 600; }
+
+.grid-table td.grp-name { font-weight: 600; white-space: nowrap; }
+.grid-table tr.grp-row:hover td { background: var(--surface-2); }
+.grid-table tr.sub-row td.sub-name { padding-left: 30px; color: var(--text-muted); font-weight: 400; }
+.grid-table tr.sub-row td { font-size: 12.5px; }
+.grid-table tr.total-row td { background: var(--surface-2); font-weight: 700; border-top: 2px solid var(--border-strong); }
+.grid-table .caret { display: inline-block; width: 12px; color: var(--text-faint); font-size: 10px; }
+
+.filter-bar { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+.inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
+.inline-field select { height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--text); }
+
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.div-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); }
+
 @media (max-width: 560px) {
   .settings-grid { grid-template-columns: 1fr; }
-  .cd-fields { grid-template-columns: 1fr; }
+  .cd-fields, .two-col, .div-fields { grid-template-columns: 1fr; }
+  .view-head { flex-direction: column; align-items: stretch; }
 }
 
 /* ---------- Mobile drawer + backdrop ---------- */
