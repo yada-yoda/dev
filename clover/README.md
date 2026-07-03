@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.3 — Account rollover linking
+- Accounts can now link to the older account they replaced — for CDs that get a
+  new account number each time they mature and roll over. Set "Continues account
+  (rollover)" on the new account and it ties the history together.
+- The predecessor is automatically marked inactive and badged "Rolled over"; the
+  successor shows a "↳ rollover of …" note so the chain is clear.
+
 ### v0.3.2 — Fix modal horizontal scroll
 - Fixed the account modal overflowing horizontally (scrollbar) when the CD type
   was selected. Form field rows now shrink to fit; modals never scroll sideways.

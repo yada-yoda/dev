@@ -259,6 +259,8 @@ button { font-family: inherit; cursor: pointer; }
 .data-table .row-actions { text-align: right; white-space: nowrap; }
 .inactive-row td { color: var(--text-faint); }
 .flags { display: flex; flex-wrap: wrap; gap: 5px; }
+.acct-sub { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+.field-hint { font-size: 11px; color: var(--text-faint); line-height: 1.4; }
 
 /* ---------- Badges ---------- */
 .badge {

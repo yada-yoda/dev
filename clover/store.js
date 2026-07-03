@@ -236,5 +236,8 @@ window.cloverStore = {
     const s = g.subs.find(x => x.id === subId); return s ? s.name : '';
   },
   accountName(id) { const a = state.accounts.find(x => x.id === id); return a ? a.name : ''; },
+  account(id) { return state.accounts.find(a => a.id === id) || null; },
+  // The account (if any) that lists `id` as the one it continued from — i.e. `id` was rolled over.
+  successorOf(id) { return state.accounts.find(a => a.previousAccountId === id) || null; },
   flush
 };

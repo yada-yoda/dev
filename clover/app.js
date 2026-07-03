@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.2';
+const VERSION = '0.3.3';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -427,13 +427,21 @@ function renderAccounts(view) {
   s.accounts.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(a => {
     const tr = el('tr');
     if (a.active === false) tr.className = 'inactive-row';
-    tr.appendChild(el('td', null, a.name));
+    const nameTd = el('td');
+    nameTd.appendChild(el('div', 'acct-name', a.name));
+    if (a.previousAccountId) {
+      const prev = store.account(a.previousAccountId);
+      const lbl = prev ? (prev.name + (prev.last4 ? ' ••' + prev.last4 : '')) : 'a previous account';
+      nameTd.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
+    }
+    tr.appendChild(nameTd);
     tr.appendChild(el('td', null, a.institution || '—'));
     const tType = el('td'); tType.appendChild(badge(a.type || '—', 'type')); tr.appendChild(tType);
     tr.appendChild(el('td', null, a.last4 ? ('••' + a.last4) : '—'));
     tr.appendChild(el('td', null, store.personName(a.personId)));
     const tFlags = el('td'); const flags = el('div', 'flags');
     flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
+    if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
     if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
     if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
     tFlags.appendChild(flags); tr.appendChild(tFlags);
@@ -470,6 +478,10 @@ function accountModal(existing) {
   const fType = select(store.ACCOUNT_TYPES, a.type || 'Checking');
   const fLast4 = input(a.last4 || '', { placeholder: '1234' }); fLast4.maxLength = 4; fLast4.inputMode = 'numeric';
   const fOwner = select(s.persons.map(p => ({ value: p.id, label: p.name })), a.personId || (s.persons[0] && s.persons[0].id));
+  const rolloverOpts = [{ value: '', label: '— None —' }].concat(
+    s.accounts.filter(x => x.id !== a.id).sort((x, y) => x.name.localeCompare(y.name))
+      .map(x => ({ value: x.id, label: x.name + (x.last4 ? ' ••' + x.last4 : '') + (x.institution ? ' (' + x.institution + ')' : '') })));
+  const fPrev = select(rolloverOpts, a.previousAccountId || '');
   const cActive = checkbox('Active', a.active !== false);
   const cIncome = checkbox('Used for income', a.usedForIncome);
   const cExpense = checkbox('Used for expenses', a.usedForExpenses);
@@ -490,6 +502,9 @@ function accountModal(existing) {
   body.appendChild(field('Type', fType));
   body.appendChild(field('Last 4', fLast4));
   body.appendChild(field('Owner', fOwner));
+  const prevField = field('Continues account (rollover)', fPrev);
+  prevField.appendChild(el('span', 'field-hint', 'If this replaced an older account — e.g. a CD that matured and got a new number — link it here to keep the history together.'));
+  body.appendChild(prevField);
   body.appendChild(cdWrap);
   const flags = el('div', 'check-row'); [cActive, cIncome, cExpense, cAuto, cRewards].forEach(c => flags.appendChild(c));
   body.appendChild(field('Flags', flags));
@@ -501,16 +516,29 @@ function accountModal(existing) {
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
+      const prevId = fPrev.value || '';
+      if (prevId) {
+        const prev = store.account(prevId);
+        if (prev && a.id && prev.previousAccountId === a.id) { toast('That would link the two accounts in a loop', 'warn'); return false; }
+      }
       const acc = Object.assign(a, {
         name, institution: fInst.value.trim(), type: fType.value,
         last4: fLast4.value.replace(/\D/g, '').slice(0, 4), personId: fOwner.value,
         active: cActive.__input.checked, usedForIncome: cIncome.__input.checked,
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
-        cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value
+        cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
+        previousAccountId: prevId
       });
       store.saveAccount(acc);
-      toast(existing ? 'Account updated' : 'Account added');
+      // A rolled-over account's old number is closed — mark the predecessor inactive.
+      if (prevId) {
+        const prev = store.account(prevId);
+        if (prev && prev.active !== false) { prev.active = false; store.saveAccount(prev); toast('Marked “' + prev.name + '” as rolled over'); }
+        else toast(existing ? 'Account updated' : 'Account added');
+      } else {
+        toast(existing ? 'Account updated' : 'Account added');
+      }
     }
   });
 }
