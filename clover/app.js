@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -306,6 +306,21 @@ function checkbox(label, checked, hint) {
 }
 function badge(text, tone) { return el('span', 'badge ' + (tone || ''), text); }
 
+// A day-of-month field (1–31) with a "Last day" checkbox. Value is a number,
+// the string 'last', or null. Read via the returned element's __value().
+function dayField(label, hint, value) {
+  const num = input(value === 'last' ? '' : (value || ''), { type: 'number', placeholder: '1–31' });
+  num.min = 1; num.max = 31;
+  const wrap = field(label, num, hint);
+  const last = checkbox('Last day', value === 'last');
+  const sync = () => { num.disabled = last.__input.checked; if (last.__input.checked) num.value = ''; };
+  last.__input.addEventListener('change', sync); sync();
+  wrap.appendChild(last);
+  wrap.__value = () => last.__input.checked ? 'last'
+    : (num.value === '' ? null : (Math.min(31, Math.max(1, parseInt(num.value, 10) || 0)) || null));
+  return wrap;
+}
+
 // ---- Reusable sortable table ----
 // cols: [{ label, key?, num?, sortable?, cell(row)->td, value?(row)->sortkey }]
 // sort: { key, dir:'asc'|'desc' }; onSort(newSort) re-renders. rowClass optional.
@@ -562,16 +577,19 @@ function renderAccounts(view) {
 // Credit-card float: days until a purchase made TODAY would be due.
 // A purchase posts to the currently-open statement, which closes on the next
 // close day; payment is due on the next due day after that close.
-function clampDay(day, y, m) { const dim = new Date(y, m + 1, 0).getDate(); return Math.min(day, dim); }
+function daysInMonth(y, m) { return new Date(y, m + 1, 0).getDate(); }
+function clampDay(day, y, m) { return Math.min(day, daysInMonth(y, m)); }
+// A day can be a number (1–31) or the string 'last' (last day of that month).
+function resolveDay(day, y, m) { return day === 'last' ? daysInMonth(y, m) : clampDay(Number(day), y, m); }
 function nextDom(day, from) {
   const y = from.getFullYear(), m = from.getMonth();
-  let d = new Date(y, m, clampDay(day, y, m));
-  if (d < from) d = new Date(y, m + 1, clampDay(day, y, m + 1));
+  let d = new Date(y, m, resolveDay(day, y, m));
+  if (d < from) d = new Date(y, m + 1, resolveDay(day, y, m + 1));
   return d;
 }
 function ccFloatToday(acc) {
-  const close = Number(acc.statementCloseDay), due = Number(acc.dueDay);
-  if (!close || !due) return null;
+  const close = acc.statementCloseDay, due = acc.dueDay;
+  if (!close || !due) return null;   // 'last' and 1–31 are truthy; null/0 are not
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const closeDate = nextDom(close, today);
   const dueDate = nextDom(due, closeDate);
@@ -627,14 +645,11 @@ function accountModal(existing) {
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
 
-  const dayAttrs = { type: 'number', placeholder: '1–31' };
-  const fCcOpen = input(a.statementStartDay || '', dayAttrs); fCcOpen.min = 1; fCcOpen.max = 31;
-  const fCcClose = input(a.statementCloseDay || '', dayAttrs); fCcClose.min = 1; fCcClose.max = 31;
-  const fCcDue = input(a.dueDay || '', dayAttrs); fCcDue.min = 1; fCcDue.max = 31;
+  const fCcOpen = dayField('Statement opens (day)', 'Day of month the statement period begins (optional; static cycle only).', a.statementStartDay);
+  const fCcClose = dayField('Statement closes (day)', 'Day of month the statement closes/cuts. Used with the due day to estimate float.', a.statementCloseDay);
+  const fCcDue = dayField('Payment due (day)', 'Day of month the payment is due. Use “Last day” for cards that cut on the last day, since not every month has 31 days. Clover uses this to estimate the float — days until a purchase made today would be due.', a.dueDay);
   const ccWrap = el('div', 'cd-fields');
-  ccWrap.appendChild(field('Statement opens (day)', fCcOpen, 'Day of month the statement period begins (optional; static cycle only).'));
-  ccWrap.appendChild(field('Statement closes (day)', fCcClose, 'Day of month the statement closes/cuts. Used with the due day to estimate float.'));
-  ccWrap.appendChild(field('Payment due (day)', fCcDue, 'Day of month the payment is due. Clover estimates the "float" — days until a purchase made today would be due — so you can use the card that buys the most time.'));
+  ccWrap.appendChild(fCcOpen); ccWrap.appendChild(fCcClose); ccWrap.appendChild(fCcDue);
 
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
@@ -668,7 +683,6 @@ function accountModal(existing) {
         const prev = store.account(prevId);
         if (prev && a.id && prev.previousAccountId === a.id) { toast('That would link the two accounts in a loop', 'warn'); return false; }
       }
-      const dayOrNull = v => (v === '' || v == null) ? null : Math.min(31, Math.max(1, parseInt(v, 10) || 0)) || null;
       const acc = Object.assign(a, {
         name, institution: fInst.value.trim(), type: fType.value,
         last4: fLast4.value.replace(/\D/g, '').slice(0, 4), personId: fOwner.value,
@@ -677,7 +691,7 @@ function accountModal(existing) {
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
-        statementStartDay: dayOrNull(fCcOpen.value), statementCloseDay: dayOrNull(fCcClose.value), dueDay: dayOrNull(fCcDue.value),
+        statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
       });
       store.saveAccount(acc);

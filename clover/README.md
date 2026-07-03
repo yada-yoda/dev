@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.7.1 — "Last day" statement dates & field alignment
+- Credit-card statement/due days can be set to "Last day" for cards that cut on
+  the last day of the month (handles months without 31 days). The float estimate
+  resolves it to each month's real last day.
+- Fixed vertical misalignment of the account modal's day-field inputs (labels that
+  wrapped to different line counts pushed their boxes out of line); inputs now line
+  up consistently.
+
 ### v0.7.0 — Phase 6: Dashboard
 - New Dashboard (the default view): KPI cards for this month's income, spending,
   recurring/month, net, and projected annual income & expenses (annualized from
