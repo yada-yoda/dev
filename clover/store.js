@@ -61,6 +61,7 @@ function defaults() {
     settings: {
       activeYear: new Date().getFullYear(),
       warnWindows: [7, 14, 30, 60],
+      netMonthlyIncome: 0,   // reference figure for "% of net income" on subscriptions
       // which flags start checked when adding a NEW account
       accountDefaults: { active: true, usedForIncome: false, usedForExpenses: false, usedForAutopay: false, rewardsCard: false }
     },
@@ -74,6 +75,7 @@ function defaults() {
     incomeCategories: seedGroups(SEED_INCOME_GROUPS),
     expenseCategories: seedGroups(SEED_EXPENSE_GROUPS),
     accounts: [],
+    recurring: [],   // subscriptions & recurring bills (Phase 3)
     catalog: {
       institutions: seedList(SEED_INSTITUTIONS),
       rewardPrograms: seedList(SEED_REWARD_PROGRAMS),
@@ -128,6 +130,7 @@ function snapshot() {
     incomeCategories: state.incomeCategories,
     expenseCategories: state.expenseCategories,
     accounts: state.accounts,
+    recurring: state.recurring,
     catalog: state.catalog
   };
 }
@@ -139,6 +142,7 @@ function apply(data) {
   state.incomeCategories = s.incomeCategories;
   state.expenseCategories = s.expenseCategories;
   state.accounts = s.accounts;
+  state.recurring = s.recurring || [];
   state.catalog = s.catalog;
   state._loaded = true;
 }
@@ -192,6 +196,18 @@ window.cloverStore = {
   // --- settings ---
   accountDefaults() { return state.settings.accountDefaults; },
   setAccountDefault(key, val) { state.settings.accountDefaults[key] = !!val; scheduleSave(); notify(); },
+  netMonthlyIncome() { return Number(state.settings.netMonthlyIncome) || 0; },
+  setNetMonthlyIncome(v) { state.settings.netMonthlyIncome = Number(v) || 0; scheduleSave(); notify(); },
+
+  // --- recurring / subscriptions ---
+  saveRecurring(item) {
+    if (item.id) { const i = state.recurring.findIndex(x => x.id === item.id); if (i >= 0) state.recurring[i] = item; else state.recurring.push(item); }
+    else { item.id = mkId('rec'); state.recurring.push(item); }
+    scheduleSave(); notify(); return item;
+  },
+  removeRecurring(id) { state.recurring = state.recurring.filter(x => x.id !== id); scheduleSave(); notify(); },
+  expenseGroup(id) { return state.expenseCategories.find(c => c.id === id) || null; },
+  expenseGroupName(id) { const g = this.expenseGroup(id); return g ? g.name : '—'; },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },

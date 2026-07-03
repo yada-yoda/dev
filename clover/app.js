@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.6';
+const VERSION = '0.4.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -39,6 +39,9 @@ let activeMonth = 0;                 // 0 = All months
 let incomeTab = 'grid';             // 'grid' | 'list'
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
+let subsSort = { key: 'monthly', dir: 'desc' };
+let subsCatFilter = 'all';
+let subsStatusFilter = 'active';   // 'active' | 'all'
 const expandedIncomeGroups = new Set();
 
 // ---------- boot ----------
@@ -115,8 +118,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (Phase 1: settings, accounts; Phase 2: income).
-const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome };
+// Feature views (Phase 1: settings, accounts; Phase 2: income; Phase 3: subscriptions).
+const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -902,6 +905,226 @@ function incomeModal(existing) {
       });
       store.saveIncome(activeYear, entry);
       toast(existing ? 'Income updated' : 'Income added');
+    }
+  });
+}
+
+// ============================================================
+// Subscriptions & recurring bills — Phase 3
+// ============================================================
+const FREQUENCIES = [
+  { key: 'weekly', label: 'Weekly', occ: 52 },
+  { key: 'biweekly', label: 'Biweekly', occ: 26 },
+  { key: 'monthly', label: 'Monthly', occ: 12 },
+  { key: 'quarterly', label: 'Quarterly', occ: 4 },
+  { key: 'semiannual', label: 'Semiannual', occ: 2 },
+  { key: 'annual', label: 'Annual', occ: 1 },
+  { key: 'everyNMonths', label: 'Every N months', occ: null },
+  { key: 'everyNYears', label: 'Every N years', occ: null }
+];
+const PRIORITIES = ['Essential', 'High', 'Medium', 'Low', 'Optional'];
+const SUB_STATUSES = ['Active', 'Trial', 'Paused', 'Canceled', 'Inactive', 'Needs review'];
+
+function occPerYear(item) {
+  const f = FREQUENCIES.find(x => x.key === item.frequency);
+  if (!f) return 12;
+  if (f.occ != null) return f.occ;
+  const n = Math.max(1, Number(item.interval) || 1);
+  return item.frequency === 'everyNMonths' ? 12 / n : 1 / n;
+}
+function monthlyEquiv(item) { return (Number(item.amount) || 0) * occPerYear(item) / 12; }
+function annualCost(item) { return (Number(item.amount) || 0) * occPerYear(item); }
+function freqLabel(item) {
+  const f = FREQUENCIES.find(x => x.key === item.frequency);
+  if (!f) return item.frequency || '—';
+  if (f.occ != null) return f.label;
+  const n = Number(item.interval) || 1;
+  return item.frequency === 'everyNMonths' ? ('Every ' + n + ' mo') : ('Every ' + n + ' yr');
+}
+function isSubActive(item) { return item.status === 'Active' || item.status === 'Trial' || !item.status; }
+function daysUntil(iso) {
+  if (!iso) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return null;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]); const t = new Date(); t.setHours(0, 0, 0, 0);
+  return Math.round((d - t) / 86400000);
+}
+
+function renderSubscriptions(view) {
+  const store = window.cloverStore, s = store.state;
+  const all = s.recurring;
+  const active = all.filter(isSubActive);
+  const totalMonthly = active.reduce((sum, r) => sum + monthlyEquiv(r), 0);
+  const totalAnnual = active.reduce((sum, r) => sum + annualCost(r), 0);
+  const net = store.netMonthlyIncome();
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Subscriptions & recurring'));
+  left.appendChild(el('p', 'muted', active.length + ' active · ' + all.length + ' total'));
+  head.appendChild(left);
+  const add = el('button', 'btn-primary', '+ Add subscription'); add.addEventListener('click', () => subscriptionModal(null));
+  head.appendChild(add);
+  view.appendChild(head);
+
+  const sum = el('div', 'sub-summary');
+  const netInput = input(net || '', { type: 'number', placeholder: '0.00' }); netInput.step = '0.01'; netInput.className = 'net-input';
+  netInput.addEventListener('change', () => store.setNetMonthlyIncome(netInput.value));
+  const netCard = el('div', 'sum-card');
+  netCard.appendChild(el('div', 'sum-label', 'Net monthly income'));
+  const netWrap = el('div', 'sum-net'); netWrap.appendChild(el('span', 'sum-dollar', '$')); netWrap.appendChild(netInput);
+  netCard.appendChild(netWrap);
+  netCard.appendChild(el('div', 'sum-hint', 'Used for % of income'));
+  sum.appendChild(netCard);
+  sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense'));
+  sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense'));
+  if (net > 0) {
+    const unalloc = net - totalMonthly;
+    sum.appendChild(sumCard('Left after subs', money(unalloc), unalloc < 0 ? 'expense' : 'income'));
+    sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral'));
+  }
+  view.appendChild(sum);
+
+  const bar = el('div', 'filter-bar');
+  const statusSel = select([{ value: 'active', label: 'Active only' }, { value: 'all', label: 'All' }], subsStatusFilter);
+  statusSel.addEventListener('change', () => { subsStatusFilter = statusSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Show', statusSel));
+  const catSel = select([{ value: 'all', label: 'All categories' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), subsCatFilter);
+  catSel.addEventListener('change', () => { subsCatFilter = catSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Category', catSel));
+  view.appendChild(bar);
+
+  let rows = all.slice();
+  if (subsStatusFilter === 'active') rows = rows.filter(isSubActive);
+  if (subsCatFilter !== 'all') rows = rows.filter(r => r.categoryId === subsCatFilter);
+
+  if (!rows.length) {
+    view.appendChild(emptyState('No subscriptions yet',
+      'Add your recurring bills and subscriptions to see monthly-equivalent cost, renewals, and what share of your income they take.',
+      '+ Add subscription', () => subscriptionModal(null)));
+    return;
+  }
+
+  const cols = [
+    { label: 'Name', key: 'name', value: r => r.name, cell: r => {
+        const td = el('td'); td.appendChild(el('div', 'acct-name', r.name));
+        if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
+        return td; } },
+    { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => el('td', null, store.expenseGroupName(r.categoryId)) },
+    { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) },
+    { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => el('td', null, freqLabel(r)) },
+    { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) },
+    { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) },
+    { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } },
+    { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) },
+    { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') },
+    { label: 'Flags', sortable: false, cell: r => {
+        const td = el('td'); const flags = el('div', 'flags');
+        if (!isSubActive(r)) flags.appendChild(badge(r.status || 'Inactive', 'red'));
+        else if (r.status === 'Trial') flags.appendChild(badge('Trial', 'amber'));
+        if (r.autoPay) flags.appendChild(badge('Auto-pay', 'amber'));
+        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority));
+        td.appendChild(flags); return td; } },
+    { label: '', sortable: false, cell: r => {
+        const td = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => subscriptionModal(r));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeRecurring(r.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  const card = el('div', 'card table-card');
+  card.appendChild(sortableTable(cols, rows, subsSort, ns => { subsSort = ns; renderView(currentRoute); }, r => isSubActive(r) ? '' : 'inactive-row'));
+  view.appendChild(card);
+}
+
+function sumCard(label, value, tone) {
+  const c = el('div', 'sum-card');
+  c.appendChild(el('div', 'sum-label', label));
+  c.appendChild(el('div', 'sum-value ' + (tone || ''), value));
+  return c;
+}
+function renewCell(r) {
+  const td = el('td');
+  const d = daysUntil(r.renewalDate);
+  if (d == null) { td.textContent = '—'; return td; }
+  const warn = window.cloverStore.state.settings.warnWindows || [7, 14, 30, 60];
+  const maxW = Math.max.apply(null, warn);
+  td.appendChild(el('span', null, fmtDate(r.renewalDate) + ' '));
+  if (d < 0) td.appendChild(badge('Overdue', 'red'));
+  else if (d <= maxW) td.appendChild(badge('in ' + d + 'd', d <= 7 ? 'red' : 'amber'));
+  else td.appendChild(el('span', 'muted', 'in ' + d + 'd'));
+  return td;
+}
+
+function subscriptionModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? Object.assign({}, existing) : { frequency: 'monthly', status: 'Active', priority: 'Medium', autoPay: false, personId: s.persons[0] && s.persons[0].id };
+  const body = el('div', 'form-grid');
+
+  const fName = input(r.name || '', { placeholder: 'e.g. Netflix' });
+  const fVendor = input(r.vendor || '', { placeholder: 'Vendor (optional)' });
+  const fCat = select([{ value: '', label: '— Select —' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), r.categoryId || '');
+  const fSub = select([{ value: '', label: '—' }], r.subId || '');
+  const rebuildSubs = () => { const g = s.expenseCategories.find(c => c.id === fCat.value); const opts = [{ value: '', label: '—' }].concat((g ? g.subs : []).map(x => ({ value: x.id, label: x.name }))); fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); }); if (r.subId) fSub.value = r.subId; };
+  const fAmount = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
+  const fFreq = select(FREQUENCIES.map(f => ({ value: f.key, label: f.label })), r.frequency || 'monthly');
+  const fInterval = input(r.interval || '', { type: 'number', placeholder: 'N' }); fInterval.min = 1;
+  const intervalWrap = field('Interval (N)', fInterval, 'How many months or years between charges.');
+  const syncInterval = () => { intervalWrap.style.display = (fFreq.value === 'everyNMonths' || fFreq.value === 'everyNYears') ? '' : 'none'; };
+  fFreq.addEventListener('change', syncInterval);
+  const fRenew = input(r.renewalDate || '', { type: 'date' });
+  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.accountId || '');
+  const fBackup = select([{ value: '', label: '— None —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.backupAccountId || '');
+  const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
+  const fPriority = select(PRIORITIES, r.priority || 'Medium');
+  const fStatus = select(SUB_STATUSES, r.status || 'Active');
+  const cAuto = checkbox('Auto-pay', r.autoPay, 'Charged automatically — no manual action needed.');
+  const fUrl = input(r.url || '', { placeholder: 'https:// (optional)' });
+  const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+
+  body.appendChild(field('Name', fName, 'What the subscription or bill is called.'));
+  body.appendChild(field('Vendor', fVendor, 'The company that bills you, if different from the name.'));
+  body.appendChild(field('Category', fCat, 'The expense category. Manage the list in Settings.'));
+  body.appendChild(field('Subcategory', fSub, 'A more specific grouping within the category (optional).'));
+  const amtRow = el('div', 'two-col');
+  amtRow.appendChild(field('Amount', fAmount, 'The amount of each charge — not the monthly equivalent. Clover computes monthly/annual from the frequency.'));
+  amtRow.appendChild(field('Frequency', fFreq, 'How often you are charged. Converted to a monthly-equivalent and annual cost.'));
+  body.appendChild(amtRow);
+  body.appendChild(intervalWrap);
+  body.appendChild(field('Next renewal date', fRenew, 'When it next renews or is due. Drives the renewal warnings (7/14/30/60 days).'));
+  const acctRow = el('div', 'two-col');
+  acctRow.appendChild(field('Payment account', fAcct, 'Which account or card pays for this.'));
+  acctRow.appendChild(field('Backup account', fBackup, 'A fallback payment method on file, if any.'));
+  body.appendChild(acctRow);
+  const metaRow = el('div', 'two-col');
+  metaRow.appendChild(field('Priority', fPriority, 'How essential this is — helps decide what to cut.'));
+  metaRow.appendChild(field('Status', fStatus, 'Active and Trial count toward totals; Paused/Canceled/Inactive do not.'));
+  body.appendChild(metaRow);
+  const pRow = el('div', 'two-col');
+  pRow.appendChild(field('Person', fPerson, 'Who this belongs to.'));
+  const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cAuto);
+  pRow.appendChild(field('Flags', flagsWrap));
+  body.appendChild(pRow);
+  body.appendChild(field('Vendor URL', fUrl, 'Link to manage or cancel the subscription (optional).'));
+  body.appendChild(field('Notes', fNotes, 'Anything else — promo pricing, renewal quirks, etc.'));
+  rebuildSubs(); syncInterval();
+  fCat.addEventListener('change', rebuildSubs);
+
+  openModal({
+    title: existing ? 'Edit subscription' : 'Add subscription', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const name = fName.value.trim();
+      if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
+      const amount = parseFloat(fAmount.value);
+      if (isNaN(amount)) { fAmount.focus(); toast('Amount is required', 'warn'); return false; }
+      const isN = fFreq.value === 'everyNMonths' || fFreq.value === 'everyNYears';
+      const item = Object.assign(r, {
+        name, vendor: fVendor.value.trim(), categoryId: fCat.value, subId: fSub.value || '',
+        amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
+        renewalDate: fRenew.value || '', accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
+        personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked,
+        url: fUrl.value.trim(), notes: fNotes.value.trim()
+      });
+      store.saveRecurring(item);
+      toast(existing ? 'Subscription updated' : 'Subscription added');
     }
   });
 }

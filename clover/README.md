@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.4.0 — Phase 3 (part 1): Subscriptions & recurring bills
+- New Subscriptions page for recurring bills and subscriptions, with a
+  frequency→monthly-equivalent engine: weekly/biweekly/monthly/quarterly/
+  semiannual/annual plus every-N-months and every-N-years (so a $120/yr sub shows
+  as $10/mo, a bi-monthly $220 bill as $110/mo).
+- Each row shows amount, frequency, monthly-equivalent, annual cost, % of net
+  income, next-renewal with 7/14/30/60-day warning badges, payment account, and
+  priority/status/auto-pay flags. Sortable columns; filter by status and category.
+- Summary cards: editable net monthly income, total monthly, total annual, and
+  "left after subs" — mirroring the expense spreadsheet's unallocated-income line.
+- Add/edit modal with every field tooltip'd, including backup payment account.
+
+_Why:_ this reproduces the recurring-expense spreadsheet as a live, sortable view
+with normalized monthly costs and renewal alerts. (Part 2 — the expense annual
+grid and one-off expense payments — comes next.)
+
 ### v0.3.6 — Account beneficiaries & credit-card float
 - Accounts now capture beneficiaries; savings/CD/brokerage/retirement accounts
   without one are flagged "No beneficiary" so you can spot gaps.
@@ -154,7 +170,7 @@ any financial data or features are built.
 | 0 | Auth & app shell ✅ |
 | 1 | Data layer, Settings, categories, accounts ✅ |
 | 2 | Income tracker + Annual Grid ✅ |
-| 3 | Expenses & subscriptions |
+| 3 | Subscriptions ✅ · expenses grid (in progress) |
 | 4 | Paychecks |
 | 5 | Credit scores & savings rates |
 | 6 | Dashboard |
