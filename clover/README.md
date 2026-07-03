@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.9.0 — Phase 8 (part 1): Export & backup
+- New Import / Export page. **Full backup**: download everything (settings,
+  categories, accounts, bills, and every year of income/expenses/paychecks) as one
+  JSON file, and **restore** it from that file.
+- **CSV export** for income, expenses, and paychecks (selected year), plus your
+  full bills and accounts lists.
+- CSV *import* (mapping/preview/dedup for old spreadsheets) is the next piece.
+
+_Why:_ data safety and portability first — your data is never trapped.
+
 ### v0.8.1 — Phase 7 (part 2): Calendar
 - New Calendar view: a month grid plus an agenda list showing paychecks, bill/
   subscription renewals, and CD maturities, colour-coded, with month navigation
@@ -269,5 +279,5 @@ any financial data or features are built.
 | 5 | Credit scores & savings rates ✅ |
 | 6 | Dashboard ✅ |
 | 7 | Reports & calendar ✅ |
-| 8 | Import / export |
+| 8 | Export & backup ✅ · CSV import (in progress) |
 | 9 | Polish, mobile, security review → v1.0.0 |

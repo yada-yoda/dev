@@ -316,6 +316,19 @@ window.cloverStore = {
     const s = g.subs.find(x => x.id === subId); return s ? s.name : '';
   },
   accountName(id) { const a = state.accounts.find(x => x.id === id); return a ? a.name : ''; },
+
+  // --- backup / restore ---
+  exportAll() { return { app: 'clover', meta: snapshot(), years: JSON.parse(JSON.stringify(state.years)) }; },
+  async restore(obj) {
+    if (obj.meta) { apply(obj.meta); if (state._uid) { try { await window.cloverData.saveMeta(state._uid, snapshot()); } catch (e) { console.warn(e); } } }
+    if (obj.years) {
+      for (const y of Object.keys(obj.years)) {
+        state.years[y] = Object.assign(emptyYear(), obj.years[y]);
+        if (state._uid) { try { await window.cloverData.saveYear(state._uid, y, state.years[y]); } catch (e) { console.warn(e); } }
+      }
+    }
+    notify();
+  },
   account(id) { return state.accounts.find(a => a.id === id) || null; },
   // The account (if any) that lists `id` as the one it continued from — i.e. `id` was rolled over.
   successorOf(id) { return state.accounts.find(a => a.previousAccountId === id) || null; },

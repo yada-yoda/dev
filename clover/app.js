@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.8.1';
+const VERSION = '0.9.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -125,8 +125,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (P1-6 + P7 reports & calendar).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports, calendar: renderCalendar };
+// Feature views (P1-7 + P8 import/export).
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -2158,4 +2158,132 @@ function calendarAgenda(events, month) {
   });
   card.appendChild(list);
   return card;
+}
+
+// ============================================================
+// Import / Export — Phase 8 (part 1: export + backup/restore)
+// ============================================================
+function downloadFile(name, content, mime) {
+  const blob = new Blob([content], { type: mime || 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function toCSV(rows, columns) {
+  const esc = v => { v = (v == null ? '' : String(v)); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+  const head = columns.map(c => esc(c.label)).join(',');
+  const lines = rows.map(r => columns.map(c => esc(c.get(r))).join(','));
+  return [head].concat(lines).join('\r\n');
+}
+
+function renderImport(view) {
+  const store = window.cloverStore;
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Import / Export'));
+  left.appendChild(el('p', 'muted', 'Back up your data, restore it, or export to spreadsheets'));
+  head.appendChild(left);
+  view.appendChild(head);
+
+  // ---- Backup / restore ----
+  const backup = el('div', 'card');
+  backup.appendChild(el('h3', 'strip-title', 'Full backup'));
+  backup.appendChild(el('p', 'muted', 'A single JSON file with everything — settings, categories, accounts, bills, and every year of income, expenses, and paychecks. Keep it somewhere safe.'));
+  const bActions = el('div', 'io-actions');
+  const dl = el('button', 'btn-primary', '⬇ Download backup (JSON)');
+  dl.addEventListener('click', async () => {
+    dl.disabled = true; dl.textContent = 'Preparing…';
+    try {
+      const curYear = new Date().getFullYear();
+      const years = []; for (let y = curYear + 1; y >= 2015; y--) years.push(y);
+      await Promise.all(years.map(y => store.loadYear(y)));
+      const data = store.exportAll();
+      data.exportedAt = new Date().toISOString();
+      data.version = VERSION;
+      downloadFile('clover-backup-' + todayISO() + '.json', JSON.stringify(data, null, 2), 'application/json');
+      toast('Backup downloaded');
+    } catch (e) { toast('Backup failed', 'warn'); }
+    dl.disabled = false; dl.textContent = '⬇ Download backup (JSON)';
+  });
+  bActions.appendChild(dl);
+
+  const restoreLabel = el('label', 'btn-ghost file-btn');
+  restoreLabel.textContent = '⬆ Restore from backup…';
+  const fileIn = document.createElement('input'); fileIn.type = 'file'; fileIn.accept = 'application/json,.json'; fileIn.style.display = 'none';
+  fileIn.addEventListener('change', () => {
+    const file = fileIn.files && fileIn.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let obj; try { obj = JSON.parse(reader.result); } catch (e) { toast('That file isn’t valid JSON', 'warn'); fileIn.value = ''; return; }
+      if (!obj || obj.app !== 'clover' || !obj.meta) { toast('That doesn’t look like a Clover backup', 'warn'); fileIn.value = ''; return; }
+      const body = el('div');
+      body.appendChild(el('p', null, 'Restore this backup? It will REPLACE your current data with the contents of the file' + (obj.exportedAt ? ' (from ' + fmtDate(obj.exportedAt.slice(0, 10)) + ')' : '') + '. This can’t be undone.'));
+      openModal({
+        title: 'Restore backup', body, confirmLabel: 'Replace my data',
+        onConfirm: async () => { try { await store.restore(obj); toast('Backup restored'); renderView(currentRoute); } catch (e) { toast('Restore failed', 'warn'); } }
+      });
+      fileIn.value = '';
+    };
+    reader.readAsText(file);
+  });
+  restoreLabel.appendChild(fileIn);
+  bActions.appendChild(restoreLabel);
+  backup.appendChild(bActions);
+  view.appendChild(backup);
+
+  // ---- CSV export ----
+  const data = store.isYearLoaded(activeYear) ? store.yearData(activeYear) : null;
+  if (!store.isYearLoaded(activeYear)) store.loadYear(activeYear);
+  const csv = el('div', 'card');
+  csv.appendChild(el('h3', 'strip-title', 'Export to CSV'));
+  csv.appendChild(el('p', 'muted', 'Download a spreadsheet of any table. Income, expenses, and paychecks are for the selected year (' + activeYear + '); accounts and bills are your full lists.'));
+  const grid = el('div', 'io-actions');
+
+  const exp = (label, filename, rows, columns) => {
+    const b = el('button', 'btn-ghost', label + ' (' + rows.length + ')');
+    b.addEventListener('click', () => { downloadFile(filename, toCSV(rows, columns), 'text/csv'); toast(label + ' exported'); });
+    grid.appendChild(b);
+  };
+
+  if (data) {
+    exp('Income', 'clover-income-' + activeYear + '.csv', data.income, [
+      { label: 'Date', get: r => r.date }, { label: 'Category', get: r => store.incomeGroupName(r.categoryId) },
+      { label: 'Source', get: r => store.subName('income', r.categoryId, r.subId) }, { label: 'Account', get: r => store.accountName(r.accountId) },
+      { label: 'Person', get: r => store.personName(r.personId) }, { label: 'Gross', get: r => r.gross }, { label: 'Net', get: r => r.net },
+      { label: 'Status', get: r => r.status }, { label: 'Received via', get: r => r.receivedVia }, { label: 'Taxable', get: r => r.taxable },
+      { label: 'Symbol', get: r => r.symbol }, { label: 'Notes', get: r => r.notes }
+    ]);
+    exp('Expenses', 'clover-expenses-' + activeYear + '.csv', data.expensePayments, [
+      { label: 'Date', get: r => r.date }, { label: 'Category', get: r => store.expenseGroupName(r.categoryId) },
+      { label: 'Source', get: r => store.subName('expense', r.categoryId, r.subId) }, { label: 'Account', get: r => store.accountName(r.accountId) },
+      { label: 'Person', get: r => store.personName(r.personId) }, { label: 'Amount', get: r => r.amount }, { label: 'Notes', get: r => r.notes }
+    ]);
+    exp('Paychecks', 'clover-paychecks-' + activeYear + '.csv', data.paychecks, [
+      { label: 'Pay date', get: r => r.payDate }, { label: 'Received', get: r => r.receivedDate }, { label: 'Gross', get: r => r.gross },
+      { label: 'Net', get: r => r.net }, { label: 'Employer', get: r => r.employer }, { label: 'Person', get: r => store.personName(r.personId) },
+      { label: 'Period', get: r => r.periodNum }, { label: 'Status', get: r => r.status }, { label: 'Method', get: r => r.method }, { label: 'Notes', get: r => r.notes }
+    ]);
+  }
+  exp('Bills & subscriptions', 'clover-bills.csv', store.state.recurring, [
+    { label: 'Name', get: r => r.name }, { label: 'Vendor', get: r => r.vendor }, { label: 'Category', get: r => store.expenseGroupName(r.categoryId) },
+    { label: 'Amount', get: r => r.amount }, { label: 'Frequency', get: r => freqLabel(r) }, { label: 'Monthly', get: r => monthlyEquiv(r).toFixed(2) },
+    { label: 'Annual', get: r => annualCost(r).toFixed(2) }, { label: 'Renews', get: r => r.renewalDate }, { label: 'Account', get: r => store.accountName(r.accountId) },
+    { label: 'Auto-pay', get: r => r.autoPay ? 'yes' : 'no' }, { label: 'Priority', get: r => r.priority }, { label: 'Status', get: r => r.status }
+  ]);
+  exp('Accounts', 'clover-accounts.csv', store.state.accounts, [
+    { label: 'Name', get: r => r.name }, { label: 'Institution', get: r => r.institution }, { label: 'Type', get: r => r.type },
+    { label: 'Last 4', get: r => r.last4 }, { label: 'Owner', get: r => store.personName(r.personId) }, { label: 'Active', get: r => r.active === false ? 'no' : 'yes' },
+    { label: 'Beneficiaries', get: r => r.beneficiaries }
+  ]);
+  csv.appendChild(grid);
+  view.appendChild(csv);
+
+  // ---- CSV import (coming next) ----
+  const imp = el('div', 'card');
+  imp.appendChild(el('h3', 'strip-title', 'Import from CSV'));
+  imp.appendChild(el('p', 'muted', 'Bringing in your old spreadsheets — with column mapping, preview, and duplicate detection — is the next piece of this section.'));
+  imp.appendChild(el('span', 'phase-tag', 'Coming soon'));
+  view.appendChild(imp);
 }
