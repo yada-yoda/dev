@@ -218,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47.4';
+const APP_VERSION = 'v0.47.5';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1157,7 +1157,7 @@ async function exportXLSX(){
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
-  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
@@ -2130,6 +2130,10 @@ function invModal(id){
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased</label><input class="input" id="iv-store" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"></div>'
     +'<div><label class="label">UPC / barcode'+tip('The product barcode number — handy for re-ordering the exact item.')+'</label><input class="input" id="iv-upc" inputmode="numeric" value="'+(it?esc(it.upc||''):'')+'" placeholder="012345678905"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="iv-paidby" value="'+(it?esc(it.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
+    +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
+    +'<div><label class="label">Last 4</label><input class="input" id="iv-cclast4" inputmode="numeric" maxlength="4" value="'+(it?esc(it.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
     +'<div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'"></div>'
     +'<div><label class="label">Finished'+tip('When it was used up or thrown out.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'"></div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
@@ -2137,13 +2141,15 @@ function invModal(id){
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveInv('+(it?"'"+it.id+"'":'null')+')">Save</button>'
     +(it?'<button class="btn btn-danger" onclick="deleteInv(\''+it.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
+  payToggle('iv');
 }
 function saveInv(id){
   if(denyManage()) return;
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
+  const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -3433,7 +3439,7 @@ function enterDemo(){
       { id:'rc5', petId:pid, type:'Test / Lab work', name:'Annual bloodwork', testedFor:'Heartworm (4Dx)', result:'Negative', date:dAgo(55), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'55.00', nextDue:'', notes:'' },
     ],
     inventory: [
-      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), runningLow:false, notes:'' },
+      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), store:'Chewy', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, notes:'' },
       { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
     ],

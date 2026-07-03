@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.4**
+**Current Version: v0.47.5**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.47.5** — Supplies now track **who paid and how** — the same Paid by / Payment method /
+  card brand + last-4 fields as vet visits and grooming (card fields appear only for card
+  payments). Included in the spreadsheet export.
 - **v0.47.4** — Connecting Google Calendar now does an **initial full sync automatically** — right
   after you create (or pick) the calendar, all existing past and future events are pushed, so you
   don't have to hit "Sync schedule" yourself the first time. Re-syncs still update the same events
