@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.5**
+**Current Version: v0.48.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,15 @@ covers both.
 
 ## Version History
 
+- **v0.48.0** — Two supply/weather touches:
+  - **Weather panel refresh + timestamp** — the weather popover now has a refresh button to
+    pull the current conditions on demand (it spins while loading), and shows a "Updated Xm
+    ago · h:mm" line at the bottom so you know how fresh the reading is — matching the Lights
+    dashboard's weather panel.
+  - **Cost breakdown for supplies** — an opt-in "Show cost breakdown" toggle when adding or
+    editing a supply. When on, the item shows **cost per day** and **cost per unit** (per
+    oz / ct / lb from the Package size, or per Qty if there's no size) right next to its name
+    in the Supplies list — handy for comparing value between brands or pack sizes.
 - **v0.47.5** — Supplies now track **who paid and how** — the same Paid by / Payment method /
   card brand + last-4 fields as vet visits and grooming (card fields appear only for card
   payments). Included in the spreadsheet export.

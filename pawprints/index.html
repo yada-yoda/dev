@@ -60,7 +60,13 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .weather-panel.hidden{display:none}
 .wx-close{position:absolute;top:10px;right:10px;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);font-size:17px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .wx-close:hover{color:var(--text-primary);border-color:var(--accent)}
-.wx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;padding-right:32px}
+.wx-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:12px;padding-right:68px}
+.wx-refresh{position:absolute;top:10px;right:44px;width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.wx-refresh:hover{color:var(--text-primary);border-color:var(--accent)}
+.wx-refresh svg{width:15px;height:15px}
+.wx-refresh.spinning svg{animation:wxspin .6s linear infinite}
+@keyframes wxspin{to{transform:rotate(360deg)}}
+.wx-synced{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);color:var(--text-secondary);font-size:11px;text-align:center;font-variant-numeric:tabular-nums}
 .wx-now-temp{font-size:24px;font-weight:700;line-height:1}
 .wx-now-sub{font-size:12px;color:var(--text-secondary);margin-top:4px}
 .wx-loc{font-size:12px;color:var(--text-secondary);text-align:right;max-width:150px}
@@ -218,7 +224,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47.5';
+const APP_VERSION = 'v0.48.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1667,10 +1673,21 @@ function renderWeatherPanel(){
   if(!w){ panel.innerHTML = '<div style="font-size:13px;color:var(--text-secondary)">Set a home ZIP in Settings → Lists &amp; preferences to see weather.</div>'; return; }
   const fmtHour = t => { const d = new Date(t); let h = d.getHours(); const ap = h>=12?'PM':'AM'; h = h%12||12; return h+' '+ap; };
   const sub = [esc(w.label), (w.pop!=null && w.pop>0)?(w.pop+'% precip'):''].filter(Boolean).join(' · ');
+  const clock = w.ts ? new Date(w.ts).toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }) : '';
+  const synced = w.ts ? ('Updated ' + timeAgo(w.ts) + (clock?' · '+clock:'') + (w.source?' · via '+esc(w.source):'')) : (w.source?('via '+esc(w.source)):'');
   panel.innerHTML = '<button class="wx-close" type="button" onclick="closeWeatherPanel()" aria-label="Close" title="Close">×</button>'
+    + '<button class="wx-refresh" type="button" onclick="refreshWeatherNow(event)" aria-label="Refresh weather" title="Refresh weather now"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5 A8 8 0 1 0 18.5 17"/><polyline points="20 5 20 11 14 11"/></svg></button>'
     + '<div class="wx-head"><div><div class="wx-now-temp">'+w.emoji+' '+w.tempF+'°</div><div class="wx-now-sub">'+sub+'</div></div><div class="wx-loc">'+esc(w.place)+'</div></div>'
     + '<div class="wx-hourly">'+w.hourly.map(h=>'<div class="wx-cell"><div class="wx-h-time">'+fmtHour(h.t)+'</div><div class="wx-h-emoji">'+h.emoji+'</div><div class="wx-h-temp">'+h.tempF+'°</div>'+((h.pop!=null&&h.pop>0)?'<div class="wx-h-time" style="color:var(--blue)">'+h.pop+'%</div>':'')+'</div>').join('')+'</div>'
-    + (w.source?'<div style="font-size:10px;color:var(--text-secondary);text-align:right;margin-top:8px">via '+esc(w.source)+'</div>':'');
+    + (synced?'<div class="wx-synced">'+synced+'</div>':'');
+}
+async function refreshWeatherNow(ev){
+  if(ev) ev.stopPropagation();
+  const btn = document.querySelector('.wx-refresh');
+  if(btn){ if(btn.classList.contains('spinning')) return; btn.classList.add('spinning'); }
+  try { await fetchHeaderWeather(); }
+  catch(e){ /* silently skip — weather is optional */ }
+  finally { const b = document.querySelector('.wx-refresh'); if(b) b.classList.remove('spinning'); renderWeatherPanel(); }
 }
 function toggleWeatherPanel(ev){
   if(ev) ev.stopPropagation();
@@ -2137,6 +2154,7 @@ function invModal(id){
     +'<div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'"></div>'
     +'<div><label class="label">Finished'+tip('When it was used up or thrown out.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'"></div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open (or since purchase). Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveInv('+(it?"'"+it.id+"'":'null')+')">Save</button>'
     +(it?'<button class="btn btn-danger" onclick="deleteInv(\''+it.id+'\')">Delete</button>':'')
@@ -2149,7 +2167,7 @@ function saveInv(id){
   if(!activePet()){ promptAddDog(); return; }
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -3099,6 +3117,24 @@ function invStatusChip(i){
   if(s==='Finished') return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Finished</span>';
   return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Inventory</span>';
 }
+// Small-value money: adds precision for sub-dollar rates like $0.04/oz so they don't round to $0.00.
+function moneyRate(n){ const v = parseFloat(n); if(isNaN(v)) return ''; const a = Math.abs(v); return '$' + (a<0.1 ? v.toFixed(3) : v.toFixed(2)); }
+// Parse a package size like "5 lb", "30 ct", "12 oz" → {n, unit}. null if no leading number.
+function parseSize(s){ if(!s) return null; const m = String(s).trim().match(/^([\d.]+)\s*([a-zA-Z]+)?/); if(!m) return null; const n = parseFloat(m[1]); if(isNaN(n)||n<=0) return null; return { n, unit:(m[2]||'').toLowerCase() }; }
+// Cost-per-day and cost-per-unit for items flagged trackCost. null when not computable.
+function invCostBreakdown(i){
+  if(!i || !i.trackCost) return null;
+  const cost = num(i.cost); if(cost==null || cost<=0) return null;
+  const out = {}, qty = num(i.qty) || 1, sz = parseSize(i.size);
+  // per-unit: cost ÷ (qty × package size) → per oz/ct/lb; else ÷ qty → per count
+  if(sz && qty>0){ out.perUnit = cost/(qty*sz.n); out.perUnitLabel = '/'+(sz.unit||'unit'); }
+  else if(qty>0){ out.perUnit = cost/qty; out.perUnitLabel = '/'+(i.unit||'ea'); }
+  // per-day: cost ÷ days opened→finished (or today); else since purchase
+  const start = i.startDate || i.purchaseDate, end = i.endDate || todayISO();
+  let days = daysBetween(start, end);
+  if(days!=null){ out.perDay = cost/Math.max(1,days); }
+  return (out.perUnit!=null || out.perDay!=null) ? out : null;
+}
 function renderSupplies(){
   if(!activePet()) return emptyState();
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Supplies</h2>'+draftStrip('supplies');
@@ -3115,7 +3151,14 @@ function renderSupplies(){
   html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
   const shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
   if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';
-  html += '<div class="card">'+shown.map(i=>'<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+'</div>').join('')+'</div>';
+  html += '<div class="card">'+shown.map(i=>{
+    const bd = invCostBreakdown(i);
+    const bdCol = bd ? '<div style="text-align:right;flex-shrink:0;font-family:JetBrains Mono,monospace;line-height:1.35" title="Cost breakdown">'
+      + (bd.perDay!=null?'<div style="font-size:12px;color:var(--accent)">'+moneyRate(bd.perDay)+'<span style="color:var(--text-secondary);font-size:10px">/day</span></div>':'')
+      + (bd.perUnit!=null?'<div style="font-size:11px;color:var(--text-secondary)">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>':'')
+      + '</div>' : '';
+    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+'</div>';
+  }).join('')+'</div>';
   return html;
 }
 
@@ -3439,7 +3482,7 @@ function enterDemo(){
       { id:'rc5', petId:pid, type:'Test / Lab work', name:'Annual bloodwork', testedFor:'Heartworm (4Dx)', result:'Negative', date:dAgo(55), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'55.00', nextDue:'', notes:'' },
     ],
     inventory: [
-      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', cost:'62.99', purchaseDate:dAgo(12), store:'Chewy', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, notes:'' },
+      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', size:'30 lb', cost:'62.99', purchaseDate:dAgo(14), startDate:dAgo(12), store:'Chewy', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, trackCost:true, notes:'' },
       { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
     ],
