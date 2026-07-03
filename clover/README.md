@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.6 — Account beneficiaries & credit-card float
+- Accounts now capture beneficiaries; savings/CD/brokerage/retirement accounts
+  without one are flagged "No beneficiary" so you can spot gaps.
+- Credit cards can store static statement-open/close and due days. From these,
+  Clover estimates each card's "float" — days until a purchase made today would
+  be due — and highlights the best card to use today for the longest interest-free
+  window.
+
 ### v0.3.5 — Field tooltips & personalized "Me" tag
 - Added ⓘ tooltips to every field in the income and account forms explaining
   what each is for (e.g. why income asks which account: to see income by

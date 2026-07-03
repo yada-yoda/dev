@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.5';
+const VERSION = '0.3.6';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -518,6 +518,9 @@ function renderAccounts(view) {
         if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
         if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
         if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
+        const fl = ccFloatToday(a);
+        if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
+        if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } },
     { label: '', sortable: false, cell: a => {
         const td = el('td', 'row-actions');
@@ -525,10 +528,47 @@ function renderAccounts(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
+  // "Best card to use today" — the active credit card whose purchase-today has the most float.
+  const cardsWithFloat = s.accounts
+    .filter(a => a.type === 'Credit Card' && a.active !== false && ccFloatToday(a) != null)
+    .map(a => ({ a, float: ccFloatToday(a) }))
+    .sort((x, y) => y.float - x.float);
+  if (cardsWithFloat.length) {
+    const best = cardsWithFloat[0];
+    const cal = el('div', 'callout');
+    cal.innerHTML = '💳 <strong>Best card to use today:</strong> ' + best.a.name +
+      (best.a.last4 ? ' ••' + best.a.last4 : '') + ' — <strong>' + best.float + ' days</strong> until a purchase made today is due.';
+    if (cardsWithFloat.length > 1) {
+      const rest = cardsWithFloat.slice(1).map(c => c.a.name + ' (' + c.float + 'd)').join(', ');
+      cal.appendChild(el('div', 'callout-sub', 'Others: ' + rest));
+    }
+    view.appendChild(cal);
+  }
+
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
 }
+
+// Credit-card float: days until a purchase made TODAY would be due.
+// A purchase posts to the currently-open statement, which closes on the next
+// close day; payment is due on the next due day after that close.
+function clampDay(day, y, m) { const dim = new Date(y, m + 1, 0).getDate(); return Math.min(day, dim); }
+function nextDom(day, from) {
+  const y = from.getFullYear(), m = from.getMonth();
+  let d = new Date(y, m, clampDay(day, y, m));
+  if (d < from) d = new Date(y, m + 1, clampDay(day, y, m + 1));
+  return d;
+}
+function ccFloatToday(acc) {
+  const close = Number(acc.statementCloseDay), due = Number(acc.dueDay);
+  if (!close || !due) return null;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const closeDate = nextDom(close, today);
+  const dueDate = nextDom(due, closeDate);
+  return Math.round((dueDate - today) / 86400000);
+}
+const BENEFICIARY_TYPES = ['Savings', 'CD', 'Brokerage', 'Retirement'];
 
 function emptyState(title, msg, btnLabel, onClick) {
   const d = el('div', 'empty');
@@ -568,6 +608,7 @@ function accountModal(existing) {
   const cAuto = checkbox('Used for auto-pay', a.usedForAutopay, 'This account has automatic payments set up on it.');
   const cRewards = checkbox('Rewards card', a.rewardsCard, 'This card earns cash back, points, or rewards.');
   const fNotes = document.createElement('textarea'); fNotes.value = a.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+  const fBenef = document.createElement('textarea'); fBenef.value = a.beneficiaries || ''; fBenef.rows = 2; fBenef.placeholder = 'e.g. names and any % split';
 
   const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 12 months' });
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
@@ -576,22 +617,37 @@ function accountModal(existing) {
   cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD — e.g. "12 months".'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
-  const syncCd = () => { cdWrap.style.display = fType.value === 'CD' ? '' : 'none'; };
-  fType.addEventListener('change', syncCd);
+
+  const dayAttrs = { type: 'number', placeholder: '1–31' };
+  const fCcOpen = input(a.statementStartDay || '', dayAttrs); fCcOpen.min = 1; fCcOpen.max = 31;
+  const fCcClose = input(a.statementCloseDay || '', dayAttrs); fCcClose.min = 1; fCcClose.max = 31;
+  const fCcDue = input(a.dueDay || '', dayAttrs); fCcDue.min = 1; fCcDue.max = 31;
+  const ccWrap = el('div', 'cd-fields');
+  ccWrap.appendChild(field('Statement opens (day)', fCcOpen, 'Day of month the statement period begins (optional; static cycle only).'));
+  ccWrap.appendChild(field('Statement closes (day)', fCcClose, 'Day of month the statement closes/cuts. Used with the due day to estimate float.'));
+  ccWrap.appendChild(field('Payment due (day)', fCcDue, 'Day of month the payment is due. Clover estimates the "float" — days until a purchase made today would be due — so you can use the card that buys the most time.'));
+
+  const syncTypeFields = () => {
+    cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
+    ccWrap.style.display = fType.value === 'Credit Card' ? '' : 'none';
+  };
+  fType.addEventListener('change', syncTypeFields);
 
   body.appendChild(field('Name', fName, 'A label for this account that makes sense to you — e.g. "Everyday Checking" or "Roth IRA".'));
   body.appendChild(field('Institution', fInst, 'The bank, broker, or card issuer. Pick from the list or type your own; manage the list in Settings.'));
-  body.appendChild(field('Type', fType, 'What kind of account this is. Choosing CD reveals term/APY/maturity fields.'));
+  body.appendChild(field('Type', fType, 'What kind of account this is. Choosing CD or Credit Card reveals extra fields.'));
   body.appendChild(field('Last 4', fLast4, 'The last four digits of the account or card number, to tell similar accounts apart.'));
   body.appendChild(field('Owner', fOwner, 'Who this account belongs to — you, joint, or another person you track.'));
+  body.appendChild(field('Beneficiaries', fBenef, 'Who inherits this account (POD/TOD, retirement, life insurance, etc.). Listing them helps you spot accounts where beneficiaries aren’t set up. Private to you.'));
   const prevField = field('Continues account (rollover)', fPrev);
   prevField.appendChild(el('span', 'field-hint', 'If this replaced an older account — e.g. a CD that matured and got a new number — link it here to keep the history together.'));
   body.appendChild(prevField);
   body.appendChild(cdWrap);
+  body.appendChild(ccWrap);
   const flags = el('div', 'check-row'); [cActive, cIncome, cExpense, cAuto, cRewards].forEach(c => flags.appendChild(c));
   body.appendChild(field('Flags', flags));
   body.appendChild(field('Notes', fNotes));
-  syncCd();
+  syncTypeFields();
 
   openModal({
     title: existing ? 'Edit account' : 'Add account', body, confirmLabel: 'Save',
@@ -603,13 +659,16 @@ function accountModal(existing) {
         const prev = store.account(prevId);
         if (prev && a.id && prev.previousAccountId === a.id) { toast('That would link the two accounts in a loop', 'warn'); return false; }
       }
+      const dayOrNull = v => (v === '' || v == null) ? null : Math.min(31, Math.max(1, parseInt(v, 10) || 0)) || null;
       const acc = Object.assign(a, {
         name, institution: fInst.value.trim(), type: fType.value,
         last4: fLast4.value.replace(/\D/g, '').slice(0, 4), personId: fOwner.value,
+        beneficiaries: fBenef.value.trim(),
         active: cActive.__input.checked, usedForIncome: cIncome.__input.checked,
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
+        statementStartDay: dayOrNull(fCcOpen.value), statementCloseDay: dayOrNull(fCcClose.value), dueDay: dayOrNull(fCcDue.value),
         previousAccountId: prevId
       });
       store.saveAccount(acc);
