@@ -224,7 +224,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.48.0';
+const APP_VERSION = 'v0.48.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2131,12 +2131,13 @@ function saveIllness(id){
 // ═══════════════════════════════════════════════
 // INVENTORY / SUPPLIES
 // ═══════════════════════════════════════════════
-function invModal(id){
-  const it = id ? data.inventory.find(x=>x.id===id) : null;
-  if(!it) draftInit('supply');
+function invModal(id, pre){
+  const editing = !!id;
+  const it = editing ? data.inventory.find(x=>x.id===id) : (pre||null);
+  if(!editing) draftInit('supply');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   const unitList = [...new Set([...(it && it.unit ? [it.unit] : []), ...unitOptions()])];
-  openModal('<h3>🛒 '+(it?'Edit item':'Add supply')+'</h3>'
+  openModal('<h3>🛒 '+(editing?'Edit item':(pre?'Duplicate supply':'Add supply'))+'</h3>'
     +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(INV_CATEGORIES, it?it.category:'Food')+'</select></div>'
     +'<div><label class="label">Brand</label><input class="input" id="iv-brand" value="'+(it?esc(it.brand||''):'')+'" placeholder="Blue Buffalo"></div></div>'
     +'<label class="label">Item name</label><input class="input" id="iv-name" value="'+(it?esc(it.name||''):'')+'" placeholder="Chicken & rice 30lb bag">'
@@ -2156,10 +2157,19 @@ function invModal(id){
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open (or since purchase). Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
-    +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveInv('+(it?"'"+it.id+"'":'null')+')">Save</button>'
-    +(it?'<button class="btn btn-danger" onclick="deleteInv(\''+it.id+'\')">Delete</button>':'')
+    +'<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="saveInv('+(editing?"'"+id+"'":'null')+')">Save</button>'
+    +(editing?'<button class="btn" onclick="dupInv(\''+id+'\')" title="Add another of this same item">Duplicate</button><button class="btn btn-danger" onclick="deleteInv(\''+id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
   payToggle('iv');
+}
+// Open a fresh Add form pre-filled from an existing item — quick "buy another of the same".
+function dupInv(id){
+  if(denyManage()) return;
+  const src = data.inventory.find(x=>x.id===id); if(!src) return;
+  const copy = {...src}; delete copy.id;
+  copy.purchaseDate = todayISO(); copy.startDate = ''; copy.endDate = ''; copy.runningLow = false;
+  invModal(null, copy);
+  showToast('📋 Duplicated — review & save');
 }
 function saveInv(id){
   if(denyManage()) return;

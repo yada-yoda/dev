@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.48.0**
+**Current Version: v0.48.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.48.1** — **Duplicate a supply** — editing an item now has a Duplicate button that opens
+  a fresh Add form pre-filled with everything from that item (brand, name, qty, size, cost,
+  card details, cost-tracking flag), with the purchase date reset to today and the open/finished
+  dates cleared — so buying another of the same item is a couple of taps.
 - **v0.48.0** — Two supply/weather touches:
   - **Weather panel refresh + timestamp** — the weather popover now has a refresh button to
     pull the current conditions on demand (it spins while loading), and shows a "Updated Xm
