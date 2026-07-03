@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.4.1';
+const VERSION = '0.5.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -44,6 +44,8 @@ let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
+let paycheckSort = { key: 'payDate', dir: 'desc' };
+let paycheckStatusFilter = 'all';
 const expandedIncomeGroups = new Set();
 const expandedExpenseGroups = new Set();
 
@@ -121,8 +123,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (Phase 1: settings, accounts; Phase 2: income; Phase 3: subscriptions + expenses).
-const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses };
+// Feature views (P1: settings, accounts; P2: income; P3: subscriptions + expenses; P4: paychecks).
+const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -712,9 +714,10 @@ function renderIncome(view) {
   const head = el('div', 'view-head');
   const left = el('div');
   left.appendChild(el('h3', null, 'Income · ' + activeYear));
-  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0);
+  const pcGross = data.paychecks.filter(isPaycheckPaid).reduce((s, p) => s + (Number(p.gross) || 0), 0);
+  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0) + pcGross;
   const n = data.income.length;
-  left.appendChild(el('p', 'muted', money(received) + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies')));
+  left.appendChild(el('p', 'muted', money(received) + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + (pcGross ? ' + paychecks' : '')));
   head.appendChild(left);
 
   const right = el('div', 'head-actions');
@@ -759,6 +762,11 @@ function incomeGrid(data) {
   groups.forEach(g => {
     const gEntries = entries.filter(e => e.categoryId === g.id);
     const monthly = monthsFor(gEntries);
+    // Paychecks are the source of truth for wages — roll their gross into the
+    // mapped income category (so wages aren't entered twice).
+    const pcMonthly = paycheckMonthsFor(data.paychecks, g.id);
+    const hasPc = pcMonthly.some(v => v > 0);
+    for (let i = 0; i < 12; i++) monthly[i] += pcMonthly[i];
     monthly.forEach((v, i) => grand[i] += v);
     const open = expandedIncomeGroups.has(g.id);
     tb.appendChild(addRow('grp-row', g.name, monthly,
@@ -768,6 +776,7 @@ function incomeGrid(data) {
       g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
       const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
       if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+      if (hasPc) tb.appendChild(addRow('sub-row', '↳ Paychecks', pcMonthly));
     }
   });
 
@@ -1293,6 +1302,190 @@ function expenseModal(existing) {
       });
       store.saveExpense(activeYear, entry);
       toast(existing ? 'Expense updated' : 'Expense added');
+    }
+  });
+}
+
+// ============================================================
+// Paychecks — Phase 4 (source of truth for wages)
+// ============================================================
+const PAYCHECK_STATUSES = ['Received', 'Expected', 'Late', 'Missing', 'Bounced/Returned', 'Manual deposit'];
+const PAYCHECK_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
+
+function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
+function paycheckDaysLate(p) {
+  if (!p.payDate || !p.receivedDate) return null;
+  const pm = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.payDate), rm = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.receivedDate);
+  if (!pm || !rm) return null;
+  const pd = new Date(+pm[1], +pm[2] - 1, +pm[3]), rd = new Date(+rm[1], +rm[2] - 1, +rm[3]);
+  return Math.round((rd - pd) / 86400000);
+}
+// Monthly gross for PAID paychecks mapped to a given income category (by pay-date month).
+function paycheckMonthsFor(paychecks, incomeCatId) {
+  const m = new Array(12).fill(0);
+  (paychecks || []).forEach(p => {
+    if (!isPaycheckPaid(p)) return;
+    if ((p.incomeCategoryId || '') !== incomeCatId) return;
+    const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p.gross) || 0;
+  });
+  return m;
+}
+function daysLateBadge(p) {
+  const d = paycheckDaysLate(p);
+  if (d == null) return null;
+  if (d > 0) return badge(d + 'd late', d > 5 ? 'red' : 'amber');
+  if (d < 0) return badge(Math.abs(d) + 'd early', 'green');
+  return badge('on time', 'green');
+}
+
+function renderPaychecks(view) {
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+  const data = store.yearData(activeYear);
+  const pays = data.paychecks;
+  const paid = pays.filter(isPaycheckPaid);
+  const grossYTD = paid.reduce((s, p) => s + (Number(p.gross) || 0), 0);
+  const netYTD = paid.reduce((s, p) => s + (Number(p.net) || 0), 0);
+  const outstanding = pays.filter(p => !isPaycheckPaid(p) && p.status !== 'Bounced/Returned');
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Paychecks · ' + activeYear));
+  left.appendChild(el('p', 'muted', paid.length + ' received · ' + pays.length + ' total'));
+  head.appendChild(left);
+  const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
+  head.appendChild(add);
+  view.appendChild(head);
+
+  const sum = el('div', 'sub-summary');
+  sum.appendChild(sumCard('Gross YTD', money(grossYTD), 'income'));
+  sum.appendChild(sumCard('Net YTD', money(netYTD), 'income'));
+  sum.appendChild(sumCard('Received', String(paid.length), 'neutral'));
+  sum.appendChild(sumCard('Outstanding', String(outstanding.length), outstanding.length ? 'expense' : 'neutral'));
+  view.appendChild(sum);
+
+  if (outstanding.length) {
+    const strip = el('div', 'card');
+    strip.appendChild(el('h3', 'strip-title', 'Upcoming / outstanding'));
+    const list = el('div', 'chip-list');
+    outstanding.slice().sort((a, b) => (a.payDate || '').localeCompare(b.payDate || '')).slice(0, 8).forEach(p => {
+      const chip = el('div', 'chip pay-chip');
+      chip.appendChild(el('span', null, fmtDate(p.payDate) + ' · ' + money(Number(p.gross) || 0)));
+      const st = p.status || 'Expected';
+      chip.appendChild(badge(st, st === 'Late' || st === 'Missing' ? 'red' : 'amber'));
+      chip.addEventListener('click', () => paycheckModal(p));
+      list.appendChild(chip);
+    });
+    strip.appendChild(list);
+    view.appendChild(strip);
+  }
+
+  const bar = el('div', 'filter-bar');
+  const statusSel = select([{ value: 'all', label: 'All statuses' }].concat(PAYCHECK_STATUSES.map(s => ({ value: s, label: s }))), paycheckStatusFilter);
+  statusSel.addEventListener('change', () => { paycheckStatusFilter = statusSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Status', statusSel));
+  view.appendChild(bar);
+
+  let rows = pays.slice();
+  if (paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
+
+  if (!rows.length) {
+    view.appendChild(emptyState('No paychecks yet', 'Add your paychecks — main job and any acting/side gigs — to track expected vs. received, days early/late, and wage totals. Wages roll into the Income view automatically.', '+ Add paycheck', () => paycheckModal(null)));
+    return;
+  }
+
+  const cols = [
+    { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) },
+    { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => {
+        const td = el('td'); td.appendChild(el('span', null, p.receivedDate ? fmtDate(p.receivedDate) + ' ' : '— '));
+        const b = daysLateBadge(p); if (b) td.appendChild(b); return td; } },
+    { label: 'Gross', key: 'gross', num: true, value: p => Number(p.gross) || 0, cell: p => numCell(Number(p.gross) || 0, true) },
+    { label: 'Net', key: 'net', num: true, value: p => Number(p.net) || 0, cell: p => numCell(Number(p.net) || 0) },
+    { label: 'Employer', key: 'employer', value: p => p.employer || '', cell: p => {
+        const td = el('td'); td.appendChild(el('div', 'acct-name', p.employer || '—'));
+        const cat = store.incomeGroupName(p.incomeCategoryId); if (cat && cat !== '—') td.appendChild(el('div', 'acct-sub', cat));
+        return td; } },
+    { label: 'Person', key: 'person', value: p => store.personName(p.personId), cell: p => el('td', null, store.personName(p.personId)) },
+    { label: 'Period', key: 'period', num: true, value: p => Number(p.periodNum) || 0, cell: p => {
+        const td = el('td'); td.textContent = p.periodNum ? '#' + p.periodNum : '—';
+        if (p.periodStart || p.periodEnd) td.title = fmtDate(p.periodStart) + ' – ' + fmtDate(p.periodEnd); return td; } },
+    { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
+        const td = el('td'); const st = p.status || 'Received';
+        const tone = st === 'Received' || st === 'Manual deposit' ? 'green' : (st === 'Late' || st === 'Missing' || st === 'Bounced/Returned') ? 'red' : 'amber';
+        td.appendChild(badge(st, tone)); return td; } },
+    { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') },
+    { label: '', sortable: false, cell: p => {
+        const td = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => paycheckModal(p));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(p.payDate) + ' · ' + (p.employer || 'paycheck'), () => store.removePaycheck(activeYear, p.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  const card = el('div', 'card table-card');
+  card.appendChild(sortableTable(cols, rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => isPaycheckPaid(p) ? '' : 'inactive-row'));
+  view.appendChild(card);
+}
+
+function paycheckModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const wages = s.incomeCategories.find(c => /wage/i.test(c.name));
+  const p = existing ? Object.assign({}, existing) : { payDate: todayISO(), status: 'Received', method: 'Direct deposit', personId: s.persons[0] && s.persons[0].id, incomeCategoryId: wages ? wages.id : (s.incomeCategories[0] && s.incomeCategories[0].id) };
+  const body = el('div', 'form-grid');
+
+  const empList = el('datalist'); empList.id = 'emp-list';
+  [...new Set(store.yearData(activeYear).paychecks.map(x => x.employer).filter(Boolean))].forEach(e => { const o = el('option'); o.value = e; empList.appendChild(o); });
+  body.appendChild(empList);
+
+  const fPay = input(p.payDate || todayISO(), { type: 'date' });
+  const fRecv = input(p.receivedDate || '', { type: 'date' });
+  const fGross = input(p.gross != null ? p.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
+  const fNet = input(p.net != null ? p.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
+  const fEmp = input(p.employer || '', { placeholder: 'Employer / source', list: 'emp-list' });
+  const fCat = select(s.incomeCategories.map(c => ({ value: c.id, label: c.name })), p.incomeCategoryId || (wages && wages.id));
+  const fPerson = select(s.persons.map(x => ({ value: x.id, label: x.name })), p.personId || (s.persons[0] && s.persons[0].id));
+  const fPeriodNum = input(p.periodNum || '', { type: 'number', placeholder: '#' }); fPeriodNum.min = 1;
+  const fPeriodStart = input(p.periodStart || '', { type: 'date' });
+  const fPeriodEnd = input(p.periodEnd || '', { type: 'date' });
+  const fStatus = select(PAYCHECK_STATUSES, p.status || 'Received');
+  const fMethod = select(PAYCHECK_METHODS, p.method || 'Direct deposit');
+  const fNotes = document.createElement('textarea'); fNotes.value = p.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+
+  const dateRow = el('div', 'two-col');
+  dateRow.appendChild(field('Expected pay date', fPay, 'The date you were supposed to be paid.'));
+  dateRow.appendChild(field('Received date', fRecv, 'When the money actually arrived. Leave blank if not received yet — days early/late is computed from these two.'));
+  body.appendChild(dateRow);
+  const amtRow = el('div', 'two-col');
+  amtRow.appendChild(field('Gross', fGross, 'Pay before taxes and deductions. This is what rolls into the income category.'));
+  amtRow.appendChild(field('Net', fNet, 'Take-home pay after taxes and deductions.'));
+  body.appendChild(amtRow);
+  body.appendChild(field('Employer / source', fEmp, 'Who paid you — your main job, or an acting/side gig.'));
+  body.appendChild(field('Income category', fCat, 'Which income category this paycheck counts toward — Wages for your job, Acting for acting gigs. It rolls into that category on the Income view automatically (so don’t also add it as income).'));
+  body.appendChild(field('Person', fPerson, 'Who this paycheck belongs to.'));
+  const perRow = el('div', 'cd-fields');
+  perRow.appendChild(field('Period #', fPeriodNum, 'The pay-period number, if your employer uses one.'));
+  perRow.appendChild(field('Period start', fPeriodStart, 'First day of the pay period.'));
+  perRow.appendChild(field('Period end', fPeriodEnd, 'Last day of the pay period.'));
+  body.appendChild(perRow);
+  const stRow = el('div', 'two-col');
+  stRow.appendChild(field('Status', fStatus, 'Received/Manual deposit count toward wage totals; Expected/Late/Missing/Bounced do not.'));
+  stRow.appendChild(field('Method', fMethod, 'How you got paid — direct deposit, check, office pickup, etc.'));
+  body.appendChild(stRow);
+  body.appendChild(field('Notes', fNotes, 'Anything unusual — bounced check, wrong amount, deposit delay, etc.'));
+
+  openModal({
+    title: existing ? 'Edit paycheck' : 'Add paycheck', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const gross = parseFloat(fGross.value);
+      if (isNaN(gross)) { fGross.focus(); toast('Gross is required', 'warn'); return false; }
+      const entry = Object.assign(p, {
+        payDate: fPay.value || todayISO(), receivedDate: fRecv.value || '',
+        gross, net: fNet.value === '' ? null : parseFloat(fNet.value),
+        employer: fEmp.value.trim(), incomeCategoryId: fCat.value, personId: fPerson.value,
+        periodNum: fPeriodNum.value === '' ? null : parseInt(fPeriodNum.value, 10),
+        periodStart: fPeriodStart.value || '', periodEnd: fPeriodEnd.value || '',
+        status: fStatus.value, method: fMethod.value, notes: fNotes.value.trim()
+      });
+      store.savePaycheck(activeYear, entry);
+      toast(existing ? 'Paycheck updated' : 'Paycheck added');
     }
   });
 }

@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.5.0 — Phase 4: Paychecks
+- New Paychecks page: expected vs. received dates with automatic days-early/late,
+  gross/net, employer/source (main job and acting/side gigs), person, pay-period
+  number and start/end, status (Received/Expected/Late/Missing/Bounced/Manual),
+  and payment method. Sortable table, status filter, and an "upcoming / outstanding"
+  strip highlighting unpaid checks.
+- Summary cards: Gross YTD, Net YTD, received count, outstanding count.
+- Paychecks are the source of truth for wages: each paycheck's gross rolls into
+  its mapped income category (Wages, Acting, …) on the Income grid automatically —
+  so wages are never entered twice. Received/Manual-deposit checks count; unpaid
+  ones don't.
+
+_Why:_ recreates the paycheck spreadsheet (expected-vs-received tracking) and ties
+earnings into the income view without double entry.
+
 ### v0.4.1 — Phase 3 (part 2): Expenses annual grid
 - New Expenses page with an Annual Grid (expense category × Jan–Dec + Total YTD +
   Average, collapsible to subcategories, grand-total row) plus a List view for
@@ -182,7 +197,7 @@ any financial data or features are built.
 | 1 | Data layer, Settings, categories, accounts ✅ |
 | 2 | Income tracker + Annual Grid ✅ |
 | 3 | Subscriptions & expenses ✅ |
-| 4 | Paychecks |
+| 4 | Paychecks ✅ |
 | 5 | Credit scores & savings rates |
 | 6 | Dashboard |
 | 7 | Reports & calendar |

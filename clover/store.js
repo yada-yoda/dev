@@ -277,6 +277,15 @@ window.cloverStore = {
   },
   removeExpense(y, id) { const d = state.years[String(y)]; if (!d) return; d.expensePayments = d.expensePayments.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
 
+  // --- paychecks (source of truth for wages; roll into income categories) ---
+  savePaycheck(y, entry) {
+    const d = state.years[String(y)]; if (!d) return null;
+    if (entry.id) { const i = d.paychecks.findIndex(x => x.id === entry.id); if (i >= 0) d.paychecks[i] = entry; else d.paychecks.push(entry); }
+    else { entry.id = mkId('pay'); d.paychecks.push(entry); }
+    this.scheduleSaveYear(y); notify(); return entry;
+  },
+  removePaycheck(y, id) { const d = state.years[String(y)]; if (!d) return; d.paychecks = d.paychecks.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
+
   // --- lookups ---
   personName(id) { const p = state.persons.find(x => x.id === id); return p ? p.name : '—'; },
   incomeGroup(id) { return state.incomeCategories.find(c => c.id === id) || null; },
