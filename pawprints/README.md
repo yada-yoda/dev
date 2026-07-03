@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.0**
+**Current Version: v0.47.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.47.1** — The "Last potty" status card now ignores trips where the dog did **nothing** — a
+  potty break with no result no longer resets the timer, so the card reflects the last time your
+  dog actually went.
 - **v0.47.0** — Feeding-goal redesign + badge prestige:
   - The daily feeding progress moved out of the "Last fed" card (which was stretching the other
     status cards) into a **clean full-width strip under the status row** — "Fed today · 1 / 2 cups"

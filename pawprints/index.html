@@ -218,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47.0';
+const APP_VERSION = 'v0.47.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -480,6 +480,8 @@ function showToast(msg){
 function activePet(){ return data.pets.find(p => p.id === data.activePetId) || data.pets[0] || null; }
 function petLogs(type){ const pid = data.activePetId; return data.logs.filter(l => l.petId === pid && (!type || l.type === type)); }
 function lastLog(type){ const ls = petLogs(type).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
+// "Last potty" skips trips where the dog did nothing — those shouldn't reset the timer.
+function lastRealPotty(){ return petLogs('potty').filter(l=>l.dateTime && (l.result||'') !== 'Nothing').sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0] || null; }
 function latestWeight(){ const ws = petLogs('weight').filter(l=>num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ws[0] || null; }
 function petArr(key){ const pid = data.activePetId; return (data[key]||[]).filter(r => r.petId === pid); }
 
@@ -2607,7 +2609,7 @@ function renderFeedingStrip(){
 function renderToday(){
   if(!activePet()) return emptyState();
   const p = activePet();
-  const fed = lastLog('feed'), water = lastLog('water'), potty = lastLog('potty'), walk = lastLog('walk');
+  const fed = lastLog('feed'), water = lastLog('water'), potty = lastRealPotty(), walk = lastLog('walk');
   const w = latestWeight();
   let html = '';
   // shared-access notice
