@@ -58,7 +58,12 @@ function seedList(names) {
 
 function defaults() {
   return {
-    settings: { activeYear: new Date().getFullYear(), warnWindows: [7, 14, 30, 60] },
+    settings: {
+      activeYear: new Date().getFullYear(),
+      warnWindows: [7, 14, 30, 60],
+      // which flags start checked when adding a NEW account
+      accountDefaults: { active: true, usedForIncome: false, usedForExpenses: false, usedForAutopay: false, rewardsCard: false }
+    },
     persons: [
       { id: mkId('p'), name: 'You' },
       { id: mkId('p'), name: 'Joint' }
@@ -79,6 +84,7 @@ function withDefaults(data) {
   const d = defaults();
   const s = Object.assign({}, d, data || {});
   s.settings = Object.assign({}, d.settings, data && data.settings);
+  s.settings.accountDefaults = Object.assign({}, d.settings.accountDefaults, data && data.settings && data.settings.accountDefaults);
   s.catalog  = Object.assign({}, d.catalog,  data && data.catalog);
   return s;
 }
@@ -167,6 +173,10 @@ window.cloverStore = {
   removeGroup(kind, id) { const k = kind === 'income' ? 'incomeCategories' : 'expenseCategories'; state[k] = state[k].filter(x => x.id !== id); scheduleSave(); notify(); },
   addSub(kind, groupId, name) { const g = this._cats(kind).find(x => x.id === groupId); if (g) { g.subs.push({ id: mkId('sub'), name: name.trim() }); scheduleSave(); notify(); } },
   removeSub(kind, groupId, subId) { const g = this._cats(kind).find(x => x.id === groupId); if (g) { g.subs = g.subs.filter(s => s.id !== subId); scheduleSave(); notify(); } },
+
+  // --- settings ---
+  accountDefaults() { return state.settings.accountDefaults; },
+  setAccountDefault(key, val) { state.settings.accountDefaults[key] = !!val; scheduleSave(); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },

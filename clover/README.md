@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.4 — Sortable tables, flag tooltips & configurable defaults
+- Account table columns are now sortable by clicking the header (toggles asc/desc,
+  with a caret on the active column) — via a reusable sortable-table helper.
+- Added tooltips (ⓘ) to the account flags explaining each one, especially the
+  difference between "Used for income" (money in) and "Used for expenses" (money
+  out).
+- New Settings card "New account defaults" controls which flags start checked when
+  adding an account; "Used for expenses" no longer defaults on.
+
 ### v0.3.3 — Account rollover linking
 - Accounts can now link to the older account they replaced — for CDs that get a
   new account number each time they mature and roll over. Set "Continues account

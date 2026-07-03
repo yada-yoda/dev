@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.3.3';
+const VERSION = '0.3.4';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -38,6 +38,7 @@ let activeYear = new Date().getFullYear();
 let activeMonth = 0;                 // 0 = All months
 let incomeTab = 'grid';             // 'grid' | 'list'
 let incomeCatFilter = 'all';
+let accountsSort = { key: 'name', dir: 'asc' };
 const expandedIncomeGroups = new Set();
 
 // ---------- boot ----------
@@ -282,8 +283,55 @@ function select(options, value) {
   options.forEach(o => { const opt = el('option'); opt.value = typeof o === 'object' ? o.value : o; opt.textContent = typeof o === 'object' ? o.label : o; if (opt.value === value) opt.selected = true; s.appendChild(opt); });
   return s;
 }
-function checkbox(label, checked) { const w = el('label', 'check'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!checked; w.appendChild(c); w.appendChild(document.createTextNode(' ' + label)); w.__input = c; return w; }
+function checkbox(label, checked, hint) {
+  const w = el('label', 'check'); const c = document.createElement('input'); c.type = 'checkbox'; c.checked = !!checked;
+  w.appendChild(c); w.appendChild(document.createTextNode(' ' + label));
+  if (hint) { const i = el('span', 'info', 'ⓘ'); i.title = hint; w.appendChild(document.createTextNode(' ')); w.appendChild(i); w.title = hint; }
+  w.__input = c; return w;
+}
 function badge(text, tone) { return el('span', 'badge ' + (tone || ''), text); }
+
+// ---- Reusable sortable table ----
+// cols: [{ label, key?, num?, sortable?, cell(row)->td, value?(row)->sortkey }]
+// sort: { key, dir:'asc'|'desc' }; onSort(newSort) re-renders. rowClass optional.
+function sortRows(rows, cols, sort) {
+  if (!sort || !sort.key) return rows.slice();
+  const col = cols.find(c => c.key === sort.key); if (!col || !col.value) return rows.slice();
+  const dir = sort.dir === 'desc' ? -1 : 1;
+  return rows.slice().sort((a, b) => {
+    let va = col.value(a), vb = col.value(b);
+    if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir;
+    va = (va == null ? '' : String(va)).toLowerCase(); vb = (vb == null ? '' : String(vb)).toLowerCase();
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+}
+function sortableTable(cols, rows, sort, onSort, rowClass) {
+  const table = el('table', 'data-table');
+  const thead = el('thead'), htr = el('tr');
+  cols.forEach(c => {
+    const th = el('th', c.num ? 'num' : null);
+    const canSort = c.sortable !== false && c.key && c.value;
+    if (canSort) {
+      th.classList.add('sortable');
+      const active = sort && sort.key === c.key;
+      th.textContent = c.label + ' ';
+      const caret = el('span', 'sort-caret', active ? (sort.dir === 'desc' ? '▼' : '▲') : '⇅');
+      if (!active) caret.classList.add('idle');
+      th.appendChild(caret);
+      th.addEventListener('click', () => onSort({ key: c.key, dir: (active && sort.dir === 'asc') ? 'desc' : 'asc' }));
+    } else { th.textContent = c.label || ''; }
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr); table.appendChild(thead);
+  const tb = el('tbody');
+  sortRows(rows, cols, sort).forEach(r => {
+    const tr = el('tr'); const cl = rowClass && rowClass(r); if (cl) tr.className = cl;
+    cols.forEach(c => tr.appendChild(c.cell(r)));
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+  return table;
+}
 
 // ============================================================
 // Modal + toast (house rules: no backdrop close; toasts top-center)
@@ -345,7 +393,29 @@ function renderSettings(view) {
     { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id) }));
   grid.appendChild(simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
     { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id) }));
+  grid.appendChild(accountDefaultsCard());
   view.appendChild(grid);
+}
+
+function accountDefaultsCard() {
+  const store = window.cloverStore, d = store.accountDefaults();
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('New account defaults', 'Which flags start checked when you add an account'));
+  const rows = [
+    ['active', 'Active', 'New accounts start marked as open/in use.'],
+    ['usedForIncome', 'Used for income', 'New accounts default to being income sources.'],
+    ['usedForExpenses', 'Used for expenses', 'New accounts default to being a payment method.'],
+    ['usedForAutopay', 'Used for auto-pay', 'New accounts default to having auto-pay on.'],
+    ['rewardsCard', 'Rewards card', 'New accounts default to being a rewards card.']
+  ];
+  const wrap = el('div', 'check-col');
+  rows.forEach(([key, label, hint]) => {
+    const c = checkbox(label, d[key], hint);
+    c.__input.addEventListener('change', () => store.setAccountDefault(key, c.__input.checked));
+    wrap.appendChild(c);
+  });
+  card.appendChild(wrap);
+  return card;
 }
 
 function sectionHead(title, subtitle, onAdd) {
@@ -420,38 +490,35 @@ function renderAccounts(view) {
     return;
   }
 
+  const cols = [
+    { label: 'Name', key: 'name', value: a => a.name, cell: a => {
+        const td = el('td'); td.appendChild(el('div', 'acct-name', a.name));
+        if (a.previousAccountId) {
+          const prev = store.account(a.previousAccountId);
+          const lbl = prev ? (prev.name + (prev.last4 ? ' ••' + prev.last4 : '')) : 'a previous account';
+          td.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
+        }
+        return td; } },
+    { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => el('td', null, a.institution || '—') },
+    { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(badge(a.type || '—', 'type')); return td; } },
+    { label: 'Last 4', key: 'last4', value: a => a.last4 || '', cell: a => el('td', null, a.last4 ? ('••' + a.last4) : '—') },
+    { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => el('td', null, store.personName(a.personId)) },
+    { label: 'Flags', sortable: false, cell: a => {
+        const td = el('td'); const flags = el('div', 'flags');
+        flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
+        if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
+        if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
+        if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
+        td.appendChild(flags); return td; } },
+    { label: '', sortable: false, cell: a => {
+        const td = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => accountModal(a));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
   const card = el('div', 'card table-card');
-  const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Name</th><th>Institution</th><th>Type</th><th>Last 4</th><th>Owner</th><th>Flags</th><th></th></tr></thead>';
-  const tb = el('tbody');
-  s.accounts.slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(a => {
-    const tr = el('tr');
-    if (a.active === false) tr.className = 'inactive-row';
-    const nameTd = el('td');
-    nameTd.appendChild(el('div', 'acct-name', a.name));
-    if (a.previousAccountId) {
-      const prev = store.account(a.previousAccountId);
-      const lbl = prev ? (prev.name + (prev.last4 ? ' ••' + prev.last4 : '')) : 'a previous account';
-      nameTd.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
-    }
-    tr.appendChild(nameTd);
-    tr.appendChild(el('td', null, a.institution || '—'));
-    const tType = el('td'); tType.appendChild(badge(a.type || '—', 'type')); tr.appendChild(tType);
-    tr.appendChild(el('td', null, a.last4 ? ('••' + a.last4) : '—'));
-    tr.appendChild(el('td', null, store.personName(a.personId)));
-    const tFlags = el('td'); const flags = el('div', 'flags');
-    flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
-    if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
-    if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
-    if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
-    tFlags.appendChild(flags); tr.appendChild(tFlags);
-    const act = el('td', 'row-actions');
-    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => accountModal(a));
-    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
-    act.appendChild(edit); act.appendChild(del); tr.appendChild(act);
-    tb.appendChild(tr);
-  });
-  table.appendChild(tb); card.appendChild(table); view.appendChild(card);
+  card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
+  view.appendChild(card);
 }
 
 function emptyState(title, msg, btnLabel, onClick) {
@@ -465,7 +532,11 @@ function emptyState(title, msg, btnLabel, onClick) {
 
 function accountModal(existing) {
   const store = window.cloverStore, s = store.state;
-  const a = existing ? Object.assign({}, existing) : { active: true, usedForExpenses: true };
+  const dflt = store.accountDefaults();
+  const a = existing ? Object.assign({}, existing) : {
+    active: dflt.active !== false, usedForIncome: !!dflt.usedForIncome,
+    usedForExpenses: !!dflt.usedForExpenses, usedForAutopay: !!dflt.usedForAutopay, rewardsCard: !!dflt.rewardsCard
+  };
   const body = el('div', 'form-grid');
 
   const dl = el('datalist'); dl.id = 'inst-list';
@@ -482,11 +553,11 @@ function accountModal(existing) {
     s.accounts.filter(x => x.id !== a.id).sort((x, y) => x.name.localeCompare(y.name))
       .map(x => ({ value: x.id, label: x.name + (x.last4 ? ' ••' + x.last4 : '') + (x.institution ? ' (' + x.institution + ')' : '') })));
   const fPrev = select(rolloverOpts, a.previousAccountId || '');
-  const cActive = checkbox('Active', a.active !== false);
-  const cIncome = checkbox('Used for income', a.usedForIncome);
-  const cExpense = checkbox('Used for expenses', a.usedForExpenses);
-  const cAuto = checkbox('Used for auto-pay', a.usedForAutopay);
-  const cRewards = checkbox('Rewards card', a.rewardsCard);
+  const cActive = checkbox('Active', a.active !== false, 'This account is currently open and in use. Inactive accounts are kept for history but hidden from most pickers.');
+  const cIncome = checkbox('Used for income', a.usedForIncome, 'Money comes IN here — e.g. a bank or broker that receives paychecks, dividends, or interest. Makes it selectable as a source when logging income.');
+  const cExpense = checkbox('Used for expenses', a.usedForExpenses, 'Money goes OUT here — e.g. a card or checking account you pay bills with. Makes it selectable as a payment method for expenses and subscriptions.');
+  const cAuto = checkbox('Used for auto-pay', a.usedForAutopay, 'This account has automatic payments set up on it.');
+  const cRewards = checkbox('Rewards card', a.rewardsCard, 'This card earns cash back, points, or rewards.');
   const fNotes = document.createElement('textarea'); fNotes.value = a.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 12 months' });

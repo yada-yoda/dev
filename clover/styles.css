@@ -300,6 +300,16 @@ button { font-family: inherit; cursor: pointer; }
 .check-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .check { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text); }
 .check input { width: 15px; height: 15px; accent-color: var(--accent); }
+.check-col { display: flex; flex-direction: column; gap: 10px; }
+.info { cursor: help; color: var(--text-faint); font-size: 11px; }
+.info:hover { color: var(--accent); }
+
+/* Sortable table headers */
+.data-table th.sortable { cursor: pointer; user-select: none; }
+.data-table th.sortable:hover { color: var(--text); }
+.sort-caret { font-size: 10px; color: var(--accent); }
+.sort-caret.idle { color: var(--text-faint); opacity: .55; }
+.data-table th.num .sort-caret { margin-left: 2px; }
 
 /* ---------- Modal ---------- */
 .modal-host {
