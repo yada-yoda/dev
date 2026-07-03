@@ -42,7 +42,12 @@
 --accent:#b45309;--accent-2:#0d9488;--accent-purple:#7c3aed;--border:#d0d7de;--danger:#cf222e;--success:#1a7f37;--warning:#9a6700;--blue:#0969da;
 --on-accent:#ffffff;--header-bg:linear-gradient(135deg,#ffffff,#eef1f5);--shadow:rgba(140,149,159,.22)}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:hidden}
+html{overflow-x:clip}
+body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);color:var(--text-primary);min-height:100vh;overflow-x:clip}
+/* iOS native date/time controls can overflow their box — keep them shrinkable and left-aligned */
+input[type="date"],input[type="time"],input[type="datetime-local"]{min-width:0;max-width:100%}
+input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date-and-time-value,input[type="datetime-local"]::-webkit-date-and-time-value{text-align:left}
+@media(max-width:600px){input[type="date"],input[type="time"],input[type="datetime-local"]{-webkit-appearance:none;appearance:none}}
 ::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
 .header{background:var(--header-bg);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
 .header-left{display:flex;align-items:center;gap:12px;cursor:pointer}
@@ -210,7 +215,7 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.44.9';
+const APP_VERSION = 'v0.44.10';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -270,6 +275,7 @@ let currentView = 'today';
 let logSubtab = 'feed';
 let careSubtab = 'vet';
 let trendMetric = 'feeding', trendStyle = 'auto', trendRange = 7, trendsChart = null;
+let recordSortAsc = false; // Records tab: false = newest first, true = oldest first
 let suppliesCat = 'all';
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
@@ -814,10 +820,12 @@ function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=
 function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 // ── Medical records (vaccinations, surgeries, tests, etc.) ─────────
+function toggleRecordSort(){ recordSortAsc = !recordSortAsc; render(); }
 function renderRecordsTab(){
-  const recs = petArr('records').slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const recs = petArr('records').slice().sort((a,b)=> recordSortAsc ? (a.date||'').localeCompare(b.date||'') : (b.date||'').localeCompare(a.date||''));
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:320px" onclick="recordModal()">+ Add medical record</button></div>':'';
   if(recs.length){
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-sm" onclick="toggleRecordSort()" title="Toggle sort order by date">Date '+(recordSortAsc?'↑ oldest first':'↓ newest first')+'</button></div>';
     html += '<div class="card">'+recs.map(r=>{
       const nd = r.nextDue ? untilStr(r.nextDue) : null;
       const due = nd ? (nd.past ? '<span style="color:var(--danger);font-weight:600">due again '+nd.text+'</span>' : '<span style="color:'+(nd.days<=30?'var(--warning)':'var(--text-secondary)')+'">due again '+nd.text+'</span>') : '';

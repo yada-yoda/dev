@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.9**
+**Current Version: v0.44.10**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,14 @@ covers both.
 
 ## Version History
 
+- **v0.44.10** — Records sorting + mobile fixes:
+  - **Sort records by date** — a toggle on the Records tab flips between newest-first and
+    oldest-first.
+  - **No more sideways scroll on mobile** — the Settings page (and pages generally) no longer
+    scroll horizontally; a hidden tooltip near the edge was leaking width. Fixed with
+    `overflow-x: clip`, which also keeps the top nav properly pinned.
+  - **Date/time fields fit on mobile** — the vet-visit (and other) date & time inputs no longer
+    run off the edge on iOS; their values are left-aligned and constrained to the field.
 - **v0.44.9** — Review pass — closed two gaps: the exported PDF report now includes a **Medical
   records** section (vaccinations, surgeries, tests, etc., with type/detail/provider/cost/next-due),
   and a line item tagged 💊 on a **grooming** visit (not just vet) now shows in Care → Meds too.
