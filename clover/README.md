@@ -45,6 +45,10 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.3.2 — Fix modal horizontal scroll
+- Fixed the account modal overflowing horizontally (scrollbar) when the CD type
+  was selected. Form field rows now shrink to fit; modals never scroll sideways.
+
 ### v0.3.1 — Alphabetized institution picker
 - The bank/broker list in the account form is now sorted alphabetically so it's
   easier to scan.

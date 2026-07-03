@@ -288,12 +288,13 @@ button { font-family: inherit; cursor: pointer; }
   height: 36px; padding: 0 10px; font-size: 14px; font-family: inherit;
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--surface); color: var(--text);
+  width: 100%; min-width: 0;   /* shrink to fit — never force the modal to scroll */
 }
 .field textarea { height: auto; padding: 8px 10px; resize: vertical; }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.cd-fields { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+.cd-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .check-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .check { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text); }
 .check input { width: 15px; height: 15px; accent-color: var(--accent); }
@@ -353,8 +354,8 @@ button { font-family: inherit; cursor: pointer; }
 .inline-field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-muted); }
 .inline-field select { height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--text); }
 
-.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.div-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); }
+.two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.div-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 12px; background: var(--surface-2); border-radius: var(--radius-sm); }
 
 @media (max-width: 560px) {
   .settings-grid { grid-template-columns: 1fr; }
