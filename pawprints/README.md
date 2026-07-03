@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.44.10**
+**Current Version: v0.45.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.45.0** — **Daily feeding goal.** Set a goal (e.g. 2 cups) in Settings, and the "Last fed"
+  box on the Today page now also shows how much has been fed today against it — "1.5 / 2 cups"
+  with a progress bar that turns green when the goal is met. With no goal set, it just shows the
+  day's total.
 - **v0.44.10** — Records sorting + mobile fixes:
   - **Sort records by date** — a toggle on the Records tab flips between newest-first and
     oldest-first.
