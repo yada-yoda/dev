@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.7.2 — Bills roll into Expenses
+- Renamed "Subscriptions" to **Bills & Subscriptions** (utility bills like ComEd
+  belong here alongside streaming, etc.).
+- Active recurring bills now roll into the **Expenses** annual grid automatically
+  at their normalized monthly cost — no double entry — shown as a "↻ Recurring
+  bills" row per category, with an **Include bills** toggle to hide them.
+- Expenses can be **linked to a bill** (e.g. the actual ComEd amount for a month);
+  the logged actual overrides that bill's estimate for that month, so nothing is
+  double-counted.
+
+_Why:_ recurring bills and one-off spending now live in one clear picture, mirroring
+how paychecks roll into Income.
+
 ### v0.7.1 — "Last day" statement dates & field alignment
 - Credit-card statement/due days can be set to "Last day" for cards that cut on
   the last day of the month (handles months without 31 days). The float estimate

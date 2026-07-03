@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.7.1';
+const VERSION = '0.7.2';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -19,7 +19,7 @@ const ROUTES = [
   { id: 'income',        label: 'Income',         ico: '▲', phase: 2 },
   { id: 'paychecks',     label: 'Paychecks',      ico: '▤', phase: 4 },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
-  { id: 'subscriptions', label: 'Subscriptions',  ico: '↻', phase: 3 },
+  { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
   { sep: true },
   { id: 'credit',        label: 'Credit & Rates', ico: '％', phase: 5 },
@@ -44,6 +44,7 @@ let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
+let expenseIncludeRecurring = true;  // roll active bills into the expense grid
 let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
 let creditTab = 'credit';   // 'credit' | 'rates'
@@ -986,7 +987,7 @@ function renderSubscriptions(view) {
 
   const head = el('div', 'view-head');
   const left = el('div');
-  left.appendChild(el('h3', null, 'Subscriptions & recurring'));
+  left.appendChild(el('h3', null, 'Bills & Subscriptions'));
   left.appendChild(el('p', 'muted', active.length + ' active · ' + all.length + ' total'));
   head.appendChild(left);
   const add = el('button', 'btn-primary', '+ Add subscription'); add.addEventListener('click', () => subscriptionModal(null));
@@ -1161,17 +1162,36 @@ function subscriptionModal(existing) {
 // ============================================================
 function expenseAmount(e) { return Number(e.amount) || 0; }
 
+// Normalized monthly cost of active recurring bills in a category, spread across
+// all 12 months — EXCEPT months where a logged payment is linked to that bill
+// (the actual overrides the estimate, so it isn't double-counted).
+function recurringMonthsForCategory(store, catId, payments) {
+  const bills = store.state.recurring.filter(isSubActive).filter(r => r.categoryId === catId);
+  const m = new Array(12).fill(0);
+  bills.forEach(bill => {
+    const me = monthlyEquiv(bill);
+    for (let mi = 0; mi < 12; mi++) {
+      const overridden = payments.some(p => p.recurringId === bill.id && monthIdx(p.date) === mi);
+      if (!overridden) m[mi] += me;
+    }
+  });
+  return m;
+}
+
 function renderExpenses(view) {
   const store = window.cloverStore;
   if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
   const data = store.yearData(activeYear);
 
+  const store2 = window.cloverStore;
+  const hasBills = store2.state.recurring.some(isSubActive);
   const head = el('div', 'view-head');
   const left = el('div');
   left.appendChild(el('h3', null, 'Expenses · ' + activeYear));
   const total = data.expensePayments.reduce((s, e) => s + expenseAmount(e), 0);
   const n = data.expensePayments.length;
-  left.appendChild(el('p', 'muted', money(total) + ' spent · ' + n + ' entr' + (n === 1 ? 'y' : 'ies')));
+  left.appendChild(el('p', 'muted', money(total) + ' logged · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') +
+    (expenseIncludeRecurring && hasBills ? ' + recurring bills' : '')));
   head.appendChild(left);
 
   const right = el('div', 'head-actions');
@@ -1182,6 +1202,11 @@ function renderExpenses(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
+  if (expenseTab === 'grid' && hasBills) {
+    const toggle = checkbox('Include bills', expenseIncludeRecurring, 'Roll active recurring bills (from Bills & Subscriptions) into the grid at their normalized monthly cost. A logged expense linked to a bill overrides its estimate for that month.');
+    toggle.__input.addEventListener('change', () => { expenseIncludeRecurring = toggle.__input.checked; renderView(currentRoute); });
+    right.appendChild(toggle);
+  }
   const add = el('button', 'btn-primary', '+ Add expense'); add.addEventListener('click', () => expenseModal(null));
   right.appendChild(add);
   head.appendChild(right);
@@ -1216,6 +1241,9 @@ function expenseGrid(data) {
   groups.forEach(g => {
     const gEntries = entries.filter(e => e.categoryId === g.id);
     const monthly = monthsFor(gEntries);
+    const rec = expenseIncludeRecurring ? recurringMonthsForCategory(store, g.id, entries) : new Array(12).fill(0);
+    const hasRec = rec.some(v => v > 0);
+    for (let i = 0; i < 12; i++) monthly[i] += rec[i];
     monthly.forEach((v, i) => grand[i] += v);
     const open = expandedExpenseGroups.has(g.id);
     tb.appendChild(addRow('grp-row', g.name, monthly,
@@ -1225,6 +1253,7 @@ function expenseGrid(data) {
       g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
       const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
       if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+      if (hasRec) tb.appendChild(addRow('sub-row', '↻ Recurring bills', rec));
     }
   });
 
@@ -1287,15 +1316,22 @@ function expenseModal(existing) {
   const body = el('div', 'form-grid');
 
   const fDate = input(e.date || todayISO(), { type: 'date' });
+  const recActive = s.recurring.filter(isSubActive).slice().sort((a, b) => a.name.localeCompare(b.name));
+  const fBill = select([{ value: '', label: '— None (one-off expense) —' }].concat(recActive.map(r => ({ value: r.id, label: r.name }))), e.recurringId || '');
   const fCat = select([{ value: '', label: '— Select —' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), e.categoryId || '');
   const fSub = select([{ value: '', label: '—' }], e.subId || '');
   const rebuildSubs = () => { const g = s.expenseCategories.find(c => c.id === fCat.value); const opts = [{ value: '', label: '—' }].concat((g ? g.subs : []).map(x => ({ value: x.id, label: x.name }))); fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); }); if (e.subId) fSub.value = e.subId; };
+  fBill.addEventListener('change', () => {
+    const bill = s.recurring.find(r => r.id === fBill.value);
+    if (bill) { fCat.value = bill.categoryId || ''; rebuildSubs(); if (bill.subId) fSub.value = bill.subId; }
+  });
   const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   body.appendChild(field('Date', fDate, 'When you paid this.'));
+  if (recActive.length) body.appendChild(field('For which bill?', fBill, 'Link this to a recurring bill (e.g. the actual ComEd amount this month). It replaces that bill’s estimate for the month so it isn’t double-counted. Leave as “one-off” for regular expenses.'));
   body.appendChild(field('Category', fCat, 'The type of expense. Manage the list in Settings.'));
   body.appendChild(field('Source (subcategory)', fSub, 'A more specific grouping within the category (optional).'));
   body.appendChild(field('Account', fAcct, 'Which account or card this was paid from.'));
@@ -1313,7 +1349,8 @@ function expenseModal(existing) {
       if (isNaN(amount)) { toast('Amount is required', 'warn'); fAmount.focus(); return false; }
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
-        accountId: fAcct.value || '', personId: fPerson.value, amount, notes: fNotes.value.trim()
+        accountId: fAcct.value || '', personId: fPerson.value, amount, notes: fNotes.value.trim(),
+        recurringId: fBill.value || ''
       });
       store.saveExpense(activeYear, entry);
       toast(existing ? 'Expense updated' : 'Expense added');
