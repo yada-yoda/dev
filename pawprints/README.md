@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.45.0**
+**Current Version: v0.46.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,11 @@ covers both.
 
 ## Version History
 
+- **v0.46.0** — **Walking milestone badges.** Every mile you log on walks now earns your dog
+  badges across five tiers (bronze → silver → gold → teal → legendary purple) — 17 milestones
+  from "First Steps" (1 mi) to "Legend of the Leash" (1,000 mi), denser in the early range.
+  A full badge grid with next-milestone progress lives on **Insights**, a compact next-badge
+  card sits on **Today**, and crossing a threshold pops a celebration toast. Tracked per dog.
 - **v0.45.0** — **Daily feeding goal.** Set a goal (e.g. 2 cups) in Settings, and the "Last fed"
   box on the Today page now also shows how much has been fed today against it — "1.5 / 2 cups"
   with a progress bar that turns green when the goal is met. With no goal set, it just shows the
