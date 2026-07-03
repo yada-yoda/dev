@@ -5,7 +5,7 @@
 // navigable placeholders so the shell is real and testable.
 // ============================================================
 
-const VERSION = '0.1.0';
+const VERSION = '0.1.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -94,10 +94,22 @@ function routeTo(id) {
   renderView(route);
 }
 
+// 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
+// 'owner'  = signed-in user is an allowlisted owner (normal use)
+// 'denied' = signed in, but not the owner (private account)
+function ownerState() {
+  if (!window.cloverConfigured) return 'setup';
+  if (OWNER_UIDS.length === 0) return 'setup';
+  if (currentUser && OWNER_UIDS.includes(currentUser.uid)) return 'owner';
+  return 'denied';
+}
+
 function renderView(route) {
   const view = document.getElementById('view');
   view.innerHTML = '';
-  if (!window.cloverConfigured) view.appendChild(setupBanner());
+  const state = ownerState();
+  if (state === 'denied') { view.appendChild(deniedPanel()); return; }
+  if (state === 'setup') view.appendChild(setupBanner());
   const p = document.createElement('div');
   p.className = 'placeholder';
   p.innerHTML =
@@ -109,16 +121,42 @@ function renderView(route) {
   view.appendChild(p);
 }
 
-// Shown until a Firebase project is wired + owner UID is locked in.
+// Shown until the app is locked to an owner UID. Surfaces the signed-in
+// user's account ID so it can be copied into the allowlist.
 function setupBanner() {
   const d = document.createElement('div');
   d.className = 'setup-note';
-  const uid = currentUser ? currentUser.uid : '(sign in to see your account ID)';
+  const uid = currentUser ? currentUser.uid : '(signing in…)';
   d.innerHTML =
-    `<strong>Setup pending.</strong> Finish wiring the Firebase project to enable saving.
-     Your account ID: <code>${uid}</code> — paste it into
-     <code>firestore.rules</code> and the <code>OWNER_UIDS</code> list in <code>app.js</code>,
-     then fill <code>firebaseConfig</code> in <code>firebase-config.js</code>.`;
+    `<strong>Almost set up.</strong> Saving is disabled until Clover is locked to your
+     account. Send this account ID to finish setup:
+     <div class="uid-row"><code id="owner-uid">${uid}</code>
+       <button class="btn-ghost" id="copy-uid" type="button">Copy</button></div>`;
+  const btn = d.querySelector('#copy-uid');
+  if (btn) btn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(uid);
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1500);
+    } catch (e) {
+      const r = document.createRange();
+      r.selectNode(d.querySelector('#owner-uid'));
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    }
+  });
+  return d;
+}
+
+// Shown when a non-owner signs into a locked, private instance.
+function deniedPanel() {
+  const d = document.createElement('div');
+  d.className = 'placeholder';
+  d.innerHTML =
+    `<div class="ph-ico">🔒</div>
+     <h3>Not authorized</h3>
+     <p>This is a private account. You're signed in as
+        <strong>${(currentUser && currentUser.email) || ''}</strong>, which isn't the
+        owner of this data.</p>`;
   return d;
 }
 

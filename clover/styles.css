@@ -185,6 +185,8 @@ button { font-family: inherit; cursor: pointer; }
   user-select: all;
 }
 .setup-note strong { color: #5f3f08; }
+.uid-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+.uid-row code { flex: 0 1 auto; overflow: auto; white-space: nowrap; }
 
 /* ---------- Mobile drawer + backdrop ---------- */
 .menu-btn {

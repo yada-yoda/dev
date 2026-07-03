@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.1.1 — Branding assets & setup fix
+- Added a Clover-branded 404 page (wired into the site-root 404 redirect map).
+- Added full favicon set (SVG, 16/32 PNG, ICO), apple-touch and PWA icons, and a
+  1200×630 social preview image with OpenGraph/Twitter meta.
+- Fixed the account-ID banner: it now shows whenever the app isn't yet locked to
+  an owner (with a copy button), instead of only when Firebase was unconfigured.
+- Added a "not authorized" screen for non-owner sign-ins.
+
+_Why:_ the account ID is needed to lock down access, and it stopped showing once
+the real Firebase config was added; also gives Clover its own identity assets.
+
 ### v0.1.0 — Phase 0: auth & app shell
 - Initial scaffold at `dev/clover/`.
 - Light white + green theme with CSS design tokens (dark-theme-ready).
