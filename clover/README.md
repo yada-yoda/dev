@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.1.2 — Owner lock
+- Locked access to the owner's Firebase UID in both `firestore.rules` and the
+  client gate. The setup banner clears once the signed-in user is the owner.
+
+_Why:_ finishes the private single-user security boundary — only the owner can
+read or write finance data; everyone else is denied at the rules layer.
+
 ### v0.1.1 — Branding assets & setup fix
 - Added a Clover-branded 404 page (wired into the site-root 404 redirect map).
 - Added full favicon set (SVG, 16/32 PNG, ICO), apple-touch and PWA icons, and a

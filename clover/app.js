@@ -5,14 +5,14 @@
 // navigable placeholders so the shell is real and testable.
 // ============================================================
 
-const VERSION = '0.1.1';
+const VERSION = '0.1.2';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
 // friendly "not authorized" screen instead of silent permission errors.
 // Leave empty during first-run setup; the app shows your account ID so
 // you can lock both this and firestore.rules to it.
-const OWNER_UIDS = [];
+const OWNER_UIDS = ['I8IKdH8q6XW34vIc4ZkwNj2roVu1'];
 
 const ROUTES = [
   { id: 'dashboard',     label: 'Dashboard',      ico: '◆', phase: 6 },

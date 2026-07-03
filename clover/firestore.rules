@@ -14,7 +14,7 @@ service cloud.firestore {
     // switch the condition to `request.auth.uid == userId`.
     function isOwner(userId) {
       let OWNERS = [
-        // 'paste-your-firebase-uid-here'
+        'I8IKdH8q6XW34vIc4ZkwNj2roVu1'
       ];
       return request.auth != null
              && request.auth.uid == userId
