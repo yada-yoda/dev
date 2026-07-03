@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Clover — private single-user finance data.
+    //
+    // Access is locked to a hard-coded allowlist of owner UIDs. Anyone
+    // else who signs in is denied at the rules layer (not just hidden UI).
+    // Only opaque Firebase UIDs go here — never email addresses — because
+    // this file is committed to a public repo.
+    //
+    // SETUP: sign in once, copy the account ID from the app's setup banner,
+    // and add it to OWNERS below. Multi-user later = add more UIDs, or
+    // switch the condition to `request.auth.uid == userId`.
+    function isOwner(userId) {
+      let OWNERS = [
+        // 'paste-your-firebase-uid-here'
+      ];
+      return request.auth != null
+             && request.auth.uid == userId
+             && userId in OWNERS;
+    }
+
+    match /finance/{userId} {
+      allow read, write: if isOwner(userId);
+      match /{document=**} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+  }
+}

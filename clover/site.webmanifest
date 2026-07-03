@@ -1,0 +1,11 @@
+{
+  "name": "Clover — Personal Finance",
+  "short_name": "Clover",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f4f7f4",
+  "theme_color": "#16a34a",
+  "icons": [
+    { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" }
+  ]
+}
