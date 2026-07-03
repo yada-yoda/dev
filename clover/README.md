@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.7.0 — Phase 6: Dashboard
+- New Dashboard (the default view): KPI cards for this month's income, spending,
+  recurring/month, net, and projected annual income & expenses (annualized from
+  YTD + subscriptions).
+- Attention strip: subscriptions renewing within your warning windows and
+  late/missing paychecks.
+- Two doughnut charts — income by category and expenses by category (YTD) — plus
+  an upcoming-renewals list and a recent-activity feed across income, paychecks,
+  and expenses.
+
+_Why:_ pulls every section together into one at-a-glance snapshot of the month
+and the year.
+
 ### v0.6.0 — Phase 5: Credit scores & savings rates (first charts)
 - New Credit & Rates page with two tabs:
   - **Credit scores** — log date/score/provider; charted as a line per provider
@@ -211,7 +224,7 @@ any financial data or features are built.
 | 3 | Subscriptions & expenses ✅ |
 | 4 | Paychecks ✅ |
 | 5 | Credit scores & savings rates ✅ |
-| 6 | Dashboard |
+| 6 | Dashboard ✅ |
 | 7 | Reports & calendar |
 | 8 | Import / export |
 | 9 | Polish, mobile, security review → v1.0.0 |

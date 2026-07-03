@@ -390,6 +390,21 @@ button { font-family: inherit; cursor: pointer; }
 .strip-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 .chart-wrap { height: 320px; position: relative; }
 .chart-wrap canvas { max-width: 100%; }
+
+/* Dashboard */
+.dash-charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; margin-bottom: 18px; }
+.dash-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
+.donut-wrap { height: 240px; position: relative; }
+.donut-wrap canvas { max-width: 100%; }
+.warn-strip { background: var(--warn-soft); border-color: #f0d9a8; }
+.warn-list { display: flex; flex-direction: column; gap: 8px; }
+.warn-item { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.mini-list { display: flex; flex-direction: column; }
+.mini-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 0; border-top: 1px solid var(--border); font-size: 13px; }
+.mini-row:first-child { border-top: none; }
+.mini-right { display: flex; align-items: center; gap: 6px; }
+.pos { color: var(--income); font-weight: 600; white-space: nowrap; }
+.neg { color: var(--expense); font-weight: 600; white-space: nowrap; }
 .pay-chip { cursor: pointer; }
 .pay-chip:hover { border-color: var(--accent); }
 
