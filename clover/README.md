@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.4.1 — Phase 3 (part 2): Expenses annual grid
+- New Expenses page with an Annual Grid (expense category × Jan–Dec + Total YTD +
+  Average, collapsible to subcategories, grand-total row) plus a List view for
+  one-off/actual expense payments, filterable by month and category.
+- Add/edit expense modal (date, category → subcategory, account, person, amount,
+  notes), all fields tooltip'd. Recurring bills stay on the Subscriptions page;
+  this is the cash-basis actuals side.
+
+_Why:_ completes the expense picture — normalized recurring costs on Subscriptions,
+and actual month-by-month spending here, both in the spreadsheet-style grid.
+
 ### v0.4.0 — Phase 3 (part 1): Subscriptions & recurring bills
 - New Subscriptions page for recurring bills and subscriptions, with a
   frequency→monthly-equivalent engine: weekly/biweekly/monthly/quarterly/
@@ -170,7 +181,7 @@ any financial data or features are built.
 | 0 | Auth & app shell ✅ |
 | 1 | Data layer, Settings, categories, accounts ✅ |
 | 2 | Income tracker + Annual Grid ✅ |
-| 3 | Subscriptions ✅ · expenses grid (in progress) |
+| 3 | Subscriptions & expenses ✅ |
 | 4 | Paychecks |
 | 5 | Credit scores & savings rates |
 | 6 | Dashboard |

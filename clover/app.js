@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.4.0';
+const VERSION = '0.4.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -42,7 +42,10 @@ let accountsSort = { key: 'name', dir: 'asc' };
 let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
+let expenseTab = 'grid';           // 'grid' | 'list'
+let expenseCatFilter = 'all';
 const expandedIncomeGroups = new Set();
+const expandedExpenseGroups = new Set();
 
 // ---------- boot ----------
 document.getElementById('ver').textContent = VERSION;
@@ -118,8 +121,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (Phase 1: settings, accounts; Phase 2: income; Phase 3: subscriptions).
-const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions };
+// Feature views (Phase 1: settings, accounts; Phase 2: income; Phase 3: subscriptions + expenses).
+const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -1125,6 +1128,171 @@ function subscriptionModal(existing) {
       });
       store.saveRecurring(item);
       toast(existing ? 'Subscription updated' : 'Subscription added');
+    }
+  });
+}
+
+// ============================================================
+// Expenses (annual grid + one-off payments) — Phase 3 part 2
+// ============================================================
+function expenseAmount(e) { return Number(e.amount) || 0; }
+
+function renderExpenses(view) {
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+  const data = store.yearData(activeYear);
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Expenses · ' + activeYear));
+  const total = data.expensePayments.reduce((s, e) => s + expenseAmount(e), 0);
+  const n = data.expensePayments.length;
+  left.appendChild(el('p', 'muted', money(total) + ' spent · ' + n + ' entr' + (n === 1 ? 'y' : 'ies')));
+  head.appendChild(left);
+
+  const right = el('div', 'head-actions');
+  const tabs = el('div', 'tabs');
+  [['grid', 'Annual grid'], ['list', 'List']].forEach(([t, label]) => {
+    const b = el('button', 'tab' + (expenseTab === t ? ' active' : ''), label);
+    b.addEventListener('click', () => { expenseTab = t; renderView(currentRoute); });
+    tabs.appendChild(b);
+  });
+  right.appendChild(tabs);
+  const add = el('button', 'btn-primary', '+ Add expense'); add.addEventListener('click', () => expenseModal(null));
+  right.appendChild(add);
+  head.appendChild(right);
+  view.appendChild(head);
+
+  view.appendChild(expenseTab === 'grid' ? expenseGrid(data) : expenseList(data));
+}
+
+function expenseGrid(data) {
+  const store = window.cloverStore, groups = store.state.expenseCategories;
+  const entries = data.expensePayments;
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table grid-table');
+  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num">Avg</th></tr></thead>';
+  const tb = el('tbody');
+  const grand = new Array(12).fill(0);
+
+  const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += expenseAmount(e); }); return m; };
+  const addRow = (cls, label, monthly, onClick, caret) => {
+    const tr = el('tr', cls);
+    const c0 = el('td', cls === 'sub-row' ? 'sub-name' : 'grp-name');
+    if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
+    else c0.textContent = label;
+    if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
+    tr.appendChild(c0);
+    monthly.forEach(v => tr.appendChild(numCell(v)));
+    tr.appendChild(numCell(monthly.reduce((a, b) => a + b, 0), true));
+    tr.appendChild(numCell(avgOf(monthly), true));
+    return tr;
+  };
+
+  groups.forEach(g => {
+    const gEntries = entries.filter(e => e.categoryId === g.id);
+    const monthly = monthsFor(gEntries);
+    monthly.forEach((v, i) => grand[i] += v);
+    const open = expandedExpenseGroups.has(g.id);
+    tb.appendChild(addRow('grp-row', g.name, monthly,
+      () => { open ? expandedExpenseGroups.delete(g.id) : expandedExpenseGroups.add(g.id); renderView(currentRoute); },
+      open ? '▾' : '▸'));
+    if (open) {
+      g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
+      const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
+      if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+    }
+  });
+
+  const gtr = el('tr', 'total-row');
+  gtr.appendChild(el('td', 'grp-name', 'Total expenses'));
+  grand.forEach(v => gtr.appendChild(numCell(v)));
+  gtr.appendChild(numCell(grand.reduce((a, b) => a + b, 0), true));
+  gtr.appendChild(numCell(avgOf(grand), true));
+  tb.appendChild(gtr);
+
+  table.appendChild(tb); card.appendChild(table);
+  return card;
+}
+
+function expenseList(data) {
+  const store = window.cloverStore;
+  let rows = data.expensePayments.slice();
+  if (activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
+  if (expenseCatFilter !== 'all') rows = rows.filter(e => e.categoryId === expenseCatFilter);
+  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const wrap = el('div');
+  const bar = el('div', 'filter-bar');
+  const catSel = select([{ value: 'all', label: 'All categories' }].concat(store.state.expenseCategories.map(c => ({ value: c.id, label: c.name }))), expenseCatFilter);
+  catSel.addEventListener('change', () => { expenseCatFilter = catSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Category', catSel));
+  bar.appendChild(el('div', 'muted', rows.length + ' shown' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  wrap.appendChild(bar);
+
+  if (!rows.length) {
+    wrap.appendChild(emptyState('No expenses logged', 'Add one-off or actual expenses for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '. (Recurring bills live on the Subscriptions page.)', '+ Add expense', () => expenseModal(null)));
+    return wrap;
+  }
+
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th class="num">Amount</th><th>Person</th><th></th></tr></thead>';
+  const tb = el('tbody');
+  rows.forEach(e => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(e.date)));
+    tr.appendChild(el('td', null, store.expenseGroupName(e.categoryId)));
+    tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
+    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
+    tr.appendChild(numCell(expenseAmount(e), true));
+    tr.appendChild(el('td', null, store.personName(e.personId)));
+    const act = el('td', 'row-actions');
+    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => expenseModal(e));
+    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.expenseGroupName(e.categoryId), () => store.removeExpense(activeYear, e.id)));
+    act.appendChild(edit); act.appendChild(del); tr.appendChild(act);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
+  return wrap;
+}
+
+function expenseModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const e = existing ? Object.assign({}, existing) : { date: todayISO(), personId: s.persons[0] && s.persons[0].id };
+  const body = el('div', 'form-grid');
+
+  const fDate = input(e.date || todayISO(), { type: 'date' });
+  const fCat = select([{ value: '', label: '— Select —' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), e.categoryId || '');
+  const fSub = select([{ value: '', label: '—' }], e.subId || '');
+  const rebuildSubs = () => { const g = s.expenseCategories.find(c => c.id === fCat.value); const opts = [{ value: '', label: '—' }].concat((g ? g.subs : []).map(x => ({ value: x.id, label: x.name }))); fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); }); if (e.subId) fSub.value = e.subId; };
+  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), e.accountId || '');
+  const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
+  const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
+  const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+
+  body.appendChild(field('Date', fDate, 'When you paid this.'));
+  body.appendChild(field('Category', fCat, 'The type of expense. Manage the list in Settings.'));
+  body.appendChild(field('Source (subcategory)', fSub, 'A more specific grouping within the category (optional).'));
+  body.appendChild(field('Account', fAcct, 'Which account or card this was paid from.'));
+  body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
+  body.appendChild(field('Amount', fAmount, 'How much you paid.'));
+  body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this expense.'));
+  rebuildSubs();
+  fCat.addEventListener('change', rebuildSubs);
+
+  openModal({
+    title: existing ? 'Edit expense' : 'Add expense', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
+      const amount = parseFloat(fAmount.value);
+      if (isNaN(amount)) { toast('Amount is required', 'warn'); fAmount.focus(); return false; }
+      const entry = Object.assign(e, {
+        date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
+        accountId: fAcct.value || '', personId: fPerson.value, amount, notes: fNotes.value.trim()
+      });
+      store.saveExpense(activeYear, entry);
+      toast(existing ? 'Expense updated' : 'Expense added');
     }
   });
 }

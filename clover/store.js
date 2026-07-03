@@ -268,6 +268,15 @@ window.cloverStore = {
   },
   removeIncome(y, id) { const d = state.years[String(y)]; if (!d) return; d.income = d.income.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
 
+  // --- expense payments (one-off / actual cash-basis expenses) ---
+  saveExpense(y, entry) {
+    const d = state.years[String(y)]; if (!d) return null;
+    if (entry.id) { const i = d.expensePayments.findIndex(x => x.id === entry.id); if (i >= 0) d.expensePayments[i] = entry; else d.expensePayments.push(entry); }
+    else { entry.id = mkId('exp'); d.expensePayments.push(entry); }
+    this.scheduleSaveYear(y); notify(); return entry;
+  },
+  removeExpense(y, id) { const d = state.years[String(y)]; if (!d) return; d.expensePayments = d.expensePayments.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
+
   // --- lookups ---
   personName(id) { const p = state.persons.find(x => x.id === id); return p ? p.name : '—'; },
   incomeGroup(id) { return state.incomeCategories.find(c => c.id === id) || null; },
