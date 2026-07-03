@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.1**
+**Current Version: v0.47.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.47.2** — The Insights Trends chart can now graph walks by **distance** — a new "Walk miles"
+  metric (miles walked per day) alongside the existing "Walk time" (minutes).
 - **v0.47.1** — The "Last potty" status card now ignores trips where the dog did **nothing** — a
   potty break with no result no longer resets the timer, so the card reflects the last time your
   dog actually went.

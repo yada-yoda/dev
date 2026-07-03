@@ -218,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47.1';
+const APP_VERSION = 'v0.47.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -379,7 +379,8 @@ function checkWalkBadges(announce){
 const TREND_METRICS = [
   { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
   { k:'potty',   label:'Potty',   icon:'potty',  auto:'bar',  hint:'Pee vs poop counts per day. A steady rhythm is healthy — sudden shifts can be an early signal.' },
-  { k:'walk',    label:'Walks',   icon:'walk',   auto:'area', hint:'Total walk minutes per day.' },
+  { k:'walk',    label:'Walk time', icon:'walk', auto:'area', hint:'Total walk minutes per day.' },
+  { k:'walkdist',label:'Walk miles',icon:'walk', auto:'area', hint:'Total miles walked per day.' },
   { k:'weight',  label:'Weight',  icon:'weight', auto:'line', hint:'Weigh-ins over time. Gaps are normal — the line connects your recorded points.' }
 ];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
@@ -3346,6 +3347,9 @@ function trendData(){
   } else if(trendMetric==='walk'){
     const a=days.map(()=>0); petLogs('walk').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx && num(l.durationMin)!=null) a[idx[d]]+=num(l.durationMin); });
     datasets=[{label:'Walk minutes',data:a,color:purple}];
+  } else if(trendMetric==='walkdist'){
+    const a=days.map(()=>0); petLogs('walk').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx && num(l.distance)!=null) a[idx[d]]+=num(l.distance); });
+    datasets=[{label:'Miles walked',data:a,color:teal}];
   } else {
     const a=days.map(()=>null); petLogs('weight').filter(l=>num(l.value)!=null).sort((x,y)=>new Date(x.dateTime)-new Date(y.dateTime)).forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx) a[idx[d]]=num(l.value); });
     datasets=[{label:'Weight',data:a,color:orange}];
