@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.47.2**
+**Current Version: v0.47.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,9 @@ covers both.
 
 ## Version History
 
+- **v0.47.3** — Two small polish touches: the dog's **latest walking badge** now shows as a small
+  medallion next to their name on the Profile tab, and on Today the **"Fed today" progress and the
+  "next walking badge" bar sit side by side** instead of stacked.
 - **v0.47.2** — The Insights Trends chart can now graph walks by **distance** — a new "Walk miles"
   metric (miles walked per day) alongside the existing "Walk time" (minutes).
 - **v0.47.1** — The "Last potty" status card now ignores trips where the dog did **nothing** — a

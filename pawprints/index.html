@@ -218,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.47.2';
+const APP_VERSION = 'v0.47.3';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -375,6 +375,16 @@ function checkWalkBadges(announce){
   if(P > prevP) p.prestige = P;
   if(newly.length || P > prevP) save(false);
   if(announce && msg) showToast(msg);
+}
+// Small inline medallion of the highest badge earned — sized to sit next to the dog's name.
+function latestBadgeInline(){
+  const mi = totalWalkMiles(), earned = walkBadgesEarned(mi);
+  if(!earned.length) return '';
+  const b = earned[earned.length-1], tc = BADGE_TIERS[b.tier];
+  const P = prestigeLevel(mi), fx = prestigeFx(P);
+  let shadow = '0 0 0 2px '+tc+'22', star = '';
+  if(fx){ shadow += ',0 0 '+Math.min(fx.glow,13)+'px '+fx.col+'aa'; star = '<span style="position:absolute;top:-4px;right:-4px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:'+fx.col+';color:#0d1117;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bg-card);font-family:JetBrains Mono,monospace">'+P+'</span>'; }
+  return '<span title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(fx?' · Prestige '+P:'')+'" style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:15px;flex-shrink:0;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:'+shadow+'">'+b.icon+star+'</span>';
 }
 const TREND_METRICS = [
   { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
@@ -2589,9 +2599,8 @@ function statusCard(label, icon, dt, overdueHrs, extra){
     +(dt?'<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+fmtTime(dt)+'</div>':'<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">not logged</div>')
     +(extra||'')+'</div>';
 }
-// Sum today's feeding amounts vs the goal → a mini progress block for the Last fed card.
-// Full-width "fed today vs goal" strip shown under the status cards (keeps the 4 cards uniform).
-function renderFeedingStrip(){
+// "Fed today vs goal" as its own card (sits side-by-side with the next-badge card on Today).
+function renderFeedingCard(){
   const todayKey = todayISO();
   const amt = petLogs('feed').filter(f => f.dateTime && f.dateTime.slice(0,10)===todayKey).reduce((s,f)=> s + (num(f.amount)||0), 0);
   const goal = num((data.settings||{}).feedGoal), unit = ((data.settings||{}).feedGoalUnit || 'cups');
@@ -2599,13 +2608,15 @@ function renderFeedingStrip(){
   const fmt = n => (Math.round(n*100)/100).toString();
   const goalTip = tip('Set a daily feeding goal in Settings → Lists & preferences to track progress toward it here.');
   const head = '<span style="font-size:12px;color:var(--text-secondary);display:inline-flex;align-items:center;gap:5px">'+svgIcon('fed',14)+' Fed today'+goalTip+'</span>';
+  let body;
   if(goal && goal>0){
     const pct = Math.min(100, Math.round(amt/goal*100)), met = amt >= goal;
-    return '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">'
-      + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:15px;color:'+(met?'var(--success)':'var(--text-primary)')+'">'+fmt(amt)+' / '+fmt(goal)+' '+esc(unit)+(met?' ✓':'')+'</span></div>'
-      + '<div style="height:9px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(met?'var(--success)':'linear-gradient(90deg,var(--accent),var(--accent-2))')+';border-radius:5px;transition:width .3s"></div></div></div>';
+    body = '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:16px;color:'+(met?'var(--success)':'var(--text-primary)')+'">'+fmt(amt)+' / '+fmt(goal)+' '+esc(unit)+(met?' ✓':'')+'</span></div>'
+      + '<div style="height:9px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+(met?'var(--success)':'linear-gradient(90deg,var(--accent),var(--accent-2))')+';border-radius:5px;transition:width .3s"></div></div>';
+  } else {
+    body = '<div style="display:flex;justify-content:space-between;align-items:baseline">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:16px">'+fmt(amt)+' '+esc(unit)+'</span></div>';
   }
-  return '<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:baseline">'+head+'<span style="font-family:\'JetBrains Mono\',monospace;font-weight:700;font-size:15px">'+fmt(amt)+' '+esc(unit)+'</span></div>';
+  return '<div class="card" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:center">'+body+'</div>';
 }
 function renderToday(){
   if(!activePet()) return emptyState();
@@ -2641,9 +2652,11 @@ function renderToday(){
     + statusCard('Water refilled',svgIcon('water',16),water?water.dateTime:null,null)
     + statusCard('Last potty',svgIcon('potty',16),potty?potty.dateTime:null,8)
     + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
-    + '</div>' + renderFeedingStrip() + '</div>';
-  // next walking badge
-  html += renderNextBadgeToday();
+    + '</div></div>';
+  // fed-today progress + next walking badge, side by side
+  const feedC = renderFeedingCard(), badgeC = renderNextBadgeToday();
+  if(feedC && badgeC) html += '<div class="grid-2" style="margin-bottom:12px">'+feedC+badgeC+'</div>';
+  else html += feedC + badgeC;
   // reminders
   const rem = getReminders();
   if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span>'+esc(r.text)+'</span></div>').join('')+'</div>';
@@ -2770,7 +2783,7 @@ function renderProfile(){
   // profile card
   html += '<div class="card"><div style="display:flex;gap:18px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
     + (p.photo?'<img src="'+p.photo+'" class="profile-photo-lg">':'<div class="profile-photo-lg">🐾</div>')
-    + '<div style="flex:1;min-width:160px"><div style="font-size:24px;font-weight:700">'+esc(p.name)+'</div>'
+    + '<div style="flex:1;min-width:160px"><div style="display:flex;align-items:center;gap:9px;font-size:24px;font-weight:700"><span>'+esc(p.name)+'</span>'+latestBadgeInline()+'</div>'
     + '<div style="color:var(--text-secondary);font-size:14px;margin-top:2px">'+[p.breed,p.sex,p.color].filter(Boolean).map(esc).join(' · ')+'</div></div>'
     + (canManage()?'<button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">'+svgIcon('edit',15)+' Edit</button>':'')+'</div>';
   // key facts grid
@@ -3191,7 +3204,7 @@ function renderNextBadgeToday(){
     const nx = (P+1)*1000; label = 'Next prestige'; name = 'Prestige '+(P+1); toGo = fmtMi(nx-mi)+' mi to go'; icon = fx&&fx.aura?'🌟':'⭐'; tc = prestigeColor(P+1); pct = Math.min(100,(mi-P*1000)/1000*100);
   }
   const pulseCls = (fx&&fx.pulse)?' prestige-pulse':'';
-  return '<div class="card" onclick="switchView(\'insights\')" style="cursor:pointer"><div style="display:flex;align-items:center;gap:14px">'
+  return '<div class="card" onclick="switchView(\'insights\')" style="cursor:pointer;margin-bottom:0;display:flex;align-items:center"><div style="display:flex;align-items:center;gap:14px;width:100%">'
     + '<div class="'+pulseCls.trim()+'" style="width:52px;height:52px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';'+(fx&&fx.pulse?'--pglow:'+fx.glow+'px;--pcol:'+fx.col+';':'')+'">'+icon+'</div>'
     + '<div style="flex:1;min-width:0"><div style="font-size:12px;color:var(--text-secondary)">'+label+(fx?' · <span style="color:'+fx.col+'">Prestige '+P+'</span>':'')+'</div>'
     + '<div style="font-weight:700;font-size:15px">'+esc(name)+' <span style="font-weight:400;color:var(--text-secondary);font-size:12px">· '+toGo+'</span></div>'
