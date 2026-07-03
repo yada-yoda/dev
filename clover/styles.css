@@ -408,6 +408,12 @@ button { font-family: inherit; cursor: pointer; }
 .mini-right { display: flex; align-items: center; gap: 6px; }
 .pos { color: var(--income); font-weight: 600; white-space: nowrap; }
 .neg { color: var(--expense); font-weight: 600; white-space: nowrap; }
+
+/* Reports */
+.report-gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 18px; margin-bottom: 18px; }
+.report-chart { height: 260px; position: relative; }
+.report-chart canvas { max-width: 100%; }
+.table-scroll { overflow-x: auto; }
 .pay-chip { cursor: pointer; }
 .pay-chip:hover { border-color: var(--accent); }
 

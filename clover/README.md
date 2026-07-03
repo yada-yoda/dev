@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.8.0 — Phase 7 (part 1): Reports
+- New Reports page with a chart gallery for the selected year: income vs expenses
+  by month, net cashflow, wages gross vs net, and doughnuts for income by category,
+  expenses by category, and expenses by payment method.
+- Year-overview table: income, expenses, net, dividends, interest, and rewards
+  per year across all your years (loads each year on demand).
+
+_Why:_ turns the raw entries into the trends and year-over-year comparisons the
+spreadsheets were really for. (Calendar view comes next.)
+
 ### v0.7.3 — Savings rates tracked by institution
 - The Savings Rates tracker now records APY per **bank/institution** (Ally,
   Synchrony, …) instead of per individual account — matching how rates actually
@@ -253,6 +263,6 @@ any financial data or features are built.
 | 4 | Paychecks ✅ |
 | 5 | Credit scores & savings rates ✅ |
 | 6 | Dashboard ✅ |
-| 7 | Reports & calendar |
+| 7 | Reports ✅ · calendar (in progress) |
 | 8 | Import / export |
 | 9 | Polish, mobile, security review → v1.0.0 |

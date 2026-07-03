@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.7.3';
+const VERSION = '0.8.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -125,8 +125,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (P1-5 + P6 dashboard).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit };
+// Feature views (P1-6 + P7 reports).
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -1894,4 +1894,171 @@ function renderDashboard(view) {
   bottom.appendChild(upcomingRenewalsCard(store, s));
   bottom.appendChild(recentActivityCard(store, data));
   view.appendChild(bottom);
+}
+
+// ============================================================
+// Reports — Phase 7 (part 1)
+// ============================================================
+async function buildBarChart(canvas, cfg) {
+  let Chart;
+  try { Chart = await ensureChart(); } catch (e) { canvas.parentElement && canvas.parentElement.appendChild(el('div', 'muted', 'Chart could not load (offline?).')); return; }
+  if (!canvas.isConnected) return;
+  _charts.push(new Chart(canvas, {
+    type: 'bar',
+    data: { labels: cfg.labels, datasets: cfg.datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: cfg.datasets.length > 1, position: 'top', labels: { boxWidth: 12, usePointStyle: true, font: { size: 12 } } },
+        tooltip: { callbacks: { label: ctx => (ctx.dataset.label ? ctx.dataset.label + ': ' : '') + money(ctx.parsed.y) } }
+      },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#5f6f66' } },
+        y: { ticks: { font: { size: 11 }, color: '#5f6f66', callback: v => '$' + v }, grid: { color: '#eef1ef' } }
+      }
+    }
+  }));
+}
+
+function reportCard(title, builder) {
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', title));
+  const wrap = el('div', 'report-chart'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
+  builder(cv);
+  return card;
+}
+function doughnutInto(cv, map) {
+  const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  if (!entries.length) { cv.parentElement.appendChild(el('div', 'muted', 'No data yet.')); return; }
+  buildDoughnut(cv, { labels: entries.map(e => e[0]), data: entries.map(e => e[1]) });
+}
+
+function monthlyIncomeTotals(store, data) {
+  const m = new Array(12).fill(0);
+  data.income.filter(countable).forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += amountOf(e); });
+  data.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p.gross) || 0; });
+  return m;
+}
+function monthlyRecurringTotals(store, payments) {
+  const m = new Array(12).fill(0);
+  store.state.recurring.filter(isSubActive).forEach(bill => {
+    const me = monthlyEquiv(bill);
+    for (let mi = 0; mi < 12; mi++) { const ov = payments.some(p => p.recurringId === bill.id && monthIdx(p.date) === mi); if (!ov) m[mi] += me; }
+  });
+  return m;
+}
+function monthlyExpenseTotals(store, data, includeRecurring) {
+  const m = new Array(12).fill(0);
+  data.expensePayments.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += expenseAmount(e); });
+  if (includeRecurring) { const rec = monthlyRecurringTotals(store, data.expensePayments); for (let i = 0; i < 12; i++) m[i] += rec[i]; }
+  return m;
+}
+function wageMonthly(data, field) {
+  const m = new Array(12).fill(0);
+  data.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p[field]) || 0; });
+  return m;
+}
+function expenseByCategoryFull(store, data) {
+  const m = {};
+  data.expensePayments.forEach(e => { const g = store.expenseGroupName(e.categoryId); m[g] = (m[g] || 0) + expenseAmount(e); });
+  store.state.expenseCategories.forEach(cat => { const rec = recurringMonthsForCategory(store, cat.id, data.expensePayments).reduce((a, b) => a + b, 0); if (rec > 0) m[cat.name] = (m[cat.name] || 0) + rec; });
+  return m;
+}
+function expenseByAccount(store, data) {
+  const m = {};
+  data.expensePayments.forEach(e => { const name = store.accountName(e.accountId) || 'Unassigned'; m[name] = (m[name] || 0) + expenseAmount(e); });
+  return m;
+}
+function incomeByNamedCategory(store, data, re) {
+  const cat = store.state.incomeCategories.find(c => re.test(c.name));
+  if (!cat) return 0;
+  let s = data.income.filter(countable).filter(e => e.categoryId === cat.id).reduce((a, e) => a + amountOf(e), 0);
+  s += data.paychecks.filter(isPaycheckPaid).filter(p => p.incomeCategoryId === cat.id).reduce((a, p) => a + (Number(p.gross) || 0), 0);
+  return s;
+}
+
+function renderReports(view) {
+  destroyCharts();
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+  const data = store.yearData(activeYear);
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Reports · ' + activeYear));
+  left.appendChild(el('p', 'muted', 'Charts follow the year selector in the top bar'));
+  head.appendChild(left);
+  view.appendChild(head);
+
+  const inc = monthlyIncomeTotals(store, data);
+  const exp = monthlyExpenseTotals(store, data, true);
+  const net = inc.map((v, i) => v - exp[i]);
+  const wGross = wageMonthly(data, 'gross');
+  const wNet = wageMonthly(data, 'net');
+
+  const gallery = el('div', 'report-gallery');
+  gallery.appendChild(reportCard('Income vs Expenses', cv => buildBarChart(cv, {
+    labels: MONTHS, datasets: [
+      { label: 'Income', data: inc, backgroundColor: '#16a34a' },
+      { label: 'Expenses', data: exp, backgroundColor: '#dc2626' }
+    ]
+  })));
+  gallery.appendChild(reportCard('Net cashflow by month', cv => buildBarChart(cv, {
+    labels: MONTHS, datasets: [{ label: 'Net', data: net, backgroundColor: net.map(v => v >= 0 ? '#16a34a' : '#dc2626') }]
+  })));
+  gallery.appendChild(reportCard('Wages: gross vs net', cv => buildBarChart(cv, {
+    labels: MONTHS, datasets: [
+      { label: 'Gross', data: wGross, backgroundColor: '#2563eb' },
+      { label: 'Net', data: wNet, backgroundColor: '#16a34a' }
+    ]
+  })));
+  gallery.appendChild(reportCard('Income by category', cv => doughnutInto(cv, incomeByCategory(store, data))));
+  gallery.appendChild(reportCard('Expenses by category', cv => doughnutInto(cv, expenseByCategoryFull(store, data))));
+  gallery.appendChild(reportCard('Expenses by payment method', cv => doughnutInto(cv, expenseByAccount(store, data))));
+  view.appendChild(gallery);
+
+  view.appendChild(yoyOverview(store));
+}
+
+function yearSummary(store, y) {
+  const d = store.yearData(y);
+  const income = incomeYTDall(d);
+  const expenses = d.expensePayments.reduce((a, e) => a + expenseAmount(e), 0);   // logged actuals (historically correct)
+  return {
+    year: y, income, expenses, net: income - expenses,
+    dividends: incomeByNamedCategory(store, d, /dividend/i),
+    interest: incomeByNamedCategory(store, d, /interest/i),
+    rewards: incomeByNamedCategory(store, d, /reward/i)
+  };
+}
+function yoyOverview(store) {
+  const curYear = new Date().getFullYear();
+  const years = []; for (let y = curYear; y >= 2020; y--) years.push(y);
+  const missing = years.filter(y => !store.isYearLoaded(y));
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'Year overview'));
+  if (missing.length) {
+    missing.forEach(y => store.loadYear(y));   // re-renders when each loads
+    card.appendChild(el('div', 'muted', 'Loading year data…'));
+    return card;
+  }
+  const rows = years.map(y => yearSummary(store, y)).filter(r => r.income || r.expenses);
+  if (!rows.length) { card.appendChild(el('div', 'muted', 'No data yet — add income and expenses to see year-over-year totals.')); return card; }
+  const wrap = el('div', 'table-scroll');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Year</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th><th class="num">Dividends</th><th class="num">Interest</th><th class="num">Rewards</th></tr></thead>';
+  const tb = el('tbody');
+  rows.forEach(r => {
+    const tr = el('tr');
+    tr.appendChild(el('td', 'strong', String(r.year)));
+    tr.appendChild(numCell(r.income, true));
+    tr.appendChild(numCell(r.expenses));
+    const netTd = numCell(r.net, true); netTd.classList.add(r.net >= 0 ? 'pos' : 'neg'); tr.appendChild(netTd);
+    tr.appendChild(numCell(r.dividends));
+    tr.appendChild(numCell(r.interest));
+    tr.appendChild(numCell(r.rewards));
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); wrap.appendChild(table); card.appendChild(wrap);
+  return card;
 }
