@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.6.0 — Phase 5: Credit scores & savings rates (first charts)
+- New Credit & Rates page with two tabs:
+  - **Credit scores** — log date/score/provider; charted as a line per provider
+    (Credit Karma, Chase, Amex, bureaus…) over time, plus a sortable table.
+  - **Savings rates** — log date/account/APY; charted as a line per account so you
+    can compare how each bank's rate moves, plus a sortable table.
+- Introduces charts via Chart.js (lazy-loaded from CDN on first use); charts are
+  responsive and fall back gracefully if the library can't load.
+
+_Why:_ recreates the credit-score history and APY-tracking sheets, and adds the
+charting foundation the Reports phase will build on.
+
 ### v0.5.0 — Phase 4: Paychecks
 - New Paychecks page: expected vs. received dates with automatic days-early/late,
   gross/net, employer/source (main job and acting/side gigs), person, pay-period
@@ -198,7 +210,7 @@ any financial data or features are built.
 | 2 | Income tracker + Annual Grid ✅ |
 | 3 | Subscriptions & expenses ✅ |
 | 4 | Paychecks ✅ |
-| 5 | Credit scores & savings rates |
+| 5 | Credit scores & savings rates ✅ |
 | 6 | Dashboard |
 | 7 | Reports & calendar |
 | 8 | Import / export |

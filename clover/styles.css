@@ -388,6 +388,8 @@ button { font-family: inherit; cursor: pointer; }
 .net-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .sum-hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 .strip-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+.chart-wrap { height: 320px; position: relative; }
+.chart-wrap canvas { max-width: 100%; }
 .pay-chip { cursor: pointer; }
 .pay-chip:hover { border-color: var(--accent); }
 

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -46,6 +46,7 @@ let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
 let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
+let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
 const expandedExpenseGroups = new Set();
 
@@ -123,8 +124,8 @@ function routeTo(id) {
   renderView(route);
 }
 
-// Feature views (P1: settings, accounts; P2: income; P3: subscriptions + expenses; P4: paychecks).
-const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks };
+// Feature views (P1-4 + P5 credit & rates).
+const LIVE_VIEWS = { settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit };
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
 // 'owner'  = signed-in user is an allowlisted owner (normal use)
@@ -1486,6 +1487,178 @@ function paycheckModal(existing) {
       });
       store.savePaycheck(activeYear, entry);
       toast(existing ? 'Paycheck updated' : 'Paycheck added');
+    }
+  });
+}
+
+// ============================================================
+// Credit scores + savings-rate history (Phase 5) — first charts
+// ============================================================
+let _chartLoading = null;
+function ensureChart() {
+  if (window.Chart) return Promise.resolve(window.Chart);
+  if (_chartLoading) return _chartLoading;
+  _chartLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js';
+    s.onload = () => resolve(window.Chart);
+    s.onerror = () => { _chartLoading = null; reject(new Error('Chart.js failed to load')); };
+    document.head.appendChild(s);
+  });
+  return _chartLoading;
+}
+const CHART_PALETTE = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#0891b2', '#db2777', '#65a30d', '#ca8a04', '#475569'];
+let _cloverChart = null;
+function destroyChart() { if (_cloverChart) { try { _cloverChart.destroy(); } catch (e) {} _cloverChart = null; } }
+function fmtDateShort(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso; return (+m[2]) + '/' + (+m[3]) + '/' + m[1].slice(2); }
+
+async function buildLineChart(canvas, cfg) {
+  let Chart;
+  try { Chart = await ensureChart(); } catch (e) { canvas.parentElement && canvas.parentElement.appendChild(el('div', 'muted', 'Chart could not load (offline?).')); return; }
+  destroyChart();
+  if (!canvas.isConnected) return;
+  _cloverChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels: cfg.labels, datasets: cfg.datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'nearest', intersect: false },
+      plugins: { legend: { position: 'top', labels: { boxWidth: 12, usePointStyle: true, font: { size: 12 } } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { font: { size: 11 }, color: '#5f6f66', maxRotation: 0, autoSkip: true } },
+        y: { title: { display: !!cfg.yTitle, text: cfg.yTitle || '' }, ticks: { font: { size: 11 }, color: '#5f6f66' }, grid: { color: '#eef1ef' } }
+      }
+    }
+  });
+}
+
+let creditSort = { key: 'date', dir: 'desc' };
+let rateSort = { key: 'date', dir: 'desc' };
+const COMMON_PROVIDERS = ['Credit Karma', 'Chase', 'Amex', 'Discover', 'Experian', 'Equifax', 'TransUnion', 'FICO', 'VantageScore'];
+
+function renderCredit(view) {
+  destroyChart();
+  const store = window.cloverStore, s = store.state;
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Credit & Rates'));
+  const cnt = creditTab === 'credit' ? (s.creditScores.length + ' score' + (s.creditScores.length === 1 ? '' : 's'))
+                                     : (s.rateHistory.length + ' rate entr' + (s.rateHistory.length === 1 ? 'y' : 'ies'));
+  left.appendChild(el('p', 'muted', cnt));
+  head.appendChild(left);
+  const right = el('div', 'head-actions');
+  const tabs = el('div', 'tabs');
+  [['credit', 'Credit scores'], ['rates', 'Savings rates']].forEach(([t, label]) => {
+    const b = el('button', 'tab' + (creditTab === t ? ' active' : ''), label);
+    b.addEventListener('click', () => { creditTab = t; renderView(currentRoute); });
+    tabs.appendChild(b);
+  });
+  right.appendChild(tabs);
+  const add = el('button', 'btn-primary', creditTab === 'credit' ? '+ Add score' : '+ Add rate');
+  add.addEventListener('click', () => creditTab === 'credit' ? creditScoreModal(null) : rateModal(null));
+  right.appendChild(add);
+  head.appendChild(right);
+  view.appendChild(head);
+
+  if (creditTab === 'credit') renderCreditTab(view); else renderRatesTab(view);
+}
+
+function renderCreditTab(view) {
+  const store = window.cloverStore, s = store.state;
+  const rows = s.creditScores.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!rows.length) { view.appendChild(emptyState('No credit scores yet', 'Log your scores over time to chart them by provider (Credit Karma, Chase, Amex, etc.).', '+ Add score', () => creditScoreModal(null))); return; }
+
+  const dates = [...new Set(rows.map(r => r.date))].sort();
+  const providers = [...new Set(rows.map(r => r.provider || 'Unknown'))];
+  const datasets = providers.map((prov, i) => ({
+    label: prov,
+    data: dates.map(d => { const rec = rows.find(x => x.date === d && (x.provider || 'Unknown') === prov); return rec ? Number(rec.score) : null; }),
+    borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+    spanGaps: true, tension: 0.25, pointRadius: 3
+  }));
+  const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
+  buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: 'Score' });
+
+  const cols = [
+    { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
+    { label: 'Score', key: 'score', num: true, value: r => Number(r.score) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = r.score || '—'; return td; } },
+    { label: 'Provider', key: 'provider', value: r => r.provider || '', cell: r => el('td', null, r.provider || '—') },
+    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => creditScoreModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + (r.provider || 'score'), () => store.removeCreditScore(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
+  ];
+  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
+}
+
+function renderRatesTab(view) {
+  const store = window.cloverStore, s = store.state;
+  const rows = s.rateHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!rows.length) { view.appendChild(emptyState('No savings rates yet', 'Log your accounts’ APY over time to compare how banks’ rates move.', '+ Add rate', () => rateModal(null))); return; }
+
+  const dates = [...new Set(rows.map(r => r.date))].sort();
+  const acctIds = [...new Set(rows.map(r => r.accountId))];
+  const datasets = acctIds.map((aid, i) => ({
+    label: store.accountName(aid) || 'Account',
+    data: dates.map(d => { const rec = rows.find(x => x.date === d && x.accountId === aid); return rec ? Number(rec.apy) : null; }),
+    borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+    spanGaps: true, tension: 0.25, pointRadius: 3
+  }));
+  const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
+  buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: '% APY' });
+
+  const cols = [
+    { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
+    { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') },
+    { label: 'APY', key: 'apy', num: true, value: r => Number(r.apy) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = (r.apy != null && r.apy !== '') ? (Number(r.apy).toFixed(2) + '%') : '—'; return td; } },
+    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + store.accountName(r.accountId), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
+  ];
+  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
+}
+
+function creditScoreModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? Object.assign({}, existing) : { date: todayISO() };
+  const body = el('div', 'form-grid');
+  const provList = el('datalist'); provList.id = 'prov-list';
+  [...new Set(COMMON_PROVIDERS.concat(s.creditScores.map(x => x.provider).filter(Boolean)))].forEach(p => { const o = el('option'); o.value = p; provList.appendChild(o); });
+  body.appendChild(provList);
+
+  const fDate = input(r.date || todayISO(), { type: 'date' });
+  const fScore = input(r.score != null ? r.score : '', { type: 'number', placeholder: '300–850' }); fScore.min = 300; fScore.max = 900;
+  const fProv = input(r.provider || '', { placeholder: 'e.g. Credit Karma', list: 'prov-list' });
+  body.appendChild(field('Date', fDate, 'When this score was reported.'));
+  body.appendChild(field('Score', fScore, 'The credit score number (usually 300–850).'));
+  body.appendChild(field('Provider', fProv, 'Who reported it — Credit Karma, Chase, Amex, a bureau, etc. Charted as its own line.'));
+
+  openModal({
+    title: existing ? 'Edit score' : 'Add score', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const score = parseInt(fScore.value, 10);
+      if (isNaN(score)) { fScore.focus(); toast('Score is required', 'warn'); return false; }
+      store.saveCreditScore(Object.assign(r, { date: fDate.value || todayISO(), score, provider: fProv.value.trim() }));
+      toast(existing ? 'Score updated' : 'Score added');
+    }
+  });
+}
+
+function rateModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? Object.assign({}, existing) : { date: todayISO() };
+  const body = el('div', 'form-grid');
+  const accts = s.accounts.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const fDate = input(r.date || todayISO(), { type: 'date' });
+  const fAcct = select([{ value: '', label: '— Select —' }].concat(accts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.accountId || '');
+  const fApy = input(r.apy != null ? r.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fApy.step = '0.01';
+  body.appendChild(field('Date', fDate, 'When this rate was in effect.'));
+  body.appendChild(field('Account', fAcct, 'Which savings/CD account this APY is for. Manage accounts on the Accounts page.'));
+  body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date. Each account is charted as its own line.'));
+
+  openModal({
+    title: existing ? 'Edit rate' : 'Add rate', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      if (!fAcct.value) { fAcct.focus(); toast('Pick an account', 'warn'); return false; }
+      const apy = parseFloat(fApy.value);
+      if (isNaN(apy)) { fApy.focus(); toast('APY is required', 'warn'); return false; }
+      store.saveRate(Object.assign(r, { date: fDate.value || todayISO(), accountId: fAcct.value, apy }));
+      toast(existing ? 'Rate updated' : 'Rate added');
     }
   });
 }

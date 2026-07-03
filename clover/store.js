@@ -80,7 +80,9 @@ function defaults() {
       institutions: seedList(SEED_INSTITUTIONS),
       rewardPrograms: seedList(SEED_REWARD_PROGRAMS),
       giftCardTypes: seedList(SEED_GIFT_CARD_TYPES)
-    }
+    },
+    creditScores: [],   // {id, date, score, provider}
+    rateHistory: []     // {id, date, accountId, apy}
   };
 }
 
@@ -131,7 +133,9 @@ function snapshot() {
     expenseCategories: state.expenseCategories,
     accounts: state.accounts,
     recurring: state.recurring,
-    catalog: state.catalog
+    catalog: state.catalog,
+    creditScores: state.creditScores,
+    rateHistory: state.rateHistory
   };
 }
 
@@ -144,6 +148,8 @@ function apply(data) {
   state.accounts = s.accounts;
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;
+  state.creditScores = s.creditScores || [];
+  state.rateHistory = s.rateHistory || [];
   state._loaded = true;
 }
 
@@ -208,6 +214,20 @@ window.cloverStore = {
   removeRecurring(id) { state.recurring = state.recurring.filter(x => x.id !== id); scheduleSave(); notify(); },
   expenseGroup(id) { return state.expenseCategories.find(c => c.id === id) || null; },
   expenseGroupName(id) { const g = this.expenseGroup(id); return g ? g.name : '—'; },
+
+  // --- credit scores + savings-rate history (Phase 5, meta doc, cross-year) ---
+  saveCreditScore(entry) {
+    if (entry.id) { const i = state.creditScores.findIndex(x => x.id === entry.id); if (i >= 0) state.creditScores[i] = entry; else state.creditScores.push(entry); }
+    else { entry.id = mkId('cs'); state.creditScores.push(entry); }
+    scheduleSave(); notify(); return entry;
+  },
+  removeCreditScore(id) { state.creditScores = state.creditScores.filter(x => x.id !== id); scheduleSave(); notify(); },
+  saveRate(entry) {
+    if (entry.id) { const i = state.rateHistory.findIndex(x => x.id === entry.id); if (i >= 0) state.rateHistory[i] = entry; else state.rateHistory.push(entry); }
+    else { entry.id = mkId('rate'); state.rateHistory.push(entry); }
+    scheduleSave(); notify(); return entry;
+  },
+  removeRate(id) { state.rateHistory = state.rateHistory.filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },
