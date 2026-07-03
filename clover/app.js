@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.7.2';
+const VERSION = '0.7.3';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1656,16 +1656,23 @@ function renderCreditTab(view) {
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
 }
 
+// An entry's institution, with a fallback for any legacy accountId-based rows.
+function rateInstitution(store, r) {
+  if (r.institution) return r.institution;
+  if (r.accountId) { const a = store.account(r.accountId); return (a && a.institution) || store.accountName(r.accountId) || ''; }
+  return '';
+}
+
 function renderRatesTab(view) {
   const store = window.cloverStore, s = store.state;
   const rows = s.rateHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  if (!rows.length) { view.appendChild(emptyState('No savings rates yet', 'Log your accounts’ APY over time to compare how banks’ rates move.', '+ Add rate', () => rateModal(null))); return; }
+  if (!rows.length) { view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null))); return; }
 
   const dates = [...new Set(rows.map(r => r.date))].sort();
-  const acctIds = [...new Set(rows.map(r => r.accountId))];
-  const datasets = acctIds.map((aid, i) => ({
-    label: store.accountName(aid) || 'Account',
-    data: dates.map(d => { const rec = rows.find(x => x.date === d && x.accountId === aid); return rec ? Number(rec.apy) : null; }),
+  const insts = [...new Set(rows.map(r => rateInstitution(store, r) || 'Unknown'))];
+  const datasets = insts.map((inst, i) => ({
+    label: inst,
+    data: dates.map(d => { const rec = rows.find(x => x.date === d && (rateInstitution(store, x) || 'Unknown') === inst); return rec ? Number(rec.apy) : null; }),
     borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
     spanGaps: true, tension: 0.25, pointRadius: 3
   }));
@@ -1674,9 +1681,9 @@ function renderRatesTab(view) {
 
   const cols = [
     { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
-    { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') },
+    { label: 'Bank / institution', key: 'institution', value: r => rateInstitution(store, r), cell: r => el('td', null, rateInstitution(store, r) || '—') },
     { label: 'APY', key: 'apy', num: true, value: r => Number(r.apy) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = (r.apy != null && r.apy !== '') ? (Number(r.apy).toFixed(2) + '%') : '—'; return td; } },
-    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + store.accountName(r.accountId), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
+    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
 }
@@ -1711,21 +1718,28 @@ function rateModal(existing) {
   const store = window.cloverStore, s = store.state;
   const r = existing ? Object.assign({}, existing) : { date: todayISO() };
   const body = el('div', 'form-grid');
-  const accts = s.accounts.slice().sort((a, b) => a.name.localeCompare(b.name));
+  const instList = el('datalist'); instList.id = 'rate-inst-list';
+  s.catalog.institutions.slice().sort((a, b) => a.name.localeCompare(b.name))
+    .forEach(i => { const o = el('option'); o.value = i.name; instList.appendChild(o); });
+  body.appendChild(instList);
+
   const fDate = input(r.date || todayISO(), { type: 'date' });
-  const fAcct = select([{ value: '', label: '— Select —' }].concat(accts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.accountId || '');
+  const fInst = input(rateInstitution(store, r), { placeholder: 'e.g. Ally', list: 'rate-inst-list' });
   const fApy = input(r.apy != null ? r.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fApy.step = '0.01';
   body.appendChild(field('Date', fDate, 'When this rate was in effect.'));
-  body.appendChild(field('Account', fAcct, 'Which savings/CD account this APY is for. Manage accounts on the Accounts page.'));
-  body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date. Each account is charted as its own line.'));
+  body.appendChild(field('Bank / institution', fInst, 'Which bank the APY is for (e.g. Ally, Synchrony). Rates are tracked per institution and each is charted as its own line. Pick from the list or type your own; manage the list in Settings.'));
+  body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date.'));
 
   openModal({
     title: existing ? 'Edit rate' : 'Add rate', body, confirmLabel: 'Save',
     onConfirm: () => {
-      if (!fAcct.value) { fAcct.focus(); toast('Pick an account', 'warn'); return false; }
+      const inst = fInst.value.trim();
+      if (!inst) { fInst.focus(); toast('Enter a bank / institution', 'warn'); return false; }
       const apy = parseFloat(fApy.value);
       if (isNaN(apy)) { fApy.focus(); toast('APY is required', 'warn'); return false; }
-      store.saveRate(Object.assign(r, { date: fDate.value || todayISO(), accountId: fAcct.value, apy }));
+      const entry = Object.assign(r, { date: fDate.value || todayISO(), institution: inst, apy });
+      delete entry.accountId;   // migrate any legacy account-based entry
+      store.saveRate(entry);
       toast(existing ? 'Rate updated' : 'Rate added');
     }
   });

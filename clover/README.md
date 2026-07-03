@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.7.3 — Savings rates tracked by institution
+- The Savings Rates tracker now records APY per **bank/institution** (Ally,
+  Synchrony, …) instead of per individual account — matching how rates actually
+  work. Pick from your institutions list (or type one); each bank is charted as
+  its own line. Any older account-based entries are read via the account's
+  institution.
+
 ### v0.7.2 — Bills roll into Expenses
 - Renamed "Subscriptions" to **Bills & Subscriptions** (utility bills like ComEd
   belong here alongside streaming, etc.).
