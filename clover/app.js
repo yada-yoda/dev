@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.0';
+const VERSION = '1.0.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -764,6 +764,7 @@ function renderIncome(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
+  right.appendChild(importButton('income'));
   const add = el('button', 'btn-primary', '+ Add income'); add.addEventListener('click', () => incomeModal(null));
   right.appendChild(add);
   head.appendChild(right);
@@ -1227,6 +1228,7 @@ function renderExpenses(view) {
     toggle.__input.addEventListener('change', () => { expenseIncludeRecurring = toggle.__input.checked; renderView(currentRoute); });
     right.appendChild(toggle);
   }
+  right.appendChild(importButton('expenses'));
   const add = el('button', 'btn-primary', '+ Add expense'); add.addEventListener('click', () => expenseModal(null));
   right.appendChild(add);
   head.appendChild(right);
@@ -1425,8 +1427,11 @@ function renderPaychecks(view) {
   left.appendChild(el('h3', null, 'Paychecks · ' + activeYear));
   left.appendChild(el('p', 'muted', paid.length + ' received · ' + pays.length + ' total'));
   head.appendChild(left);
+  const pcActions = el('div', 'head-actions');
+  pcActions.appendChild(importButton('paychecks'));
   const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
-  head.appendChild(add);
+  pcActions.appendChild(add);
+  head.appendChild(pcActions);
   view.appendChild(head);
 
   const sum = el('div', 'sub-summary');
@@ -2358,6 +2363,17 @@ const IMPORT_FIELDS = {
   ]
 };
 let importState = { target: 'income', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+
+// Jump to the Import page pre-set to a dataset (used by per-page Import buttons).
+function startImport(target) {
+  importState = { target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+  location.hash = '#import';
+}
+function importButton(target) {
+  const b = el('button', 'btn-ghost', '⬆ Import CSV');
+  b.addEventListener('click', () => startImport(target));
+  return b;
+}
 
 function parseImportDate(str) {
   if (!str) return '';

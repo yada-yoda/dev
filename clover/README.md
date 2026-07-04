@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.1 — Per-page CSV import
+- Added an "Import CSV" button to the Income, Expenses, and Paychecks pages that
+  jumps straight into the importer pre-set to that dataset — no need to pick the
+  target manually.
+
 ### v1.0.0 — Phase 9: polish & first stable release
 - Added an in-app "How Clover works" guide (Settings) covering paycheck→income and
   bill→expense roll-ups, backups, and privacy.
