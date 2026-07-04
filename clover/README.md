@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.3 — Fuller paycheck import + multi-year CSVs
+- Paycheck CSV import now maps Person, Period #, Period start/end, Status, and
+  payment Method (previously only date/gross/net/employer/notes).
+- A CSV can span multiple years — each row is routed to the correct year
+  automatically on import, and one Undo removes the whole multi-year batch.
+
 ### v1.0.2 — CSV import for Bills & Subscriptions
 - The importer now supports Bills & Subscriptions as a target, and that page has
   its own "Import CSV" button. Frequency, priority, and status text are normalized;

@@ -333,11 +333,15 @@ window.cloverStore = {
     this.scheduleSaveYear(y); notify();
   },
   undoImportBatch(y, batchId) {
-    const d = state.years[String(y)]; if (!d) return;
-    ['income', 'expensePayments', 'paychecks'].forEach(k => { d[k] = d[k].filter(e => e.batchId !== batchId); });
+    // A batch can span multiple years — remove it from every loaded year.
+    Object.keys(state.years).forEach(yr => {
+      const d = state.years[yr];
+      ['income', 'expensePayments', 'paychecks'].forEach(k => { d[k] = d[k].filter(e => e.batchId !== batchId); });
+      d.importBatches = (d.importBatches || []).filter(b => b.id !== batchId);
+      this.scheduleSaveYear(yr);
+    });
     if (state.recurring.some(r => r.batchId === batchId)) { state.recurring = state.recurring.filter(r => r.batchId !== batchId); scheduleSave(); }
-    d.importBatches = (d.importBatches || []).filter(b => b.id !== batchId);
-    this.scheduleSaveYear(y); notify();
+    notify();
   },
 
   // --- backup / restore ---

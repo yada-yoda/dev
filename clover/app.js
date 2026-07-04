@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.2';
+const VERSION = '1.0.3';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2361,7 +2361,13 @@ const IMPORT_FIELDS = {
     { key: 'gross', label: 'Gross', req: true, num: true, kw: ['gross', 'amount'] },
     { key: 'net', label: 'Net', num: true, kw: ['net'] },
     { key: 'receivedDate', label: 'Received date', kw: ['received', 'deposit'] },
-    { key: 'employer', label: 'Employer', kw: ['employer', 'source', 'person'] },
+    { key: 'employer', label: 'Employer', kw: ['employer', 'source'] },
+    { key: 'person', label: 'Person', kw: ['person', 'owner'] },
+    { key: 'periodNum', label: 'Period #', kw: ['period #', 'period no', 'period num', 'period'] },
+    { key: 'periodStart', label: 'Period start', kw: ['period start', 'pay date start', 'period pay date start', 'start'] },
+    { key: 'periodEnd', label: 'Period end', kw: ['period end', 'pay date end', 'period pay date end', 'end'] },
+    { key: 'status', label: 'Status', kw: ['status'] },
+    { key: 'method', label: 'Method', kw: ['method'] },
     { key: 'notes', label: 'Notes', kw: ['note', 'memo'] }
   ],
   subscriptions: [
@@ -2400,6 +2406,23 @@ function normalizePriority(t) {
   if (t.startsWith('l')) return 'Low';
   if (t.startsWith('o')) return 'Optional';
   return 'Medium';
+}
+function normalizePaycheckStatus(t) {
+  t = (t || '').trim().toLowerCase(); if (!t) return 'Received';
+  if (/bounce|return/.test(t)) return 'Bounced/Returned';
+  if (/manual/.test(t)) return 'Manual deposit';
+  if (/late/.test(t)) return 'Late';
+  if (/miss/.test(t)) return 'Missing';
+  if (/expect|pending/.test(t)) return 'Expected';
+  return 'Received';
+}
+function normalizePayMethod(t) {
+  t = (t || '').trim().toLowerCase(); if (!t) return 'Direct deposit';
+  if (/direct/.test(t)) return 'Direct deposit';
+  if (/check/.test(t)) return 'Check';
+  if (/office|pick|mailbox|door|driveway|joe/.test(t)) return 'Office pickup';
+  if (/deposit/.test(t)) return 'Direct deposit';
+  return 'Other';
 }
 let importState = { target: 'income', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
 
@@ -2470,7 +2493,14 @@ function buildImportEntries(store) {
       if (!date || isNaN(amt)) { skipped++; return; }
       if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', notes: g('notes') };
       else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
-      else e = { payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, receivedDate: parseImportDate(g('receivedDate')), employer: g('employer'), incomeCategoryId: fallbackCat, personId: matchPerson(store), status: 'Received', method: 'Direct deposit', notes: g('notes') };
+      else e = {
+        payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,
+        receivedDate: parseImportDate(g('receivedDate')), employer: String(g('employer')).trim(),
+        incomeCategoryId: fallbackCat, personId: matchPerson(store, g('person')),
+        periodNum: g('periodNum') ? (parseInt(String(g('periodNum')).replace(/[^\d]/g, ''), 10) || null) : null,
+        periodStart: parseImportDate(g('periodStart')), periodEnd: parseImportDate(g('periodEnd')),
+        status: normalizePaycheckStatus(g('status')), method: normalizePayMethod(g('method')), notes: g('notes')
+      };
     }
     if (existing.has(dupKey(target, e))) { dupes++; return; }
     entries.push(e);
@@ -2556,13 +2586,23 @@ function importSection() {
   const actions = el('div', 'io-actions');
   const impBtn = el('button', 'btn-primary', 'Import ' + entries.length + ' rows');
   impBtn.disabled = !entries.length;
-  impBtn.addEventListener('click', () => {
-    const missingReq = IMPORT_FIELDS[importState.target].filter(f => f.req && !importState.mapping[f.key]);
+  impBtn.addEventListener('click', async () => {
+    const target = importState.target;
+    const missingReq = IMPORT_FIELDS[target].filter(f => f.req && !importState.mapping[f.key]);
     if (missingReq.length) { toast('Map the required fields: ' + missingReq.map(f => f.label).join(', '), 'warn'); return; }
-    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: importState.target, source: importState.filename, count: entries.length };
-    store.importEntries(activeYear, importState.target, entries, batch);
+    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target, source: importState.filename, count: entries.length };
+    importState = { target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+    if (target === 'subscriptions') {
+      store.importEntries(activeYear, target, entries, batch);
+    } else {
+      // Route each row to the year of its date so a multi-year CSV imports correctly.
+      const byYear = {};
+      entries.forEach(e => { const m = /^(\d{4})/.exec(e.date || e.payDate || ''); const yr = m ? +m[1] : activeYear; (byYear[yr] = byYear[yr] || []).push(e); });
+      const years = Object.keys(byYear);
+      await Promise.all(years.map(y => store.loadYear(y)));
+      years.forEach(y => store.importEntries(+y, target, byYear[y], batch));
+    }
     toast('Imported ' + entries.length + ' rows');
-    importState = { target: importState.target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
     renderView(currentRoute);
   });
   actions.appendChild(impBtn);
