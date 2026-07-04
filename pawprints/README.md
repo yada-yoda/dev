@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.48.2**
+**Current Version: v0.48.3**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.48.3** — **Clear a supply's date** — a small "↺ Clear" link now appears under the Started
+  and Finished date fields when they have a value, since native date inputs (especially on iOS)
+  are hard to blank. Clearing the Finished date marks the item **still in use** again; clearing
+  Started puts it back in inventory — handy for fixing a date set by mistake.
 - **v0.48.2** — **One-tap Start / Finish on supplies** — each item in the Supplies list now has a
   quick action button: **Start** for items still in inventory (stamps today as the opened date and
   moves it to "In use"), and **Finish** for in-use items (stamps today as the finished date). No

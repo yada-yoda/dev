@@ -87,6 +87,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .btn-primary{background:linear-gradient(135deg,#f4a261,#2dd4bf);border:none;color:#08231f;font-weight:700;font-size:16px;padding:14px 28px;border-radius:12px;width:100%;cursor:pointer;font-family:inherit}
 .btn-google{background:#fff;color:#333;border:1px solid #ddd;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit}
 .btn-sm{padding:6px 14px;border-radius:8px;font-size:12px}.btn-danger{color:var(--danger)}.btn-accent{color:var(--accent)}
+.date-clear{background:none;border:none;color:var(--accent);font-size:11px;padding:4px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:3px}.date-clear:hover{text-decoration:underline}
 .label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
 .input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
 .input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
@@ -224,7 +225,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.48.2';
+const APP_VERSION = 'v0.48.3';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -591,6 +592,9 @@ function draftStrip(section){
 function fv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
 // Small info tooltip for confusing fields: tip('explanation') → appended after a label.
 function tip(t){ return t ? ' <span class="tip" tabindex="0" role="img" aria-label="Help: '+esc(t)+'" data-tip="'+esc(t)+'">i</span>' : ''; }
+// Clear-a-date link: native date inputs are hard to blank (esp. on iOS), so this lets a
+// mistakenly-set date be emptied. Rendered under a date field only when it has a value.
+function clearDateBtn(id, label){ return '<button type="button" class="date-clear" onclick="var e=document.getElementById(\''+id+'\');if(e){e.value=\'\';e.dispatchEvent(new Event(\'change\',{bubbles:true}));this.remove();}">'+esc(label)+'</button>'; }
 
 // ═══════════════════════════════════════════════
 // FIREBASE (shared login with Illness Tracker — same project)
@@ -2152,8 +2156,8 @@ function invModal(id, pre){
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="iv-cclast4" inputmode="numeric" maxlength="4" value="'+(it?esc(it.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
-    +'<div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'"></div>'
-    +'<div><label class="label">Finished'+tip('When it was used up or thrown out.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
+    +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open (or since purchase). Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
