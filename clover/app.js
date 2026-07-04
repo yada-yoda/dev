@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.1';
+const VERSION = '1.0.2';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1011,8 +1011,11 @@ function renderSubscriptions(view) {
   left.appendChild(el('h3', null, 'Bills & Subscriptions'));
   left.appendChild(el('p', 'muted', active.length + ' active · ' + all.length + ' total'));
   head.appendChild(left);
+  const subActions = el('div', 'head-actions');
+  subActions.appendChild(importButton('subscriptions'));
   const add = el('button', 'btn-primary', '+ Add subscription'); add.addEventListener('click', () => subscriptionModal(null));
-  head.appendChild(add);
+  subActions.appendChild(add);
+  head.appendChild(subActions);
   view.appendChild(head);
 
   const sum = el('div', 'sub-summary');
@@ -2360,8 +2363,44 @@ const IMPORT_FIELDS = {
     { key: 'receivedDate', label: 'Received date', kw: ['received', 'deposit'] },
     { key: 'employer', label: 'Employer', kw: ['employer', 'source', 'person'] },
     { key: 'notes', label: 'Notes', kw: ['note', 'memo'] }
+  ],
+  subscriptions: [
+    { key: 'name', label: 'Name', req: true, kw: ['name', 'subscription', 'service', 'item', 'reason'] },
+    { key: 'amount', label: 'Amount', req: true, num: true, kw: ['amount', 'monthly', 'annual', 'cost', 'price'] },
+    { key: 'frequency', label: 'Frequency', kw: ['frequency', 'freq', 'billing'] },
+    { key: 'category', label: 'Category', kw: ['category', 'type'] },
+    { key: 'renewalDate', label: 'Renewal date', kw: ['renew', 'renewal', 'next', 'date'] },
+    { key: 'account', label: 'Account', kw: ['account', 'card', 'payment', 'method'] },
+    { key: 'priority', label: 'Priority', kw: ['priority'] },
+    { key: 'status', label: 'Status', kw: ['status', 'active'] },
+    { key: 'autoPay', label: 'Auto-pay', kw: ['auto', 'autopay'] },
+    { key: 'vendor', label: 'Vendor', kw: ['vendor'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'description', 'memo'] }
   ]
 };
+function parseFrequency(t) {
+  t = (t || '').toLowerCase();
+  if (/bi.?week/.test(t)) return 'biweekly';
+  if (/week/.test(t)) return 'weekly';
+  if (/month/.test(t)) return 'monthly';
+  if (/quarter/.test(t)) return 'quarterly';
+  if (/semi|half.?year|6.?mo/.test(t)) return 'semiannual';
+  if (/year|annual|yr/.test(t)) return 'annual';
+  return 'monthly';
+}
+function normalizeSubStatus(t) {
+  t = (t || '').trim().toLowerCase();
+  const map = { active: 'Active', trial: 'Trial', paused: 'Paused', canceled: 'Canceled', cancelled: 'Canceled', inactive: 'Inactive' };
+  return map[t] || (t.includes('review') ? 'Needs review' : 'Active');
+}
+function normalizePriority(t) {
+  t = (t || '').trim().toLowerCase();
+  if (t.startsWith('ess')) return 'Essential';
+  if (t.startsWith('h')) return 'High';
+  if (t.startsWith('l')) return 'Low';
+  if (t.startsWith('o')) return 'Optional';
+  return 'Medium';
+}
 let importState = { target: 'income', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
 
 // Jump to the Import page pre-set to a dataset (used by per-page Import buttons).
@@ -2414,25 +2453,32 @@ function matchPerson(store, text) {
 function buildImportEntries(store) {
   const { target, rows, mapping, fallbackCat } = importState;
   const yd = store.yearData(activeYear);
-  const kind = target === 'income' ? 'income' : 'expense';
-  const existing = new Set((target === 'income' ? yd.income : target === 'expenses' ? yd.expensePayments : yd.paychecks)
-    .map(e => dupKey(target, e)));
+  const existingArr = target === 'income' ? yd.income : target === 'expenses' ? yd.expensePayments : target === 'paychecks' ? yd.paychecks : store.state.recurring;
+  const existing = new Set(existingArr.map(e => dupKey(target, e)));
   const entries = []; let dupes = 0, skipped = 0;
   rows.forEach(row => {
     const g = k => mapping[k] ? (row[mapping[k]] || '') : '';
-    const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
-    const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
-    if (!date || isNaN(amt)) { skipped++; return; }
     let e;
-    if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', notes: g('notes') };
-    else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
-    else e = { payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, receivedDate: parseImportDate(g('receivedDate')), employer: g('employer'), incomeCategoryId: fallbackCat, personId: matchPerson(store), status: 'Received', method: 'Direct deposit', notes: g('notes') };
+    if (target === 'subscriptions') {
+      const name = String(g('name')).trim();
+      const amount = parseImportAmount(g('amount'));
+      if (!name || isNaN(amount)) { skipped++; return; }
+      e = { name, vendor: String(g('vendor')).trim(), categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', amount, frequency: parseFrequency(g('frequency')), interval: null, renewalDate: parseImportDate(g('renewalDate')), accountId: matchAccount(store, g('account')), backupAccountId: '', personId: matchPerson(store, g('person')), priority: normalizePriority(g('priority')), status: normalizeSubStatus(g('status')), autoPay: /^(y|yes|true|1)$/i.test(String(g('autoPay')).trim()), url: '', notes: g('notes') };
+    } else {
+      const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
+      const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
+      if (!date || isNaN(amt)) { skipped++; return; }
+      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', notes: g('notes') };
+      else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
+      else e = { payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, receivedDate: parseImportDate(g('receivedDate')), employer: g('employer'), incomeCategoryId: fallbackCat, personId: matchPerson(store), status: 'Received', method: 'Direct deposit', notes: g('notes') };
+    }
     if (existing.has(dupKey(target, e))) { dupes++; return; }
     entries.push(e);
   });
   return { entries, dupes, skipped };
 }
 function dupKey(target, e) {
+  if (target === 'subscriptions') return (e.name || '').toLowerCase() + '|' + (Number(e.amount) || 0).toFixed(2);
   if (target === 'expenses') return e.date + '|' + (Number(e.amount) || 0).toFixed(2) + '|' + (e.categoryId || '');
   if (target === 'paychecks') return (e.payDate || '') + '|' + (Number(e.gross) || 0).toFixed(2);
   return e.date + '|' + (Number(e.gross) || 0).toFixed(2) + '|' + (e.categoryId || '');
@@ -2446,7 +2492,7 @@ function importSection() {
   if (!importState.rows) {
     card.appendChild(el('p', 'muted', 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
     const row = el('div', 'io-actions');
-    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }], importState.target);
+    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }], importState.target);
     tSel.addEventListener('change', () => { importState.target = tSel.value; });
     row.appendChild(labelWrap('Import as', tSel));
     const fileLabel = el('label', 'btn-primary file-btn'); fileLabel.textContent = 'Choose CSV…';
@@ -2483,7 +2529,7 @@ function importSection() {
   card.appendChild(mapGrid);
 
   // fallback category
-  const kind = importState.target === 'expenses' ? 'expense' : 'income';
+  const kind = (importState.target === 'expenses' || importState.target === 'subscriptions') ? 'expense' : 'income';
   const cats = kind === 'expense' ? store.state.expenseCategories : store.state.incomeCategories;
   const fbSel = select([{ value: '', label: '— none —' }].concat(cats.map(c => ({ value: c.id, label: c.name }))), importState.fallbackCat);
   fbSel.addEventListener('change', () => { importState.fallbackCat = fbSel.value; renderView(currentRoute); });
@@ -2491,14 +2537,15 @@ function importSection() {
 
   const { entries, dupes, skipped } = buildImportEntries(store);
   // preview
+  const isSub = importState.target === 'subscriptions';
   const prevWrap = el('div', 'table-scroll'); const pt = el('table', 'data-table');
-  pt.innerHTML = '<thead><tr><th>Date</th><th class="num">Amount</th><th>Category</th></tr></thead>';
+  pt.innerHTML = '<thead><tr><th>' + (isSub ? 'Name' : 'Date') + '</th><th class="num">Amount</th><th>' + (isSub ? 'Frequency' : 'Category') + '</th></tr></thead>';
   const ptb = el('tbody');
   entries.slice(0, 6).forEach(e => {
     const tr = el('tr');
-    tr.appendChild(el('td', null, fmtDate(e.date || e.payDate)));
+    tr.appendChild(el('td', null, isSub ? (e.name || '—') : fmtDate(e.date || e.payDate)));
     tr.appendChild(numCell(Number(e.amount != null ? e.amount : e.gross) || 0, true));
-    tr.appendChild(el('td', null, importState.target === 'paychecks' ? (e.employer || '—') : store[kind === 'expense' ? 'expenseGroupName' : 'incomeGroupName'](e.categoryId)));
+    tr.appendChild(el('td', null, isSub ? freqLabel(e) : (importState.target === 'paychecks' ? (e.employer || '—') : store[kind === 'expense' ? 'expenseGroupName' : 'incomeGroupName'](e.categoryId))));
     ptb.appendChild(tr);
   });
   pt.appendChild(ptb); prevWrap.appendChild(pt); card.appendChild(el('div', 'muted', 'Preview (first 6 of ' + entries.length + ' new rows):')); card.appendChild(prevWrap);

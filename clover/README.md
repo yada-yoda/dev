@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.2 — CSV import for Bills & Subscriptions
+- The importer now supports Bills & Subscriptions as a target, and that page has
+  its own "Import CSV" button. Frequency, priority, and status text are normalized;
+  category text is matched to your categories; monthly/annual equivalents compute
+  automatically. Imports are batched and undoable like the others.
+
 ### v1.0.1 — Per-page CSV import
 - Added an "Import CSV" button to the Income, Expenses, and Paychecks pages that
   jumps straight into the importer pre-set to that dataset — no need to pick the

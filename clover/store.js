@@ -320,6 +320,12 @@ window.cloverStore = {
   // --- CSV import (batched, undoable) ---
   importEntries(y, target, entries, batch) {
     const d = state.years[String(y)]; if (!d) return;
+    if (target === 'subscriptions') {
+      // recurring lives in the meta doc; the batch is still logged in the year doc.
+      entries.forEach(e => { e.id = mkId('rec'); e.batchId = batch.id; state.recurring.push(e); });
+      d.importBatches = d.importBatches || []; d.importBatches.push(batch);
+      scheduleSave(); this.scheduleSaveYear(y); notify(); return;
+    }
     const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : 'paychecks';
     entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
     d.importBatches = d.importBatches || [];
@@ -329,6 +335,7 @@ window.cloverStore = {
   undoImportBatch(y, batchId) {
     const d = state.years[String(y)]; if (!d) return;
     ['income', 'expensePayments', 'paychecks'].forEach(k => { d[k] = d[k].filter(e => e.batchId !== batchId); });
+    if (state.recurring.some(r => r.batchId === batchId)) { state.recurring = state.recurring.filter(r => r.batchId !== batchId); scheduleSave(); }
     d.importBatches = (d.importBatches || []).filter(b => b.id !== batchId);
     this.scheduleSaveYear(y); notify();
   },
