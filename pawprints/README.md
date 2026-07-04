@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.48.1**
+**Current Version: v0.48.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.48.2** — **One-tap Start / Finish on supplies** — each item in the Supplies list now has a
+  quick action button: **Start** for items still in inventory (stamps today as the opened date and
+  moves it to "In use"), and **Finish** for in-use items (stamps today as the finished date). No
+  need to open the item and pick a date just to mark it opened or used up.
 - **v0.48.1** — **Duplicate a supply** — editing an item now has a Duplicate button that opens
   a fresh Add form pre-filled with everything from that item (brand, name, qty, size, cost,
   card details, cost-tracking flag), with the purchase date reset to today and the open/finished

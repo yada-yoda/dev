@@ -224,7 +224,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.48.1';
+const APP_VERSION = 'v0.48.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2185,6 +2185,10 @@ function saveInv(id){
   closeModal(); save(); showToast('🛒 Saved');
 }
 function toggleLow(id){ if(denyManage()) return; const it = data.inventory.find(x=>x.id===id); if(it){ it.runningLow = !it.runningLow; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+(it.runningLow?' — marked low':' — restocked')); save(); } }
+// One-tap: open an inventory item today (start using it).
+function startInv(id){ if(denyManage()) return; const it = data.inventory.find(x=>x.id===id); if(!it) return; it.startDate = todayISO(); if(it.endDate && it.endDate < it.startDate) it.endDate=''; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+' — started'); save(); showToast('▶️ Started today'); }
+// One-tap: finish an in-use item today (mark it used up).
+function finishInv(id){ if(denyManage()) return; const it = data.inventory.find(x=>x.id===id); if(!it) return; if(!it.startDate) it.startDate = todayISO(); it.endDate = todayISO(); it.runningLow = false; logChange('edited','supply', (it.brand?it.brand+' ':'')+(it.name||'')+' — finished'); save(); showToast('✅ Finished today'); }
 
 // ═══════════════════════════════════════════════
 // CONTACTS + vCARDS
@@ -3167,7 +3171,12 @@ function renderSupplies(){
       + (bd.perDay!=null?'<div style="font-size:12px;color:var(--accent)">'+moneyRate(bd.perDay)+'<span style="color:var(--text-secondary);font-size:10px">/day</span></div>':'')
       + (bd.perUnit!=null?'<div style="font-size:11px;color:var(--text-secondary)">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>':'')
       + '</div>' : '';
-    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+'</div>';
+    const st = invStatus(i);
+    const action = canManage() ? (
+      st==='Inventory' ? '<button class="btn btn-sm btn-accent" onclick="event.stopPropagation();startInv(\''+i.id+'\')" title="Start using this item — stamps today as the opened date">Start</button>'
+      : st==='In use' ? '<button class="btn btn-sm" onclick="event.stopPropagation();finishInv(\''+i.id+'\')" title="Mark used up — stamps today as the finished date">Finish</button>'
+      : '') : '';
+    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+action+'</div>';
   }).join('')+'</div>';
   return html;
 }
