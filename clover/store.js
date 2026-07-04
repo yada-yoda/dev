@@ -103,7 +103,14 @@ const yearSaveTimers = {};
 
 function emptyYear() { return { income: [], paychecks: [], expensePayments: [], importBatches: [] }; }
 
-function notify() { subscribers.forEach(cb => { try { cb(); } catch (e) { console.error(e); } }); }
+// Coalesce synchronous notify() calls into one microtask render, so a burst of
+// mutations (e.g. loading several years at once) can't cause re-entrant renders.
+let _notifyScheduled = false;
+function notify() {
+  if (_notifyScheduled) return;
+  _notifyScheduled = true;
+  Promise.resolve().then(() => { _notifyScheduled = false; subscribers.forEach(cb => { try { cb(); } catch (e) { console.error(e); } }); });
+}
 
 function scheduleSave() {
   state._dirty = true;

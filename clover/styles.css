@@ -363,6 +363,12 @@ button { font-family: inherit; cursor: pointer; }
 .tab.active { background: var(--surface); color: var(--accent-hover); box-shadow: var(--shadow-sm); }
 .tab:hover:not(.active) { color: var(--text); }
 
+/* Year tabs (per-year sections with multiple years of data) */
+.year-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.ytab { padding: 5px 13px; border: 1px solid var(--border-strong); background: var(--surface); border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--text-muted); }
+.ytab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); font-weight: 600; }
+.ytab:hover:not(.active) { background: var(--surface-2); color: var(--text); }
+
 .data-table th.num, .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .data-table td.zero { color: var(--text-faint); }
 .data-table td.strong { font-weight: 600; }

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -232,6 +232,44 @@ function onPeriodChange() {
   activeYear = +document.getElementById('sel-year').value;
   activeMonth = +document.getElementById('sel-month').value;
   if (currentRoute) renderView(currentRoute);
+}
+function setActiveYear(y) {
+  activeYear = y;
+  const sel = document.getElementById('sel-year'); if (sel) sel.value = String(y);
+  renderView(currentRoute);
+}
+// Loads the year range once so we know which years have data (for year tabs).
+let _yearsScanned = false;
+function ensureYearsScanned(store) {
+  if (_yearsScanned) return;
+  const cur = new Date().getFullYear();
+  let allLoaded = true;
+  for (let y = cur + 1; y >= 2020; y--) { if (!store.isYearLoaded(y)) { allLoaded = false; store.loadYear(y); } }
+  if (allLoaded) _yearsScanned = true;
+}
+// A row of year tabs for a per-year section, shown only when >1 year has data.
+function yearTabs(store, section) {
+  ensureYearsScanned(store);
+  const cur = new Date().getFullYear();
+  const years = [];
+  for (let y = cur + 1; y >= 2020; y--) {
+    if (!store.isYearLoaded(y)) continue;
+    const d = store.yearData(y);
+    const has = section === 'income' ? (d.income.length || d.paychecks.length)
+      : section === 'expenses' ? d.expensePayments.length
+      : d.paychecks.length;
+    if (has) years.push(y);
+  }
+  if (!years.includes(activeYear)) years.push(activeYear);
+  years.sort((a, b) => b - a);
+  if (years.length < 2) return null;
+  const strip = el('div', 'year-tabs');
+  years.forEach(y => {
+    const b = el('button', 'ytab' + (y === activeYear ? ' active' : ''), String(y));
+    b.addEventListener('click', () => setActiveYear(y));
+    strip.appendChild(b);
+  });
+  return strip;
 }
 
 // ---------- chrome wiring ----------
@@ -770,6 +808,7 @@ function renderIncome(view) {
   head.appendChild(right);
   view.appendChild(head);
 
+  const yt = yearTabs(store, 'income'); if (yt) view.appendChild(yt);
   view.appendChild(incomeTab === 'grid' ? incomeGrid(data) : incomeList(data));
 }
 
@@ -1237,6 +1276,7 @@ function renderExpenses(view) {
   head.appendChild(right);
   view.appendChild(head);
 
+  const yt = yearTabs(store2, 'expenses'); if (yt) view.appendChild(yt);
   view.appendChild(expenseTab === 'grid' ? expenseGrid(data) : expenseList(data));
 }
 
@@ -1436,6 +1476,7 @@ function renderPaychecks(view) {
   pcActions.appendChild(add);
   head.appendChild(pcActions);
   view.appendChild(head);
+  const yt = yearTabs(store, 'paychecks'); if (yt) view.appendChild(yt);
 
   const sum = el('div', 'sub-summary');
   sum.appendChild(sumCard('Gross YTD', money(grossYTD), 'income'));

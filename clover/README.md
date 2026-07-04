@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.4 — Per-year tabs
+- Income, Expenses, and Paychecks now show a row of year tabs when you have data in
+  more than one year — click to jump between years (kept in sync with the top-bar
+  year selector).
+- Coalesced store change-notifications into one render, fixing a duplicate-render
+  glitch when several years load at once.
+
 ### v1.0.3 — Fuller paycheck import + multi-year CSVs
 - Paycheck CSV import now maps Person, Period #, Period start/end, Status, and
   payment Method (previously only date/gross/net/employer/notes).
