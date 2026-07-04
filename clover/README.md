@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.8 — Other-income detail, net-based "left over", fuller import preview, button polish
+- **Other income** now has dedicated **Type** (Lawsuit, Gift, Stimulus, Rebate, Winnings…)
+  and **Description** (e.g. the class-action case name) fields, shown in the add/edit form
+  when the category is Other, and importable as their own CSV columns. Income import also
+  gained a **Received via** column (Venmo, PayPal, check…).
+- The dashboard **"Should be left / mo"** and monthly **"Net"** cards now calculate from
+  **take-home (net) income**, not gross — so the number reflects money left after taxes.
+- The **CSV import preview** now shows every column you mapped (up to 8 sample rows), not
+  just date/amount/category, so you can sanity-check the whole row before importing.
+- Buttons no longer wrap or vary in size — the **+ Add** buttons in Settings (and all
+  primary/ghost buttons) are now uniform.
+
 ### v1.0.7 — Reward source & type
 - Reward income entries now have dedicated **Reward source** (Chase, Amex, Coinbase,
   Fetch, Ebates, ReceiptPal, Microsoft…) and **Reward type** (cash back, statement

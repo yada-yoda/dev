@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.7';
+const VERSION = '1.0.8';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -903,8 +903,9 @@ function incomeList(data) {
     tr.appendChild(el('td', null, fmtDate(e.date)));
     tr.appendChild(el('td', null, store.incomeGroupName(e.categoryId)));
     const srcTd = el('td');
-    srcTd.appendChild(document.createTextNode(e.rewardSource || store.subName('income', e.categoryId, e.subId) || '—'));
-    if (e.rewardType) srcTd.appendChild(el('div', 'acct-sub', e.rewardType));
+    srcTd.appendChild(document.createTextNode(e.rewardSource || e.otherType || store.subName('income', e.categoryId, e.subId) || '—'));
+    const srcSub = e.rewardType || e.description;
+    if (srcSub) srcTd.appendChild(el('div', 'acct-sub', srcSub));
     tr.appendChild(srcTd);
     tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
     tr.appendChild(numCell(amountOf(e), true));
@@ -973,10 +974,22 @@ function incomeModal(existing) {
   rwWrap.appendChild(field('Reward source', fRwSrc, 'Which program or card the reward came from — e.g. Chase, Amex, Coinbase, Fetch, Ebates.'));
   rwWrap.appendChild(field('Reward type', fRwType, 'What kind of reward it is — e.g. Cash back, Statement credit, Gift card, Crypto.'));
 
+  // Other-income fields (shown when the category looks like Other) — e.g. lawsuit
+  // settlements, gifts, stimulus, rebates, winnings.
+  const otTypeList = el('datalist'); otTypeList.id = 'ot-type-list';
+  ['Lawsuit', 'Class action', 'Settlement', 'Gift', 'Stimulus', 'Rebate', 'Winnings', 'Survey reward', 'Refund', 'Inheritance'].forEach(v => { const o = el('option'); o.value = v; otTypeList.appendChild(o); });
+  body.appendChild(otTypeList);
+  const fOtType = input(e.otherType || '', { placeholder: 'e.g. Lawsuit, Gift, Rebate', list: 'ot-type-list' });
+  const fDesc = input(e.description || '', { placeholder: 'e.g. case name or what it was' });
+  const otWrap = el('div', 'div-fields');
+  otWrap.appendChild(field('Type', fOtType, 'What kind of “other” income this is — e.g. Lawsuit settlement, Gift, Stimulus, Rebate, Winnings.'));
+  otWrap.appendChild(field('Description', fDesc, 'A short label or name — e.g. the class-action case name, or what the gift/rebate was for.'));
+
   const syncCat = () => {
     const g = s.incomeCategories.find(c => c.id === fCat.value);
     divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none';
     rwWrap.style.display = (g && /reward/i.test(g.name)) ? '' : 'none';
+    otWrap.style.display = (g && /other/i.test(g.name)) ? '' : 'none';
   };
   fCat.addEventListener('change', () => { rebuildSubs(); syncCat(); });
   rebuildSubs(); syncCat();
@@ -1002,6 +1015,7 @@ function incomeModal(existing) {
   body.appendChild(tRow);
   body.appendChild(divWrap);
   body.appendChild(rwWrap);
+  body.appendChild(otWrap);
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this entry.'));
 
   openModal({
@@ -1018,7 +1032,8 @@ function incomeModal(existing) {
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
-        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim()
+        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim(),
+        otherType: fOtType.value.trim(), description: fDesc.value.trim()
       });
       store.saveIncome(activeYear, entry);
       toast(existing ? 'Income updated' : 'Income added');
@@ -1981,6 +1996,21 @@ function incomeYTDall(data) {
   sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + (Number(p.gross) || 0), 0);
   return sum;
 }
+// Take-home (after-tax) versions: use the net figure where recorded, else fall
+// back to gross (e.g. interest/rewards have no withholding). Used for
+// "what's actually left to spend" calcs, which must start from net, not gross.
+function netAmountOf(e) { return (e.net != null && e.net !== '') ? (Number(e.net) || 0) : amountOf(e); }
+function paycheckNet(p) { return (p.net != null && p.net !== '') ? (Number(p.net) || 0) : (Number(p.gross) || 0); }
+function incomeNetForMonth(data, mi) {
+  let sum = data.income.filter(countable).filter(e => monthIdx(e.date) === mi).reduce((a, e) => a + netAmountOf(e), 0);
+  sum += data.paychecks.filter(isPaycheckPaid).filter(p => monthIdx(p.payDate) === mi).reduce((a, p) => a + paycheckNet(p), 0);
+  return sum;
+}
+function incomeNetYTDall(data) {
+  let sum = data.income.filter(countable).reduce((a, e) => a + netAmountOf(e), 0);
+  sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + paycheckNet(p), 0);
+  return sum;
+}
 function incomeByCategory(store, data) {
   const m = {};
   data.income.filter(countable).forEach(e => { const g = store.incomeGroupName(e.categoryId); m[g] = (m[g] || 0) + amountOf(e); });
@@ -2073,21 +2103,24 @@ function renderDashboard(view) {
   const monthName = MONTHS[focusMonth];
 
   const incThisMonth = incomeForMonth(data, focusMonth);
+  const incNetThisMonth = incomeNetForMonth(data, focusMonth);
   const spendThisMonth = data.expensePayments.filter(e => monthIdx(e.date) === focusMonth).reduce((a, e) => a + expenseAmount(e), 0);
   const activeSubs = s.recurring.filter(isSubActive);
   const recurringMonthly = activeSubs.reduce((a, r) => a + monthlyEquiv(r), 0);
   const recurringAnnual = activeSubs.reduce((a, r) => a + annualCost(r), 0);
-  const netThisMonth = incThisMonth - spendThisMonth - recurringMonthly;
+  // Cashflow left = take-home (net) income − spending − bills.
+  const netThisMonth = incNetThisMonth - spendThisMonth - recurringMonthly;
   const incYTD = incomeYTDall(data);
+  const netYTD = incomeNetYTDall(data);
   const spendYTD = data.expensePayments.reduce((a, e) => a + expenseAmount(e), 0);
   const projAnnualIncome = monthsElapsed > 0 ? incYTD / monthsElapsed * 12 : incYTD;
   const projAnnualExpense = recurringAnnual + (monthsElapsed > 0 ? spendYTD / monthsElapsed * 12 : spendYTD);
 
-  // "Should be left over" for a typical month: income basis − recurring bills −
-  // typical (average) non-recurring spending.
+  // "Should be left over" for a typical month: take-home income − recurring bills −
+  // typical (average) non-recurring spending. Starts from NET, not gross.
   const setNet = store.netMonthlyIncome();
   const avgSpend = monthsElapsed > 0 ? spendYTD / monthsElapsed : spendThisMonth;
-  const incomeBasis = setNet > 0 ? setNet : (monthsElapsed > 0 ? incYTD / monthsElapsed : incThisMonth);
+  const incomeBasis = setNet > 0 ? setNet : (monthsElapsed > 0 ? netYTD / monthsElapsed : incNetThisMonth);
   const shouldLeft = incomeBasis - recurringMonthly - avgSpend;
 
   const head = el('div', 'view-head');
@@ -2100,8 +2133,8 @@ function renderDashboard(view) {
   kpis.appendChild(kpiCard('Income · ' + monthName, money(incThisMonth), 'income'));
   kpis.appendChild(kpiCard('Spending · ' + monthName, money(spendThisMonth), 'expense'));
   kpis.appendChild(kpiCard('Recurring / mo', money(recurringMonthly), 'expense', money(recurringAnnual) + ' / yr'));
-  kpis.appendChild(kpiCard('Net · ' + monthName, money(netThisMonth), netThisMonth < 0 ? 'expense' : 'income'));
-  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', (setNet > 0 ? 'take-home' : 'avg income') + ' − bills − avg spend'));
+  kpis.appendChild(kpiCard('Net · ' + monthName, money(netThisMonth), netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
+  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', (setNet > 0 ? 'take-home' : 'avg take-home') + ' − bills − avg spend'));
   kpis.appendChild(kpiCard('Projected income', money(projAnnualIncome), 'income', 'annualized from YTD'));
   kpis.appendChild(kpiCard('Projected expenses', money(projAnnualExpense), 'expense', 'subs + annualized spend'));
   view.appendChild(kpis);
@@ -2531,12 +2564,15 @@ const IMPORT_FIELDS = {
     { key: 'date', label: 'Date', req: true, kw: ['date'] },
     { key: 'gross', label: 'Gross amount', req: true, num: true, kw: ['gross', 'amount', 'paid', 'total'] },
     { key: 'net', label: 'Net (optional)', num: true, kw: ['net'] },
-    { key: 'category', label: 'Category', kw: ['category', 'affiliate', 'reason', 'action', 'description'] },
-    { key: 'rewardSource', label: 'Reward source', kw: ['source', 'program', 'card', 'from'] },
-    { key: 'rewardType', label: 'Reward type', kw: ['reward type', 'type', 'kind'] },
+    { key: 'category', label: 'Category', kw: ['category', 'affiliate', 'reason'] },
+    { key: 'rewardSource', label: 'Reward source', kw: ['reward source', 'program'] },
+    { key: 'rewardType', label: 'Reward type', kw: ['reward type'] },
+    { key: 'otherType', label: 'Other type', kw: ['other type'] },
+    { key: 'description', label: 'Description', kw: ['description', 'case', 'details'] },
+    { key: 'receivedVia', label: 'Received via', kw: ['received via', 'via', 'received', 'method'] },
     { key: 'account', label: 'Account', kw: ['account', 'bank', 'broker'] },
     { key: 'person', label: 'Person', kw: ['person', 'owner'] },
-    { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'symbol', 'description'] }
+    { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'symbol'] }
   ],
   expenses: [
     { key: 'date', label: 'Date', req: true, kw: ['date'] },
@@ -2662,6 +2698,23 @@ function matchPerson(store, text) {
   const p = t && store.state.persons.find(x => t.includes(x.name.toLowerCase()) || x.name.toLowerCase().includes(t));
   return p ? p.id : (store.state.persons[0] && store.state.persons[0].id);
 }
+// Human-readable value for one built-entry field, for the import preview table.
+function importPreviewText(key, e, store, kind) {
+  const gName = kind === 'expense' ? 'expenseGroupName' : 'incomeGroupName';
+  switch (key) {
+    case 'date': case 'payDate': return fmtDate(e.date || e.payDate) || '—';
+    case 'receivedDate': return e.receivedDate ? fmtDate(e.receivedDate) : '—';
+    case 'periodStart': return e.periodStart ? fmtDate(e.periodStart) : '—';
+    case 'periodEnd': return e.periodEnd ? fmtDate(e.periodEnd) : '—';
+    case 'renewalDate': return e.renewalDate ? fmtDate(e.renewalDate) : '—';
+    case 'category': return store[gName](e.categoryId || e.incomeCategoryId) || '—';
+    case 'account': return store.accountName(e.accountId) || '—';
+    case 'person': return store.personName(e.personId) || '—';
+    case 'frequency': return freqLabel(e);
+    case 'name': return e.name || '—';
+    default: { const v = e[key]; return (v != null && v !== '') ? String(v) : '—'; }
+  }
+}
 
 function buildImportEntries(store) {
   const { target, rows, mapping, fallbackCat } = importState;
@@ -2681,7 +2734,7 @@ function buildImportEntries(store) {
       const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
       const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
       if (!date || isNaN(amt)) { skipped++; return; }
-      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), notes: g('notes') };
+      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), otherType: String(g('otherType')).trim(), description: String(g('description')).trim(), receivedVia: String(g('receivedVia')).trim(), notes: g('notes') };
       else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
       else e = {
         payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,
@@ -2756,19 +2809,29 @@ function importSection() {
   card.appendChild(field(importState.target === 'paychecks' ? 'Income category for these paychecks' : 'Category for unmatched rows', fbSel, 'Rows whose category text doesn’t match one of your categories go here.'));
 
   const { entries, dupes, skipped } = buildImportEntries(store);
-  // preview
+  // preview — show every column the user mapped (plus the resolved category),
+  // so they can sanity-check the whole row instead of just date/amount.
   const isSub = importState.target === 'subscriptions';
+  const fields = IMPORT_FIELDS[importState.target];
+  const prevCols = fields.filter(f => importState.mapping[f.key] || f.req);
+  const catField = fields.find(f => f.key === 'category');
+  if (!isSub && importState.target !== 'paychecks' && catField && prevCols.indexOf(catField) < 0) prevCols.push(catField);
   const prevWrap = el('div', 'table-scroll'); const pt = el('table', 'data-table');
-  pt.innerHTML = '<thead><tr><th>' + (isSub ? 'Name' : 'Date') + '</th><th class="num">Amount</th><th>' + (isSub ? 'Frequency' : 'Category') + '</th></tr></thead>';
+  const thead = el('thead'); const htr = el('tr');
+  prevCols.forEach(f => htr.appendChild(el('th', f.num ? 'num' : null, f.label)));
+  thead.appendChild(htr); pt.appendChild(thead);
   const ptb = el('tbody');
-  entries.slice(0, 6).forEach(e => {
+  const previewN = Math.min(8, entries.length);
+  entries.slice(0, previewN).forEach(e => {
     const tr = el('tr');
-    tr.appendChild(el('td', null, isSub ? (e.name || '—') : fmtDate(e.date || e.payDate)));
-    tr.appendChild(numCell(Number(e.amount != null ? e.amount : e.gross) || 0, true));
-    tr.appendChild(el('td', null, isSub ? freqLabel(e) : (importState.target === 'paychecks' ? (e.employer || '—') : store[kind === 'expense' ? 'expenseGroupName' : 'incomeGroupName'](e.categoryId))));
+    prevCols.forEach(f => {
+      if (f.num) tr.appendChild(numCell(Number(e[f.key]) || 0, f.key !== 'net'));
+      else tr.appendChild(el('td', null, importPreviewText(f.key, e, store, kind)));
+    });
     ptb.appendChild(tr);
   });
-  pt.appendChild(ptb); prevWrap.appendChild(pt); card.appendChild(el('div', 'muted', 'Preview (first 6 of ' + entries.length + ' new rows):')); card.appendChild(prevWrap);
+  pt.appendChild(ptb); prevWrap.appendChild(pt);
+  card.appendChild(el('div', 'muted', 'Preview (first ' + previewN + ' of ' + entries.length + ' new rows):')); card.appendChild(prevWrap);
 
   const summary = el('p', 'muted', entries.length + ' will import · ' + dupes + ' duplicates skipped' + (skipped ? ' · ' + skipped + ' rows had no date/amount' : ''));
   card.appendChild(summary);

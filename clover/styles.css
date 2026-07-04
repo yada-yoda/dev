@@ -144,9 +144,11 @@ button { font-family: inherit; cursor: pointer; }
 .user-chip .uname { font-size: 13px; font-weight: 500; max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .btn-ghost {
   height: 34px; padding: 0 12px;
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--surface); color: var(--text-muted);
   border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   font-size: 13px; font-weight: 500;
+  white-space: nowrap; flex-shrink: 0;
 }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); }
 
@@ -191,8 +193,10 @@ button { font-family: inherit; cursor: pointer; }
 /* ---------- Buttons ---------- */
 .btn-primary {
   height: 34px; padding: 0 14px;
+  display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent); color: #fff; border: none;
   border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+  white-space: nowrap; flex-shrink: 0;
 }
 .btn-primary:hover { background: var(--accent-hover); }
 .mini {
