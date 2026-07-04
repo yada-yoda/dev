@@ -312,6 +312,13 @@ window.cloverStore = {
     this.scheduleSaveYear(y); notify(); return entry;
   },
   removePaycheck(y, id) { const d = state.years[String(y)]; if (!d) return; d.paychecks = d.paychecks.filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
+  bulkUpdatePaychecks(y, ids, changes) {
+    const d = state.years[String(y)]; if (!d) return 0;
+    const set = new Set(ids); let n = 0;
+    d.paychecks.forEach(p => { if (set.has(p.id)) { Object.assign(p, changes); n++; } });
+    if (n) { this.scheduleSaveYear(y); notify(); }
+    return n;
+  },
 
   // --- lookups ---
   personName(id) { const p = state.persons.find(x => x.id === id); return p ? p.name : '—'; },

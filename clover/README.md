@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.5 — Bulk-edit paychecks
+- Paychecks table now has a checkbox column with select-all/clear, so you can pick
+  several pay dates at once and apply a Method (Direct deposit, Office pickup, Other…)
+  or Status to all of them in one action — handy for fixing a batch of pickup methods
+  without editing each row.
+- The selection bar updates in place as you check rows, so the table doesn't jump or
+  lose your scroll position.
+
 ### v1.0.4 — Per-year tabs
 - Income, Expenses, and Paychecks now show a row of year tabs when you have data in
   more than one year — click to jump between years (kept in sync with the top-bar

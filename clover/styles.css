@@ -369,6 +369,13 @@ button { font-family: inherit; cursor: pointer; }
 .ytab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); font-weight: 600; }
 .ytab:hover:not(.active) { background: var(--surface-2); color: var(--text); }
 
+/* Bulk edit bar + selection column */
+.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--accent-soft); border: 1px solid #cde9d6; border-radius: var(--radius); }
+.bulk-count { font-weight: 600; color: var(--accent-hover); font-size: 13px; }
+.bulk-bar select { height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--text); }
+.sel-cell { width: 28px; text-align: center; }
+.sel-cell input, .data-table th:first-child input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
+
 .data-table th.num, .data-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .data-table td.zero { color: var(--text-faint); }
 .data-table td.strong { font-weight: 600; }

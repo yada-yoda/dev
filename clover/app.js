@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.4';
+const VERSION = '1.0.5';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -47,6 +47,8 @@ let expenseCatFilter = 'all';
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
 let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
+let paycheckSel = new Set();       // selected paycheck ids for bulk edit
+let paycheckSelYear = null;
 let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
 const expandedExpenseGroups = new Set();
@@ -381,6 +383,11 @@ function sortableTable(cols, rows, sort, onSort, rowClass) {
   cols.forEach(c => {
     const th = el('th', c.num ? 'num' : null);
     const canSort = c.sortable !== false && c.key && c.value;
+    if (c.headCell) {
+      th.appendChild(c.headCell());
+      htr.appendChild(th);
+      return;
+    }
     if (canSort) {
       th.classList.add('sortable');
       const active = sort && sort.key === c.key;
@@ -1507,6 +1514,11 @@ function renderPaychecks(view) {
   bar.appendChild(labelWrap('Status', statusSel));
   view.appendChild(bar);
 
+  // Reset bulk selection when the year changes; drop ids that no longer exist.
+  if (paycheckSelYear !== activeYear) { paycheckSel = new Set(); paycheckSelYear = activeYear; }
+  const validIds = new Set(pays.map(p => p.id));
+  [...paycheckSel].forEach(id => { if (!validIds.has(id)) paycheckSel.delete(id); });
+
   let rows = pays.slice();
   if (paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
 
@@ -1515,7 +1527,25 @@ function renderPaychecks(view) {
     return;
   }
 
+  const bulkContainer = el('div'); bulkContainer.id = 'pc-bulk-bar';
+  if (paycheckSel.size) bulkContainer.appendChild(paycheckBulkBar(store));
+  view.appendChild(bulkContainer);
+
   const cols = [
+    { sortable: false, headCell: () => {
+        const cb = document.createElement('input'); cb.type = 'checkbox'; cb.title = 'Select all';
+        cb.checked = rows.length > 0 && rows.every(r => paycheckSel.has(r.id));
+        cb.addEventListener('change', () => {
+          rows.forEach(r => cb.checked ? paycheckSel.add(r.id) : paycheckSel.delete(r.id));
+          document.querySelectorAll('#view .data-table tbody .sel-cell input').forEach(box => { box.checked = cb.checked; });
+          updatePaycheckSelectionUI();
+        });
+        return cb; },
+      cell: p => {
+        const td = el('td', 'sel-cell'); const cb = document.createElement('input'); cb.type = 'checkbox';
+        cb.checked = paycheckSel.has(p.id);
+        cb.addEventListener('change', () => { cb.checked ? paycheckSel.add(p.id) : paycheckSel.delete(p.id); updatePaycheckSelectionUI(); });
+        td.appendChild(cb); return td; } },
     { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) },
     { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => {
         const td = el('td'); td.appendChild(el('span', null, p.receivedDate ? fmtDate(p.receivedDate) + ' ' : '— '));
@@ -1544,6 +1574,40 @@ function renderPaychecks(view) {
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => isPaycheckPaid(p) ? '' : 'inactive-row'));
   view.appendChild(card);
+}
+
+// In-place refresh of the bulk bar + select-all state (no full table re-render,
+// so scroll position and other checkboxes are preserved while selecting).
+function updatePaycheckSelectionUI() {
+  const container = document.getElementById('pc-bulk-bar');
+  if (container) { container.innerHTML = ''; if (paycheckSel.size) container.appendChild(paycheckBulkBar(window.cloverStore)); }
+  const head = document.querySelector('#view .data-table thead th:first-child input[type=checkbox]');
+  const rowBoxes = [...document.querySelectorAll('#view .data-table tbody .sel-cell input')];
+  if (head) head.checked = rowBoxes.length > 0 && rowBoxes.every(cb => cb.checked);
+}
+
+function paycheckBulkBar(store) {
+  const bar = el('div', 'bulk-bar');
+  bar.appendChild(el('span', 'bulk-count', paycheckSel.size + ' selected'));
+  const mSel = select([{ value: '', label: 'Method: no change' }].concat(PAYCHECK_METHODS.map(m => ({ value: m, label: m }))), '');
+  const sSel = select([{ value: '', label: 'Status: no change' }].concat(PAYCHECK_STATUSES.map(s => ({ value: s, label: s }))), '');
+  bar.appendChild(mSel); bar.appendChild(sSel);
+  const apply = el('button', 'btn-primary', 'Apply');
+  apply.addEventListener('click', () => {
+    const changes = {};
+    if (mSel.value) changes.method = mSel.value;
+    if (sSel.value) changes.status = sSel.value;
+    if (!Object.keys(changes).length) { toast('Pick a method or status to set', 'warn'); return; }
+    const n = store.bulkUpdatePaychecks(activeYear, [...paycheckSel], changes);
+    paycheckSel = new Set();
+    toast('Updated ' + n + ' paycheck' + (n === 1 ? '' : 's'));
+    renderView(currentRoute);
+  });
+  bar.appendChild(apply);
+  const clear = el('button', 'btn-ghost', 'Clear');
+  clear.addEventListener('click', () => { paycheckSel = new Set(); renderView(currentRoute); });
+  bar.appendChild(clear);
+  return bar;
 }
 
 function paycheckModal(existing) {
