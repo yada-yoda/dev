@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.14 — Net monthly income is annualized
+- The **Net monthly income** figure now sums your net pay over the trailing 12 months
+  and divides by 12, so the occasional "extra" biweekly paycheck is spread evenly and
+  the number doesn't jump around month to month. (With under a year of pay history it
+  divides by the months you have.)
+
 ### v1.0.13 — Net monthly income = paychecks only
 - The **Net monthly income** figure (Bills & Subscriptions, and the dashboard "Should
   be left" basis) now comes **only from paycheck take-home**, averaged over the months

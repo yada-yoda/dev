@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.13';
+const VERSION = '1.0.14';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1129,7 +1129,7 @@ function renderSubscriptions(view) {
   const netCard = el('div', 'sum-card');
   netCard.appendChild(el('div', 'sum-label', 'Net monthly income'));
   netCard.appendChild(el('div', 'sum-value income', autoNet == null ? '…' : (net > 0 ? money(net) : '–')));
-  netCard.appendChild(el('div', 'sum-hint', 'avg paycheck take-home / mo'));
+  netCard.appendChild(el('div', 'sum-hint', 'net pay ÷ 12 (annualized)'));
   sum.appendChild(netCard);
   sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense'));
   sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense'));
@@ -2052,20 +2052,33 @@ function incomeNetYTDall(data) {
   return sum;
 }
 // Auto basis for "% of income" / "should be left" so the user never types it in.
-// Uses PAYCHECK take-home only — averaged over the months that had a paycheck — so
-// sporadic interest/rewards income doesn't inflate or distort the figure. If the
-// active year has no paychecks yet (e.g. a brand-new year), it walks back to the
-// most recent prior year that does. Returns null while a needed year doc loads;
-// returns 0 if no paychecks exist in the last few years.
+// Uses PAYCHECK take-home only (no interest/rewards), annualized: it sums net pay
+// over the trailing 12 months ending at your most recent paycheck and divides by
+// 12 — so the "extra" biweekly check some months get is spread evenly and the
+// figure doesn't spike. Months are keyed as (year*12 + month) so the window spans
+// year boundaries. If you have under a year of pay history, it divides by the
+// number of months you do have. Returns null while a needed year doc loads; 0 if
+// no paychecks exist in the active year or the two before it.
 function avgNetMonthlyIncome(store) {
-  for (let y = activeYear, tries = 0; tries < 4; y--, tries++) {
-    if (!store.isYearLoaded(y)) { store.loadYear(y); return null; }
-    const payM = new Array(12).fill(0);
-    store.yearData(y).paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) payM[mi] += paycheckNet(p); });
-    const paidMonths = payM.filter(v => v > 0);
-    if (paidMonths.length) return paidMonths.reduce((a, b) => a + b, 0) / paidMonths.length;
+  const cur = activeYear;
+  let loading = false;
+  for (let y = cur; y >= cur - 2; y--) if (!store.isYearLoaded(y)) { store.loadYear(y); loading = true; }
+  if (loading) return null;
+  const byMonth = {};   // (year*12 + month-1) -> net paycheck total
+  for (let y = cur; y >= cur - 2; y--) {
+    store.yearData(y).paychecks.filter(isPaycheckPaid).forEach(p => {
+      const m = /^(\d{4})-(\d{2})/.exec(p.payDate); if (!m) return;
+      const idx = (+m[1]) * 12 + (+m[2]) - 1;
+      byMonth[idx] = (byMonth[idx] || 0) + paycheckNet(p);
+    });
   }
-  return 0;
+  const idxs = Object.keys(byMonth).map(Number);
+  if (!idxs.length) return 0;
+  const latest = Math.max(...idxs), earliest = Math.min(...idxs);
+  const denom = Math.min(12, latest - earliest + 1);   // full year -> 12; less -> actual span
+  let sum = 0;
+  for (let k = 0; k < 12; k++) sum += byMonth[latest - k] || 0;   // trailing 12 months
+  return sum / denom;
 }
 function incomeByCategory(store, data) {
   const m = {};
