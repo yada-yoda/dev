@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.10 — Grid breakdowns, "via" in list, rewards Person, paychecks All view
+- **Annual grid**: expanding **Interest** now breaks it down by bank/institution, and
+  **Rewards** by reward source — one row per source with its monthly totals (instead of
+  by subcategory).
+- The income **List** now shows how money arrived ("via Venmo/PayPal/check…") under the
+  account, so imported Received-via data is visible.
+- The rewards import CSV now includes a **Person** column.
+- **Paychecks** has an **All** tab next to the years that shows every year's paychecks
+  together (sorted, with combined totals) for cross-year review.
+
 ### v1.0.9 — Auto net income, sortable paycheck timing, Period alignment
 - **Bills & Subscriptions** no longer asks you to type your net monthly income — it's
   now computed automatically as your average take-home per month (averaged over the

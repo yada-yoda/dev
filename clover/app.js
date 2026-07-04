@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.9';
+const VERSION = '1.0.10';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -49,6 +49,7 @@ let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
 let paycheckSel = new Set();       // selected paycheck ids for bulk edit
 let paycheckSelYear = null;
+let paycheckAllYears = false;      // paychecks "All" tab: show every year at once
 let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
 const expandedExpenseGroups = new Set();
@@ -233,6 +234,7 @@ function buildPeriodSelectors() {
 function onPeriodChange() {
   activeYear = +document.getElementById('sel-year').value;
   activeMonth = +document.getElementById('sel-month').value;
+  paycheckAllYears = false;   // picking a specific year exits the paychecks "All" view
   if (currentRoute) renderView(currentRoute);
 }
 function setActiveYear(y) {
@@ -266,9 +268,14 @@ function yearTabs(store, section) {
   years.sort((a, b) => b - a);
   if (years.length < 2) return null;
   const strip = el('div', 'year-tabs');
+  if (section === 'paychecks') {
+    const allBtn = el('button', 'ytab' + (paycheckAllYears ? ' active' : ''), 'All');
+    allBtn.addEventListener('click', () => { paycheckAllYears = true; renderView(currentRoute); });
+    strip.appendChild(allBtn);
+  }
   years.forEach(y => {
-    const b = el('button', 'ytab' + (y === activeYear ? ' active' : ''), String(y));
-    b.addEventListener('click', () => setActiveYear(y));
+    const b = el('button', 'ytab' + (!paycheckAllYears && y === activeYear ? ' active' : ''), String(y));
+    b.addEventListener('click', () => { paycheckAllYears = false; setActiveYear(y); });
     strip.appendChild(b);
   });
   return strip;
@@ -856,9 +863,21 @@ function incomeGrid(data) {
       () => { open ? expandedIncomeGroups.delete(g.id) : expandedIncomeGroups.add(g.id); renderView(currentRoute); },
       open ? '▾' : '▸'));
     if (open) {
-      g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
-      const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
-      if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+      const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name);
+      if (rewardCat || interestCat) {
+        // Break the group down by reward source (Rewards) or bank/institution
+        // (Interest) instead of subcategory, one row per source per month.
+        const keyOf = rewardCat
+          ? (e => (e.rewardSource || '').trim() || '(unspecified)')
+          : (e => store.accountName(e.accountId) || (e.notes || '').trim() || '(unspecified)');
+        const byKey = new Map();
+        gEntries.forEach(e => { const k = keyOf(e); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(e); });
+        [...byKey.keys()].sort((a, b) => a.localeCompare(b)).forEach(k => tb.appendChild(addRow('sub-row', k, monthsFor(byKey.get(k)))));
+      } else {
+        g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
+        const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
+        if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
+      }
       if (hasPc) tb.appendChild(addRow('sub-row', '↳ Paychecks', pcMonthly));
     }
   });
@@ -907,7 +926,12 @@ function incomeList(data) {
     const srcSub = e.rewardType || e.description;
     if (srcSub) srcTd.appendChild(el('div', 'acct-sub', srcSub));
     tr.appendChild(srcTd);
-    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
+    const acctTd = el('td');
+    const acctName = store.accountName(e.accountId);
+    if (acctName) acctTd.appendChild(document.createTextNode(acctName));
+    else if (!e.receivedVia) acctTd.textContent = '—';
+    if (e.receivedVia) acctTd.appendChild(el('div', 'acct-sub', 'via ' + e.receivedVia));
+    tr.appendChild(acctTd);
     tr.appendChild(numCell(amountOf(e), true));
     tr.appendChild(numCell(Number(e.net) || 0));
     tr.appendChild(el('td', null, store.personName(e.personId)));
@@ -1472,6 +1496,7 @@ const PAYCHECK_STATUSES = ['Received', 'Expected', 'Late', 'Missing', 'Bounced/R
 const PAYCHECK_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
 
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
+function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }
 function paycheckDaysLate(p) {
   if (!p.payDate || !p.receivedDate) return null;
   const pm = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.payDate), rm = /^(\d{4})-(\d{2})-(\d{2})/.exec(p.receivedDate);
@@ -1499,9 +1524,17 @@ function daysLateBadge(p) {
 
 function renderPaychecks(view) {
   const store = window.cloverStore;
-  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
-  const data = store.yearData(activeYear);
-  const pays = data.paychecks;
+  const allMode = paycheckAllYears;
+  let pays;
+  if (allMode) {
+    ensureYearsScanned(store);
+    const cur = new Date().getFullYear();
+    pays = [];
+    for (let y = cur + 1; y >= 2020; y--) if (store.isYearLoaded(y)) pays = pays.concat(store.yearData(y).paychecks);
+  } else {
+    if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+    pays = store.yearData(activeYear).paychecks;
+  }
   const paid = pays.filter(isPaycheckPaid);
   const grossYTD = paid.reduce((s, p) => s + (Number(p.gross) || 0), 0);
   const netYTD = paid.reduce((s, p) => s + (Number(p.net) || 0), 0);
@@ -1509,7 +1542,7 @@ function renderPaychecks(view) {
 
   const head = el('div', 'view-head');
   const left = el('div');
-  left.appendChild(el('h3', null, 'Paychecks · ' + activeYear));
+  left.appendChild(el('h3', null, 'Paychecks · ' + (allMode ? 'All years' : activeYear)));
   left.appendChild(el('p', 'muted', paid.length + ' received · ' + pays.length + ' total'));
   head.appendChild(left);
   const pcActions = el('div', 'head-actions');
@@ -1521,8 +1554,8 @@ function renderPaychecks(view) {
   const yt = yearTabs(store, 'paychecks'); if (yt) view.appendChild(yt);
 
   const sum = el('div', 'sub-summary');
-  sum.appendChild(sumCard('Gross YTD', money(grossYTD), 'income'));
-  sum.appendChild(sumCard('Net YTD', money(netYTD), 'income'));
+  sum.appendChild(sumCard(allMode ? 'Gross (all yrs)' : 'Gross YTD', money(grossYTD), 'income'));
+  sum.appendChild(sumCard(allMode ? 'Net (all yrs)' : 'Net YTD', money(netYTD), 'income'));
   sum.appendChild(sumCard('Received', String(paid.length), 'neutral'));
   sum.appendChild(sumCard('Outstanding', String(outstanding.length), outstanding.length ? 'expense' : 'neutral'));
   view.appendChild(sum);
@@ -1549,10 +1582,14 @@ function renderPaychecks(view) {
   bar.appendChild(labelWrap('Status', statusSel));
   view.appendChild(bar);
 
-  // Reset bulk selection when the year changes; drop ids that no longer exist.
-  if (paycheckSelYear !== activeYear) { paycheckSel = new Set(); paycheckSelYear = activeYear; }
-  const validIds = new Set(pays.map(p => p.id));
-  [...paycheckSel].forEach(id => { if (!validIds.has(id)) paycheckSel.delete(id); });
+  // Bulk selection is per-year only; in the All view we skip it (edits would span
+  // year docs). Reset selection when the year changes; drop ids that vanished.
+  if (allMode) { paycheckSel = new Set(); paycheckSelYear = null; }
+  else {
+    if (paycheckSelYear !== activeYear) { paycheckSel = new Set(); paycheckSelYear = activeYear; }
+    const validIds = new Set(pays.map(p => p.id));
+    [...paycheckSel].forEach(id => { if (!validIds.has(id)) paycheckSel.delete(id); });
+  }
 
   let rows = pays.slice();
   if (paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
@@ -1562,9 +1599,11 @@ function renderPaychecks(view) {
     return;
   }
 
-  const bulkContainer = el('div'); bulkContainer.id = 'pc-bulk-bar';
-  if (paycheckSel.size) bulkContainer.appendChild(paycheckBulkBar(store));
-  view.appendChild(bulkContainer);
+  if (!allMode) {
+    const bulkContainer = el('div'); bulkContainer.id = 'pc-bulk-bar';
+    if (paycheckSel.size) bulkContainer.appendChild(paycheckBulkBar(store));
+    view.appendChild(bulkContainer);
+  }
 
   const cols = [
     { sortable: false, headCell: () => {
@@ -1603,11 +1642,11 @@ function renderPaychecks(view) {
     { label: '', sortable: false, cell: p => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => paycheckModal(p));
-        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(p.payDate) + ' · ' + (p.employer || 'paycheck'), () => store.removePaycheck(activeYear, p.id)));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(p.payDate) + ' · ' + (p.employer || 'paycheck'), () => store.removePaycheck(yearOfPaycheck(p), p.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(cols, rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => isPaycheckPaid(p) ? '' : 'inactive-row'));
+  card.appendChild(sortableTable(allMode ? cols.slice(1) : cols, rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => isPaycheckPaid(p) ? '' : 'inactive-row'));
   view.appendChild(card);
 }
 
@@ -1704,7 +1743,11 @@ function paycheckModal(existing) {
         periodStart: fPeriodStart.value || '', periodEnd: fPeriodEnd.value || '',
         status: fStatus.value, method: fMethod.value, notes: fNotes.value.trim()
       });
-      store.savePaycheck(activeYear, entry);
+      // A paycheck belongs to the year of its pay date, not whatever year is
+      // being viewed — this keeps All-view edits and cross-year adds correct.
+      const y = yearOfPaycheck(entry);
+      const doSave = () => store.savePaycheck(y, entry);
+      if (store.isYearLoaded(y)) doSave(); else store.loadYear(y).then(doSave);
       toast(existing ? 'Paycheck updated' : 'Paycheck added');
     }
   });
