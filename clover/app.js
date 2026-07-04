@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2280,10 +2280,225 @@ function renderImport(view) {
   csv.appendChild(grid);
   view.appendChild(csv);
 
-  // ---- CSV import (coming next) ----
-  const imp = el('div', 'card');
-  imp.appendChild(el('h3', 'strip-title', 'Import from CSV'));
-  imp.appendChild(el('p', 'muted', 'Bringing in your old spreadsheets — with column mapping, preview, and duplicate detection — is the next piece of this section.'));
-  imp.appendChild(el('span', 'phase-tag', 'Coming soon'));
-  view.appendChild(imp);
+  // ---- CSV import ----
+  view.appendChild(importSection());
+  const hist = importHistoryCard();
+  if (hist) view.appendChild(hist);
+}
+
+// ============================================================
+// CSV import wizard — Phase 8 (part 2)
+// ============================================================
+let _papaLoading = null;
+function ensurePapa() {
+  if (window.Papa) return Promise.resolve(window.Papa);
+  if (_papaLoading) return _papaLoading;
+  _papaLoading = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js';
+    s.onload = () => resolve(window.Papa);
+    s.onerror = () => { _papaLoading = null; reject(new Error('PapaParse failed to load')); };
+    document.head.appendChild(s);
+  });
+  return _papaLoading;
+}
+
+const IMPORT_FIELDS = {
+  income: [
+    { key: 'date', label: 'Date', req: true, kw: ['date'] },
+    { key: 'gross', label: 'Gross amount', req: true, num: true, kw: ['gross', 'amount', 'paid', 'total'] },
+    { key: 'net', label: 'Net (optional)', num: true, kw: ['net'] },
+    { key: 'category', label: 'Category', kw: ['category', 'affiliate', 'reason', 'action', 'description', 'type'] },
+    { key: 'account', label: 'Account', kw: ['account', 'bank', 'broker'] },
+    { key: 'person', label: 'Person', kw: ['person', 'owner'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'symbol', 'description'] }
+  ],
+  expenses: [
+    { key: 'date', label: 'Date', req: true, kw: ['date'] },
+    { key: 'amount', label: 'Amount', req: true, num: true, kw: ['amount', 'paid', 'cost', 'total'] },
+    { key: 'category', label: 'Category', kw: ['category', 'reason', 'type', 'description'] },
+    { key: 'account', label: 'Account', kw: ['account', 'card', 'method'] },
+    { key: 'person', label: 'Person', kw: ['person', 'owner'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'description'] }
+  ],
+  paychecks: [
+    { key: 'payDate', label: 'Pay date', req: true, kw: ['pay date', 'date'] },
+    { key: 'gross', label: 'Gross', req: true, num: true, kw: ['gross', 'amount'] },
+    { key: 'net', label: 'Net', num: true, kw: ['net'] },
+    { key: 'receivedDate', label: 'Received date', kw: ['received', 'deposit'] },
+    { key: 'employer', label: 'Employer', kw: ['employer', 'source', 'person'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'memo'] }
+  ]
+};
+let importState = { target: 'income', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+
+function parseImportDate(str) {
+  if (!str) return '';
+  str = String(str).trim();
+  const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str); if (iso) return iso[0];
+  let d = new Date(str);
+  if (isNaN(d)) d = new Date(str.replace(/-/g, ' '));   // "9-Oct-2025" -> "9 Oct 2025"
+  if (isNaN(d)) return '';
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function parseImportAmount(v) {
+  if (v == null || v === '') return NaN;
+  const s = String(v).replace(/[$,\s()]/g, '');
+  return parseFloat(s);
+}
+function guessColumn(headers, kw) {
+  const h = headers.map(x => (x || '').toLowerCase());
+  for (const k of kw) { const i = h.findIndex(x => x.includes(k)); if (i >= 0) return headers[i]; }
+  return '';
+}
+function matchCategory(store, kind, text, fallbackId) {
+  const cats = kind === 'income' ? store.state.incomeCategories : store.state.expenseCategories;
+  const t = (text || '').toLowerCase().trim();
+  if (t) { const g = cats.find(c => c.name.toLowerCase() === t) || cats.find(c => t.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(t)); if (g) return g.id; }
+  return fallbackId;
+}
+function matchAccount(store, text) {
+  const t = (text || '').toLowerCase().trim(); if (!t) return '';
+  const a = store.state.accounts.find(x => x.name.toLowerCase() === t) || store.state.accounts.find(x => (x.last4 && t.includes(x.last4)) || t.includes(x.name.toLowerCase()));
+  return a ? a.id : '';
+}
+function matchPerson(store, text) {
+  const t = (text || '').toLowerCase().trim();
+  const p = t && store.state.persons.find(x => t.includes(x.name.toLowerCase()) || x.name.toLowerCase().includes(t));
+  return p ? p.id : (store.state.persons[0] && store.state.persons[0].id);
+}
+
+function buildImportEntries(store) {
+  const { target, rows, mapping, fallbackCat } = importState;
+  const yd = store.yearData(activeYear);
+  const kind = target === 'income' ? 'income' : 'expense';
+  const existing = new Set((target === 'income' ? yd.income : target === 'expenses' ? yd.expensePayments : yd.paychecks)
+    .map(e => dupKey(target, e)));
+  const entries = []; let dupes = 0, skipped = 0;
+  rows.forEach(row => {
+    const g = k => mapping[k] ? (row[mapping[k]] || '') : '';
+    const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
+    const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
+    if (!date || isNaN(amt)) { skipped++; return; }
+    let e;
+    if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', notes: g('notes') };
+    else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
+    else e = { payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, receivedDate: parseImportDate(g('receivedDate')), employer: g('employer'), incomeCategoryId: fallbackCat, personId: matchPerson(store), status: 'Received', method: 'Direct deposit', notes: g('notes') };
+    if (existing.has(dupKey(target, e))) { dupes++; return; }
+    entries.push(e);
+  });
+  return { entries, dupes, skipped };
+}
+function dupKey(target, e) {
+  if (target === 'expenses') return e.date + '|' + (Number(e.amount) || 0).toFixed(2) + '|' + (e.categoryId || '');
+  if (target === 'paychecks') return (e.payDate || '') + '|' + (Number(e.gross) || 0).toFixed(2);
+  return e.date + '|' + (Number(e.gross) || 0).toFixed(2) + '|' + (e.categoryId || '');
+}
+
+function importSection() {
+  const store = window.cloverStore;
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'Import from CSV'));
+
+  if (!importState.rows) {
+    card.appendChild(el('p', 'muted', 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
+    const row = el('div', 'io-actions');
+    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }], importState.target);
+    tSel.addEventListener('change', () => { importState.target = tSel.value; });
+    row.appendChild(labelWrap('Import as', tSel));
+    const fileLabel = el('label', 'btn-primary file-btn'); fileLabel.textContent = 'Choose CSV…';
+    const fileIn = document.createElement('input'); fileIn.type = 'file'; fileIn.accept = '.csv,text/csv'; fileIn.style.display = 'none';
+    fileIn.addEventListener('change', async () => {
+      const file = fileIn.files && fileIn.files[0]; if (!file) return;
+      let Papa; try { Papa = await ensurePapa(); } catch (e) { toast('CSV parser couldn’t load', 'warn'); return; }
+      Papa.parse(file, {
+        header: true, skipEmptyLines: true,
+        complete: (res) => {
+          const headers = (res.meta && res.meta.fields) || [];
+          if (!headers.length || !res.data.length) { toast('No rows found in that CSV', 'warn'); return; }
+          const mapping = {}; IMPORT_FIELDS[importState.target].forEach(f => { mapping[f.key] = guessColumn(headers, f.kw); });
+          importState = Object.assign(importState, { rows: res.data, headers, mapping, filename: file.name });
+          renderView(currentRoute);
+        },
+        error: () => toast('Couldn’t read that CSV', 'warn')
+      });
+    });
+    fileLabel.appendChild(fileIn); row.appendChild(fileLabel);
+    card.appendChild(row);
+    return card;
+  }
+
+  // mapping + preview
+  card.appendChild(el('p', 'muted', importState.rows.length + ' rows from “' + importState.filename + '” · importing as ' + importState.target + ' into ' + activeYear));
+  const opts = [{ value: '', label: '— not mapped —' }].concat(importState.headers.map(h => ({ value: h, label: h })));
+  const mapGrid = el('div', 'map-grid');
+  IMPORT_FIELDS[importState.target].forEach(f => {
+    const sel = select(opts, importState.mapping[f.key] || '');
+    sel.addEventListener('change', () => { importState.mapping[f.key] = sel.value; renderView(currentRoute); });
+    mapGrid.appendChild(field(f.label + (f.req ? ' *' : ''), sel));
+  });
+  card.appendChild(mapGrid);
+
+  // fallback category
+  const kind = importState.target === 'expenses' ? 'expense' : 'income';
+  const cats = kind === 'expense' ? store.state.expenseCategories : store.state.incomeCategories;
+  const fbSel = select([{ value: '', label: '— none —' }].concat(cats.map(c => ({ value: c.id, label: c.name }))), importState.fallbackCat);
+  fbSel.addEventListener('change', () => { importState.fallbackCat = fbSel.value; renderView(currentRoute); });
+  card.appendChild(field(importState.target === 'paychecks' ? 'Income category for these paychecks' : 'Category for unmatched rows', fbSel, 'Rows whose category text doesn’t match one of your categories go here.'));
+
+  const { entries, dupes, skipped } = buildImportEntries(store);
+  // preview
+  const prevWrap = el('div', 'table-scroll'); const pt = el('table', 'data-table');
+  pt.innerHTML = '<thead><tr><th>Date</th><th class="num">Amount</th><th>Category</th></tr></thead>';
+  const ptb = el('tbody');
+  entries.slice(0, 6).forEach(e => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(e.date || e.payDate)));
+    tr.appendChild(numCell(Number(e.amount != null ? e.amount : e.gross) || 0, true));
+    tr.appendChild(el('td', null, importState.target === 'paychecks' ? (e.employer || '—') : store[kind === 'expense' ? 'expenseGroupName' : 'incomeGroupName'](e.categoryId)));
+    ptb.appendChild(tr);
+  });
+  pt.appendChild(ptb); prevWrap.appendChild(pt); card.appendChild(el('div', 'muted', 'Preview (first 6 of ' + entries.length + ' new rows):')); card.appendChild(prevWrap);
+
+  const summary = el('p', 'muted', entries.length + ' will import · ' + dupes + ' duplicates skipped' + (skipped ? ' · ' + skipped + ' rows had no date/amount' : ''));
+  card.appendChild(summary);
+
+  const actions = el('div', 'io-actions');
+  const impBtn = el('button', 'btn-primary', 'Import ' + entries.length + ' rows');
+  impBtn.disabled = !entries.length;
+  impBtn.addEventListener('click', () => {
+    const missingReq = IMPORT_FIELDS[importState.target].filter(f => f.req && !importState.mapping[f.key]);
+    if (missingReq.length) { toast('Map the required fields: ' + missingReq.map(f => f.label).join(', '), 'warn'); return; }
+    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: importState.target, source: importState.filename, count: entries.length };
+    store.importEntries(activeYear, importState.target, entries, batch);
+    toast('Imported ' + entries.length + ' rows');
+    importState = { target: importState.target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+    renderView(currentRoute);
+  });
+  actions.appendChild(impBtn);
+  const cancel = el('button', 'btn-ghost', 'Cancel');
+  cancel.addEventListener('click', () => { importState = { target: importState.target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' }; renderView(currentRoute); });
+  actions.appendChild(cancel);
+  card.appendChild(actions);
+  return card;
+}
+
+function importHistoryCard() {
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) return null;
+  const batches = (store.yearData(activeYear).importBatches || []).slice().reverse();
+  if (!batches.length) return null;
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'Import history · ' + activeYear));
+  const list = el('div', 'mini-list');
+  batches.forEach(b => {
+    const row = el('div', 'mini-row');
+    row.appendChild(el('span', null, fmtDate((b.importedAt || '').slice(0, 10)) + ' · ' + b.count + ' ' + b.target + (b.source ? ' · ' + b.source : '')));
+    const undo = el('button', 'icon-btn danger', 'Undo');
+    undo.addEventListener('click', () => confirmRemove('this import of ' + b.count + ' ' + b.target + ' rows', () => store.undoImportBatch(activeYear, b.id)));
+    row.appendChild(undo);
+    list.appendChild(row);
+  });
+  card.appendChild(list);
+  return card;
 }

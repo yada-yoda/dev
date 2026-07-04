@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.9.1 — Phase 8 (part 2): CSV import
+- Import transaction CSVs (income, expenses, or paychecks) into the selected year:
+  upload → columns auto-map to Clover fields (adjustable) → preview → import.
+- Category/account/person text is matched to your existing records; unmatched rows
+  fall back to a category you choose. Dates and amounts are parsed from common
+  formats; likely duplicates are detected and skipped.
+- Every import is a batch shown in an import history, with one-click **Undo**.
+- CSV parsing via PapaParse (lazy-loaded from CDN).
+
+_Why:_ completes import/export — your prior-year spreadsheets can now come in, and
+any mistake is one Undo away.
+
 ### v0.9.0 — Phase 8 (part 1): Export & backup
 - New Import / Export page. **Full backup**: download everything (settings,
   categories, accounts, bills, and every year of income/expenses/paychecks) as one
@@ -279,5 +291,5 @@ any financial data or features are built.
 | 5 | Credit scores & savings rates ✅ |
 | 6 | Dashboard ✅ |
 | 7 | Reports & calendar ✅ |
-| 8 | Export & backup ✅ · CSV import (in progress) |
+| 8 | Import / export ✅ |
 | 9 | Polish, mobile, security review → v1.0.0 |

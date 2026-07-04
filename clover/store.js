@@ -317,6 +317,22 @@ window.cloverStore = {
   },
   accountName(id) { const a = state.accounts.find(x => x.id === id); return a ? a.name : ''; },
 
+  // --- CSV import (batched, undoable) ---
+  importEntries(y, target, entries, batch) {
+    const d = state.years[String(y)]; if (!d) return;
+    const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : 'paychecks';
+    entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
+    d.importBatches = d.importBatches || [];
+    d.importBatches.push(batch);
+    this.scheduleSaveYear(y); notify();
+  },
+  undoImportBatch(y, batchId) {
+    const d = state.years[String(y)]; if (!d) return;
+    ['income', 'expensePayments', 'paychecks'].forEach(k => { d[k] = d[k].filter(e => e.batchId !== batchId); });
+    d.importBatches = (d.importBatches || []).filter(b => b.id !== batchId);
+    this.scheduleSaveYear(y); notify();
+  },
+
   // --- backup / restore ---
   exportAll() { return { app: 'clover', meta: snapshot(), years: JSON.parse(JSON.stringify(state.years)) }; },
   async restore(obj) {
