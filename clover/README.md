@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v0.9.2 — "Should be left / month" stat card
+- Added a Dashboard card estimating the money that should be left over in a typical
+  month: your take-home (or average income) minus recurring bills minus average
+  spending — the "unallocated income" figure from the spreadsheets.
+
 ### v0.9.1 — Phase 8 (part 2): CSV import
 - Import transaction CSVs (income, expenses, or paychecks) into the selected year:
   upload → columns auto-map to Clover fields (adjustable) → preview → import.

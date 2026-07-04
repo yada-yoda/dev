@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.9.1';
+const VERSION = '0.9.2';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1868,6 +1868,13 @@ function renderDashboard(view) {
   const projAnnualIncome = monthsElapsed > 0 ? incYTD / monthsElapsed * 12 : incYTD;
   const projAnnualExpense = recurringAnnual + (monthsElapsed > 0 ? spendYTD / monthsElapsed * 12 : spendYTD);
 
+  // "Should be left over" for a typical month: income basis − recurring bills −
+  // typical (average) non-recurring spending.
+  const setNet = store.netMonthlyIncome();
+  const avgSpend = monthsElapsed > 0 ? spendYTD / monthsElapsed : spendThisMonth;
+  const incomeBasis = setNet > 0 ? setNet : (monthsElapsed > 0 ? incYTD / monthsElapsed : incThisMonth);
+  const shouldLeft = incomeBasis - recurringMonthly - avgSpend;
+
   const head = el('div', 'view-head');
   const left = el('div'); left.appendChild(el('h3', null, 'Dashboard'));
   left.appendChild(el('p', 'muted', monthName + ' ' + activeYear + ' snapshot'));
@@ -1879,6 +1886,7 @@ function renderDashboard(view) {
   kpis.appendChild(kpiCard('Spending · ' + monthName, money(spendThisMonth), 'expense'));
   kpis.appendChild(kpiCard('Recurring / mo', money(recurringMonthly), 'expense', money(recurringAnnual) + ' / yr'));
   kpis.appendChild(kpiCard('Net · ' + monthName, money(netThisMonth), netThisMonth < 0 ? 'expense' : 'income'));
+  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', (setNet > 0 ? 'take-home' : 'avg income') + ' − bills − avg spend'));
   kpis.appendChild(kpiCard('Projected income', money(projAnnualIncome), 'income', 'annualized from YTD'));
   kpis.appendChild(kpiCard('Projected expenses', money(projAnnualExpense), 'expense', 'subs + annualized spend'));
   view.appendChild(kpis);
