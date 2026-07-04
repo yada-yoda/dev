@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.12';
+const VERSION = '1.0.13';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1129,7 +1129,7 @@ function renderSubscriptions(view) {
   const netCard = el('div', 'sum-card');
   netCard.appendChild(el('div', 'sum-label', 'Net monthly income'));
   netCard.appendChild(el('div', 'sum-value income', autoNet == null ? '…' : (net > 0 ? money(net) : '–')));
-  netCard.appendChild(el('div', 'sum-hint', 'avg take-home / mo (auto)'));
+  netCard.appendChild(el('div', 'sum-hint', 'avg paycheck take-home / mo'));
   sum.appendChild(netCard);
   sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense'));
   sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense'));
@@ -2051,33 +2051,19 @@ function incomeNetYTDall(data) {
   sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + paycheckNet(p), 0);
   return sum;
 }
-function netMonthlyArray(data) {
-  const m = new Array(12).fill(0);
-  data.income.filter(countable).forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += netAmountOf(e); });
-  data.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += paycheckNet(p); });
-  return m;
-}
 // Auto basis for "% of income" / "should be left" so the user never types it in.
-// Averages net (take-home) income over the months that actually have income in
-// the active year; if the active year has none yet (a brand-new year), walks
-// back to the most recent prior year that does. Returns null while a needed
-// year doc is still loading (caller shows a placeholder and re-renders on load).
+// Uses PAYCHECK take-home only — averaged over the months that had a paycheck — so
+// sporadic interest/rewards income doesn't inflate or distort the figure. If the
+// active year has no paychecks yet (e.g. a brand-new year), it walks back to the
+// most recent prior year that does. Returns null while a needed year doc loads;
+// returns 0 if no paychecks exist in the last few years.
 function avgNetMonthlyIncome(store) {
   for (let y = activeYear, tries = 0; tries < 4; y--, tries++) {
     if (!store.isYearLoaded(y)) { store.loadYear(y); return null; }
-    const d = store.yearData(y);
-    const incomeM = netMonthlyArray(d);   // all net income by month
-    // Prefer months that actually had a paycheck — that's your regular income.
-    // Averaging over those (not every month with a stray reward/interest deposit)
-    // keeps the figure representative of a normal month's take-home.
     const payM = new Array(12).fill(0);
-    d.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) payM[mi] += paycheckNet(p); });
-    const paidMonths = [];
-    for (let i = 0; i < 12; i++) if (payM[i] > 0) paidMonths.push(i);
-    if (paidMonths.length) return paidMonths.reduce((a, i) => a + incomeM[i], 0) / paidMonths.length;
-    // No paychecks that year — fall back to any month that has income.
-    const anyMonths = incomeM.filter(v => v > 0);
-    if (anyMonths.length) return anyMonths.reduce((a, b) => a + b, 0) / anyMonths.length;
+    store.yearData(y).paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) payM[mi] += paycheckNet(p); });
+    const paidMonths = payM.filter(v => v > 0);
+    if (paidMonths.length) return paidMonths.reduce((a, b) => a + b, 0) / paidMonths.length;
   }
   return 0;
 }

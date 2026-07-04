@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.13 — Net monthly income = paychecks only
+- The **Net monthly income** figure (Bills & Subscriptions, and the dashboard "Should
+  be left" basis) now comes **only from paycheck take-home**, averaged over the months
+  you were paid. Interest, rewards, and other one-off income no longer distort it, so it
+  reflects your regular pay.
+
 ### v1.0.12 — Rewards net = gross
 - Reward income has no tax withheld, so its **Net now auto-fills to equal the Gross**
   whenever net is left blank — on both CSV import and manual entry. Reward rows in the
