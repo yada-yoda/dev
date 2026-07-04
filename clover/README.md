@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.6 — Chart date range on Credit & Rates
+- The credit-score and savings-rate charts now have a "Chart range" selector: view
+  all time, a single year, or a custom From/To date window. The table below stays
+  full so you can still edit any entry; only the chart narrows to the chosen range.
+
 ### v1.0.5 — Bulk-edit paychecks
 - Paychecks table now has a checkbox column with select-all/clear, so you can pick
   several pay dates at once and apply a Method (Direct deposit, Office pickup, Other…)

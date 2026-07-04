@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.5';
+const VERSION = '1.0.6';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1737,6 +1737,51 @@ let creditSort = { key: 'date', dir: 'desc' };
 let rateSort = { key: 'date', dir: 'desc' };
 const COMMON_PROVIDERS = ['Credit Karma', 'Chase', 'Amex', 'Discover', 'Experian', 'Equifax', 'TransUnion', 'FICO', 'VantageScore'];
 
+// Shared date-range filter for the Credit & Rates charts.
+// mode: 'all' | a 4-digit year string | 'custom' (uses from/to ISO dates).
+let chartRange = { mode: 'all', from: '', to: '' };
+
+function chartRangeInRange(dateStr) {
+  if (!dateStr) return false;
+  if (chartRange.mode === 'all') return true;
+  if (chartRange.mode === 'custom') {
+    if (chartRange.from && dateStr < chartRange.from) return false;
+    if (chartRange.to && dateStr > chartRange.to) return false;
+    return true;
+  }
+  return dateStr.slice(0, 4) === chartRange.mode; // specific year
+}
+
+// Reset a stale year selection when switching to a tab that lacks that year.
+function normalizeChartRange(rows) {
+  if (chartRange.mode === 'all' || chartRange.mode === 'custom') return;
+  const years = new Set(rows.map(r => (r.date || '').slice(0, 4)));
+  if (!years.has(chartRange.mode)) chartRange.mode = 'all';
+}
+
+function chartRangeControls(rows, onChange) {
+  const bar = el('div', 'chart-range');
+  const years = [...new Set(rows.map(r => (r.date || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+  const sel = el('select');
+  const opt = (v, l) => { const o = el('option', null, l); o.value = v; if (chartRange.mode === v) o.selected = true; sel.appendChild(o); };
+  opt('all', 'All time');
+  years.forEach(y => opt(y, y));
+  opt('custom', 'Custom range…');
+  sel.addEventListener('change', () => { chartRange.mode = sel.value; onChange(); });
+  const lbl = el('label', 'range-label'); lbl.appendChild(el('span', null, 'Chart range')); lbl.appendChild(sel);
+  bar.appendChild(lbl);
+  if (chartRange.mode === 'custom') {
+    const mk = (label, val, set) => {
+      const inp = el('input'); inp.type = 'date'; if (val) inp.value = val;
+      inp.addEventListener('change', () => { set(inp.value); onChange(); });
+      const l = el('label', 'range-label'); l.appendChild(el('span', null, label)); l.appendChild(inp); return l;
+    };
+    bar.appendChild(mk('From', chartRange.from, v => chartRange.from = v));
+    bar.appendChild(mk('To', chartRange.to, v => chartRange.to = v));
+  }
+  return bar;
+}
+
 function renderCredit(view) {
   destroyCharts();
   const store = window.cloverStore, s = store.state;
@@ -1766,19 +1811,27 @@ function renderCredit(view) {
 
 function renderCreditTab(view) {
   const store = window.cloverStore, s = store.state;
-  const rows = s.creditScores.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  if (!rows.length) { view.appendChild(emptyState('No credit scores yet', 'Log your scores over time to chart them by provider (Credit Karma, Chase, Amex, etc.).', '+ Add score', () => creditScoreModal(null))); return; }
+  const allRows = s.creditScores.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!allRows.length) { view.appendChild(emptyState('No credit scores yet', 'Log your scores over time to chart them by provider (Credit Karma, Chase, Amex, etc.).', '+ Add score', () => creditScoreModal(null))); return; }
 
-  const dates = [...new Set(rows.map(r => r.date))].sort();
-  const providers = [...new Set(rows.map(r => r.provider || 'Unknown'))];
-  const datasets = providers.map((prov, i) => ({
-    label: prov,
-    data: dates.map(d => { const rec = rows.find(x => x.date === d && (x.provider || 'Unknown') === prov); return rec ? Number(rec.score) : null; }),
-    borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
-    spanGaps: true, tension: 0.25, pointRadius: 3
-  }));
-  const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
-  buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: 'Score' });
+  normalizeChartRange(allRows);
+  view.appendChild(chartRangeControls(allRows, () => renderView(currentRoute)));
+  const rows = allRows.filter(r => chartRangeInRange(r.date));
+
+  if (!rows.length) {
+    view.appendChild(el('div', 'card muted pad', 'No scores in this range.'));
+  } else {
+    const dates = [...new Set(rows.map(r => r.date))].sort();
+    const providers = [...new Set(rows.map(r => r.provider || 'Unknown'))];
+    const datasets = providers.map((prov, i) => ({
+      label: prov,
+      data: dates.map(d => { const rec = rows.find(x => x.date === d && (x.provider || 'Unknown') === prov); return rec ? Number(rec.score) : null; }),
+      borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+      spanGaps: true, tension: 0.25, pointRadius: 3
+    }));
+    const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
+    buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: 'Score' });
+  }
 
   const cols = [
     { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
@@ -1798,19 +1851,27 @@ function rateInstitution(store, r) {
 
 function renderRatesTab(view) {
   const store = window.cloverStore, s = store.state;
-  const rows = s.rateHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  if (!rows.length) { view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null))); return; }
+  const allRows = s.rateHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (!allRows.length) { view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null))); return; }
 
-  const dates = [...new Set(rows.map(r => r.date))].sort();
-  const insts = [...new Set(rows.map(r => rateInstitution(store, r) || 'Unknown'))];
-  const datasets = insts.map((inst, i) => ({
-    label: inst,
-    data: dates.map(d => { const rec = rows.find(x => x.date === d && (rateInstitution(store, x) || 'Unknown') === inst); return rec ? Number(rec.apy) : null; }),
-    borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
-    spanGaps: true, tension: 0.25, pointRadius: 3
-  }));
-  const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
-  buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: '% APY' });
+  normalizeChartRange(allRows);
+  view.appendChild(chartRangeControls(allRows, () => renderView(currentRoute)));
+  const rows = allRows.filter(r => chartRangeInRange(r.date));
+
+  if (!rows.length) {
+    view.appendChild(el('div', 'card muted pad', 'No rate entries in this range.'));
+  } else {
+    const dates = [...new Set(rows.map(r => r.date))].sort();
+    const insts = [...new Set(rows.map(r => rateInstitution(store, r) || 'Unknown'))];
+    const datasets = insts.map((inst, i) => ({
+      label: inst,
+      data: dates.map(d => { const rec = rows.find(x => x.date === d && (rateInstitution(store, x) || 'Unknown') === inst); return rec ? Number(rec.apy) : null; }),
+      borderColor: CHART_PALETTE[i % CHART_PALETTE.length], backgroundColor: CHART_PALETTE[i % CHART_PALETTE.length],
+      spanGaps: true, tension: 0.25, pointRadius: 3
+    }));
+    const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); view.appendChild(wrap);
+    buildLineChart(cv, { labels: dates.map(fmtDateShort), datasets, yTitle: '% APY' });
+  }
 
   const cols = [
     { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
