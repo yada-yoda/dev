@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '0.9.2';
+const VERSION = '1.0.0';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -412,8 +412,27 @@ function confirmRemove(name, onYes) {
 // ============================================================
 // Settings view
 // ============================================================
+function helpCard() {
+  const card = el('div', 'card help-card');
+  card.appendChild(el('h3', 'strip-title', 'How Clover works'));
+  const ul = el('ul', 'help-list');
+  [
+    'Add your <strong>paychecks</strong> — their gross rolls into the Wages income category automatically, so you never enter wages twice.',
+    'Put recurring bills (electric, streaming, mortgage) in <strong>Bills &amp; Subscriptions</strong>. They show up in <strong>Expenses</strong> automatically at their monthly cost.',
+    'For a bill whose amount changes (like electric), add an <strong>Expense</strong> and pick it under “For which bill?” — the real amount replaces that month’s estimate.',
+    'Log one-off spending and other income as it happens under <strong>Expenses</strong> and <strong>Income</strong>.',
+    'The <strong>Dashboard</strong> and <strong>Reports</strong> summarize everything; the <strong>Calendar</strong> shows upcoming paychecks, renewals, and CD maturities.',
+    'Back up anytime under <strong>Import / Export → Download backup</strong>. You can restore or import spreadsheets there too.',
+    'Your data is private to your Google account — nothing here is public.'
+  ].forEach(t => { const li = el('li'); li.innerHTML = t; ul.appendChild(li); });
+  card.appendChild(ul);
+  card.appendChild(el('div', 'muted', 'Clover v' + VERSION));
+  return card;
+}
+
 function renderSettings(view) {
   const store = window.cloverStore, s = store.state;
+  view.appendChild(helpCard());
   const grid = el('div', 'settings-grid');
   grid.appendChild(simpleListCard('People', 'Who money belongs to — you, joint, or others. Click a name to rename.', s.persons,
     { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id), onRename: (id, v) => store.renamePerson(id, v) }));

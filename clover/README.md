@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.0 — Phase 9: polish & first stable release
+- Added an in-app "How Clover works" guide (Settings) covering paycheck→income and
+  bill→expense roll-ups, backups, and privacy.
+- Security review: rules locked to the owner's account ID (anonymous access is
+  denied), noindex, no secrets or financial amounts in client logs, no debug pages.
+- All nine build phases complete — the app is feature-complete and stable.
+
 ### v0.9.2 — "Should be left / month" stat card
 - Added a Dashboard card estimating the money that should be left over in a typical
   month: your take-home (or average income) minus recurring bills minus average
@@ -297,4 +304,4 @@ any financial data or features are built.
 | 6 | Dashboard ✅ |
 | 7 | Reports & calendar ✅ |
 | 8 | Import / export ✅ |
-| 9 | Polish, mobile, security review → v1.0.0 |
+| 9 | Polish, security review → v1.0.0 ✅ |
