@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.11';
+const VERSION = '1.0.12';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1044,10 +1044,13 @@ function incomeModal(existing) {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const gross = parseFloat(fGross.value);
       if (isNaN(gross)) { toast('Gross amount is required', 'warn'); fGross.focus(); return false; }
+      // Rewards have no withholding — if net is left blank, it equals gross.
+      const catName = (s.incomeCategories.find(c => c.id === fCat.value) || {}).name || '';
+      const net = fNet.value !== '' ? parseFloat(fNet.value) : (/reward/i.test(catName) ? gross : null);
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
         accountId: fAcct.value || '', personId: fPerson.value, gross,
-        net: fNet.value === '' ? null : parseFloat(fNet.value), status: fStatus.value,
+        net, status: fStatus.value,
         expectedDate: fExpected.value || '', receivedVia: fVia.value.trim(), taxable: fTax.value,
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
@@ -2801,7 +2804,13 @@ function buildImportEntries(store) {
       const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
       const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
       if (!date || isNaN(amt)) { skipped++; return; }
-      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), otherType: String(g('otherType')).trim(), description: String(g('description')).trim(), receivedVia: String(g('receivedVia')).trim(), notes: g('notes') };
+      if (target === 'income') {
+        const catId = matchCategory(store, 'income', g('category'), fallbackCat);
+        let net = g('net') ? parseImportAmount(g('net')) : null;
+        // Rewards have no withholding — net equals gross. Fill it in if absent.
+        if ((net == null || isNaN(net)) && /reward/i.test(store.incomeGroupName(catId) || '')) net = amt;
+        e = { date, gross: amt, net, categoryId: catId, subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), otherType: String(g('otherType')).trim(), description: String(g('description')).trim(), receivedVia: String(g('receivedVia')).trim(), notes: g('notes') };
+      }
       else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
       else e = {
         payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,

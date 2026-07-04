@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.12 — Rewards net = gross
+- Reward income has no tax withheld, so its **Net now auto-fills to equal the Gross**
+  whenever net is left blank — on both CSV import and manual entry. Reward rows in the
+  List now show a Net figure instead of a dash.
+
 ### v1.0.11 — Fix net-income average, add Received-via column
 - Fixed the **Net monthly income** figure (Bills & Subscriptions, and the dashboard
   "Should be left"): it now averages over the months that actually had a **paycheck**,
