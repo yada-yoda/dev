@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.10';
+const VERSION = '1.0.11';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -915,7 +915,7 @@ function incomeList(data) {
 
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th class="num">Gross</th><th class="num">Net</th><th>Person</th><th>Status</th><th></th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th>Received via</th><th class="num">Gross</th><th class="num">Net</th><th>Person</th><th>Status</th><th></th></tr></thead>';
   const tb = el('tbody');
   rows.forEach(e => {
     const tr = el('tr');
@@ -926,12 +926,8 @@ function incomeList(data) {
     const srcSub = e.rewardType || e.description;
     if (srcSub) srcTd.appendChild(el('div', 'acct-sub', srcSub));
     tr.appendChild(srcTd);
-    const acctTd = el('td');
-    const acctName = store.accountName(e.accountId);
-    if (acctName) acctTd.appendChild(document.createTextNode(acctName));
-    else if (!e.receivedVia) acctTd.textContent = '—';
-    if (e.receivedVia) acctTd.appendChild(el('div', 'acct-sub', 'via ' + e.receivedVia));
-    tr.appendChild(acctTd);
+    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
+    tr.appendChild(el('td', 'muted', e.receivedVia || '—'));
     tr.appendChild(numCell(amountOf(e), true));
     tr.appendChild(numCell(Number(e.net) || 0));
     tr.appendChild(el('td', null, store.personName(e.personId)));
@@ -2066,8 +2062,19 @@ function netMonthlyArray(data) {
 function avgNetMonthlyIncome(store) {
   for (let y = activeYear, tries = 0; tries < 4; y--, tries++) {
     if (!store.isYearLoaded(y)) { store.loadYear(y); return null; }
-    const withIncome = netMonthlyArray(store.yearData(y)).filter(v => v > 0);
-    if (withIncome.length) return withIncome.reduce((a, b) => a + b, 0) / withIncome.length;
+    const d = store.yearData(y);
+    const incomeM = netMonthlyArray(d);   // all net income by month
+    // Prefer months that actually had a paycheck — that's your regular income.
+    // Averaging over those (not every month with a stray reward/interest deposit)
+    // keeps the figure representative of a normal month's take-home.
+    const payM = new Array(12).fill(0);
+    d.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) payM[mi] += paycheckNet(p); });
+    const paidMonths = [];
+    for (let i = 0; i < 12; i++) if (payM[i] > 0) paidMonths.push(i);
+    if (paidMonths.length) return paidMonths.reduce((a, i) => a + incomeM[i], 0) / paidMonths.length;
+    // No paychecks that year — fall back to any month that has income.
+    const anyMonths = incomeM.filter(v => v > 0);
+    if (anyMonths.length) return anyMonths.reduce((a, b) => a + b, 0) / anyMonths.length;
   }
   return 0;
 }

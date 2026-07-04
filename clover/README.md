@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.11 — Fix net-income average, add Received-via column
+- Fixed the **Net monthly income** figure (Bills & Subscriptions, and the dashboard
+  "Should be left"): it now averages over the months that actually had a **paycheck**,
+  so a month with only a small reward or interest deposit no longer drags the average
+  down. It reads as a normal month's take-home again.
+- The income **List** now has a proper **Received via** column (Venmo, PayPal, check…),
+  visible for every category including Other.
+
 ### v1.0.10 — Grid breakdowns, "via" in list, rewards Person, paychecks All view
 - **Annual grid**: expanding **Interest** now breaks it down by bank/institution, and
   **Rewards** by reward source — one row per source with its monthly totals (instead of
