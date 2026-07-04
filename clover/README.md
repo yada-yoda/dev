@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.7 — Reward source & type
+- Reward income entries now have dedicated **Reward source** (Chase, Amex, Coinbase,
+  Fetch, Ebates, ReceiptPal, Microsoft…) and **Reward type** (cash back, statement
+  credit, gift card, crypto…) fields, shown in the add/edit form when the category is
+  Rewards. Both are importable as their own CSV columns and appear in the income List.
+
 ### v1.0.6 — Chart date range on Credit & Rates
 - The credit-score and savings-rate charts now have a "Chart range" selector: view
   all time, a single year, or a custom From/To date window. The table below stays

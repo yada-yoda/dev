@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.6';
+const VERSION = '1.0.7';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -902,7 +902,10 @@ function incomeList(data) {
     const tr = el('tr');
     tr.appendChild(el('td', null, fmtDate(e.date)));
     tr.appendChild(el('td', null, store.incomeGroupName(e.categoryId)));
-    tr.appendChild(el('td', null, store.subName('income', e.categoryId, e.subId) || '—'));
+    const srcTd = el('td');
+    srcTd.appendChild(document.createTextNode(e.rewardSource || store.subName('income', e.categoryId, e.subId) || '—'));
+    if (e.rewardType) srcTd.appendChild(el('div', 'acct-sub', e.rewardType));
+    tr.appendChild(srcTd);
     tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
     tr.appendChild(numCell(amountOf(e), true));
     tr.appendChild(numCell(Number(e.net) || 0));
@@ -957,9 +960,26 @@ function incomeModal(existing) {
   divWrap.appendChild(field('Action', fAction, 'The dividend type as your broker labels it — e.g. Qualified Dividend, Cash Dividend, Reinvest.'));
   divWrap.appendChild(field('Qty', fQty, 'Shares involved, if reinvested.'));
   divWrap.appendChild(field('Price', fPrice, 'Share price at reinvestment, if applicable.'));
-  const syncDiv = () => { const g = s.incomeCategories.find(c => c.id === fCat.value); divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none'; };
-  fCat.addEventListener('change', () => { rebuildSubs(); syncDiv(); });
-  rebuildSubs(); syncDiv();
+
+  // Reward-specific fields (shown when the category looks like Rewards).
+  const rwSrcList = el('datalist'); rwSrcList.id = 'rw-src-list';
+  ['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal'].forEach(v => { const o = el('option'); o.value = v; rwSrcList.appendChild(o); });
+  const rwTypeList = el('datalist'); rwTypeList.id = 'rw-type-list';
+  ['Cash back', 'Statement credit', 'Gift card', 'Crypto', 'Points', 'Miles', 'Referral bonus'].forEach(v => { const o = el('option'); o.value = v; rwTypeList.appendChild(o); });
+  body.appendChild(rwSrcList); body.appendChild(rwTypeList);
+  const fRwSrc = input(e.rewardSource || '', { placeholder: 'e.g. Chase, Coinbase, Fetch', list: 'rw-src-list' });
+  const fRwType = input(e.rewardType || '', { placeholder: 'e.g. Cash back, Gift card', list: 'rw-type-list' });
+  const rwWrap = el('div', 'div-fields');
+  rwWrap.appendChild(field('Reward source', fRwSrc, 'Which program or card the reward came from — e.g. Chase, Amex, Coinbase, Fetch, Ebates.'));
+  rwWrap.appendChild(field('Reward type', fRwType, 'What kind of reward it is — e.g. Cash back, Statement credit, Gift card, Crypto.'));
+
+  const syncCat = () => {
+    const g = s.incomeCategories.find(c => c.id === fCat.value);
+    divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none';
+    rwWrap.style.display = (g && /reward/i.test(g.name)) ? '' : 'none';
+  };
+  fCat.addEventListener('change', () => { rebuildSubs(); syncCat(); });
+  rebuildSubs(); syncCat();
 
   body.appendChild(field('Date', fDate, 'When you received this money. For pending items, the date you expect it.'));
   body.appendChild(field('Category', fCat, 'The type of income — e.g. Wages, Dividends, Interest, Rewards. Manage the list in Settings.'));
@@ -981,6 +1001,7 @@ function incomeModal(existing) {
   tRow.appendChild(field('Flags', flagsWrap));
   body.appendChild(tRow);
   body.appendChild(divWrap);
+  body.appendChild(rwWrap);
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this entry.'));
 
   openModal({
@@ -996,7 +1017,8 @@ function incomeModal(existing) {
         expectedDate: fExpected.value || '', receivedVia: fVia.value.trim(), taxable: fTax.value,
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
-        qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value)
+        qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
+        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim()
       });
       store.saveIncome(activeYear, entry);
       toast(existing ? 'Income updated' : 'Income added');
@@ -2509,7 +2531,9 @@ const IMPORT_FIELDS = {
     { key: 'date', label: 'Date', req: true, kw: ['date'] },
     { key: 'gross', label: 'Gross amount', req: true, num: true, kw: ['gross', 'amount', 'paid', 'total'] },
     { key: 'net', label: 'Net (optional)', num: true, kw: ['net'] },
-    { key: 'category', label: 'Category', kw: ['category', 'affiliate', 'reason', 'action', 'description', 'type'] },
+    { key: 'category', label: 'Category', kw: ['category', 'affiliate', 'reason', 'action', 'description'] },
+    { key: 'rewardSource', label: 'Reward source', kw: ['source', 'program', 'card', 'from'] },
+    { key: 'rewardType', label: 'Reward type', kw: ['reward type', 'type', 'kind'] },
     { key: 'account', label: 'Account', kw: ['account', 'bank', 'broker'] },
     { key: 'person', label: 'Person', kw: ['person', 'owner'] },
     { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'symbol', 'description'] }
@@ -2657,7 +2681,7 @@ function buildImportEntries(store) {
       const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
       const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
       if (!date || isNaN(amt)) { skipped++; return; }
-      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', notes: g('notes') };
+      if (target === 'income') e = { date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null, categoryId: matchCategory(store, 'income', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), notes: g('notes') };
       else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
       else e = {
         payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,
