@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.8';
+const VERSION = '1.0.9';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1087,7 +1087,8 @@ function renderSubscriptions(view) {
   const active = all.filter(isSubActive);
   const totalMonthly = active.reduce((sum, r) => sum + monthlyEquiv(r), 0);
   const totalAnnual = active.reduce((sum, r) => sum + annualCost(r), 0);
-  const net = store.netMonthlyIncome();
+  const autoNet = avgNetMonthlyIncome(store);   // null while a year doc loads
+  const net = autoNet || 0;
 
   const head = el('div', 'view-head');
   const left = el('div');
@@ -1102,13 +1103,10 @@ function renderSubscriptions(view) {
   view.appendChild(head);
 
   const sum = el('div', 'sub-summary');
-  const netInput = input(net || '', { type: 'number', placeholder: '0.00' }); netInput.step = '0.01'; netInput.className = 'net-input';
-  netInput.addEventListener('change', () => store.setNetMonthlyIncome(netInput.value));
   const netCard = el('div', 'sum-card');
   netCard.appendChild(el('div', 'sum-label', 'Net monthly income'));
-  const netWrap = el('div', 'sum-net'); netWrap.appendChild(el('span', 'sum-dollar', '$')); netWrap.appendChild(netInput);
-  netCard.appendChild(netWrap);
-  netCard.appendChild(el('div', 'sum-hint', 'Used for % of income'));
+  netCard.appendChild(el('div', 'sum-value income', autoNet == null ? '…' : (net > 0 ? money(net) : '–')));
+  netCard.appendChild(el('div', 'sum-hint', 'avg take-home / mo (auto)'));
   sum.appendChild(netCard);
   sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense'));
   sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense'));
@@ -1584,9 +1582,9 @@ function renderPaychecks(view) {
         cb.addEventListener('change', () => { cb.checked ? paycheckSel.add(p.id) : paycheckSel.delete(p.id); updatePaycheckSelectionUI(); });
         td.appendChild(cb); return td; } },
     { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) },
-    { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => {
-        const td = el('td'); td.appendChild(el('span', null, p.receivedDate ? fmtDate(p.receivedDate) + ' ' : '— '));
-        const b = daysLateBadge(p); if (b) td.appendChild(b); return td; } },
+    { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => el('td', null, p.receivedDate ? fmtDate(p.receivedDate) : '—') },
+    { label: 'Timing', key: 'timing', value: p => { const d = paycheckDaysLate(p); return d == null ? 100000 : d; }, cell: p => {
+        const td = el('td'); const b = daysLateBadge(p); if (b) td.appendChild(b); else td.textContent = '—'; return td; } },
     { label: 'Gross', key: 'gross', num: true, value: p => Number(p.gross) || 0, cell: p => numCell(Number(p.gross) || 0, true) },
     { label: 'Net', key: 'net', num: true, value: p => Number(p.net) || 0, cell: p => numCell(Number(p.net) || 0) },
     { label: 'Employer', key: 'employer', value: p => p.employer || '', cell: p => {
@@ -1595,7 +1593,7 @@ function renderPaychecks(view) {
         return td; } },
     { label: 'Person', key: 'person', value: p => store.personName(p.personId), cell: p => el('td', null, store.personName(p.personId)) },
     { label: 'Period', key: 'period', num: true, value: p => Number(p.periodNum) || 0, cell: p => {
-        const td = el('td'); td.textContent = p.periodNum ? '#' + p.periodNum : '—';
+        const td = el('td', 'num'); td.textContent = p.periodNum ? '#' + p.periodNum : '—';
         if (p.periodStart || p.periodEnd) td.title = fmtDate(p.periodStart) + ' – ' + fmtDate(p.periodEnd); return td; } },
     { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
         const td = el('td'); const st = p.status || 'Received';
@@ -2011,6 +2009,25 @@ function incomeNetYTDall(data) {
   sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + paycheckNet(p), 0);
   return sum;
 }
+function netMonthlyArray(data) {
+  const m = new Array(12).fill(0);
+  data.income.filter(countable).forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += netAmountOf(e); });
+  data.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += paycheckNet(p); });
+  return m;
+}
+// Auto basis for "% of income" / "should be left" so the user never types it in.
+// Averages net (take-home) income over the months that actually have income in
+// the active year; if the active year has none yet (a brand-new year), walks
+// back to the most recent prior year that does. Returns null while a needed
+// year doc is still loading (caller shows a placeholder and re-renders on load).
+function avgNetMonthlyIncome(store) {
+  for (let y = activeYear, tries = 0; tries < 4; y--, tries++) {
+    if (!store.isYearLoaded(y)) { store.loadYear(y); return null; }
+    const withIncome = netMonthlyArray(store.yearData(y)).filter(v => v > 0);
+    if (withIncome.length) return withIncome.reduce((a, b) => a + b, 0) / withIncome.length;
+  }
+  return 0;
+}
 function incomeByCategory(store, data) {
   const m = {};
   data.income.filter(countable).forEach(e => { const g = store.incomeGroupName(e.categoryId); m[g] = (m[g] || 0) + amountOf(e); });
@@ -2118,9 +2135,9 @@ function renderDashboard(view) {
 
   // "Should be left over" for a typical month: take-home income − recurring bills −
   // typical (average) non-recurring spending. Starts from NET, not gross.
-  const setNet = store.netMonthlyIncome();
+  const autoNet = avgNetMonthlyIncome(store);
   const avgSpend = monthsElapsed > 0 ? spendYTD / monthsElapsed : spendThisMonth;
-  const incomeBasis = setNet > 0 ? setNet : (monthsElapsed > 0 ? netYTD / monthsElapsed : incNetThisMonth);
+  const incomeBasis = (autoNet && autoNet > 0) ? autoNet : (monthsElapsed > 0 ? netYTD / monthsElapsed : incNetThisMonth);
   const shouldLeft = incomeBasis - recurringMonthly - avgSpend;
 
   const head = el('div', 'view-head');
@@ -2134,7 +2151,7 @@ function renderDashboard(view) {
   kpis.appendChild(kpiCard('Spending · ' + monthName, money(spendThisMonth), 'expense'));
   kpis.appendChild(kpiCard('Recurring / mo', money(recurringMonthly), 'expense', money(recurringAnnual) + ' / yr'));
   kpis.appendChild(kpiCard('Net · ' + monthName, money(netThisMonth), netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
-  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', (setNet > 0 ? 'take-home' : 'avg take-home') + ' − bills − avg spend'));
+  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', 'avg take-home − bills − avg spend'));
   kpis.appendChild(kpiCard('Projected income', money(projAnnualIncome), 'income', 'annualized from YTD'));
   kpis.appendChild(kpiCard('Projected expenses', money(projAnnualExpense), 'expense', 'subs + annualized spend'));
   view.appendChild(kpis);

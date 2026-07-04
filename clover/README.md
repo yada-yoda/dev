@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.9 — Auto net income, sortable paycheck timing, Period alignment
+- **Bills & Subscriptions** no longer asks you to type your net monthly income — it's
+  now computed automatically as your average take-home per month (averaged over the
+  months that have income, falling back to the most recent prior year so a new month
+  or new year never reads as $0). The dashboard "Should be left" uses the same basis.
+- **Paychecks**: the days-early/on-time/late tag is now its own **Timing** column —
+  cleaner than sharing the Received cell, and sortable (earliest to latest).
+- Fixed the **Period** column so the number lines up under its header.
+
 ### v1.0.8 — Other-income detail, net-based "left over", fuller import preview, button polish
 - **Other income** now has dedicated **Type** (Lawsuit, Gift, Stimulus, Rebate, Winnings…)
   and **Description** (e.g. the class-action case name) fields, shown in the add/edit form
