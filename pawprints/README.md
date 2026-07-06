@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.49.0**
+**Current Version: v0.49.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.49.1** — **Fixed walking-badge notifications** — the "🎉 Badge unlocked" / "🌟 Prestige"
+  toasts weren't firing: the very first walk you logged silently seeded the badge tracker and
+  swallowed that crossing. The tracker is now seeded once at load (existing miles marked seen with
+  no spam), so every badge and prestige you cross from a logged walk now pops a toast.
 - **v0.49.0** — **30d / 90d / YTD range toggle on Insights** — the Spending and Potty breakdown
   cards each get a range selector so you can view them over the last 30 days, last 90 days, or
   year-to-date. Spending totals and the vet/grooming/supplies split, and the potty counts, average

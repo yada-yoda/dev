@@ -229,7 +229,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.49.0';
+const APP_VERSION = 'v0.49.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -386,6 +386,18 @@ function checkWalkBadges(announce){
   if(P > prevP) p.prestige = P;
   if(newly.length || P > prevP) save(false);
   if(announce && msg) showToast(msg);
+}
+// Seed each pet's badgesSeen once (silently) at load, so the FIRST logged walk isn't swallowed
+// by the lazy seeding above. Existing miles are marked already-seen; only crossings from here
+// forward toast. Idempotent — only touches pets that don't have badgesSeen yet. Must run at
+// data-load time, NOT inside render() (addLog renders before checkWalkBadges, which would re-swallow).
+function seedWalkBadges(){
+  (data.pets||[]).forEach(p=>{
+    if(p.badgesSeen) return;
+    const mi = (data.logs||[]).filter(l=>l.type==='walk' && l.petId===p.id).reduce((s,w)=>s+(num(w.distance)||0),0);
+    p.badgesSeen = WALK_BADGES.filter(b=>mi>=b.mi).map(b=>b.mi);
+    p.prestige = prestigeLevel(mi);
+  });
 }
 // Small inline medallion of the highest badge earned — sized to sit next to the dog's name.
 function latestBadgeInline(){
@@ -678,6 +690,7 @@ async function loadFromFirestore(){
         data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
         sharedOwnerName = d.ownerName || '';
         if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
+        seedWalkBadges();
         render();
         showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs ('+(SHARE_ACCESS_LABEL[sharedAccess]||'access')+')');
         return;
@@ -693,7 +706,7 @@ async function loadFromFirestore(){
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
-      backfillVetContacts(); saveLocal(); render();
+      backfillVetContacts(); seedWalkBadges(); saveLocal(); render();
       showToast('✅ Synced from cloud');
     } else if(shared){
       showToast('⚠️ Couldn’t open that shared profile — check the code and that they added your email');
@@ -1376,7 +1389,7 @@ function savePet(id){
     vet2Name:fv('p-vet2name'), vet2Doctor:fv('p-vet2doctor'), vet2Phone:fv('p-vet2phone'), vet2Email:fv('p-vet2email'), notes:fv('p-notes') };
   let pid = id;
   if(id){ data.pets = data.pets.map(p => p.id===id ? {...p, ...fields} : p); logChange('edited','dog profile', name); showToast('✅ Saved'); }
-  else { pid = genId(); data.pets.push({ id:pid, ...fields }); data.activePetId = pid; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
+  else { pid = genId(); data.pets.push({ id:pid, ...fields, badgesSeen:[], prestige:0 }); data.activePetId = pid; logChange('added','dog', name); showToast('🐾 '+name+' added'); }
   // Current weight → a weight-history entry. Adds one on creation, or a new weigh-in on edit if it changed.
   const wVal = fv('p-weight');
   if(num(wVal) != null){
@@ -3545,6 +3558,7 @@ function enterDemo(){
     ],
     gcalEvents: {}, settings: { feedGoal:'3', feedGoalUnit:'cups' }
   };
+  seedWalkBadges();
   if(history.replaceState && !location.search.includes('demo=1')) history.replaceState(null,'','?demo=1');
   document.getElementById('demo-banner').classList.remove('hidden');
   document.getElementById('btn-signin').classList.add('hidden');
@@ -3572,6 +3586,7 @@ document.title = 'PawPrints ' + APP_VERSION + ' — Feed · Walk · Care';
 loadLocal();
 applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.settings.theme) || currentTheme());
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
+seedWalkBadges();
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
 else { backfillVetContacts(); render(); }
 initAnalytics();
