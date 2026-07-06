@@ -88,6 +88,10 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .btn-google{background:#fff;color:#333;border:1px solid #ddd;padding:10px 18px;border-radius:10px;font-weight:600;font-size:14px;display:inline-flex;align-items:center;gap:10px;cursor:pointer;font-family:inherit}
 .btn-sm{padding:6px 14px;border-radius:8px;font-size:12px}.btn-danger{color:var(--danger)}.btn-accent{color:var(--accent)}
 .date-clear{background:none;border:none;color:var(--accent);font-size:11px;padding:4px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:3px}.date-clear:hover{text-decoration:underline}
+.section-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.range-seg{display:inline-flex;gap:4px;flex-shrink:0}
+.range-seg button{padding:4px 10px;border-radius:8px;font-size:12px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer}
+.range-seg button.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
 .label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
 .input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
 .input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
@@ -225,7 +229,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.48.3';
+const APP_VERSION = 'v0.49.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3200,18 +3204,20 @@ function pottyPreds(){
     isPoop: p => { const r = p.result||''; return r==='Poop' || r==='Both' || !!(p.stool && String(p.stool).trim()); }
   };
 }
+// Drill-downs match the Potty breakdown card's selected range so the counts line up.
+function pottyInRange(){ const ms = rangeInfo(pottyRange).ms; return petLogs('potty').filter(p=>p.dateTime && new Date(p.dateTime).getTime() >= ms); }
 function pottyTypeDetail(type){
   const P = pottyPreds(), pred = type==='poop'?P.isPoop:P.isPee;
-  logListModal((type==='poop'?'💩 All poops':'💧 All pees'), petLogs('potty').filter(pred));
+  logListModal((type==='poop'?'💩 Poops':'💧 Pees'), pottyInRange().filter(pred));
 }
 function pottySpotDetail(type, encPlace){
   const place = decodeURIComponent(encPlace);
   const P = pottyPreds(), pred = type==='poop'?P.isPoop:P.isPee;
-  const list = petLogs('potty').filter(p => pred(p) && (((p.place||'').trim())||'Unspecified')===place);
+  const list = pottyInRange().filter(p => pred(p) && (((p.place||'').trim())||'Unspecified')===place);
   logListModal((type==='poop'?'💩 Poops':'💧 Pees')+' · '+place, list);
 }
 function pottyResultDetail(result){
-  logListModal(result+' potty breaks', petLogs('potty').filter(p=>(p.result||'Pee')===result));
+  logListModal(result+' potty breaks', pottyInRange().filter(p=>(p.result||'Pee')===result));
 }
 function insightStat(which){
   const today = todayISO();
@@ -3283,6 +3289,19 @@ function renderNextBadgeToday(){
     + '<div style="height:7px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden;margin-top:6px"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:5px"></div></div></div>'
     + '<div style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary);flex-shrink:0">'+earned.length+'/'+WALK_BADGES.length+'</div></div></div>';
 }
+// Range toggle (30d / 90d / YTD) for the Spending and Potty breakdown cards.
+const RANGES = [{k:'30',label:'30d'},{k:'90',label:'90d'},{k:'ytd',label:'YTD'}];
+let spendRange = 'ytd', pottyRange = '30';
+function rangeInfo(k){
+  if(k==='ytd'){ const y=new Date().getFullYear(); return { ms:new Date(y+'-01-01T00:00').getTime(), label:'year so far' }; }
+  const days = k==='90'?90:30; return { ms:Date.now()-days*86400000, label:'last '+days+' days' };
+}
+function rangeToggle(kind, cur){
+  const fn = kind==='spend' ? 'setSpendRange' : 'setPottyRange';
+  return '<div class="range-seg">'+RANGES.map(r=>'<button class="'+(cur===r.k?'active':'')+'" onclick="'+fn+'(\''+r.k+'\')">'+r.label+'</button>').join('')+'</div>';
+}
+function setSpendRange(v){ spendRange=v; const w=document.getElementById('spend-card-wrap'); if(w) w.innerHTML=renderSpendCard(); }
+function setPottyRange(v){ pottyRange=v; const w=document.getElementById('potty-card-wrap'); if(w) w.innerHTML=renderPottyCard(); }
 function renderInsights(){
   if(!activePet()) return emptyState();
   const feeds = petLogs('feed'), walks = petLogs('walk'), potty = petLogs('potty');
@@ -3292,11 +3311,7 @@ function renderInsights(){
   const avgWalk = walksDur7.length ? Math.round(walksDur7.reduce((s,w)=>s+num(w.durationMin),0)/walksDur7.length) : null;
   const today = todayISO();
   const mealsToday = feeds.filter(f=>f.dateTime && f.dateTime.slice(0,10)===today).length;
-  const yearStart = new Date().getFullYear()+'-01-01';
-  const spendVet = petArr('vetVisits').filter(v=>v.date>=yearStart).reduce((s,v)=>s+(num(v.cost)||0),0);
-  const spendGroom = petArr('grooming').filter(g=>g.date>=yearStart).reduce((s,g)=>s+(num(g.cost)||0),0);
-  const spendSupplies = petArr('inventory').filter(i=>i.purchaseDate>=yearStart).reduce((s,i)=>s+(num(i.cost)||0),0);
-  const spendTotal = spendVet+spendGroom+spendSupplies;
+  const anySpend = petArr('vetVisits').some(v=>num(v.cost)) || petArr('grooming').some(g=>num(g.cost)) || petArr('inventory').some(i=>num(i.cost));
   let html = '<h2 style="font-size:20px;font-weight:700;margin-bottom:16px">Insights</h2>';
   html += '<div class="stats-grid">'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'meals\')"><div class="stat-value" style="color:var(--accent)">'+mealsToday+'</div><div class="stat-label">Meals today</div></div>'
@@ -3316,54 +3331,68 @@ function renderInsights(){
     + '<div style="height:260px"><canvas class="trend-chart"></canvas></div>'
     + '<p id="trend-hint" style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+esc(TREND_METRICS.find(m=>m.k===trendMetric).hint)+'</p>'
     + '</div>';
-  // spend breakdown
-  if(spendTotal>0){
-    const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
-    html += '<div class="card"><h3 class="section-title">'+svgIcon('spend',18)+' Spending this year — '+money(spendTotal)+'</h3>'
-      + bar(svgIcon('vet',16)+' Vet', spendVet, 'var(--blue)') + bar(svgIcon('groom',16)+' Grooming', spendGroom, 'var(--accent)') + bar(svgIcon('supplies',16)+' Food & supplies', spendSupplies, 'var(--success)')
-      + '</div>';
-  }
-  // potty / feeding summary
-  if(potty.length){
-    const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
-    // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
-    const isPee = p => { const r = p.result||''; return r==='Pee' || r==='Both'; };
-    const isPoop = p => { const r = p.result||''; return r==='Poop' || r==='Both' || !!(p.stool && String(p.stool).trim()); };
-    // Average gap between pees and between poops — over the last 30 days so it reflects the current rhythm.
-    const potty30 = potty.filter(p => p.dateTime && (Date.now()-new Date(p.dateTime).getTime()) < 30*86400000);
-    const pee30 = potty30.filter(isPee).length, poop30 = potty30.filter(isPoop).length;
-    const avgGapHrs = (pred) => {
-      const times = potty30.filter(p=>p.dateTime && pred(p)).map(p=>new Date(p.dateTime).getTime()).sort((a,b)=>a-b);
-      if(times.length < 2) return null;
-      let sum=0; for(let i=1;i<times.length;i++) sum += times[i]-times[i-1];
-      return (sum/(times.length-1))/3600000; // hours
-    };
-    const fmtGap = (h) => h==null ? '—' : (h>=24 ? (h/24).toFixed(1)+'d' : h.toFixed(1)+'h');
-    const peeGap = avgGapHrs(isPee);
-    const poopGap = avgGapHrs(isPoop);
-    // Popular spots: count pee/poop per location.
-    const spots = {};
-    potty.forEach(p => {
-      const place = (p.place||'').trim() || 'Unspecified';
-      if(!spots[place]) spots[place] = { pee:0, poop:0, total:0 };
-      if(isPee(p)) spots[place].pee++;
-      if(isPoop(p)) spots[place].poop++;
-      spots[place].total++;
-    });
-    const spotList = Object.entries(spots).sort((a,b)=>b[1].total-a[1].total);
-    // Reserve a fixed width for the count (in '0'-widths) so pee/poop chips line up as columns
-    // regardless of digit widths (DM Sans lacks tabular figures, so "0" is wider than "1").
-    const spotDigits = Math.max(1, ...spotList.flatMap(([,c])=>[c.pee,c.poop]).map(n=>String(n).length));
-    html += '<div class="card"><h3 class="section-title">'+svgIcon('potty',18)+' Potty breakdown</h3><div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\''+esc(k)+'\')">'+esc(k)+': '+v+'</span>').join('')+'</div>'
-      + '<div class="grid-2"><div class="timing-box" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
-      + '<div class="timing-box" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
-      + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>last 30 days</strong> ('+pee30+' pee'+(pee30===1?'':'s')+', '+poop30+' poop'+(poop30===1?'':'s')+'). A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
-      + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
-      + spotList.map(([place, c]) => '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px;flex-shrink:0"><span class="chip-2" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.pee+'</span></span><span class="chip" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.poop+'</span></span></span></div>').join('')
-      + '</div>';
-  }
-  if(!feeds.length && !walks.length && weights.length<2 && spendTotal===0) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
+  // spend breakdown (range-selectable: 30d / 90d / YTD)
+  html += '<div id="spend-card-wrap">'+renderSpendCard()+'</div>';
+  // potty breakdown (range-selectable: 30d / 90d / YTD)
+  html += '<div id="potty-card-wrap">'+renderPottyCard()+'</div>';
+  if(!feeds.length && !walks.length && weights.length<2 && !anySpend) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
   return html;
+}
+// Spending breakdown card — vet / grooming / supplies within the selected range.
+function renderSpendCard(){
+  const anySpend = petArr('vetVisits').some(v=>num(v.cost)) || petArr('grooming').some(g=>num(g.cost)) || petArr('inventory').some(i=>num(i.cost));
+  if(!anySpend) return '';
+  const R = rangeInfo(spendRange);
+  const inR = d => d && new Date(d+'T00:00').getTime() >= R.ms;
+  const spendVet = petArr('vetVisits').filter(v=>inR(v.date)).reduce((s,v)=>s+(num(v.cost)||0),0);
+  const spendGroom = petArr('grooming').filter(g=>inR(g.date)).reduce((s,g)=>s+(num(g.cost)||0),0);
+  const spendSupplies = petArr('inventory').filter(i=>inR(i.purchaseDate)).reduce((s,i)=>s+(num(i.cost)||0),0);
+  const spendTotal = spendVet+spendGroom+spendSupplies;
+  const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
+  return '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('spend',18)+' Spending — '+money(spendTotal)+'</h3>'+rangeToggle('spend', spendRange)+'</div>'
+    + (spendTotal>0
+        ? bar(svgIcon('vet',16)+' Vet', spendVet, 'var(--blue)') + bar(svgIcon('groom',16)+' Grooming', spendGroom, 'var(--accent)') + bar(svgIcon('supplies',16)+' Food & supplies', spendSupplies, 'var(--success)')
+        : '<p style="font-size:12px;color:var(--text-secondary);margin:0">No spending recorded in the '+R.label+'.</p>')
+    + '</div>';
+}
+// Potty breakdown card — counts, avg gaps, and popular spots within the selected range.
+function renderPottyCard(){
+  const all = petLogs('potty');
+  if(!all.length) return '';
+  const R = rangeInfo(pottyRange);
+  const potty = all.filter(p=>p.dateTime && new Date(p.dateTime).getTime() >= R.ms);
+  const head = '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('potty',18)+' Potty breakdown</h3>'+rangeToggle('potty', pottyRange)+'</div>';
+  if(!potty.length) return head + '<p style="font-size:12px;color:var(--text-secondary);margin:0">No potty breaks in the '+R.label+'.</p></div>';
+  const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
+  // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
+  const isPee = p => { const r = p.result||''; return r==='Pee' || r==='Both'; };
+  const isPoop = p => { const r = p.result||''; return r==='Poop' || r==='Both' || !!(p.stool && String(p.stool).trim()); };
+  const peeN = potty.filter(isPee).length, poopN = potty.filter(isPoop).length;
+  const avgGapHrs = (pred) => {
+    const times = potty.filter(p=>p.dateTime && pred(p)).map(p=>new Date(p.dateTime).getTime()).sort((a,b)=>a-b);
+    if(times.length < 2) return null;
+    let sum=0; for(let i=1;i<times.length;i++) sum += times[i]-times[i-1];
+    return (sum/(times.length-1))/3600000;
+  };
+  const fmtGap = (h) => h==null ? '—' : (h>=24 ? (h/24).toFixed(1)+'d' : h.toFixed(1)+'h');
+  const peeGap = avgGapHrs(isPee), poopGap = avgGapHrs(isPoop);
+  const spots = {};
+  potty.forEach(p => {
+    const place = (p.place||'').trim() || 'Unspecified';
+    if(!spots[place]) spots[place] = { pee:0, poop:0, total:0 };
+    if(isPee(p)) spots[place].pee++;
+    if(isPoop(p)) spots[place].poop++;
+    spots[place].total++;
+  });
+  const spotList = Object.entries(spots).sort((a,b)=>b[1].total-a[1].total);
+  const spotDigits = Math.max(1, ...spotList.flatMap(([,c])=>[c.pee,c.poop]).map(n=>String(n).length));
+  return head + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\''+esc(k)+'\')">'+esc(k)+': '+v+'</span>').join('')+'</div>'
+    + '<div class="grid-2"><div class="timing-box" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
+    + '<div class="timing-box" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
+    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>'+R.label+'</strong> ('+peeN+' pee'+(peeN===1?'':'s')+', '+poopN+' poop'+(poopN===1?'':'s')+'). A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
+    + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
+    + spotList.map(([place, c]) => '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px;flex-shrink:0"><span class="chip-2" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.pee+'</span></span><span class="chip" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.poop+'</span></span></span></div>').join('')
+    + '</div>';
 }
 
 // ── CHARTS ──
