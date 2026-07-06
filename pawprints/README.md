@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.49.1**
+**Current Version: v0.49.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,8 @@ covers both.
 
 ## Version History
 
+- **v0.49.2** — **7d & 14d ranges on Insights** — the Spending and Potty breakdown range toggles
+  now offer 7d and 14d in addition to 30d / 90d / YTD.
 - **v0.49.1** — **Fixed walking-badge notifications** — the "🎉 Badge unlocked" / "🌟 Prestige"
   toasts weren't firing: the very first walk you logged silently seeded the badge tracker and
   swallowed that crossing. The tracker is now seeded once at load (existing miles marked seen with
