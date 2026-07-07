@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.17';
+const VERSION = '1.0.18';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -42,6 +42,7 @@ let accountsSort = { key: 'name', dir: 'asc' };
 let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
+let subPriceSel = null;            // which bill's price history the chart shows
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
@@ -1166,7 +1167,26 @@ function renewalDaysInMonth(sub, year, month) {
   return [Math.min(+m[3], monthEnd.getDate())];
 }
 
+// Amount-change trend from a bill's priceHistory: direction of the last change,
+// how many increases, and when it last rose. Flat if fewer than 2 recorded amounts.
+function priceTrend(sub) {
+  const h = (Array.isArray(sub.priceHistory) ? sub.priceHistory : []).filter(x => x && x.amount != null).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (h.length < 2) return { dir: 'none', points: h.length, rises: 0, lastRise: null, from: null, to: h.length ? Number(h[0].amount) : null, first: h.length ? Number(h[0].amount) : null };
+  const to = Number(h[h.length - 1].amount), from = Number(h[h.length - 2].amount);
+  let rises = 0, lastRise = null;
+  for (let i = 1; i < h.length; i++) if (Number(h[i].amount) > Number(h[i - 1].amount)) { rises++; lastRise = h[i].date; }
+  return { dir: to > from ? 'up' : to < from ? 'down' : 'flat', from, to, rises, lastRise, points: h.length, first: Number(h[0].amount) };
+}
+function trendIcon(sub) {
+  const t = priceTrend(sub);
+  if (t.dir === 'none') return null;
+  if (t.dir === 'up') { const s = el('span', 'trend up', '▲'); s.title = 'Went up ' + money(t.from) + ' → ' + money(t.to) + (t.lastRise ? ' on ' + fmtDate(t.lastRise) : ''); return s; }
+  if (t.dir === 'down') { const s = el('span', 'trend down', '▼'); s.title = 'Went down ' + money(t.from) + ' → ' + money(t.to); return s; }
+  const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
+}
+
 function renderSubscriptions(view) {
+  destroyCharts();
   const store = window.cloverStore, s = store.state;
   const all = s.recurring;
   const active = all.filter(isSubActive);
@@ -1224,7 +1244,9 @@ function renderSubscriptions(view) {
 
   const cols = [
     { label: 'Name', key: 'name', value: r => r.name, cell: r => {
-        const td = el('td'); td.appendChild(el('div', 'acct-name', r.name));
+        const td = el('td'); const nm = el('div', 'acct-name'); nm.appendChild(document.createTextNode(r.name));
+        const ti = trendIcon(r); if (ti) { nm.appendChild(document.createTextNode(' ')); nm.appendChild(ti); }
+        td.appendChild(nm);
         if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
         return td; } },
     { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => el('td', null, store.expenseGroupName(r.categoryId)) },
@@ -1251,6 +1273,29 @@ function renderSubscriptions(view) {
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, rows, subsSort, ns => { subsSort = ns; renderView(currentRoute); }, r => isSubActive(r) ? '' : 'inactive-row'));
   view.appendChild(card);
+
+  // Price-history chart: pick a bill and see how its amount has changed over time.
+  const withHist = all.filter(r => Array.isArray(r.priceHistory) && r.priceHistory.length >= 2);
+  if (withHist.length) {
+    const pcard = el('div', 'card');
+    const phead = el('div', 'view-head');
+    phead.appendChild(el('h3', 'strip-title', 'Price history'));
+    if (!withHist.some(r => r.id === subPriceSel)) subPriceSel = withHist[0].id;
+    const psel = select(withHist.map(r => ({ value: r.id, label: r.name })), subPriceSel);
+    psel.addEventListener('change', () => { subPriceSel = psel.value; renderView(currentRoute); });
+    phead.appendChild(psel);
+    pcard.appendChild(phead);
+    const sub = withHist.find(r => r.id === subPriceSel) || withHist[0];
+    const h = sub.priceHistory.slice().filter(x => x && x.amount != null).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    const t = priceTrend(sub);
+    const summ = el('p', 'muted');
+    summ.textContent = t.rises + ' increase' + (t.rises === 1 ? '' : 's') + (t.lastRise ? ' · last rose ' + fmtDate(t.lastRise) : '')
+      + ' · now ' + money(t.to) + (t.first != null && t.first !== t.to ? ' (' + (t.to > t.first ? '+' : '') + money(t.to - t.first) + ' since ' + fmtDate(h[0].date) + ')' : '');
+    pcard.appendChild(summ);
+    const wrap = el('div', 'chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); pcard.appendChild(wrap);
+    buildLineChart(cv, { labels: h.map(x => fmtDateShort(x.date)), datasets: [{ label: sub.name, data: h.map(x => Number(x.amount)), borderColor: CHART_PALETTE[0], backgroundColor: CHART_PALETTE[0], stepped: true, pointRadius: 4, tension: 0 }], yTitle: 'Amount ($)' });
+    view.appendChild(pcard);
+  }
 }
 
 function sumCard(label, value, tone) {
@@ -1338,12 +1383,26 @@ function subscriptionModal(existing) {
       const amount = parseFloat(fAmount.value);
       if (isNaN(amount)) { fAmount.focus(); toast('Amount is required', 'warn'); return false; }
       const isN = fFreq.value === 'everyNMonths' || fFreq.value === 'everyNYears';
+      // Track amount changes over time (powers the trend arrow + price-history chart).
+      // Append a point only when the amount actually changes; collapse same-day edits.
+      let hist = Array.isArray(r.priceHistory) ? r.priceHistory.slice() : [];
+      // Seed a baseline for a pre-existing bill (no history yet) so its first change
+      // shows as a trend — dated to its renewal anchor when that's in the past.
+      if (!hist.length && r.amount != null && r.amount !== '' && !isNaN(Number(r.amount))) {
+        const anch = parseISODate(r.renewalDate);
+        if (anch && anch < new Date() && Number(r.amount) !== amount) hist.push({ date: r.renewalDate, amount: Number(r.amount) });
+      }
+      const lastH = hist[hist.length - 1];
+      if (!lastH || Number(lastH.amount) !== amount) {
+        if (lastH && lastH.date === todayISO()) hist[hist.length - 1] = { date: todayISO(), amount };
+        else hist.push({ date: todayISO(), amount });
+      }
       const item = Object.assign(r, {
         name, vendor: fVendor.value.trim(), categoryId: fCat.value, subId: fSub.value || '',
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
         renewalDate: fRenew.value || '', accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
         personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked,
-        url: fUrl.value.trim(), notes: fNotes.value.trim()
+        url: fUrl.value.trim(), notes: fNotes.value.trim(), priceHistory: hist
       });
       store.saveRecurring(item);
       toast(existing ? 'Subscription updated' : 'Subscription added');

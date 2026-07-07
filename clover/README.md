@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.18 — Bill price-change tracking
+- Clover now remembers each bill/subscription's amount over time. When you change an
+  amount, it records the new price with the date.
+- Each bill row shows a small **trend arrow** — ▲ (up, red), ▼ (down, green), or – (no
+  change) — with a tooltip of the last change.
+- A **Price history** chart at the bottom of Bills & Subscriptions lets you pick a bill
+  and see its amount over time, with a summary: how many times it rose, when it last
+  rose, and the net change since the first recorded price.
+
 ### v1.0.17 — Pay-schedule employer picker + nicer missing section
 - The pay-schedule **Employer** is now a **dropdown of your existing paycheck employers**
   (with counts), so a schedule pairs to the right job instead of every period showing as
