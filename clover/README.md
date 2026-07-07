@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.17 — Pay-schedule employer picker + nicer missing section
+- The pay-schedule **Employer** is now a **dropdown of your existing paycheck employers**
+  (with counts), so a schedule pairs to the right job instead of every period showing as
+  "missing" from a name mismatch. A schedule pointed at an employer with no paychecks is
+  flagged ("no matching paychecks"); switch it to the real one to reconcile. New jobs can
+  still add a fresh employer.
+- The **Missing paychecks** section was redesigned as a clean card grid (period, date,
+  amount, Record) instead of a cramped chip list.
+
 ### v1.0.16 — Pay schedules & missing-paycheck detection
 - New **pay schedules** (Settings, and a "Pay schedule" button on Paychecks): tell Clover
   how a job pays — **weekly, biweekly (26/yr), semimonthly (24/yr), or monthly** — with a

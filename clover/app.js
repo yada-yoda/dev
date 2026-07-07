@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.16';
+const VERSION = '1.0.17';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1723,23 +1723,33 @@ function renderPaychecks(view) {
   if (!allMode) {
     const missing = missingExpectedPaychecks(store, activeYear, pays);
     if (missing.length) {
-      const strip = el('div', 'card');
-      strip.appendChild(el('h3', 'strip-title', 'Missing paychecks · ' + activeYear + ' (' + missing.length + ')'));
-      const list = el('div', 'chip-list');
-      missing.slice(0, 16).forEach(({ sch, per }) => {
-        const chip = el('div', 'chip pay-chip');
-        chip.appendChild(el('span', null, (sch.name || sch.employer) + ' · #' + per.periodNum + ' · ' + fmtDate(per.payDate) + (sch.gross ? ' · ~' + money(sch.gross) : '')));
-        const rec = el('button', 'mini', 'Record');
+      const strip = el('div', 'card missing-card');
+      const mh = el('div', 'missing-head');
+      const mhl = el('div');
+      mhl.appendChild(el('h3', 'strip-title', 'Missing paychecks'));
+      mhl.appendChild(el('div', 'muted', missing.length + ' expected pay date' + (missing.length === 1 ? '' : 's') + ' in ' + activeYear + ' not recorded yet — click to add.'));
+      mh.appendChild(mhl);
+      strip.appendChild(mh);
+      const grid = el('div', 'missing-grid');
+      missing.slice(0, 24).forEach(({ sch, per }) => {
+        const item = el('div', 'missing-item');
+        const top = el('div', 'mi-top');
+        top.appendChild(el('span', 'mi-period', '#' + per.periodNum));
+        top.appendChild(el('span', 'mi-emp', sch.name || sch.employer));
+        item.appendChild(top);
+        item.appendChild(el('div', 'mi-date', fmtDate(per.payDate)));
+        item.appendChild(el('div', 'mi-amt', sch.gross ? '~' + money(sch.gross) : '—'));
+        const rec = el('button', 'btn-ghost mi-rec', 'Record');
         rec.addEventListener('click', () => paycheckModal({
           payDate: per.payDate, periodNum: per.periodNum, periodStart: per.periodStart, periodEnd: per.periodEnd,
           employer: sch.employer, incomeCategoryId: sch.incomeCategoryId, personId: sch.personId,
           gross: sch.gross, net: sch.net, status: 'Received', method: 'Direct deposit'
         }));
-        chip.appendChild(rec);
-        list.appendChild(chip);
+        item.appendChild(rec);
+        grid.appendChild(item);
       });
-      strip.appendChild(list);
-      if (missing.length > 16) strip.appendChild(el('div', 'muted', '+' + (missing.length - 16) + ' more'));
+      strip.appendChild(grid);
+      if (missing.length > 24) strip.appendChild(el('div', 'muted', '+ ' + (missing.length - 24) + ' more — record the recent ones first.'));
       view.appendChild(strip);
     }
   }
@@ -1953,12 +1963,23 @@ function payScheduleModal(existing) {
   const c = existing ? Object.assign({}, existing) : { frequency: 'biweekly', active: true, incomeCategoryId: wages ? wages.id : (s.incomeCategories[0] && s.incomeCategories[0].id), personId: s.persons[0] && s.persons[0].id };
   const body = el('div', 'form-grid');
 
-  const empList = el('datalist'); empList.id = 'sch-emp-list';
-  [...new Set(store.yearData(activeYear).paychecks.map(x => x.employer).filter(Boolean))].forEach(e => { const o = el('option'); o.value = e; empList.appendChild(o); });
-  body.appendChild(empList);
+  // Employer: choose an EXISTING employer (from recorded paychecks) so the schedule
+  // pairs up; only add a new one for a job with no paychecks yet.
+  const EMP_NEW = '__new_emp__';
+  const empCounts = {};
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(x => { if (x.employer) empCounts[x.employer] = (empCounts[x.employer] || 0) + 1; }));
+  const employers = Object.keys(empCounts).sort((a, b) => empCounts[b] - empCounts[a]);
+  ensureYearsScanned(store);
 
   const fName = input(c.name || '', { placeholder: 'e.g. Main Job' });
-  const fEmp = input(c.employer || '', { placeholder: 'Employer name on the paycheck', list: 'sch-emp-list' });
+  const empOpts = employers.map(e => ({ value: e, label: e + ' · ' + empCounts[e] + ' paycheck' + (empCounts[e] === 1 ? '' : 's') }));
+  if (c.employer && !employers.includes(c.employer)) empOpts.unshift({ value: c.employer, label: c.employer + ' · no matching paychecks' });
+  empOpts.push({ value: EMP_NEW, label: employers.length ? '＋ New employer…' : '＋ Add employer…' });
+  const fEmpSel = select(empOpts, c.employer || employers[0] || EMP_NEW);
+  const fEmpNew = input('', { placeholder: 'Employer name exactly as on paychecks' });
+  const empNewField = field('New employer name', fEmpNew, 'Type it exactly as it appears on your recorded paychecks so they pair up.');
+  const empVal = () => (fEmpSel.value === EMP_NEW ? fEmpNew.value.trim() : fEmpSel.value);
+
   const fCat = select(s.incomeCategories.map(x => ({ value: x.id, label: x.name })), c.incomeCategoryId || (wages && wages.id));
   const fPerson = select(s.persons.map(x => ({ value: x.id, label: x.name })), c.personId || (s.persons[0] && s.persons[0].id));
   const fFreq = select(PAY_FREQUENCIES.map(f => ({ value: f.key, label: f.label })), c.frequency || 'biweekly');
@@ -1971,9 +1992,12 @@ function payScheduleModal(existing) {
   const day2Field = field('Second pay day of month', fDay2, 'For semimonthly pay, the second day each month (the first comes from the anchor date). Blank = last day of the month.');
   const syncFreq = () => { day2Field.style.display = fFreq.value === 'semimonthly' ? '' : 'none'; };
   fFreq.addEventListener('change', syncFreq);
+  const syncEmp = () => { empNewField.style.display = fEmpSel.value === EMP_NEW ? '' : 'none'; };
+  fEmpSel.addEventListener('change', syncEmp);
 
   body.appendChild(field('Name', fName, 'A label for this schedule — e.g. Main Job.'));
-  body.appendChild(field('Employer', fEmp, 'Must match the Employer on your paychecks so Clover can pair them up (e.g. Main Job).'));
+  body.appendChild(field('Employer (matches paychecks)', fEmpSel, 'Pick the job whose paychecks this tracks. Choosing an EXISTING employer is what pairs the schedule to your recorded paychecks — otherwise every period shows as “missing.”'));
+  body.appendChild(empNewField);
   const catRow = el('div', 'two-col');
   catRow.appendChild(field('Income category', fCat, 'Which category these paychecks count toward (usually Wages).'));
   catRow.appendChild(field('Person', fPerson, 'Whose paychecks these are.'));
@@ -1986,15 +2010,16 @@ function payScheduleModal(existing) {
   amtRow.appendChild(field('Expected net', fNet, 'Typical take-home per paycheck.'));
   body.appendChild(amtRow);
   body.appendChild(field('Status', cActive));
-  syncFreq();
+  syncFreq(); syncEmp();
 
   openModal({
     title: existing ? 'Edit pay schedule' : 'Add pay schedule', body, confirmLabel: 'Save',
     onConfirm: () => {
-      if (!fEmp.value.trim()) { fEmp.focus(); toast('Employer is required (must match your paychecks)', 'warn'); return false; }
+      const employer = empVal();
+      if (!employer) { toast('Pick or enter the employer', 'warn'); return false; }
       if (!fAnchor.value) { fAnchor.focus(); toast('Pick a known pay date to anchor the schedule', 'warn'); return false; }
       const entry = Object.assign(c, {
-        name: fName.value.trim() || fEmp.value.trim(), employer: fEmp.value.trim(),
+        name: fName.value.trim() || employer, employer,
         incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
         anchorDate: fAnchor.value, day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
