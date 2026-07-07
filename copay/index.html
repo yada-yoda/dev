@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="app-version" content="0.6.1">
+<meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
+<title>Copay — health plan cost estimator</title>
+<style>
+:root{
+  --bg:#f4f6f8; --card:#ffffff; --ink:#1a2430; --muted:#5c6b7a; --line:#dfe5eb;
+  --accent:#0f766e; --accent-soft:#e6f2f0; --win:#15803d; --win-soft:#e9f7ee;
+  --danger:#b91c1c; --shadow:0 1px 3px rgba(16,32,48,.08),0 4px 14px rgba(16,32,48,.05);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1060px;margin:0 auto;padding:20px 16px 60px}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:6px 0 4px}
+header h1{font-size:26px;margin:0;letter-spacing:-.3px}
+.ver{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:1px 9px}
+.tagline{color:var(--muted);margin:0 0 18px}
+.toolbar{margin-left:auto;display:flex;gap:8px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:18px}
+section>h2{margin:0 0 4px;font-size:17px}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 14px}
+button:hover{border-color:var(--accent);color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.primary:hover{filter:brightness(1.08);color:#fff}
+button.danger{color:var(--danger)}
+button.danger:hover{border-color:var(--danger)}
+button.link{border:none;background:none;padding:2px 6px;color:var(--accent);text-decoration:underline}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.plan-card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.plan-card h3{margin:0;font-size:16px}
+.plan-card .big{font-size:22px;font-weight:600}
+.plan-card .big small{font-size:12px;font-weight:400;color:var(--muted)}
+.kv{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
+.kv b{color:var(--ink);font-weight:500}
+.card-actions{margin-top:8px;display:flex;gap:8px}
+.card-actions button{padding:4px 10px;font-size:13px}
+.empty{color:var(--muted);font-size:14px;border:1px dashed var(--line);border-radius:10px;padding:18px;text-align:center}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{cursor:pointer;user-select:none;color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.4px}
+thead th:hover{color:var(--accent)}
+thead th .caret{display:inline-block;width:12px;color:var(--accent)}
+tr.winner td{background:var(--win-soft)}
+td.win{color:var(--win);font-weight:600}
+.tablewrap{overflow-x:auto}
+.banner{background:var(--win-soft);border:1px solid #bfe6cc;border-radius:10px;padding:12px 16px;margin-bottom:14px}
+.banner b{color:var(--win)}
+.banner ul{margin:6px 0 0;padding-left:20px;color:var(--muted);font-size:13.5px}
+.usage-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-top:10px}
+.rx-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px}
+.rx-row .name{font-weight:600}
+.rx-row .meta{color:var(--muted);font-size:13px}
+.rx-row .spacer{flex:1}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+label.f>span{display:flex;align-items:center;gap:4px}
+input,select{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%;min-width:0}
+input:focus,select:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.info{cursor:help;color:var(--accent);font-size:12px;border:1px solid var(--accent);border-radius:50%;width:15px;height:15px;line-height:13px;display:inline-block;text-align:center;flex:none}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+fieldset{border:1px solid var(--line);border-radius:10px;margin:0 0 12px;padding:10px 14px 14px;min-width:0}
+legend{font-size:13px;color:var(--muted);padding:0 4px}
+.overlay{position:fixed;inset:0;background:rgba(16,28,40,.45);display:flex;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;z-index:50}
+.modal{background:var(--card);border-radius:14px;box-shadow:0 10px 40px rgba(0,0,0,.25);width:100%;max-width:560px;padding:18px 20px;overflow-x:hidden}
+.modal-head{display:flex;align-items:center;margin-bottom:12px}
+.modal-head h3{margin:0;font-size:17px;flex:1}
+.modal-head .x{border:none;background:none;font-size:18px;color:var(--muted);padding:2px 8px}
+.modal-head .x:hover{color:var(--ink)}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+#toasts{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{background:#1f2c3a;color:#fff;border-radius:8px;padding:9px 18px;font-size:14px;box-shadow:var(--shadow);animation:pop .18s ease-out}
+@keyframes pop{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.demo-banner{background:#fff7e6;border:1px solid #f0d9a8;color:#7a5b12;border-radius:10px;padding:10px 16px;margin-bottom:16px;font-size:14px}
+footer{color:var(--muted);font-size:12.5px;text-align:center;margin-top:30px}
+footer a{color:var(--accent)}
+@media(max-width:560px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line)}
+.tab{border:none;background:none;border-radius:8px 8px 0 0;padding:8px 18px;color:var(--muted);font-size:15px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.tab:hover{color:var(--accent)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.delta-good{color:var(--win);font-weight:600}
+.delta-bad{color:var(--danger);font-weight:600}
+textarea{font:inherit;padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);width:100%;min-width:0;resize:vertical}
+textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
+.print-header{display:none}
+@media print{
+  body{background:#fff;font-size:13px}
+  .toolbar,.demo-banner,button,input[type=range],.info,.no-print,footer,#toasts,.overlay{display:none !important}
+  .wrap{max-width:none;padding:0}
+  section{box-shadow:none;border-color:#bbb;padding:12px 16px;margin-bottom:12px}
+  .print-header{display:block;margin:0 0 4px;color:var(--muted);font-size:12px}
+  .plan-card,.rx-row,.banner,.tablewrap,.chartbox{break-inside:avoid;page-break-inside:avoid}
+  .banner,tr.winner td,td.win{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .tablewrap{overflow:visible}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Copay</h1>
+    <span class="ver" id="verBadge"></span>
+    <div class="toolbar">
+      <button id="pdfBtn" title="Open the print dialog — choose 'Save as PDF' to export the comparison as a shareable document">Print / PDF</button>
+      <button id="exportBtn" title="Download your data as a JSON file for backup or moving to another device">Export</button>
+      <button id="importBtn" title="Load a previously exported JSON file">Import</button>
+      <input type="file" id="importFile" accept="application/json" hidden>
+    </div>
+  </header>
+  <div class="print-header" id="printHeader"></div>
+  <p class="tagline">Which health plan actually costs less? Enter your plan options and what you really use — see the true monthly and annual cost side by side.</p>
+
+  <div class="demo-banner" id="demoBanner" hidden>Demo data — changes are not saved. Remove <b>?demo=1</b> from the address to use your own data.</div>
+
+  <nav class="tabs no-print">
+    <button class="tab active" id="tabCompare">Compare</button>
+    <button class="tab" id="tabHistory">History</button>
+  </nav>
+
+  <div id="viewCompare">
+  <section>
+    <h2>Your plans</h2>
+    <p class="sub">Everything here is on your plan's Summary of Benefits and Coverage (SBC) sheet. Costs marked "after deductible" are charged at full price until the deductible is met — the simulation handles that month by month.</p>
+    <div class="cards" id="planCards"></div>
+    <div style="margin-top:12px"><button class="primary" id="addPlanBtn">Add plan</button></div>
+  </section>
+
+  <section>
+    <h2>Your usage</h2>
+    <p class="sub">Applies to every plan. Prescriptions can sit in different tiers under different plans — set the tier per plan when adding one.</p>
+    <div id="rxList"></div>
+    <button id="addRxBtn">Add prescription</button>
+    <div class="usage-grid" id="visitInputs"></div>
+  </section>
+
+  <section id="resultsSection">
+    <h2>Results</h2>
+    <p class="sub">Click any column header to sort. Worst-case year = premiums + out-of-pocket max − HSA/HRA money.</p>
+    <div id="results"></div>
+    <div class="no-print" style="margin-top:14px"><button class="primary" id="snapshotBtn">Save comparison to history</button></div>
+  </section>
+  </div>
+
+  <div id="viewHistory" hidden>
+  <section>
+    <h2>Plan years — predicted vs. actual</h2>
+    <p class="sub">One row per plan year you actually lived through. Log what you really paid and compare it to what the estimate predicted, so next year's decision gets smarter.</p>
+    <div id="historyList"></div>
+    <div style="margin-top:12px"><button class="primary" id="addYearBtn">Add plan year</button></div>
+  </section>
+  <section>
+    <h2>Saved comparisons</h2>
+    <p class="sub">Snapshots of past comparisons — when they were made, with whom, and the full plan set, which you can load back into the Compare tab any time.</p>
+    <div id="snapshotList"></div>
+  </section>
+  </div>
+
+  <footer>
+    Your data never leaves this browser — stored locally, export it any time. ·
+    <span id="verFoot"></span> · <a href="https://github.com/yada-yoda/dev">GitHub</a>
+  </footer>
+</div>
+<div id="toasts"></div>
+
+<script>
+"use strict";
+const APP_VERSION = "0.6.1";
+const LS_KEY = "copay_v1";
+const TIERS = [
+  ["t1","Tier 1 — Generic"],
+  ["t2","Tier 2 — Preferred brand"],
+  ["t3","Tier 3 — Non-preferred brand"],
+  ["t4","Tier 4 — Specialty"],
+  ["custom","Custom amount"]
+];
+const PREMIUM_PERIODS = [
+  ["monthly","per month",1],
+  ["biweekly","per paycheck (every 2 weeks, 26/yr)",26/12],
+  ["semimonthly","per paycheck (twice a month, 24/yr)",2]
+];
+const MODES = [
+  ["copay","$ copay (no deductible)"],
+  ["copay_ded","$ copay after deductible"],
+  ["coins","% coinsurance (no deductible)"],
+  ["coins_ded","% coinsurance after deductible"]
+];
+const SHARE_KEYS = ["pcp","spec","uc","t1","t2","t3","t4"];
+const ASSUME_DEFAULTS = { pcpCost:180, specCost:300, ucCost:200 };
+/* categorical series colors — dataviz reference palette, validated on white */
+const SERIES = ["#2a78d6","#1baf7a","#eda100","#008300","#4a3aa7","#e34948"];
+
+const DEMO = window.location.search.indexOf("demo=1") !== -1;
+
+let state = { plans: [], rxs: [], visits: { pcp: 3, spec: 0, uc: 1 }, assume: Object.assign({}, ASSUME_DEFAULTS), history: [], snapshots: [] };
+let whatIf = 0; /* extra billed care this year, from the what-if slider (not persisted) */
+
+function migrate(st){
+  st.assume = Object.assign({}, ASSUME_DEFAULTS, st.assume || {});
+  for (const p of st.plans || []){
+    const mode = {};
+    for (const k of SHARE_KEYS) mode[k] = (p.mode && p.mode[k]) || "copay";
+    p.mode = mode;
+    if (p.coins == null) p.coins = 20;
+    if (p.dentalName == null) p.dentalName = "";
+    if (p.dentalPrem == null) p.dentalPrem = 0;
+    if (p.visionPrem == null) p.visionPrem = 0;
+    if (p.dentalOopYr == null) p.dentalOopYr = 0;
+  }
+  for (const rx of st.rxs || []){
+    if (rx.fills == null){ rx.fills = num(rx.fillsPerMonth); rx.per = "month"; }
+    if (rx.per !== "year") rx.per = "month";
+    delete rx.fillsPerMonth;
+  }
+  if (!Array.isArray(st.history)) st.history = [];
+  if (!Array.isArray(st.snapshots)) st.snapshots = [];
+  for (const y of st.history) if (!y.actual) y.actual = {};
+  return st;
+}
+/* fills per month, whichever way the user entered it */
+function fillsMo(rx){ return rx.per === "year" ? num(rx.fills)/12 : num(rx.fills); }
+function fillsLabel(rx){ return num(rx.fills) + "/" + (rx.per === "year" ? "yr" : "mo"); }
+
+function uid(){ return (crypto.randomUUID ? crypto.randomUUID() : Date.now()+"-"+Math.random().toString(36).slice(2)); }
+function fmt(n){ return (n<0?"-":"") + "$" + Math.abs(n).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function num(v){ const n = parseFloat(v); return isFinite(n) ? n : 0; }
+
+function load(){
+  if (DEMO){ state = demoData(); return; }
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if (raw) state = Object.assign({plans:[],rxs:[],visits:{pcp:0,spec:0,uc:0}}, JSON.parse(raw));
+  }catch(e){ console.error("load failed", e); }
+  migrate(state);
+}
+function save(){
+  if (DEMO) return;
+  try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch(e){ toast("Could not save — storage unavailable"); }
+}
+
+function demoData(){
+  const a = uid(), b = uid();
+  return migrate({
+    plans: [
+      { id:a, name:"Acme PPO 500", premium:235, period:"monthly", deductible:500, oopMax:4500, hsa:0, coins:20,
+        pcp:25, spec:50, uc:60, rx:{t1:10,t2:35,t3:65,t4:150},
+        dentalName:"Acme Dental Basic", dentalPrem:24, visionPrem:0, dentalOopYr:80,
+        mode:{pcp:"copay",spec:"copay",uc:"copay",t1:"copay",t2:"copay",t3:"copay",t4:"copay"} },
+      { id:b, name:"Acme HDHP Saver", premium:152, period:"monthly", deductible:3200, oopMax:6000, hsa:750, coins:20,
+        pcp:20, spec:20, uc:20, rx:{t1:15,t2:55,t3:95,t4:25},
+        dentalName:"", dentalPrem:0, visionPrem:0, dentalOopYr:350,
+        mode:{pcp:"coins_ded",spec:"coins_ded",uc:"coins_ded",t1:"copay_ded",t2:"copay_ded",t3:"copay_ded",t4:"coins_ded"} }
+    ],
+    rxs: [
+      { id:uid(), name:"Atorvastatin 20 mg", fills:1, per:"month", retail:25, perPlan:{ [a]:{tier:"t1"}, [b]:{tier:"t1"} } },
+      { id:uid(), name:"Eliquis 5 mg", fills:1, per:"month", retail:550, perPlan:{ [a]:{tier:"t2"}, [b]:{tier:"t3"} } },
+      { id:uid(), name:"Albuterol inhaler", fills:6, per:"year", retail:90, perPlan:{ [a]:{tier:"t1"}, [b]:{tier:"t2"} } }
+    ],
+    visits: { pcp:3, spec:2, uc:1 },
+    assume: { pcpCost:180, specCost:300, ucCost:200 },
+    history: [
+      { id:uid(), year:"2024", planName:"Acme PPO 500", planType:"PPO", premiumMo:220, predictedYr:3400,
+        predictedFrom:"comparison saved 11/2023",
+        actual:{ premiumPaidYr:2640, medicalYr:610, rxYr:540, otherYr:0, dedUsedYr:480, billedYr:2900 },
+        notes:"First year on this plan." },
+      { id:uid(), year:"2025", planName:"Acme PPO 500", planType:"PPO", premiumMo:235, predictedYr:3600,
+        predictedFrom:"comparison saved 11/2024",
+        actual:{ premiumPaidYr:2820, medicalYr:940, rxYr:600, otherYr:75, dedUsedYr:500, billedYr:4100 },
+        notes:"One urgent care visit more than planned." }
+    ],
+    snapshots: [
+      { id:uid(), savedAt:"2025-11-14T15:30:00", withAgent:true, agentName:"Jordan (broker)",
+        note:"Open enrollment comparison for 2026", whatIf:0,
+        results:[ {name:"Acme PPO 500", totalYr:3655}, {name:"Acme HDHP Saver", totalYr:5494.77} ],
+        winnerName:"Acme PPO 500", data:null }
+    ]
+  });
+}
+
+/* ---------- tiny DOM helpers ---------- */
+function h(tag, attrs, ...kids){
+  const el = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    if (k === "class") el.className = attrs[k];
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), attrs[k]);
+    else if (k === "html") el.innerHTML = attrs[k];
+    else el.setAttribute(k, attrs[k]);
+  }
+  for (const kid of kids){
+    if (kid == null) continue;
+    el.appendChild(typeof kid === "string" ? document.createTextNode(kid) : kid);
+  }
+  return el;
+}
+function field(label, node, hint){
+  const span = h("span", null, label);
+  if (hint) span.appendChild(h("span", {class:"info", title:hint}, "ⓘ"));
+  return h("label", {class:"f"}, span, node);
+}
+
+/* ---------- toasts & modals ---------- */
+function toast(msg){
+  const t = h("div", {class:"toast"}, msg);
+  document.getElementById("toasts").appendChild(t);
+  setTimeout(()=>{ t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(()=>t.remove(), 320); }, 2600);
+}
+function openModal(title, body, actions){
+  const x = h("button", {class:"x", title:"Close", onclick: close}, "✕");
+  const overlay = h("div", {class:"overlay"},
+    h("div", {class:"modal"},
+      h("div", {class:"modal-head"}, h("h3", null, title), x),
+      body,
+      actions ? h("div", {class:"modal-actions"}, ...actions) : null
+    )
+  );
+  function close(){ overlay.remove(); }
+  document.body.appendChild(overlay);
+  return close;
+}
+function confirmModal(title, msg, onYes){
+  const close = openModal(title, h("p", null, msg), [
+    h("button", {onclick:()=>close()}, "Cancel"),
+    h("button", {class:"danger", onclick:()=>{ close(); onYes(); }}, "Delete")
+  ]);
+}
+
+/* ---------- math ---------- */
+function monthlyPremium(p){
+  const per = PREMIUM_PERIODS.find(x=>x[0]===p.period) || PREMIUM_PERIODS[0];
+  return num(p.premium) * per[2];
+}
+/* One event's member cost. copayTotal = count × copay $, C = count × retail price,
+   pct = coinsurance %. Deductible dollars and cost shares both accrue to the OOP cap. */
+function payEvent(st, mode, copayTotal, C, pct){
+  let pay;
+  if (mode === "copay") pay = copayTotal;
+  else if (mode === "coins") pay = pct/100 * C;
+  else {
+    const rem = Math.max(0, st.ded - st.dedPaid);
+    const dedPart = Math.min(C, rem);
+    st.dedPaid += dedPart;
+    if (mode === "copay_ded") pay = dedPart + copayTotal * (C > 0 ? (C - dedPart)/C : 0);
+    else pay = dedPart + pct/100 * Math.max(0, C - dedPart);
+  }
+  const capped = Math.min(pay, Math.max(0, st.oopMax - st.oopPaid));
+  st.oopPaid += capped;
+  return capped;
+}
+
+/* Month-by-month simulation of one plan year. Rules that need a retail price
+   but don't have one degrade to plain copay (amount = what you pay). */
+function dentalMo(plan){
+  const per = PREMIUM_PERIODS.find(x=>x[0]===plan.period) || PREMIUM_PERIODS[0];
+  return (num(plan.dentalPrem) + num(plan.visionPrem)) * per[2] + num(plan.dentalOopYr)/12;
+}
+function simulate(plan, extraAnnual){
+  const prem = monthlyPremium(plan);
+  const dentMo = dentalMo(plan);
+  const hsaMo = num(plan.hsa)/12;
+  const st = { ded: num(plan.deductible), dedPaid: 0,
+               oopMax: num(plan.oopMax) > 0 ? num(plan.oopMax) : Infinity, oopPaid: 0 };
+  let rxPaid = 0, visPaid = 0, extraPaid = 0, running = 0;
+  const cum = [];
+  for (let m = 0; m < 12; m++){
+    let mo = 0;
+    for (const rx of state.rxs){
+      const count = fillsMo(rx);
+      if (!count) continue;
+      const cfg = (rx.perPlan && rx.perPlan[plan.id]) || { tier:"t1" };
+      let paid;
+      if (cfg.tier === "custom"){
+        paid = payEvent(st, "copay", count*num(cfg.customCost), 0, 0);
+      } else {
+        const amt = num(plan.rx && plan.rx[cfg.tier]);
+        let mode = plan.mode[cfg.tier] || "copay";
+        const retail = num(rx.retail);
+        if (mode !== "copay" && retail <= 0) mode = "copay";
+        paid = payEvent(st, mode, count*amt, count*retail, amt);
+      }
+      rxPaid += paid; mo += paid;
+    }
+    for (const k of ["pcp","spec","uc"]){
+      const count = num(state.visits[k])/12;
+      if (!count) continue;
+      const amt = num(plan[k]);
+      const retail = num(state.assume[k+"Cost"]);
+      let mode = plan.mode[k] || "copay";
+      if (mode !== "copay" && retail <= 0) mode = "copay";
+      const paid = payEvent(st, mode, count*amt, count*retail, amt);
+      visPaid += paid; mo += paid;
+    }
+    if (extraAnnual > 0){
+      const paid = payEvent(st, "coins_ded", 0, extraAnnual/12, num(plan.coins));
+      extraPaid += paid; mo += paid;
+    }
+    running += prem + dentMo + mo - hsaMo;
+    cum.push(running);
+  }
+  return { prem, dentMo, hsaMo, rxMo: rxPaid/12, visMo: visPaid/12, extraMo: extraPaid/12,
+           totalMo: running/12, totalYr: running, cum,
+           worstYr: prem*12 + dentMo*12 + num(plan.oopMax) - num(plan.hsa) };
+}
+
+/* ---------- sortable tables ---------- */
+function makeSortable(table){
+  const ths = table.querySelectorAll("thead th");
+  ths.forEach((th, idx)=>{
+    th.appendChild(h("span", {class:"caret"}, ""));
+    th.addEventListener("click", ()=>{
+      const asc = th.dataset.dir !== "asc";
+      ths.forEach(o=>{ o.dataset.dir=""; o.querySelector(".caret").textContent=""; });
+      th.dataset.dir = asc ? "asc" : "desc";
+      th.querySelector(".caret").textContent = asc ? "▲" : "▼";
+      const tbody = table.querySelector("tbody");
+      const rows = Array.from(tbody.rows);
+      rows.sort((r1,r2)=>{
+        const c1 = r1.cells[idx], c2 = r2.cells[idx];
+        const v1 = c1.dataset.sort !== undefined ? parseFloat(c1.dataset.sort) : c1.textContent.trim().toLowerCase();
+        const v2 = c2.dataset.sort !== undefined ? parseFloat(c2.dataset.sort) : c2.textContent.trim().toLowerCase();
+        if (v1 < v2) return asc ? -1 : 1;
+        if (v1 > v2) return asc ? 1 : -1;
+        return 0;
+      });
+      rows.forEach(r=>tbody.appendChild(r));
+    });
+  });
+}
+
+/* ---------- plan modal ---------- */
+const RULE_HINT = "How this cost is shared. \"$ copay\" = flat amount per visit/fill. \"% coinsurance\" = you pay that percent of the price. \"after deductible\" = you pay full price until the deductible is met, then this rule applies (typical for HDHPs). Check the plan's SBC sheet.";
+function planModal(existing){
+  const p = existing || migrate({plans:[{ name:"", premium:"", period:"monthly", deductible:"", oopMax:"", hsa:"",
+                          pcp:"", spec:"", uc:"", rx:{t1:"",t2:"",t3:"",t4:""} }]}).plans[0];
+  const inName = h("input", {value:p.name, placeholder:"e.g. BCBS PPO 500"});
+  const inPrem = h("input", {type:"number", min:"0", step:"0.01", value:p.premium});
+  const inPeriod = h("select", null, ...PREMIUM_PERIODS.map(([v,l])=>{
+    const o = h("option", {value:v}, l); if (v===p.period) o.selected = true; return o;
+  }));
+  const inDed = h("input", {type:"number", min:"0", step:"1", value:p.deductible});
+  const inOop = h("input", {type:"number", min:"0", step:"1", value:p.oopMax});
+  const inHsa = h("input", {type:"number", min:"0", step:"1", value:p.hsa});
+  const inCoins = h("input", {type:"number", min:"0", max:"100", step:"1", value:p.coins});
+  const inDentName = h("input", {value:p.dentalName||"", placeholder:"e.g. BlueCare Dental 1B"});
+  const inDentPrem = h("input", {type:"number", min:"0", step:"0.01", value:p.dentalPrem||""});
+  const inVisPrem = h("input", {type:"number", min:"0", step:"0.01", value:p.visionPrem||""});
+  const inDentOop = h("input", {type:"number", min:"0", step:"1", value:p.dentalOopYr||""});
+  const amtIn = {}, modeIn = {};
+  function shareRow(key, label, amtVal, amtHint){
+    amtIn[key] = h("input", {type:"number", min:"0", step:"0.01", value:amtVal!=null?amtVal:""});
+    modeIn[key] = h("select", null, ...MODES.map(([v,l])=>{
+      const o = h("option", {value:v}, l); if (v===(p.mode[key]||"copay")) o.selected = true; return o;
+    }));
+    return h("div", {class:"grid2"},
+      field(label, amtIn[key], amtHint),
+      field("Rule", modeIn[key], RULE_HINT)
+    );
+  }
+  const body = h("div", null,
+    h("div", {class:"grid2", style:"margin-bottom:12px"},
+      field("Plan name", inName, "Any label that helps you tell the plans apart."),
+      null
+    ),
+    h("fieldset", null, h("legend", null, "Premium"),
+      h("div", {class:"grid2"},
+        field("Amount", inPrem, "What you pay for coverage, before any care. On a pay stub this is the medical deduction."),
+        field("Billed", inPeriod, "Employer plans are usually quoted per paycheck. Pick how yours is quoted and the math converts it to monthly.")
+      )
+    ),
+    h("fieldset", null, h("legend", null, "Plan limits"),
+      h("div", {class:"grid3"},
+        field("Deductible ($)", inDed, "What you pay out of pocket before the plan starts sharing costs. The simulation charges full price to \"after deductible\" items until this is met."),
+        field("Out-of-pocket max ($)", inOop, "The most you can pay for covered care in a year, not counting premiums. The simulation stops charging you here."),
+        field("HSA/HRA from employer ($/yr)", inHsa, "Free money your employer puts in a health account each year. It directly offsets your costs — common with high-deductible plans."),
+        field("Coinsurance for other care (%)", inCoins, "Your share of costs after the deductible for care not listed here — used by the what-if slider. Typically 10–30%.")
+      )
+    ),
+    h("fieldset", null, h("legend", null, "Dental & vision (optional)"),
+      h("div", {class:"grid2"},
+        field("Dental plan name", inDentName, "If this option bundles or pairs with a dental plan, name it here so the card shows it."),
+        field("Dental premium", inDentPrem, "Dental premium, billed the same way as the health premium above (monthly or per paycheck). Leave 0 if none."),
+        field("Vision premium", inVisPrem, "Vision premium if you'd carry one alongside this plan, billed the same way. Leave 0 if none."),
+        field("Expected dental/vision out-of-pocket ($/yr)", inDentOop, "Your estimate of yearly dental and vision costs you'd pay yourself on this option — cleanings, fillings, glasses. If a plan has no dental, put the cash price of your usual care here so the comparison stays fair.")
+      )
+    ),
+    h("fieldset", null, h("legend", null, "Office visits — amount is $ per visit, or % if the rule is coinsurance"),
+      shareRow("pcp", "Primary care", p.pcp, "Copay $ (or coinsurance %) for a regular doctor visit."),
+      shareRow("spec", "Specialist", p.spec, "Copay $ (or coinsurance %) for a specialist visit (dermatologist, cardiologist, etc.)."),
+      shareRow("uc", "Urgent care", p.uc, "Copay $ (or coinsurance %) for an urgent care visit.")
+    ),
+    h("fieldset", null, h("legend", null, "Prescriptions — amount is $ per 30-day fill, or % if the rule is coinsurance"),
+      shareRow("t1", "Tier 1 — Generic", p.rx&&p.rx.t1, "Cheapest tier: generic drugs."),
+      shareRow("t2", "Tier 2 — Preferred brand", p.rx&&p.rx.t2, "Brand-name drugs the plan favors."),
+      shareRow("t3", "Tier 3 — Non-preferred", p.rx&&p.rx.t3, "Brand-name drugs the plan does not favor."),
+      shareRow("t4", "Tier 4 — Specialty", p.rx&&p.rx.t4, "High-cost specialty drugs; often a coinsurance percentage.")
+    )
+  );
+  const close = openModal(existing ? "Edit plan" : "Add plan", body, [
+    h("button", {onclick:()=>close()}, "Cancel"),
+    h("button", {class:"primary", onclick:saveIt}, existing ? "Save" : "Add plan")
+  ]);
+  function saveIt(){
+    const name = inName.value.trim();
+    if (!name){ toast("Give the plan a name"); return; }
+    const mode = {};
+    for (const k of SHARE_KEYS) mode[k] = modeIn[k].value;
+    const data = {
+      id: existing ? existing.id : uid(),
+      name, premium: num(inPrem.value), period: inPeriod.value,
+      deductible: num(inDed.value), oopMax: num(inOop.value), hsa: num(inHsa.value), coins: num(inCoins.value),
+      dentalName: inDentName.value.trim(), dentalPrem: num(inDentPrem.value), visionPrem: num(inVisPrem.value), dentalOopYr: num(inDentOop.value),
+      pcp: num(amtIn.pcp.value), spec: num(amtIn.spec.value), uc: num(amtIn.uc.value),
+      rx: { t1:num(amtIn.t1.value), t2:num(amtIn.t2.value), t3:num(amtIn.t3.value), t4:num(amtIn.t4.value) },
+      mode
+    };
+    if (existing) Object.assign(existing, data);
+    else state.plans.push(data);
+    save(); renderAll(); close();
+    toast(existing ? "Plan updated" : "Plan added");
+  }
+}
+
+/* ---------- prescription modal ---------- */
+function rxModal(existing){
+  const r = existing || { name:"", fills:1, per:"month", retail:"", perPlan:{} };
+  const inName = h("input", {value:r.name, placeholder:"e.g. Atorvastatin 20 mg"});
+  const inFills = h("input", {type:"number", min:"0", step:"0.1", value:r.fills});
+  const inPer = h("select", null, ...[["month","per month"],["year","per year"]].map(([v,l])=>{
+    const o = h("option", {value:v}, l); if (v===r.per) o.selected = true; return o;
+  }));
+  const inRetail = h("input", {type:"number", min:"0", step:"0.01", value:r.retail!=null?r.retail:""});
+  const perPlanEls = {};
+  const planBlocks = state.plans.map(p=>{
+    const cfg = (r.perPlan && r.perPlan[p.id]) || { tier:"t1", customCost:"" };
+    const sel = h("select", null, ...TIERS.map(([v,l])=>{
+      const o = h("option", {value:v}, l); if (v===cfg.tier) o.selected = true; return o;
+    }));
+    const custom = h("input", {type:"number", min:"0", step:"0.01", value:cfg.customCost!=null?cfg.customCost:"", placeholder:"$ per fill"});
+    const customWrap = field("Custom cost per fill ($)", custom, "Exact amount you pay per fill under this plan — use when tiers don't apply or you know the real number.");
+    customWrap.style.display = cfg.tier === "custom" ? "" : "none";
+    sel.addEventListener("change", ()=>{ customWrap.style.display = sel.value === "custom" ? "" : "none"; });
+    perPlanEls[p.id] = { sel, custom };
+    return h("fieldset", null, h("legend", null, p.name),
+      h("div", {class:"grid2"},
+        field("Tier under this plan", sel, "The same drug can be a different tier under different insurers. Check each plan's drug list (formulary)."),
+        customWrap
+      )
+    );
+  });
+  const body = h("div", null,
+    h("div", {class:"grid2", style:"margin-bottom:12px"},
+      field("Name", inName, null),
+      h("div", {class:"grid2"},
+        field("Fills", inFills, "How many fills in the chosen period. A monthly refill = 1 per month; an as-needed inhaler = maybe 2 or 3 per year; a 90-day supply = 4 per year."),
+        field("Every", inPer, "Pick per year for occasional prescriptions so you don't have to do fraction math. Costs are spread evenly across the year either way.")
+      ),
+      field("Retail price per fill ($)", inRetail, "The full cash/negotiated price of one fill — what you'd pay before the deductible is met. Needed for \"after deductible\" and coinsurance rules; GoodRx or your pharmacy receipt is a good source. Leave blank on pure-copay plans."),
+      null
+    ),
+    ...(planBlocks.length ? planBlocks : [h("p", {class:"sub"}, "Add a plan first to set per-plan tiers — this prescription will default to Tier 1 on plans added later.")])
+  );
+  const close = openModal(existing ? "Edit prescription" : "Add prescription", body, [
+    h("button", {onclick:()=>close()}, "Cancel"),
+    h("button", {class:"primary", onclick:saveIt}, existing ? "Save" : "Add prescription")
+  ]);
+  function saveIt(){
+    const name = inName.value.trim();
+    if (!name){ toast("Give the prescription a name"); return; }
+    const perPlan = {};
+    for (const pid in perPlanEls){
+      perPlan[pid] = { tier: perPlanEls[pid].sel.value, customCost: num(perPlanEls[pid].custom.value) };
+    }
+    const data = { id: existing ? existing.id : uid(), name, fills: num(inFills.value), per: inPer.value, retail: num(inRetail.value), perPlan };
+    if (existing) Object.assign(existing, data);
+    else state.rxs.push(data);
+    save(); renderAll(); close();
+    toast(existing ? "Prescription updated" : "Prescription added");
+  }
+}
+
+/* ---------- rendering ---------- */
+function fmtShare(plan, key, amt){
+  const mode = (plan.mode && plan.mode[key]) || "copay";
+  const n = num(amt);
+  if (mode === "copay") return "$" + n;
+  if (mode === "copay_ded") return "$" + n + "*";
+  if (mode === "coins") return n + "%";
+  return n + "%*";
+}
+function renderPlans(){
+  const wrap = document.getElementById("planCards");
+  wrap.innerHTML = "";
+  if (!state.plans.length){
+    wrap.appendChild(h("div", {class:"empty", style:"grid-column:1/-1"}, "No plans yet. Add the plans you're choosing between — the numbers are on each plan's benefits summary."));
+    return;
+  }
+  for (const p of state.plans){
+    wrap.appendChild(h("div", {class:"plan-card"},
+      h("h3", null, p.name),
+      h("div", {class:"big"}, fmt(monthlyPremium(p)), h("small", null, " /mo premium")),
+      h("div", {class:"kv"}, h("span", null, "Deductible"), h("b", null, fmt(num(p.deductible)))),
+      h("div", {class:"kv"}, h("span", null, "OOP max"), h("b", null, fmt(num(p.oopMax)))),
+      h("div", {class:"kv"}, h("span", null, "PCP / Specialist / UC"), h("b", null, fmtShare(p,"pcp",p.pcp)+" / "+fmtShare(p,"spec",p.spec)+" / "+fmtShare(p,"uc",p.uc))),
+      num(p.hsa) ? h("div", {class:"kv"}, h("span", null, "Employer HSA/HRA"), h("b", null, fmt(num(p.hsa))+"/yr")) : null,
+      dentalMo(p) > 0.005 ? h("div", {class:"kv"}, h("span", null, "Dental & vision" + (p.dentalName ? " (" + p.dentalName + ")" : "")), h("b", null, fmt(dentalMo(p))+"/mo")) : null,
+      Object.values(p.mode||{}).some(m=>m.indexOf("_ded")!==-1) ? h("div", {class:"kv"}, h("span", null, "* = after deductible")) : null,
+      h("div", {class:"card-actions"},
+        h("button", {onclick:()=>planModal(p)}, "Edit"),
+        h("button", {class:"danger", onclick:()=>confirmModal("Delete plan", "Delete \""+p.name+"\"? Prescription tier settings for this plan are removed too.", ()=>{
+          state.plans = state.plans.filter(x=>x.id!==p.id);
+          for (const rx of state.rxs) if (rx.perPlan) delete rx.perPlan[p.id];
+          save(); renderAll(); toast("Plan deleted");
+        })}, "Delete")
+      )
+    ));
+  }
+}
+
+function renderRx(){
+  const wrap = document.getElementById("rxList");
+  wrap.innerHTML = "";
+  if (!state.rxs.length){
+    wrap.appendChild(h("div", {class:"empty", style:"margin-bottom:10px"}, "No prescriptions yet. Add what you actually fill — this is usually where plans differ the most."));
+  }
+  for (const rx of state.rxs){
+    const tierBits = state.plans.map(p=>{
+      const cfg = (rx.perPlan && rx.perPlan[p.id]) || {tier:"t1"};
+      const label = cfg.tier === "custom" ? fmt(num(cfg.customCost)) : cfg.tier.toUpperCase();
+      return p.name + ": " + label;
+    }).join(" · ");
+    wrap.appendChild(h("div", {class:"rx-row"},
+      h("span", {class:"name"}, rx.name),
+      h("span", {class:"meta"}, num(rx.fills) + " fill" + (num(rx.fills)===1?"":"s") + (rx.per==="year"?"/yr":"/mo") + (tierBits ? " · " + tierBits : "")),
+      h("span", {class:"spacer"}),
+      h("button", {class:"link", onclick:()=>rxModal(rx)}, "Edit"),
+      h("button", {class:"link", style:"color:var(--danger)", onclick:()=>confirmModal("Delete prescription", "Delete \""+rx.name+"\"?", ()=>{
+        state.rxs = state.rxs.filter(x=>x.id!==rx.id);
+        save(); renderAll(); toast("Prescription deleted");
+      })}, "Delete")
+    ));
+  }
+}
+
+function renderVisits(){
+  const wrap = document.getElementById("visitInputs");
+  wrap.innerHTML = "";
+  const defs = [
+    ["pcp","Primary care visits / year","Checkups, sick visits — how many times a year you see your regular doctor."],
+    ["spec","Specialist visits / year","Visits to any specialist across the year."],
+    ["uc","Urgent care visits / year","Walk-in urgent care visits in a typical year."]
+  ];
+  for (const [key,label,hint] of defs){
+    const inp = h("input", {type:"number", min:"0", step:"1", value:state.visits[key] != null ? state.visits[key] : 0,
+      onchange: (e)=>{ state.visits[key] = num(e.target.value); save(); renderResults(); }});
+    wrap.appendChild(field(label, inp, hint));
+  }
+  const costDefs = [
+    ["pcpCost","Full price: PCP visit ($)","What a primary care visit costs before insurance shares it — used when a plan's rule is \"after deductible\" or coinsurance. ~$150–250 is typical."],
+    ["specCost","Full price: specialist ($)","Full billed price of a specialist visit. ~$250–400 is typical."],
+    ["ucCost","Full price: urgent care ($)","Full billed price of an urgent care visit. ~$150–300 is typical."]
+  ];
+  for (const [key,label,hint] of costDefs){
+    const inp = h("input", {type:"number", min:"0", step:"1", value:state.assume[key] != null ? state.assume[key] : 0,
+      onchange: (e)=>{ state.assume[key] = num(e.target.value); save(); renderResults(); }});
+    wrap.appendChild(field(label, inp, hint));
+  }
+}
+
+function flipPoint(baseWinnerId){
+  /* scan extra billed spending to find where the cheapest plan changes */
+  for (let extra = 250; extra <= 30000; extra += 250){
+    let best = null;
+    for (const p of state.plans){
+      const yr = simulate(p, extra).totalYr;
+      if (!best || yr < best.yr) best = { id: p.id, name: p.name, yr };
+    }
+    if (best.id !== baseWinnerId) return { extra, name: best.name };
+  }
+  return null;
+}
+
+function renderResults(){
+  const wrap = document.getElementById("results");
+  wrap.innerHTML = "";
+  if (!state.plans.length){
+    wrap.appendChild(h("div", {class:"empty"}, "Add at least one plan to see totals — two or more to compare."));
+    return;
+  }
+  const rows = state.plans.map(p=>({ p, t: simulate(p, whatIf) }));
+  rows.sort((a,b)=>a.t.totalYr - b.t.totalYr);
+  const winner = rows[0], runner = rows[1];
+
+  if (runner){
+    const diff = runner.t.totalYr - winner.t.totalYr;
+    const parts = [];
+    const cmp = (label, a, b, unit)=>{
+      const d = a - b;
+      if (Math.abs(d) < 0.005) return;
+      parts.push(label + ": " + winner.p.name + " is " + fmt(Math.abs(d)) + unit + (d < 0 ? " less" : " more"));
+    };
+    cmp("Premiums", winner.t.prem, runner.t.prem, "/mo");
+    cmp("Prescriptions", winner.t.rxMo, runner.t.rxMo, "/mo");
+    cmp("Office visits", winner.t.visMo, runner.t.visMo, "/mo");
+    cmp("Dental & vision", winner.t.dentMo, runner.t.dentMo, "/mo");
+    if (whatIf > 0) cmp("Extra care", winner.t.extraMo, runner.t.extraMo, "/mo");
+    const hd = winner.t.hsaMo - runner.t.hsaMo;
+    if (Math.abs(hd) >= 0.005) parts.push("Employer HSA/HRA: " + winner.p.name + " gets " + fmt(Math.abs(hd)) + "/mo " + (hd > 0 ? "more" : "less") + " free money");
+    wrap.appendChild(h("div", {class:"banner"},
+      h("div", {html: "<b>" + esc(winner.p.name) + "</b> comes out ahead — about <b>" + fmt(diff) + "/yr</b> (" + fmt(diff/12) + "/mo) cheaper than " + esc(runner.p.name) + " at your usage" + (whatIf > 0 ? " plus " + fmt(whatIf) + " of extra billed care" : "") + "."}),
+      parts.length ? h("ul", null, ...parts.map(s=>h("li", null, s))) : null
+    ));
+  }
+
+  const anyDental = rows.some(r=>r.t.dentMo > 0.005);
+  const heads = ["Plan","Premium /mo","Rx /mo","Visits /mo"];
+  if (anyDental) heads.push("Dental /mo");
+  if (whatIf > 0) heads.push("Extra /mo");
+  heads.push("HSA /mo","Total /mo","Total /yr","Worst case /yr");
+  const table = h("table", null,
+    h("thead", null, h("tr", null, ...heads.map(x=>h("th", null, x)))),
+    h("tbody", null, ...rows.map(({p,t})=>{
+      const win = runner && p.id === winner.p.id;
+      const tds = [h("td", null, p.name), cell(t.prem), cell(t.rxMo), cell(t.visMo)];
+      if (anyDental) tds.push(cell(t.dentMo));
+      if (whatIf > 0) tds.push(cell(t.extraMo));
+      tds.push(cell(-t.hsaMo), cell(t.totalMo, win), cell(t.totalYr, win), cell(t.worstYr));
+      return h("tr", {class: win ? "winner" : ""}, ...tds);
+    }))
+  );
+  const tw = h("div", {class:"tablewrap"}, table);
+  wrap.appendChild(tw);
+  makeSortable(table);
+
+  /* what-if slider */
+  const sliderVal = h("b", null, whatIf > 0 ? fmt(whatIf) : "$0");
+  const slider = h("input", {type:"range", min:"0", max:"20000", step:"250", value:whatIf,
+    oninput: (e)=>{ whatIf = num(e.target.value); renderResults(); }});
+  const sliderWrap = h("div", {class: whatIf > 0 ? "" : "no-print", style:"margin:18px 0 4px"},
+    h("label", {class:"f"},
+      h("span", null, "What if something happens? Extra billed care this year: ", sliderVal,
+        h("span", {class:"info", title:"Drag to add unexpected medical spending (billed prices — an ER visit, imaging, a procedure). It runs through each plan's deductible, its \"coinsurance for other care\" percent, and the out-of-pocket max, so you can see whether the winner flips in a bad year."}, "ⓘ")),
+      slider
+    )
+  );
+  wrap.appendChild(sliderWrap);
+  if (runner){
+    const baseRows = state.plans.map(p=>({ id: p.id, yr: simulate(p, 0).totalYr }));
+    baseRows.sort((a,b)=>a.yr-b.yr);
+    const fp = flipPoint(baseRows[0].id);
+    wrap.appendChild(h("p", {class:"sub", style:"margin:2px 0 12px"},
+      fp ? "Tipping point: if extra billed care exceeds about " + fmt(fp.extra) + " this year, " + fp.name + " becomes the cheaper plan."
+         : "No tipping point: the same plan stays cheapest even with up to $30,000 of extra billed care."));
+  }
+
+  renderChart(wrap, rows);
+
+  if (state.rxs.length){
+    wrap.appendChild(h("h3", {style:"font-size:15px;margin:18px 0 6px"}, "Prescription cost per month, by plan"));
+    const rxTable = h("table", null,
+      h("thead", null, h("tr", null, h("th", null, "Prescription"), ...state.plans.map(p=>h("th", null, p.name)))),
+      h("tbody", null, ...state.rxs.map(rx=>h("tr", null,
+        h("td", null, rx.name + " (" + fillsLabel(rx) + ")"),
+        ...state.plans.map(p=>{
+          const count = fillsMo(rx);
+          const cfg = (rx.perPlan && rx.perPlan[p.id]) || {tier:"t1"};
+          let mo, rule;
+          if (cfg.tier === "custom"){ mo = count*num(cfg.customCost); rule = "custom amount"; }
+          else {
+            const amt = num(p.rx && p.rx[cfg.tier]);
+            const mode = p.mode[cfg.tier] || "copay";
+            rule = fmtShare(p, cfg.tier, amt) + " per fill";
+            mo = (mode === "coins" || mode === "coins_ded") ? count * amt/100 * num(rx.retail) : count * amt;
+          }
+          const td = cell(mo);
+          td.title = rule;
+          return td;
+        })
+      )))
+    );
+    wrap.appendChild(h("div", {class:"tablewrap"}, rxTable));
+    wrap.appendChild(h("p", {class:"sub", style:"margin:6px 0 0"}, "Steady-state cost once any deductible is met (hover a value for the rule). The totals above also include the pre-deductible phase."));
+    makeSortable(rxTable);
+  }
+
+  function cell(v, win){
+    const td = h("td", {class: win ? "win" : ""}, fmt(v));
+    td.dataset.sort = v;
+    return td;
+  }
+}
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+/* ---------- cumulative cost chart ---------- */
+function renderChart(wrap, rows){
+  if (state.plans.length < 1) return;
+  const shown = rows.filter(r => state.plans.indexOf(r.p) < 6); /* color follows the entity; no cycling past 6 */
+  const colorOf = p => SERIES[state.plans.indexOf(p)];
+  wrap.appendChild(h("h3", {style:"font-size:15px;margin:22px 0 6px"}, "Cumulative cost through the plan year"));
+  if (rows.length > shown.length)
+    wrap.appendChild(h("p", {class:"sub"}, "Chart shows the first 6 plans; the table above covers all of them."));
+
+  const W = 720, H = 300, padL = 62, padR = 130, padT = 14, padB = 34;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const maxV = Math.max(...shown.map(r => r.t.cum[11]), 1);
+  const minV = Math.min(0, ...shown.map(r => r.t.cum[0]));
+  /* nice ceiling: 1/2/5 × 10^k */
+  const pow = Math.pow(10, Math.floor(Math.log10(maxV)));
+  let top = pow; for (const mlt of [1,2,2.5,5,10]) if (mlt*pow >= maxV){ top = mlt*pow; break; }
+  const x = i => padL + (i/11)*iw;
+  const y = v => padT + ih - ((v - minV)/(top - minV))*ih;
+
+  const svg = document.createElementNS("http://www.w3.org/2000/svg","svg");
+  svg.setAttribute("viewBox", "0 0 "+W+" "+H);
+  svg.style.width = "100%"; svg.style.height = "auto"; svg.style.display = "block";
+  function sEl(tag, attrs, text){
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const k in attrs) el.setAttribute(k, attrs[k]);
+    if (text != null) el.textContent = text;
+    return el;
+  }
+  /* gridlines + y labels */
+  const ticks = 4;
+  for (let t = 0; t <= ticks; t++){
+    const v = minV + (top - minV)*t/ticks;
+    svg.appendChild(sEl("line", {x1:padL, x2:W-padR, y1:y(v), y2:y(v), stroke:"#e1e0d9", "stroke-width":1}));
+    svg.appendChild(sEl("text", {x:padL-8, y:y(v)+4, "text-anchor":"end", fill:"#898781", "font-size":"11.5",
+      style:"font-variant-numeric:tabular-nums"}, "$"+Math.round(v).toLocaleString()));
+  }
+  /* x labels */
+  for (const m of [1,3,6,9,12]){
+    svg.appendChild(sEl("text", {x:x(m-1), y:H-padB+18, "text-anchor":"middle", fill:"#898781", "font-size":"11.5"}, "M"+m));
+  }
+  svg.appendChild(sEl("text", {x:padL+iw/2, y:H-2, "text-anchor":"middle", fill:"#898781", "font-size":"11"}, "Month of plan year"));
+  svg.appendChild(sEl("line", {x1:padL, x2:W-padR, y1:y(minV), y2:y(minV), stroke:"#c3c2b7", "stroke-width":1}));
+
+  /* lines + end labels (collision-nudged, text in ink not series color) */
+  const ends = [];
+  for (const r of shown){
+    const pts = r.t.cum.map((v,i)=>x(i)+","+y(v)).join(" ");
+    svg.appendChild(sEl("polyline", {points:pts, fill:"none", stroke:colorOf(r.p), "stroke-width":2,
+      "stroke-linejoin":"round", "stroke-linecap":"round"}));
+    ends.push({ name:r.p.name, y:y(r.t.cum[11]), color:colorOf(r.p) });
+  }
+  ends.sort((a,b)=>a.y-b.y);
+  for (let i=1;i<ends.length;i++) if (ends[i].y - ends[i-1].y < 14) ends[i].y = ends[i-1].y + 14;
+  for (const e of ends){
+    svg.appendChild(sEl("circle", {cx:W-padR+8, cy:e.y-4, r:4, fill:e.color}));
+    svg.appendChild(sEl("text", {x:W-padR+16, y:e.y, fill:"#52514e", "font-size":"12"},
+      e.name.length>16 ? e.name.slice(0,15)+"…" : e.name));
+  }
+  /* crosshair */
+  const cross = sEl("line", {x1:0, x2:0, y1:padT, y2:padT+ih, stroke:"#c3c2b7", "stroke-width":1, visibility:"hidden"});
+  svg.appendChild(cross);
+
+  const legend = h("div", {style:"display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted);margin:2px 0 6px"},
+    ...shown.map(r=>h("span", {style:"display:inline-flex;align-items:center;gap:6px"},
+      h("span", {style:"width:10px;height:10px;border-radius:2px;background:"+colorOf(r.p)}), r.p.name)));
+
+  const tip = h("div", {style:"position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--line);"+
+    "border-radius:8px;box-shadow:var(--shadow);padding:7px 11px;font-size:12.5px;display:none;white-space:nowrap;z-index:5"});
+  const box = h("div", {class:"chartbox", style:"position:relative"}, legend, svg, tip);
+  wrap.appendChild(box);
+
+  svg.addEventListener("mousemove", (ev)=>{
+    const rect = svg.getBoundingClientRect();
+    const sx = (ev.clientX - rect.left) * (W/rect.width);
+    let i = Math.round(((sx - padL)/iw)*11);
+    i = Math.max(0, Math.min(11, i));
+    cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i));
+    cross.setAttribute("visibility", "visible");
+    const items = shown.map(r=>({name:r.p.name, v:r.t.cum[i], c:colorOf(r.p)})).sort((a,b)=>a.v-b.v);
+    tip.innerHTML = "<b>Month "+(i+1)+"</b><br>" + items.map(it=>
+      "<span style='display:inline-block;width:8px;height:8px;border-radius:2px;background:"+it.c+";margin-right:5px'></span>"+
+      esc(it.name)+": <b style='font-variant-numeric:tabular-nums'>"+fmt(it.v)+"</b>").join("<br>");
+    tip.style.display = "block";
+    const bx = box.getBoundingClientRect();
+    let left = ev.clientX - bx.left + 14;
+    if (left + tip.offsetWidth > bx.width) left = ev.clientX - bx.left - tip.offsetWidth - 14;
+    tip.style.left = left + "px";
+    tip.style.top = (ev.clientY - bx.top - 10) + "px";
+  });
+  svg.addEventListener("mouseleave", ()=>{ tip.style.display = "none"; cross.setAttribute("visibility","hidden"); });
+}
+
+function renderAll(){ renderPlans(); renderRx(); renderVisits(); renderResults(); renderHistory(); }
+
+/* ---------- history: snapshots + plan years ---------- */
+function snapshotModal(){
+  if (!state.plans.length){ toast("Add at least one plan first"); return; }
+  const inNote = h("input", {placeholder:"e.g. Open enrollment comparison for next year"});
+  const inAgent = h("input", {type:"checkbox"});
+  const inAgentName = h("input", {placeholder:"Agent / broker name", disabled:true});
+  inAgent.addEventListener("change", ()=>{ inAgentName.disabled = !inAgent.checked; if (!inAgent.checked) inAgentName.value = ""; });
+  const body = h("div", null,
+    h("p", {class:"sub"}, "Saves a timestamped snapshot of every plan, your usage, and the results — you can load it back later or compare it against what the year actually cost."),
+    field("Note", inNote, "Anything that gives this comparison context later."),
+    h("div", {class:"grid2", style:"margin-top:10px;align-items:end"},
+      h("label", {class:"f", style:"flex-direction:row;align-items:center;gap:8px"}, inAgent,
+        h("span", null, "Compared with an insurance agent",
+          h("span", {class:"info", title:"Check this if an agent or broker walked you through these numbers, so you remember who to call (or blame) next year."}, "ⓘ"))),
+      field("Agent name", inAgentName, null)
+    )
+  );
+  const close = openModal("Save comparison to history", body, [
+    h("button", {onclick:()=>close()}, "Cancel"),
+    h("button", {class:"primary", onclick:saveIt}, "Save snapshot")
+  ]);
+  function saveIt(){
+    const results = state.plans.map(p=>{
+      const t = simulate(p, whatIf);
+      return { name: p.name, totalYr: t.totalYr, totalMo: t.totalMo };
+    });
+    const winner = results.slice().sort((a,b)=>a.totalYr-b.totalYr)[0];
+    state.snapshots.push({
+      id: uid(), savedAt: new Date().toISOString(),
+      withAgent: inAgent.checked, agentName: inAgentName.value.trim(),
+      note: inNote.value.trim(), whatIf,
+      results, winnerName: winner ? winner.name : "",
+      data: JSON.parse(JSON.stringify({ plans: state.plans, rxs: state.rxs, visits: state.visits, assume: state.assume }))
+    });
+    save(); renderHistory(); close();
+    toast("Comparison saved to history");
+  }
+}
+
+function actualTotal(y){
+  const a = y.actual || {};
+  return num(a.premiumPaidYr) + num(a.medicalYr) + num(a.rxYr) + num(a.otherYr);
+}
+
+function yearModal(existing){
+  const y = existing || { year:"", planName:"", planType:"", premiumMo:"", predictedYr:"", predictedFrom:"", actual:{}, notes:"" };
+  const a = y.actual || {};
+  const inYear = h("input", {value:y.year, placeholder:"e.g. 2025"});
+  const inPlan = h("input", {value:y.planName, placeholder:"Plan you were on"});
+  const inType = h("input", {value:y.planType||"", placeholder:"PPO / HMO / HDHP"});
+  const inPremMo = h("input", {type:"number", min:"0", step:"0.01", value:y.premiumMo});
+  const inPred = h("input", {type:"number", min:"0", step:"0.01", value:y.predictedYr});
+  const snapSel = h("select", null, h("option", {value:""}, "— pick a saved comparison —"),
+    ...state.snapshots.map(s=>h("option", {value:s.id}, new Date(s.savedAt).toLocaleDateString() + (s.note ? " · " + s.note : ""))));
+  const planSel = h("select", null, h("option", {value:""}, "— then a plan —"));
+  snapSel.addEventListener("change", ()=>{
+    planSel.innerHTML = "";
+    planSel.appendChild(h("option", {value:""}, "— then a plan —"));
+    const s = state.snapshots.find(x=>x.id===snapSel.value);
+    if (s) for (const r of s.results) planSel.appendChild(h("option", {value:r.name}, r.name + " (" + fmt(r.totalYr) + "/yr)"));
+  });
+  planSel.addEventListener("change", ()=>{
+    const s = state.snapshots.find(x=>x.id===snapSel.value);
+    const r = s && s.results.find(x=>x.name===planSel.value);
+    if (r){
+      inPred.value = Math.round(r.totalYr*100)/100;
+      y.predictedFrom = "comparison saved " + new Date(s.savedAt).toLocaleDateString() + " — " + r.name;
+      if (!inPlan.value) inPlan.value = r.name;
+    }
+  });
+  const inPremPaid = h("input", {type:"number", min:"0", step:"0.01", value:a.premiumPaidYr!=null?a.premiumPaidYr:""});
+  const inMed = h("input", {type:"number", min:"0", step:"0.01", value:a.medicalYr!=null?a.medicalYr:""});
+  const inRx = h("input", {type:"number", min:"0", step:"0.01", value:a.rxYr!=null?a.rxYr:""});
+  const inOther = h("input", {type:"number", min:"0", step:"0.01", value:a.otherYr!=null?a.otherYr:""});
+  const inDedUsed = h("input", {type:"number", min:"0", step:"0.01", value:a.dedUsedYr!=null?a.dedUsedYr:""});
+  const inBilled = h("input", {type:"number", min:"0", step:"0.01", value:a.billedYr!=null?a.billedYr:""});
+  const inNotes = h("textarea", {rows:"2"}, y.notes||"");
+  const body = h("div", null,
+    h("div", {class:"grid3", style:"margin-bottom:12px"},
+      field("Plan year", inYear, "The calendar or coverage year this row describes."),
+      field("Plan name", inPlan, null),
+      field("Type", inType, "PPO, HMO, EPO, HDHP — however you think of it.")
+    ),
+    h("fieldset", null, h("legend", null, "Predicted"),
+      h("div", {class:"grid3"},
+        field("Premium at signup ($/mo)", inPremMo, "The monthly premium when you chose the plan."),
+        field("Predicted total ($/yr)", inPred, "What the estimate said this year would cost in total. Fill by hand, or copy from a saved comparison on the right."),
+        h("div", null, field("Copy from snapshot", snapSel, "Pull the predicted total straight from a comparison you saved."), planSel)
+      )
+    ),
+    h("fieldset", null, h("legend", null, "Actual — what the year really cost"),
+      h("div", {class:"grid3"},
+        field("Premiums paid ($/yr)", inPremPaid, "Total premiums you actually paid across the year (add up the payments)."),
+        field("Medical spending ($/yr)", inMed, "Deductible payments, copays, coinsurance for visits and procedures — your money, not what providers billed."),
+        field("Prescriptions ($/yr)", inRx, "What you paid at the pharmacy across the year."),
+        field("Other ($/yr)", inOther, "Anything else out of pocket that belongs to this plan year (dental/vision if you track them here)."),
+        field("Deductible used ($)", inDedUsed, "How much of the deductible you chewed through — a good signal of whether a higher-deductible plan would have been safe."),
+        field("Providers billed ($)", inBilled, "Optional context: the total providers billed the insurer. Not part of your cost math — it shows what the plan absorbed.")
+      )
+    ),
+    field("Notes", inNotes, null)
+  );
+  const close = openModal(existing ? "Edit plan year" : "Add plan year", body, [
+    h("button", {onclick:()=>close()}, "Cancel"),
+    h("button", {class:"primary", onclick:saveIt}, existing ? "Save" : "Add plan year")
+  ]);
+  function saveIt(){
+    if (!inYear.value.trim()){ toast("Give the plan year a label"); return; }
+    const data = {
+      id: existing ? existing.id : uid(),
+      year: inYear.value.trim(), planName: inPlan.value.trim(), planType: inType.value.trim(),
+      premiumMo: num(inPremMo.value), predictedYr: num(inPred.value), predictedFrom: y.predictedFrom || "",
+      actual: { premiumPaidYr: num(inPremPaid.value), medicalYr: num(inMed.value), rxYr: num(inRx.value),
+                otherYr: num(inOther.value), dedUsedYr: num(inDedUsed.value), billedYr: num(inBilled.value) },
+      notes: inNotes.value.trim()
+    };
+    if (existing) Object.assign(existing, data);
+    else state.history.push(data);
+    save(); renderHistory(); close();
+    toast(existing ? "Plan year updated" : "Plan year added");
+  }
+}
+
+function renderHistory(){
+  const listWrap = document.getElementById("historyList");
+  listWrap.innerHTML = "";
+  if (!state.history.length){
+    listWrap.appendChild(h("div", {class:"empty"}, "No plan years yet. Add the years you've been through — even rough numbers make next year's comparison sharper."));
+  } else {
+    const rows = state.history.slice().sort((x,z)=>String(z.year).localeCompare(String(x.year)));
+    const table = h("table", null,
+      h("thead", null, h("tr", null, ...["Year","Plan","Premiums /yr","Care /yr","Actual total","Predicted","Δ actual − predicted",""].map(x=>h("th", null, x)))),
+      h("tbody", null, ...rows.map(yr=>{
+        const a = yr.actual || {};
+        const care = num(a.medicalYr) + num(a.rxYr) + num(a.otherYr);
+        const total = actualTotal(yr);
+        const pred = num(yr.predictedYr);
+        let deltaTd;
+        if (pred > 0 && total > 0){
+          const d = total - pred;
+          deltaTd = h("td", {class: d <= 0 ? "delta-good" : "delta-bad"}, (d <= 0 ? "−" : "+") + fmt(Math.abs(d)));
+          deltaTd.dataset.sort = d;
+          deltaTd.title = (d <= 0 ? "Came in under the prediction" : "Cost more than predicted") + (yr.predictedFrom ? " (" + yr.predictedFrom + ")" : "");
+        } else {
+          deltaTd = h("td", null, "—"); deltaTd.dataset.sort = 0;
+        }
+        const tdCell = (v)=>{ const td = h("td", null, v > 0 ? fmt(v) : "—"); td.dataset.sort = v; return td; };
+        return h("tr", null,
+          h("td", null, yr.year + (yr.planType ? " · " + yr.planType : "")),
+          h("td", null, yr.planName || "—"),
+          tdCell(num(a.premiumPaidYr)), tdCell(care), tdCell(total), tdCell(pred), deltaTd,
+          h("td", {class:"no-print"},
+            h("button", {class:"link", onclick:()=>yearModal(yr)}, "Edit"),
+            h("button", {class:"link", style:"color:var(--danger)", onclick:()=>confirmModal("Delete plan year", "Delete the " + yr.year + " record?", ()=>{
+              state.history = state.history.filter(x=>x.id!==yr.id);
+              save(); renderHistory(); toast("Plan year deleted");
+            })}, "Delete"))
+        );
+      }))
+    );
+    listWrap.appendChild(h("div", {class:"tablewrap"}, table));
+    makeSortable(table);
+  }
+
+  const snapWrap = document.getElementById("snapshotList");
+  snapWrap.innerHTML = "";
+  if (!state.snapshots.length){
+    snapWrap.appendChild(h("div", {class:"empty"}, "No saved comparisons yet. On the Compare tab, \"Save comparison to history\" stores a timestamped snapshot."));
+    return;
+  }
+  const snaps = state.snapshots.slice().sort((x,z)=>String(z.savedAt).localeCompare(String(x.savedAt)));
+  const st = h("table", null,
+    h("thead", null, h("tr", null, ...["Saved","Cheapest plan","Predicted /yr","With agent","Note",""].map(x=>h("th", null, x)))),
+    h("tbody", null, ...snaps.map(s=>{
+      const win = s.results && s.results.slice().sort((a,b)=>a.totalYr-b.totalYr)[0];
+      const dt = new Date(s.savedAt);
+      const tdSaved = h("td", null, dt.toLocaleDateString() + " " + dt.toLocaleTimeString([], {hour:"numeric", minute:"2-digit"}));
+      tdSaved.dataset.sort = dt.getTime();
+      const predTd = h("td", null, win ? fmt(win.totalYr) : "—"); predTd.dataset.sort = win ? win.totalYr : 0;
+      return h("tr", null,
+        tdSaved,
+        h("td", null, s.winnerName || (win && win.name) || "—"),
+        predTd,
+        h("td", null, s.withAgent ? ("yes" + (s.agentName ? " — " + s.agentName : "")) : "no"),
+        h("td", {style:"white-space:normal"}, s.note || ""),
+        h("td", {class:"no-print"},
+          s.data ? h("button", {class:"link", onclick:()=>confirmLoad(s)}, "Load") : null,
+          h("button", {class:"link", style:"color:var(--danger)", onclick:()=>confirmModal("Delete snapshot", "Delete the comparison saved " + dt.toLocaleDateString() + "?", ()=>{
+            state.snapshots = state.snapshots.filter(x=>x.id!==s.id);
+            save(); renderHistory(); toast("Snapshot deleted");
+          })}, "Delete"))
+      );
+    }))
+  );
+  snapWrap.appendChild(h("div", {class:"tablewrap"}, st));
+  makeSortable(st);
+}
+function confirmLoad(s){
+  const close = openModal("Load saved comparison",
+    h("p", null, "Replace the current plans and usage on the Compare tab with the snapshot from " + new Date(s.savedAt).toLocaleString() + "? Your current setup will be overwritten (save it as a snapshot first if you want to keep it)."),
+    [ h("button", {onclick:()=>close()}, "Cancel"),
+      h("button", {class:"primary", onclick:()=>{
+        const d = JSON.parse(JSON.stringify(s.data));
+        state.plans = d.plans; state.rxs = d.rxs; state.visits = d.visits; state.assume = d.assume;
+        migrate(state); save(); renderAll(); close(); showTab("compare");
+        toast("Snapshot loaded into Compare");
+      }}, "Load") ]);
+}
+
+/* ---------- tabs ---------- */
+function showTab(which){
+  const compare = which !== "history";
+  document.getElementById("viewCompare").hidden = !compare;
+  document.getElementById("viewHistory").hidden = compare;
+  document.getElementById("tabCompare").classList.toggle("active", compare);
+  document.getElementById("tabHistory").classList.toggle("active", !compare);
+}
+
+/* ---------- export / import ---------- */
+document.getElementById("pdfBtn").addEventListener("click", ()=>{ fillPrintHeader(); window.print(); });
+function fillPrintHeader(){
+  document.getElementById("printHeader").textContent =
+    "Copay v" + APP_VERSION + " — health plan comparison, generated " + new Date().toLocaleDateString() +
+    (whatIf > 0 ? " — includes " + fmt(whatIf) + " of what-if extra billed care" : "") +
+    " — dev.rizzo.cc/copay";
+}
+window.addEventListener("beforeprint", fillPrintHeader);
+document.getElementById("exportBtn").addEventListener("click", ()=>{
+  const blob = new Blob([JSON.stringify(Object.assign({version:APP_VERSION}, state), null, 2)], {type:"application/json"});
+  const a = h("a", {href:URL.createObjectURL(blob), download:"copay-data.json"});
+  document.body.appendChild(a); a.click(); a.remove();
+  toast("Exported copay-data.json");
+});
+document.getElementById("importBtn").addEventListener("click", ()=>document.getElementById("importFile").click());
+document.getElementById("importFile").addEventListener("change", (e)=>{
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data.plans) && (Array.isArray(data.history) || Array.isArray(data.snapshots))){
+        /* history-only file: merge into what's here instead of replacing */
+        for (const yn of data.history || []) if (!state.history.some(x=>x.id===yn.id)) state.history.push(yn);
+        for (const sn of data.snapshots || []) if (!state.snapshots.some(x=>x.id===sn.id)) state.snapshots.push(sn);
+        migrate(state); save(); renderAll(); showTab("history");
+        toast("History merged in");
+      } else {
+        if (!Array.isArray(data.plans)) throw new Error("bad shape");
+        state = migrate({ plans: data.plans, rxs: data.rxs || [], visits: data.visits || {pcp:0,spec:0,uc:0},
+                          assume: data.assume, history: data.history, snapshots: data.snapshots });
+        save(); renderAll(); toast("Data imported");
+      }
+    }catch(err){ toast("That file doesn't look like a Copay export"); }
+    e.target.value = "";
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- boot ---------- */
+document.getElementById("addPlanBtn").addEventListener("click", ()=>planModal());
+document.getElementById("addRxBtn").addEventListener("click", ()=>rxModal());
+document.getElementById("snapshotBtn").addEventListener("click", snapshotModal);
+document.getElementById("addYearBtn").addEventListener("click", ()=>yearModal());
+document.getElementById("tabCompare").addEventListener("click", ()=>showTab("compare"));
+document.getElementById("tabHistory").addEventListener("click", ()=>showTab("history"));
+document.getElementById("verBadge").textContent = "v" + APP_VERSION;
+document.getElementById("verFoot").textContent = "Copay v" + APP_VERSION;
+if (DEMO) document.getElementById("demoBanner").hidden = false;
+load();
+renderAll();
+</script>
+</body>
+</html>
