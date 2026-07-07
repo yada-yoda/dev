@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="0.6.1">
+<meta name="app-version" content="0.6.2">
 <meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
-<title>Copay — health plan cost estimator</title>
+<title>PlanMath — health plan cost estimator</title>
 <style>
 :root{
   --bg:#f4f6f8; --card:#ffffff; --ink:#1a2430; --muted:#5c6b7a; --line:#dfe5eb;
@@ -106,7 +106,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 <body>
 <div class="wrap">
   <header>
-    <h1>Copay</h1>
+    <h1>PlanMath</h1>
     <span class="ver" id="verBadge"></span>
     <div class="toolbar">
       <button id="pdfBtn" title="Open the print dialog — choose 'Save as PDF' to export the comparison as a shareable document">Print / PDF</button>
@@ -172,8 +172,8 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 
 <script>
 "use strict";
-const APP_VERSION = "0.6.1";
-const LS_KEY = "copay_v1";
+const APP_VERSION = "0.6.2";
+const LS_KEY = "planmath_v1";
 const TIERS = [
   ["t1","Tier 1 — Generic"],
   ["t2","Tier 2 — Preferred brand"],
@@ -235,7 +235,7 @@ function num(v){ const n = parseFloat(v); return isFinite(n) ? n : 0; }
 function load(){
   if (DEMO){ state = demoData(); return; }
   try{
-    const raw = localStorage.getItem(LS_KEY);
+    const raw = localStorage.getItem(LS_KEY) || localStorage.getItem("copay_v1"); /* pre-rename key */
     if (raw) state = Object.assign({plans:[],rxs:[],visits:{pcp:0,spec:0,uc:0}}, JSON.parse(raw));
   }catch(e){ console.error("load failed", e); }
   migrate(state);
@@ -1113,16 +1113,16 @@ function showTab(which){
 document.getElementById("pdfBtn").addEventListener("click", ()=>{ fillPrintHeader(); window.print(); });
 function fillPrintHeader(){
   document.getElementById("printHeader").textContent =
-    "Copay v" + APP_VERSION + " — health plan comparison, generated " + new Date().toLocaleDateString() +
+    "PlanMath v" + APP_VERSION + " — health plan comparison, generated " + new Date().toLocaleDateString() +
     (whatIf > 0 ? " — includes " + fmt(whatIf) + " of what-if extra billed care" : "") +
-    " — dev.rizzo.cc/copay";
+    " — dev.rizzo.cc/planmath";
 }
 window.addEventListener("beforeprint", fillPrintHeader);
 document.getElementById("exportBtn").addEventListener("click", ()=>{
   const blob = new Blob([JSON.stringify(Object.assign({version:APP_VERSION}, state), null, 2)], {type:"application/json"});
-  const a = h("a", {href:URL.createObjectURL(blob), download:"copay-data.json"});
+  const a = h("a", {href:URL.createObjectURL(blob), download:"planmath-data.json"});
   document.body.appendChild(a); a.click(); a.remove();
-  toast("Exported copay-data.json");
+  toast("Exported planmath-data.json");
 });
 document.getElementById("importBtn").addEventListener("click", ()=>document.getElementById("importFile").click());
 document.getElementById("importFile").addEventListener("change", (e)=>{
@@ -1144,7 +1144,7 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
                           assume: data.assume, history: data.history, snapshots: data.snapshots });
         save(); renderAll(); toast("Data imported");
       }
-    }catch(err){ toast("That file doesn't look like a Copay export"); }
+    }catch(err){ toast("That file doesn't look like a PlanMath export"); }
     e.target.value = "";
   };
   reader.readAsText(file);
@@ -1158,7 +1158,7 @@ document.getElementById("addYearBtn").addEventListener("click", ()=>yearModal())
 document.getElementById("tabCompare").addEventListener("click", ()=>showTab("compare"));
 document.getElementById("tabHistory").addEventListener("click", ()=>showTab("history"));
 document.getElementById("verBadge").textContent = "v" + APP_VERSION;
-document.getElementById("verFoot").textContent = "Copay v" + APP_VERSION;
+document.getElementById("verFoot").textContent = "PlanMath v" + APP_VERSION;
 if (DEMO) document.getElementById("demoBanner").hidden = false;
 load();
 renderAll();

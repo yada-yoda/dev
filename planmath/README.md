@@ -1,15 +1,15 @@
-# Copay
+# PlanMath
 
 **Which health plan actually costs less?**
 
 A single-file health insurance cost estimator. Enter the plans you're choosing
 between — premium, deductible, out-of-pocket max, visit copays, prescription
 tiers — plus what you actually use (your prescriptions and how often you see a
-doctor), and Copay shows the true monthly and annual cost of each plan side by
+doctor), and PlanMath shows the true monthly and annual cost of each plan side by
 side. It answers the real question: is the plan with the $5-cheaper
 prescription still cheaper after its $20-higher premium?
 
-Live: https://dev.rizzo.cc/copay/ · Demo with sample data: add `?demo=1`
+Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
 
 ## Features (v0.6)
 
@@ -62,6 +62,13 @@ No accounts, no server, no analytics. Health and cost data never leaves your
 browser unless you export it yourself.
 
 ## Changelog
+
+### v0.6.2 - 2026-07-07
+
+Renamed: Copay is now PlanMath - a clearer name for what it does (the
+math across whole plans, not just copays), and it frees the word copay
+to mean only the insurance term inside the app. Address is now
+dev.rizzo.cc/planmath. Saved data carries over automatically.
 
 ### v0.6.1 - 2026-07-07
 
