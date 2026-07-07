@@ -75,4 +75,5 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 First release. Dashboard front end (Google sign-in, create/edit/pause/delete monitors, status
 filters, change-history + before/after diff view, demo mode) and the Phase 1 worker (whole-page /
 CSS-element / keyword monitoring, server-side fetch + word-level diff, Firestore snapshots, Resend
-email alerts on change, 5-minute cron). Visual screenshot diffing is planned for Phase 2.
+email alerts on change, 5-minute cron). Wired to the `spyglass-f0de2` Firebase project; ships with
+an OG share card and version-driven title. Visual screenshot diffing is planned for Phase 2.

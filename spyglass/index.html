@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass — watch any web page for changes</title>
+<title>Spyglass v0.1.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -12,7 +12,8 @@
 <meta property="og:description" content="Watch any web page for changes and get an email when it updates." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://dev.rizzo.cc/spyglass/" />
-<meta name="twitter:card" content="summary" />
+<meta property="og:image" content="https://dev.rizzo.cc/spyglass/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%234f46e5'/%3E%3Ccircle cx='16' cy='16' r='5' fill='%23fff'/%3E%3C/svg%3E" />
 
@@ -301,12 +302,12 @@
 <!-- These values are PUBLIC and safe to commit. -->
 <script>
   const FIREBASE_CONFIG = {
-    apiKey: "REPLACE_ME",
-    authDomain: "REPLACE_ME.firebaseapp.com",
-    projectId: "REPLACE_ME",
-    storageBucket: "REPLACE_ME.appspot.com",
-    messagingSenderId: "REPLACE_ME",
-    appId: "REPLACE_ME"
+    apiKey: "AIzaSyC7fTEDZPfMfPPJ-yWhatEC9h-PqKGB35Q",
+    authDomain: "spyglass-f0de2.firebaseapp.com",
+    projectId: "spyglass-f0de2",
+    storageBucket: "spyglass-f0de2.firebasestorage.app",
+    messagingSenderId: "77811070485",
+    appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
   const APP_VERSION = "0.1.0";
 </script>
@@ -586,6 +587,7 @@ function wireUi(){
     $$("#filters button").forEach(b => b.classList.remove("active"));
     e.target.classList.add("active"); activeFilter = e.target.dataset.f; renderList();
   };
+  $("#verChip").childNodes[0].nodeValue = "v" + APP_VERSION;   // chip label follows APP_VERSION
   $("#verChip").onclick = () => {
     openOverlay("#whatsnewOverlay");
     localStorage.setItem("spyglass:seenVer", APP_VERSION);
@@ -597,6 +599,8 @@ function wireUi(){
 }
 
 function boot(){
+  // Version drives the visible title (site standard: semver-in-title).
+  document.title = `Spyglass v${APP_VERSION} — watch any web page for changes`;
   wireUi();
   if(DEMO){ renderAuth(null); startData(); return; }
   if(FIREBASE_CONFIG.apiKey === "REPLACE_ME"){
