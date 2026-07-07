@@ -82,7 +82,11 @@ function defaults() {
       giftCardTypes: seedList(SEED_GIFT_CARD_TYPES)
     },
     creditScores: [],   // {id, date, score, provider}
-    rateHistory: []     // {id, date, accountId, apy}
+    rateHistory: [],    // {id, date, accountId, apy}
+    // Expected-payroll schedules: {id, name, employer, incomeCategoryId, personId,
+    // frequency, anchorDate, day2, gross, net, active} — drive missing-paycheck
+    // detection + auto period numbers.
+    paySchedules: []
   };
 }
 
@@ -142,7 +146,8 @@ function snapshot() {
     recurring: state.recurring,
     catalog: state.catalog,
     creditScores: state.creditScores,
-    rateHistory: state.rateHistory
+    rateHistory: state.rateHistory,
+    paySchedules: state.paySchedules
   };
 }
 
@@ -157,6 +162,7 @@ function apply(data) {
   state.catalog = s.catalog;
   state.creditScores = s.creditScores || [];
   state.rateHistory = s.rateHistory || [];
+  state.paySchedules = s.paySchedules || [];
   state._loaded = true;
 }
 
@@ -235,6 +241,12 @@ window.cloverStore = {
     scheduleSave(); notify(); return entry;
   },
   removeRate(id) { state.rateHistory = state.rateHistory.filter(x => x.id !== id); scheduleSave(); notify(); },
+  savePaySchedule(entry) {
+    if (entry.id) { const i = state.paySchedules.findIndex(x => x.id === entry.id); if (i >= 0) state.paySchedules[i] = entry; else state.paySchedules.push(entry); }
+    else { entry.id = mkId('sch'); state.paySchedules.push(entry); }
+    scheduleSave(); notify(); return entry;
+  },
+  removePaySchedule(id) { state.paySchedules = state.paySchedules.filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },

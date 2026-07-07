@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.15';
+const VERSION = '1.0.16';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -496,6 +496,7 @@ function renderSettings(view) {
     { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id), onRename: (id, v) => store.renameCatalog('rewardPrograms', id, v) }));
   grid.appendChild(simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
     { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
+  grid.appendChild(paySchedulesCard());
   grid.appendChild(accountDefaultsCard());
   view.appendChild(grid);
 }
@@ -1558,6 +1559,80 @@ function expenseModal(existing) {
 // ============================================================
 const PAYCHECK_STATUSES = ['Received', 'Expected', 'Late', 'Missing', 'Bounced/Returned', 'Manual deposit'];
 const PAYCHECK_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
+const PAY_FREQUENCIES = [
+  { key: 'weekly', label: 'Weekly (52 / yr)' },
+  { key: 'biweekly', label: 'Biweekly (26 / yr)' },
+  { key: 'semimonthly', label: 'Semimonthly (24 / yr)' },
+  { key: 'monthly', label: 'Monthly (12 / yr)' }
+];
+function payFreqLabel(key) { const f = PAY_FREQUENCIES.find(x => x.key === key); return f ? f.label : (key || '—'); }
+
+// ---- Pay-schedule engine: expected pay dates, missing detection, period #s ----
+function parseISODate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function isoOfDate(d) { const p = k => String(k).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+function daysBetweenISO(a, b) { const da = parseISODate(a), db = parseISODate(b); if (!da || !db) return 1e9; return Math.round((da - db) / 86400000); }
+
+// All expected pay dates for a schedule within a calendar year, ordered, with a
+// period number (ordinal within the year) and the pay-period start/end.
+function expectedPayPeriods(sch, year) {
+  const anchor = parseISODate(sch.anchorDate); if (!anchor) return [];
+  const jan1 = new Date(year, 0, 1), dec31 = new Date(year, 11, 31);
+  const out = [];
+  if (sch.frequency === 'weekly' || sch.frequency === 'biweekly') {
+    const step = sch.frequency === 'weekly' ? 7 : 14, ms = step * 86400000;
+    let d = new Date(anchor.getTime() + Math.round((jan1 - anchor) / ms) * ms);
+    while (d > jan1) d = new Date(d.getTime() - ms);
+    while (d < jan1) d = new Date(d.getTime() + ms);
+    for (; d <= dec31; d = new Date(d.getTime() + ms)) {
+      out.push({ payDate: isoOfDate(d), periodStart: isoOfDate(new Date(d.getTime() - ms)), periodEnd: isoOfDate(new Date(d.getTime() - 86400000)) });
+    }
+  } else if (sch.frequency === 'monthly') {
+    const day = anchor.getDate();
+    for (let mo = 0; mo < 12; mo++) {
+      const dim = new Date(year, mo + 1, 0).getDate();
+      out.push({ payDate: isoOfDate(new Date(year, mo, Math.min(day, dim))), periodStart: isoOfDate(new Date(year, mo, 1)), periodEnd: isoOfDate(new Date(year, mo + 1, 0)) });
+    }
+  } else if (sch.frequency === 'semimonthly') {
+    const d1 = anchor.getDate(), d2 = Number(sch.day2) || 0;   // day2 = 0 -> last day
+    for (let mo = 0; mo < 12; mo++) {
+      const dim = new Date(year, mo + 1, 0).getDate();
+      [...new Set([Math.min(d1, dim), d2 ? Math.min(d2, dim) : dim].sort((a, b) => a - b))].forEach(dd => {
+        out.push({ payDate: isoOfDate(new Date(year, mo, dd)), periodStart: isoOfDate(new Date(year, mo, 1)), periodEnd: isoOfDate(new Date(year, mo + 1, 0)) });
+      });
+    }
+  }
+  out.sort((a, b) => a.payDate.localeCompare(b.payDate));
+  out.forEach((o, i) => o.periodNum = i + 1);
+  return out;
+}
+function activeSchedules(store) { return (store.state.paySchedules || []).filter(sch => sch.active !== false && sch.anchorDate && sch.frequency); }
+function scheduleForPaycheck(store, p) {
+  if (!p.employer) return null;
+  return activeSchedules(store).find(sch => sch.employer && sch.employer.toLowerCase() === p.employer.toLowerCase()) || null;
+}
+// The pay-period info a schedule implies for a recorded paycheck's date (so the
+// period # is never blank even if it wasn't entered). Null if no match within 4d.
+function derivedPeriod(store, p) {
+  const sch = scheduleForPaycheck(store, p); if (!sch || !p.payDate) return null;
+  const periods = expectedPayPeriods(sch, yearOfPaycheck(p));
+  let best = null, bestDiff = 1e9;
+  periods.forEach(per => { const diff = Math.abs(daysBetweenISO(per.payDate, p.payDate)); if (diff < bestDiff) { bestDiff = diff; best = per; } });
+  return best && bestDiff <= 4 ? best : null;
+}
+function paycheckPeriodNum(store, p) { return p.periodNum || (derivedPeriod(store, p) || {}).periodNum || null; }
+// Expected pay dates (past/today) for the year that have no recorded paycheck.
+function missingExpectedPaychecks(store, year, recorded) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const out = [];
+  activeSchedules(store).forEach(sch => {
+    expectedPayPeriods(sch, year).forEach(per => {
+      const pd = parseISODate(per.payDate); if (!pd || pd > today) return;
+      const has = recorded.some(p => p.employer && p.employer.toLowerCase() === sch.employer.toLowerCase() && Math.abs(daysBetweenISO(p.payDate, per.payDate)) <= 4);
+      if (!has) out.push({ sch, per });
+    });
+  });
+  return out.sort((a, b) => b.per.payDate.localeCompare(a.per.payDate));
+}
 
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
 function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }
@@ -1610,6 +1685,9 @@ function renderPaychecks(view) {
   left.appendChild(el('p', 'muted', paid.length + ' received · ' + pays.length + ' total'));
   head.appendChild(left);
   const pcActions = el('div', 'head-actions');
+  const schedBtn = el('button', 'btn-ghost', activeSchedules(store).length ? '📅 Pay schedule' : '📅 Set up pay schedule');
+  schedBtn.addEventListener('click', () => { const first = activeSchedules(store)[0]; payScheduleModal(first || null); });
+  pcActions.appendChild(schedBtn);
   pcActions.appendChild(importButton('paychecks'));
   const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
   pcActions.appendChild(add);
@@ -1638,6 +1716,32 @@ function renderPaychecks(view) {
     });
     strip.appendChild(list);
     view.appendChild(strip);
+  }
+
+  // Missing paychecks: expected pay dates (per your pay schedule) with nothing
+  // recorded yet. Not shown in the All view (it's per-year).
+  if (!allMode) {
+    const missing = missingExpectedPaychecks(store, activeYear, pays);
+    if (missing.length) {
+      const strip = el('div', 'card');
+      strip.appendChild(el('h3', 'strip-title', 'Missing paychecks · ' + activeYear + ' (' + missing.length + ')'));
+      const list = el('div', 'chip-list');
+      missing.slice(0, 16).forEach(({ sch, per }) => {
+        const chip = el('div', 'chip pay-chip');
+        chip.appendChild(el('span', null, (sch.name || sch.employer) + ' · #' + per.periodNum + ' · ' + fmtDate(per.payDate) + (sch.gross ? ' · ~' + money(sch.gross) : '')));
+        const rec = el('button', 'mini', 'Record');
+        rec.addEventListener('click', () => paycheckModal({
+          payDate: per.payDate, periodNum: per.periodNum, periodStart: per.periodStart, periodEnd: per.periodEnd,
+          employer: sch.employer, incomeCategoryId: sch.incomeCategoryId, personId: sch.personId,
+          gross: sch.gross, net: sch.net, status: 'Received', method: 'Direct deposit'
+        }));
+        chip.appendChild(rec);
+        list.appendChild(chip);
+      });
+      strip.appendChild(list);
+      if (missing.length > 16) strip.appendChild(el('div', 'muted', '+' + (missing.length - 16) + ' more'));
+      view.appendChild(strip);
+    }
   }
 
   const bar = el('div', 'filter-bar');
@@ -1695,8 +1799,10 @@ function renderPaychecks(view) {
         const cat = store.incomeGroupName(p.incomeCategoryId); if (cat && cat !== '—') td.appendChild(el('div', 'acct-sub', cat));
         return td; } },
     { label: 'Person', key: 'person', value: p => store.personName(p.personId), cell: p => el('td', null, store.personName(p.personId)) },
-    { label: 'Period', key: 'period', num: true, value: p => Number(p.periodNum) || 0, cell: p => {
-        const td = el('td', 'num'); td.textContent = p.periodNum ? '#' + p.periodNum : '—';
+    { label: 'Period', key: 'period', num: true, value: p => paycheckPeriodNum(store, p) || 0, cell: p => {
+        const td = el('td', 'num');
+        if (p.periodNum) { td.textContent = '#' + p.periodNum; }
+        else { const dp = derivedPeriod(store, p); if (dp) { td.textContent = '#' + dp.periodNum; td.classList.add('muted'); td.title = 'From your pay schedule'; } else td.textContent = '—'; }
         if (p.periodStart || p.periodEnd) td.title = fmtDate(p.periodStart) + ' – ' + fmtDate(p.periodEnd); return td; } },
     { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
         const td = el('td'); const st = p.status || 'Received';
@@ -1794,8 +1900,9 @@ function paycheckModal(existing) {
   body.appendChild(stRow);
   body.appendChild(field('Notes', fNotes, 'Anything unusual — bounced check, wrong amount, deposit delay, etc.'));
 
+  const isEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit paycheck' : 'Add paycheck', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit paycheck' : 'Add paycheck', body, confirmLabel: 'Save',
     onConfirm: () => {
       const gross = parseFloat(fGross.value);
       if (isNaN(gross)) { fGross.focus(); toast('Gross is required', 'warn'); return false; }
@@ -1812,7 +1919,89 @@ function paycheckModal(existing) {
       const y = yearOfPaycheck(entry);
       const doSave = () => store.savePaycheck(y, entry);
       if (store.isYearLoaded(y)) doSave(); else store.loadYear(y).then(doSave);
-      toast(existing ? 'Paycheck updated' : 'Paycheck added');
+      toast(isEdit ? 'Paycheck updated' : 'Paycheck added');
+    }
+  });
+}
+
+// Settings card: manage pay schedules inline (add/edit/remove open the form modal).
+function paySchedulesCard() {
+  const store = window.cloverStore, s = store.state;
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Pay schedules', 'How often each job pays — powers missing-paycheck alerts + period numbers', () => payScheduleModal(null)));
+  const scheds = s.paySchedules || [];
+  if (!scheds.length) card.appendChild(el('div', 'muted', 'No pay schedules yet. Add one to track expected paychecks.'));
+  scheds.forEach(sch => {
+    const row = el('div', 'mini-row');
+    const left = el('div');
+    left.appendChild(el('div', null, (sch.name || sch.employer || 'Schedule') + (sch.active === false ? ' (inactive)' : '')));
+    left.appendChild(el('div', 'muted', payFreqLabel(sch.frequency) + (sch.anchorDate ? ' · from ' + fmtDate(sch.anchorDate) : '')));
+    row.appendChild(left);
+    const right = el('span', 'mini-right');
+    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => payScheduleModal(sch));
+    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(sch.name || sch.employer || 'schedule', () => store.removePaySchedule(sch.id)));
+    right.appendChild(edit); right.appendChild(del); row.appendChild(right);
+    card.appendChild(row);
+  });
+  return card;
+}
+
+// Add/edit a single pay schedule.
+function payScheduleModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const wages = s.incomeCategories.find(c => /wage/i.test(c.name));
+  const c = existing ? Object.assign({}, existing) : { frequency: 'biweekly', active: true, incomeCategoryId: wages ? wages.id : (s.incomeCategories[0] && s.incomeCategories[0].id), personId: s.persons[0] && s.persons[0].id };
+  const body = el('div', 'form-grid');
+
+  const empList = el('datalist'); empList.id = 'sch-emp-list';
+  [...new Set(store.yearData(activeYear).paychecks.map(x => x.employer).filter(Boolean))].forEach(e => { const o = el('option'); o.value = e; empList.appendChild(o); });
+  body.appendChild(empList);
+
+  const fName = input(c.name || '', { placeholder: 'e.g. Main Job' });
+  const fEmp = input(c.employer || '', { placeholder: 'Employer name on the paycheck', list: 'sch-emp-list' });
+  const fCat = select(s.incomeCategories.map(x => ({ value: x.id, label: x.name })), c.incomeCategoryId || (wages && wages.id));
+  const fPerson = select(s.persons.map(x => ({ value: x.id, label: x.name })), c.personId || (s.persons[0] && s.persons[0].id));
+  const fFreq = select(PAY_FREQUENCIES.map(f => ({ value: f.key, label: f.label })), c.frequency || 'biweekly');
+  const fAnchor = input(c.anchorDate || '', { type: 'date' });
+  const fDay2 = input(c.day2 != null ? c.day2 : '', { type: 'number', placeholder: 'e.g. 30 (blank = last day)' }); fDay2.min = 1; fDay2.max = 31;
+  const fGross = input(c.gross != null ? c.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
+  const fNet = input(c.net != null ? c.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
+  const cActive = checkbox('Active', c.active !== false, 'Only active schedules flag missing paychecks and fill period numbers.');
+
+  const day2Field = field('Second pay day of month', fDay2, 'For semimonthly pay, the second day each month (the first comes from the anchor date). Blank = last day of the month.');
+  const syncFreq = () => { day2Field.style.display = fFreq.value === 'semimonthly' ? '' : 'none'; };
+  fFreq.addEventListener('change', syncFreq);
+
+  body.appendChild(field('Name', fName, 'A label for this schedule — e.g. Main Job.'));
+  body.appendChild(field('Employer', fEmp, 'Must match the Employer on your paychecks so Clover can pair them up (e.g. Main Job).'));
+  const catRow = el('div', 'two-col');
+  catRow.appendChild(field('Income category', fCat, 'Which category these paychecks count toward (usually Wages).'));
+  catRow.appendChild(field('Person', fPerson, 'Whose paychecks these are.'));
+  body.appendChild(catRow);
+  body.appendChild(field('Pay frequency', fFreq, 'How often you’re paid. Biweekly = every 2 weeks (26/yr); Semimonthly = twice a month (24/yr).'));
+  body.appendChild(field('A recent / first pay date', fAnchor, 'Any known real pay date. Clover steps forward and back from this to build the whole schedule (e.g. every other Friday).'));
+  body.appendChild(day2Field);
+  const amtRow = el('div', 'two-col');
+  amtRow.appendChild(field('Expected gross', fGross, 'Typical gross per paycheck — prefilled when you record a missing one.'));
+  amtRow.appendChild(field('Expected net', fNet, 'Typical take-home per paycheck.'));
+  body.appendChild(amtRow);
+  body.appendChild(field('Status', cActive));
+  syncFreq();
+
+  openModal({
+    title: existing ? 'Edit pay schedule' : 'Add pay schedule', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      if (!fEmp.value.trim()) { fEmp.focus(); toast('Employer is required (must match your paychecks)', 'warn'); return false; }
+      if (!fAnchor.value) { fAnchor.focus(); toast('Pick a known pay date to anchor the schedule', 'warn'); return false; }
+      const entry = Object.assign(c, {
+        name: fName.value.trim() || fEmp.value.trim(), employer: fEmp.value.trim(),
+        incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
+        anchorDate: fAnchor.value, day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
+        gross: fGross.value === '' ? null : parseFloat(fGross.value),
+        net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked
+      });
+      store.savePaySchedule(entry);
+      toast(existing ? 'Schedule updated' : 'Schedule added');
     }
   });
 }

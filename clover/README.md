@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.16 — Pay schedules & missing-paycheck detection
+- New **pay schedules** (Settings, and a "Pay schedule" button on Paychecks): tell Clover
+  how a job pays — **weekly, biweekly (26/yr), semimonthly (24/yr), or monthly** — with a
+  known pay date to anchor from.
+- Paychecks then shows a **"Missing paychecks"** strip: expected pay dates you haven't
+  recorded yet, each with its period number and expected amount and a one-click **Record**
+  that prefills the paycheck form (date, period #, period start/end, gross, net, employer).
+- **Period numbers are never blank** — if a paycheck has none, the number is derived from
+  your pay schedule and shown (subtly) so periods stay consistent.
+
 ### v1.0.15 — Renewal dates auto-advance
 - A recurring bill's **renewal/due date now rolls forward automatically**. Set the day
   once (e.g. the 8th) and an active monthly bill always shows next month's 8th, an annual
