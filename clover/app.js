@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.14';
+const VERSION = '1.0.15';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1103,6 +1103,67 @@ function daysUntil(iso) {
   const d = new Date(+m[1], +m[2] - 1, +m[3]); const t = new Date(); t.setHours(0, 0, 0, 0);
   return Math.round((d - t) / 86400000);
 }
+// Months between renewals for month-based frequencies; 0 for day-based (weekly/biweekly).
+function subStepMonths(sub) {
+  const n = Math.max(1, Number(sub.interval) || 1);
+  switch (sub.frequency) {
+    case 'monthly': return 1;
+    case 'quarterly': return 3;
+    case 'semiannual': return 6;
+    case 'annual': return 12;
+    case 'everyNMonths': return n;
+    case 'everyNYears': return 12 * n;
+    default: return 0;
+  }
+}
+// The stored renewalDate is an anchor (the day it recurs — e.g. the 8th). For an
+// active recurring bill this rolls it forward by its frequency to the next date
+// that's today or later, so it never sits blank/overdue or needs a manual reset.
+// Inactive subs keep their stored date; the day-of-month is preserved (clamped).
+function nextRenewalDate(sub) {
+  const iso = sub && sub.renewalDate;
+  if (!iso) return '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso;
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  let d = new Date(+m[1], +m[2] - 1, +m[3]);
+  if (d >= today || !isSubActive(sub)) return iso;
+  const stepMonths = subStepMonths(sub);
+  let guard = 0;
+  if (!stepMonths) {
+    const step = sub.frequency === 'biweekly' ? 14 : 7;
+    const jumps = Math.floor((today - d) / (step * 86400000));
+    d = new Date(d.getTime() + jumps * step * 86400000);
+    while (d < today && guard++ < 500) d = new Date(d.getTime() + step * 86400000);
+  } else {
+    const day = +m[3]; let ty = +m[1], tm = +m[2] - 1;
+    while (d < today && guard++ < 1200) {
+      tm += stepMonths; ty += Math.floor(tm / 12); tm = ((tm % 12) + 12) % 12;
+      d = new Date(ty, tm, Math.min(day, new Date(ty, tm + 1, 0).getDate()));
+    }
+  }
+  const p = k => String(k).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+// Every day-of-month an active bill renews within the given month (for the calendar).
+function renewalDaysInMonth(sub, year, month) {
+  if (!isSubActive(sub) || !sub.renewalDate) return [];
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(sub.renewalDate); if (!m) return [];
+  const anchor = new Date(+m[1], +m[2] - 1, +m[3]);
+  const monthEnd = new Date(year, month + 1, 0);
+  if (monthEnd < anchor) return [];
+  const stepMonths = subStepMonths(sub);
+  if (!stepMonths) {
+    const step = sub.frequency === 'biweekly' ? 14 : 7;
+    const monthStart = new Date(year, month, 1);
+    const days = []; let d = new Date(anchor), guard = 0;
+    if (d < monthStart) { const gap = Math.ceil((monthStart - d) / (step * 86400000)); d = new Date(d.getTime() + gap * step * 86400000); }
+    while (d <= monthEnd && guard++ < 10) { if (d >= anchor) days.push(d.getDate()); d = new Date(d.getTime() + step * 86400000); }
+    return days;
+  }
+  const anchorIdx = anchor.getFullYear() * 12 + anchor.getMonth(), targetIdx = year * 12 + month;
+  if (targetIdx < anchorIdx || (targetIdx - anchorIdx) % stepMonths !== 0) return [];
+  return [Math.min(+m[3], monthEnd.getDate())];
+}
 
 function renderSubscriptions(view) {
   const store = window.cloverStore, s = store.state;
@@ -1171,7 +1232,7 @@ function renderSubscriptions(view) {
     { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) },
     { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) },
     { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } },
-    { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) },
+    { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) },
     { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') },
     { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
@@ -1199,14 +1260,18 @@ function sumCard(label, value, tone) {
 }
 function renewCell(r) {
   const td = el('td');
-  const d = daysUntil(r.renewalDate);
+  const active = isSubActive(r);
+  const next = active ? nextRenewalDate(r) : r.renewalDate;
+  const d = daysUntil(next);
   if (d == null) { td.textContent = '—'; return td; }
   const warn = window.cloverStore.state.settings.warnWindows || [7, 14, 30, 60];
   const maxW = Math.max.apply(null, warn);
-  td.appendChild(el('span', null, fmtDate(r.renewalDate) + ' '));
-  if (d < 0) td.appendChild(badge('Overdue', 'red'));
-  else if (d <= maxW) td.appendChild(badge('in ' + d + 'd', d <= 7 ? 'red' : 'amber'));
-  else td.appendChild(el('span', 'muted', 'in ' + d + 'd'));
+  td.appendChild(el('span', null, fmtDate(next) + ' '));
+  // Active bills always roll forward, so they're never overdue; only an inactive
+  // sub can show a past date.
+  if (active && d >= 0 && d <= maxW) td.appendChild(badge('in ' + d + 'd', d <= 7 ? 'red' : 'amber'));
+  else if (d >= 0) td.appendChild(el('span', 'muted', 'in ' + d + 'd'));
+  else td.appendChild(el('span', 'muted', -d + 'd ago'));
   return td;
 }
 
@@ -1245,7 +1310,7 @@ function subscriptionModal(existing) {
   amtRow.appendChild(field('Frequency', fFreq, 'How often you are charged. Converted to a monthly-equivalent and annual cost.'));
   body.appendChild(amtRow);
   body.appendChild(intervalWrap);
-  body.appendChild(field('Next renewal date', fRenew, 'When it next renews or is due. Drives the renewal warnings (7/14/30/60 days).'));
+  body.appendChild(field('Renewal / due date', fRenew, 'The day it recurs — e.g. the 8th. For an active bill this auto-advances each period (monthly → next month’s same day, annual → next year), so you set it once and it never goes overdue or blank. Drives the renewal warnings (7/14/30/60 days).'));
   const acctRow = el('div', 'two-col');
   acctRow.appendChild(field('Payment account', fAcct, 'Which account or card pays for this.'));
   acctRow.appendChild(field('Backup account', fBackup, 'A fallback payment method on file, if any.'));
@@ -2103,7 +2168,7 @@ function donutCard(title, map) {
 function buildWarnings(store, data, s) {
   const warn = s.settings.warnWindows || [7, 14, 30, 60];
   const maxW = Math.max.apply(null, warn);
-  const renewSoon = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(r.renewalDate) })).filter(x => x.d != null && x.d >= 0 && x.d <= maxW).sort((a, b) => a.d - b.d);
+  const renewSoon = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(nextRenewalDate(r)) })).filter(x => x.d != null && x.d >= 0 && x.d <= maxW).sort((a, b) => a.d - b.d);
   const overdue = data.paychecks.filter(p => !isPaycheckPaid(p) && p.status !== 'Bounced/Returned' && (p.status === 'Late' || p.status === 'Missing' || (p.payDate && daysUntil(p.payDate) < 0)));
   if (!renewSoon.length && !overdue.length) return null;
   const strip = el('div', 'card warn-strip');
@@ -2127,7 +2192,7 @@ function buildWarnings(store, data, s) {
 function upcomingRenewalsCard(store, s) {
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'Upcoming renewals'));
-  const items = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(r.renewalDate) })).filter(x => x.d != null && x.d >= 0).sort((a, b) => a.d - b.d).slice(0, 8);
+  const items = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(nextRenewalDate(r)) })).filter(x => x.d != null && x.d >= 0).sort((a, b) => a.d - b.d).slice(0, 8);
   if (!items.length) { card.appendChild(el('div', 'muted', 'No upcoming renewals.')); return card; }
   const list = el('div', 'mini-list');
   items.forEach(x => {
@@ -2404,7 +2469,7 @@ function calendarEvents(store, year, month) {
   const events = [];
   const yd = store.yearData(year);
   (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
-  store.state.recurring.filter(isSubActive).forEach(r => { const d = dateInMonth(r.renewalDate, year, month); if (d) events.push({ day: d, type: 'Bill', label: r.name + ' renews · ' + money(Number(r.amount) || 0), tone: 'amber' }); });
+  store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + ' renews · ' + money(Number(r.amount) || 0), tone: 'amber' })); });
   store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => { const d = dateInMonth(a.cdMaturity, year, month); if (d) events.push({ day: d, type: 'CD matures', label: a.name + (a.last4 ? ' ••' + a.last4 : '') + ' matures', tone: 'blue' }); });
   return events;
 }

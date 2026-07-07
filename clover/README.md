@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.15 — Renewal dates auto-advance
+- A recurring bill's **renewal/due date now rolls forward automatically**. Set the day
+  once (e.g. the 8th) and an active monthly bill always shows next month's 8th, an annual
+  one shows next year's date, etc. — so an active bill is never overdue or blank and you
+  never have to reset it. (Inactive/canceled bills keep their last date, shown muted.)
+- The **Calendar** now shows recurring bills on every month they land, not just the one
+  month the stored date happened to fall in.
+
 ### v1.0.14 — Net monthly income is annualized
 - The **Net monthly income** figure now sums your net pay over the trailing 12 months
   and divides by 12, so the occasional "extra" biweekly paycheck is spread evenly and
