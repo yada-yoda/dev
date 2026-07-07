@@ -63,6 +63,11 @@ browser unless you export it yourself.
 
 ## Changelog
 
+### v0.6.4 - 2026-07-07
+
+Removed the GitHub repo link from the footer — the app is a self-contained
+tool and shouldn't point back at its source repository.
+
 ### v0.6.3 - 2026-07-07
 
 Site polish to match the other projects: the version now shows in the
