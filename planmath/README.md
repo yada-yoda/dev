@@ -63,6 +63,15 @@ browser unless you export it yourself.
 
 ## Changelog
 
+### v0.6.5 - 2026-07-07
+
+No more horizontal scrollbars. Table text now wraps instead of forcing
+the table wide (long plan names were the culprit), and on narrow screens
+tables restack into per-row cards with labeled values, so nothing ever
+scrolls sideways. Also, re-importing a history JSON now updates rows that
+share an id instead of keeping the stale copy - so a corrected export
+can fix earlier data in place.
+
 ### v0.6.4 - 2026-07-07
 
 Removed the GitHub repo link from the footer — the app is a self-contained
