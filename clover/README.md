@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.19 — Merge / rename employer
+- New **⇄ Merge employers** button on Paychecks: relabel every paycheck (and any matching
+  pay schedule) from one employer name to another — e.g. rename "Main Job" to "Director of
+  Support", or merge two names into one. This fixes a schedule and its paychecks being
+  filed under different names, so the missing-paycheck detection lines up.
+
 ### v1.0.18 — Bill price-change tracking
 - Clover now remembers each bill/subscription's amount over time. When you change an
   amount, it records the new price with the date.

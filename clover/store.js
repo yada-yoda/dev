@@ -331,6 +331,22 @@ window.cloverStore = {
     if (n) { this.scheduleSaveYear(y); notify(); }
     return n;
   },
+  // Relabel/merge an employer across every loaded year's paychecks + any pay
+  // schedule that used it. Returns how many paychecks were renamed.
+  renameEmployer(oldName, newName) {
+    const o = (oldName || '').trim().toLowerCase(), n = (newName || '').trim();
+    if (!o || !n) return 0;
+    let count = 0;
+    Object.keys(state.years).forEach(yk => {
+      const d = state.years[yk]; if (!d || !d.paychecks) return;
+      let changed = false;
+      d.paychecks.forEach(p => { if ((p.employer || '').trim().toLowerCase() === o) { p.employer = n; count++; changed = true; } });
+      if (changed) this.scheduleSaveYear(+yk);
+    });
+    (state.paySchedules || []).forEach(sch => { if ((sch.employer || '').trim().toLowerCase() === o) sch.employer = n; });
+    scheduleSave(); notify();
+    return count;
+  },
 
   // --- lookups ---
   personName(id) { const p = state.persons.find(x => x.id === id); return p ? p.name : '—'; },

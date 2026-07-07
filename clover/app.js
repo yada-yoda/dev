@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.18';
+const VERSION = '1.0.19';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1747,6 +1747,11 @@ function renderPaychecks(view) {
   const schedBtn = el('button', 'btn-ghost', activeSchedules(store).length ? '📅 Pay schedule' : '📅 Set up pay schedule');
   schedBtn.addEventListener('click', () => { const first = activeSchedules(store)[0]; payScheduleModal(first || null); });
   pcActions.appendChild(schedBtn);
+  if (pays.some(p => p.employer)) {
+    const mergeBtn = el('button', 'btn-ghost', '⇄ Merge employers');
+    mergeBtn.addEventListener('click', () => employerMergeModal());
+    pcActions.appendChild(mergeBtn);
+  }
   pcActions.appendChild(importButton('paychecks'));
   const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
   pcActions.appendChild(add);
@@ -2086,6 +2091,35 @@ function payScheduleModal(existing) {
       });
       store.savePaySchedule(entry);
       toast(existing ? 'Schedule updated' : 'Schedule added');
+    }
+  });
+}
+
+// Relabel/merge an employer across all paychecks (+ matching pay schedules).
+function employerMergeModal() {
+  const store = window.cloverStore;
+  ensureYearsScanned(store);
+  const empCounts = {};
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(p => { if (p.employer) empCounts[p.employer] = (empCounts[p.employer] || 0) + 1; }));
+  const employers = Object.keys(empCounts).sort((a, b) => empCounts[b] - empCounts[a]);
+  if (!employers.length) { toast('No paychecks with an employer yet', 'warn'); return; }
+  const body = el('div', 'form-grid');
+  body.appendChild(el('p', 'muted', 'Relabel every paycheck (and any matching pay schedule) from one employer name to another — e.g. rename “Main Job” to “Director of Support”, or merge two names into one.'));
+  const fFrom = select(employers.map(e => ({ value: e, label: e + ' · ' + empCounts[e] + ' paycheck' + (empCounts[e] === 1 ? '' : 's') })), employers[0]);
+  const toList = el('datalist'); toList.id = 'emp-to-list';
+  employers.forEach(e => { const o = el('option'); o.value = e; toList.appendChild(o); });
+  body.appendChild(toList);
+  const fTo = input('', { placeholder: 'New name (or pick an existing to merge)', list: 'emp-to-list' });
+  body.appendChild(field('Rename from', fFrom, 'The employer name currently on your paychecks.'));
+  body.appendChild(field('Rename to', fTo, 'Type a new name, or choose another existing employer to merge the two together.'));
+  openModal({
+    title: 'Merge / rename employer', body, confirmLabel: 'Rename',
+    onConfirm: () => {
+      const to = fTo.value.trim();
+      if (!to) { fTo.focus(); toast('Enter the new employer name', 'warn'); return false; }
+      if (to.toLowerCase() === fFrom.value.toLowerCase()) { toast('Pick a different name', 'warn'); return false; }
+      const n = store.renameEmployer(fFrom.value, to);
+      toast('Renamed ' + n + ' paycheck' + (n === 1 ? '' : 's') + ' to “' + to + '”');
     }
   });
 }
