@@ -38,11 +38,10 @@ The first check of a monitor just records a baseline; you only get emailed on la
 2. **Authentication** → enable **Google** sign-in.
 3. **Firestore** → create database (production mode).
 4. Project settings → add a **Web app**; copy the config into `FIREBASE_CONFIG` in `index.html`.
-5. Deploy rules + indexes (from this folder):
-   ```
-   firebase deploy --only firestore:rules,firestore:indexes
-   ```
-   (or paste `firestore.rules` / create the index from `firestore.indexes.json` in the console).
+5. Deploy the rules: paste `firestore.rules` in the console (Firestore → Rules → Publish) or run
+   `firebase deploy --only firestore:rules` from this folder. No indexes are needed — the worker
+   deliberately queries per-user with single-field filters so Firestore's automatic indexes cover
+   everything.
 
 ### 2. Hosting (yada-yoda/dev monorepo)
 This folder lives at `dev/spyglass/` in the `yada-yoda/dev` repo, which already serves
