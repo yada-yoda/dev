@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DASH · dev.rizzo.cc</title>
+<meta name="version" content="0.1.0">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="theme-color" content="#050805">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23050805'/%3E%3Ctext x='5' y='24' font-family='monospace' font-size='22' fill='%2333ff66'%3E%26gt;_%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=VT323&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050805;
+  --screen:#0a120b;
+  --phos:#33ff66;
+  --phos-bright:#8dffab;
+  --phos-dim:#1d8f43;
+  --phos-faint:#0f4a24;
+  --amber:#ffb000;
+  --line:rgba(51,255,102,.28);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{
+  background:var(--bg);
+  color:var(--phos);
+  font-family:'VT323',monospace;
+  font-size:21px;line-height:1.45;
+  min-height:100vh;
+}
+body{
+  background:
+    radial-gradient(ellipse at center, #0d1a0e 0%, var(--bg) 78%) fixed;
+}
+/* CRT scanlines + vignette overlay */
+body::before{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(
+    to bottom,
+    rgba(0,0,0,0) 0px, rgba(0,0,0,0) 2px,
+    rgba(0,0,0,.22) 3px, rgba(0,0,0,.22) 4px);
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:51;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,.55) 100%);
+}
+a{color:inherit;text-decoration:none}
+::selection{background:var(--phos);color:var(--bg)}
+
+.wrap{max-width:1060px;margin:0 auto;padding:40px 22px 80px;position:relative}
+
+/* ============ Header ============ */
+.boot{color:var(--phos-dim);font-size:19px;letter-spacing:.03em;min-height:1.4em}
+.boot .ok{color:var(--phos-bright)}
+h1{
+  font-family:'Press Start 2P',monospace;
+  font-size:clamp(20px,4.4vw,34px);
+  color:var(--phos-bright);
+  text-shadow:0 0 6px rgba(51,255,102,.75), 0 0 24px rgba(51,255,102,.35);
+  margin:14px 0 6px;
+  letter-spacing:.04em;
+}
+h1 .cursor{
+  display:inline-block;width:.55em;height:1em;
+  background:var(--phos-bright);vertical-align:-.12em;margin-left:.18em;
+  animation:blink 1.06s steps(1) infinite;
+}
+@keyframes blink{50%{opacity:0}}
+.sub{
+  color:var(--phos-dim);font-size:20px;letter-spacing:.14em;text-transform:uppercase;
+}
+.sub b{color:var(--amber);font-weight:normal}
+.rule{
+  margin:22px 0 26px;color:var(--phos-faint);font-size:18px;
+  white-space:nowrap;overflow:hidden;user-select:none;
+}
+
+/* ============ Grid ============ */
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
+  gap:20px;
+}
+.card{
+  position:relative;
+  display:flex;flex-direction:column;gap:8px;
+  background:var(--screen);
+  border:1px solid var(--line);
+  padding:18px 18px 16px;
+  box-shadow:inset 0 0 22px rgba(51,255,102,.05);
+  transition:border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+/* box-drawing corner ticks */
+.card::before,.card::after{
+  content:"";position:absolute;width:10px;height:10px;pointer-events:none;
+  border-color:var(--phos);border-style:solid;
+}
+.card::before{top:-1px;left:-1px;border-width:2px 0 0 2px}
+.card::after{bottom:-1px;right:-1px;border-width:0 2px 2px 0}
+.card:hover,.card:focus-visible{
+  border-color:var(--phos);
+  box-shadow:inset 0 0 26px rgba(51,255,102,.12), 0 0 18px rgba(51,255,102,.22);
+  transform:translateY(-2px);
+  outline:none;
+}
+.card-top{display:flex;align-items:baseline;gap:10px}
+.led{
+  width:9px;height:9px;border-radius:50%;flex:none;align-self:center;
+  background:var(--phos);
+  box-shadow:0 0 6px var(--phos), 0 0 12px rgba(51,255,102,.6);
+  animation:pulse 2.6s ease-in-out infinite;
+}
+@keyframes pulse{50%{opacity:.45}}
+.card h2{
+  font-family:'Press Start 2P',monospace;
+  font-size:13px;color:var(--phos-bright);
+  text-shadow:0 0 5px rgba(51,255,102,.6);
+  letter-spacing:.03em;line-height:1.5;
+}
+.ver{
+  margin-left:auto;flex:none;
+  color:var(--amber);font-size:18px;letter-spacing:.05em;
+  text-shadow:0 0 6px rgba(255,176,0,.45);
+}
+.desc{color:var(--phos);opacity:.85;font-size:20px;min-height:2.9em}
+.card-bot{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:auto;padding-top:8px;border-top:1px dashed var(--phos-faint);
+  font-size:18px;color:var(--phos-dim);letter-spacing:.06em;
+}
+.launch{color:var(--phos-bright)}
+.launch::after{content:" >";}
+.card:hover .launch{color:var(--amber);text-shadow:0 0 6px rgba(255,176,0,.5)}
+
+/* ============ Footer ============ */
+.foot{
+  margin-top:44px;padding-top:14px;border-top:1px solid var(--phos-faint);
+  display:flex;flex-wrap:wrap;gap:6px 24px;
+  color:var(--phos-dim);font-size:18px;letter-spacing:.06em;
+}
+.foot .clock{color:var(--phos)}
+.foot a:hover{color:var(--phos-bright)}
+
+@media (prefers-reduced-motion: reduce){
+  .cursor,.led{animation:none}
+  .card,.card:hover{transform:none;transition:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="boot" id="boot" aria-hidden="true"></div>
+    <h1>DASH<span class="cursor"></span></h1>
+    <div class="sub">dev.rizzo.cc <b>//</b> active projects</div>
+    <div class="rule" aria-hidden="true">════════════════════════════════════════════════════════════════════════════════════════════</div>
+  </header>
+
+  <main class="grid" id="grid"></main>
+
+  <footer class="foot">
+    <span>DASH v<span id="dashver">0.1.0</span></span>
+    <span class="clock" id="clock">--:--:--</span>
+    <span><a href="/projects/">full project index</a></span>
+  </footer>
+
+</div>
+
+<script>
+'use strict';
+
+/* Program table. `ver` is the baked fallback; at load we scan each program's
+   own page (same origin) so the chip tracks whatever is actually deployed. */
+var PROGRAMS = [
+  { name: 'USAGE TRACKER', href: '/usage/', ver: '0.27.4', src: '/usage/index.html',
+    desc: 'Household product usage and reorder tracking, with a UPC barcode scanner.' },
+  { name: 'PAWPRINTS', href: '/pawprints/', ver: '0.49.2', src: '/pawprints/index.html',
+    desc: 'Dog care tracker: feeding, walks, potty, supplies, vet visits, and insights.' },
+  { name: 'CLOVER', href: '/clover/', ver: '1.0.15', src: '/clover/app.js',
+    desc: 'Personal finance dashboard. Accounts, spending, and recurring bills in one place.' },
+  { name: 'SCENESEED', href: '/sceneseed/', ver: '1.3.1', src: '/sceneseed/index.html',
+    desc: 'Audience suggestions for live improv shows, straight from their phones.' },
+  { name: 'ILLNESS TRACKER', href: '/sick/', ver: '0.50', src: '/sick/index.html',
+    desc: 'Symptom and illness logging with analysis and Google Calendar sync.' },
+  { name: 'PLANMATH', href: '/planmath/', ver: '0.6.2', src: '/planmath/index.html',
+    desc: 'Health plan cost estimator: compare plans against your real usage history.' }
+];
+
+/* ---- render cards ---- */
+var grid = document.getElementById('grid');
+PROGRAMS.forEach(function (p, i) {
+  var a = document.createElement('a');
+  a.className = 'card';
+  a.href = p.href;
+  a.innerHTML =
+    '<div class="card-top"><span class="led"></span><h2></h2>' +
+    '<span class="ver" data-i="' + i + '">v' + p.ver + '</span></div>' +
+    '<p class="desc"></p>' +
+    '<div class="card-bot"><span>STATUS: ONLINE</span><span class="launch">LAUNCH</span></div>';
+  a.querySelector('h2').textContent = p.name;
+  a.querySelector('.desc').textContent = p.desc;
+  grid.appendChild(a);
+});
+
+/* ---- live version scan (same-origin fetch; falls back to baked version) ---- */
+function extractVersion(text) {
+  var m =
+    text.match(/meta\s+name="version"\s+content="([^"]+)"/) ||
+    text.match(/APP_VERSION\s*=\s*["']v?([0-9][^"']*)["']/) ||
+    text.match(/const\s+VERSION\s*=\s*["']v?([0-9][^"']*)["']/);
+  return m ? m[1] : null;
+}
+if (location.protocol !== 'file:') {
+  PROGRAMS.forEach(function (p, i) {
+    fetch(p.src, { cache: 'no-cache' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (text) {
+        if (!text) return;
+        var v = extractVersion(text);
+        if (v) document.querySelector('.ver[data-i="' + i + '"]').textContent = 'v' + v;
+      })
+      .catch(function () { /* keep baked fallback */ });
+  });
+}
+
+/* ---- boot line ---- */
+var bootMsg = '> SYSTEM CHECK ......... [ OK ]  ' + PROGRAMS.length + ' PROGRAMS LOADED';
+var bootEl = document.getElementById('boot');
+var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+if (reduced) {
+  bootEl.innerHTML = bootMsg.replace('[ OK ]', '[ <span class="ok">OK</span> ]');
+} else {
+  var bi = 0;
+  (function type() {
+    bootEl.textContent = bootMsg.slice(0, ++bi);
+    if (bi < bootMsg.length) setTimeout(type, 14);
+    else bootEl.innerHTML = bootMsg.replace('[ OK ]', '[ <span class="ok">OK</span> ]');
+  })();
+}
+
+/* ---- footer clock ---- */
+var clockEl = document.getElementById('clock');
+function tick() {
+  var d = new Date();
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  clockEl.textContent = pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+}
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
