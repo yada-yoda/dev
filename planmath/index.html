@@ -3,9 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="0.6.2">
+<meta name="app-version" content="0.6.3">
 <meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
-<title>PlanMath — health plan cost estimator</title>
+<title>PlanMath v0.6.3 — health plan cost estimator</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%230f766e%22/%3E%3Crect%20x=%2214%22%20y=%2234%22%20width=%228%22%20height=%2216%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.55%22/%3E%3Crect%20x=%2228%22%20y=%2224%22%20width=%228%22%20height=%2226%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.78%22/%3E%3Crect%20x=%2242%22%20y=%2214%22%20width=%228%22%20height=%2236%22%20rx=%222%22%20fill=%22%23fff%22/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="PlanMath">
+<meta property="og:title" content="PlanMath — which health plan actually costs less?">
+<meta property="og:description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
+<meta property="og:url" content="https://dev.rizzo.cc/planmath/">
+<meta property="og:image" content="https://dev.rizzo.cc/planmath/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="PlanMath — Which health plan actually costs less?">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="PlanMath — which health plan actually costs less?">
+<meta name="twitter:description" content="Compare the real monthly and annual cost of health insurance plans, side by side.">
+<meta name="twitter:image" content="https://dev.rizzo.cc/planmath/og.png">
 <style>
 :root{
   --bg:#f4f6f8; --card:#ffffff; --ink:#1a2430; --muted:#5c6b7a; --line:#dfe5eb;
@@ -172,7 +186,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 
 <script>
 "use strict";
-const APP_VERSION = "0.6.2";
+const APP_VERSION = "0.6.3";
 const LS_KEY = "planmath_v1";
 const TIERS = [
   ["t1","Tier 1 — Generic"],
@@ -1157,6 +1171,7 @@ document.getElementById("snapshotBtn").addEventListener("click", snapshotModal);
 document.getElementById("addYearBtn").addEventListener("click", ()=>yearModal());
 document.getElementById("tabCompare").addEventListener("click", ()=>showTab("compare"));
 document.getElementById("tabHistory").addEventListener("click", ()=>showTab("history"));
+document.title = "PlanMath v" + APP_VERSION + " — health plan cost estimator"; /* single source of truth for the version */
 document.getElementById("verBadge").textContent = "v" + APP_VERSION;
 document.getElementById("verFoot").textContent = "PlanMath v" + APP_VERSION;
 if (DEMO) document.getElementById("demoBanner").hidden = false;

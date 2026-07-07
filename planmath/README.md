@@ -63,6 +63,14 @@ browser unless you export it yourself.
 
 ## Changelog
 
+### v0.6.3 - 2026-07-07
+
+Site polish to match the other projects: the version now shows in the
+browser tab title, a favicon (an ascending-bars mark echoing the cost
+chart) appears in the tab, and Open Graph / Twitter card tags plus a
+share image (og.png) give it a proper preview when the link is pasted
+into a message or social post.
+
 ### v0.6.2 - 2026-07-07
 
 Renamed: Copay is now PlanMath - a clearer name for what it does (the
