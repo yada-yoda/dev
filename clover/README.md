@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.20 — Refresh button on missing paychecks
+- The Missing-paychecks panel has a **↻ Refresh** button that re-pulls the year's data and
+  recomputes against your pay schedule — handy if a change (like merging employers, or a
+  paycheck added elsewhere) didn't show up automatically.
+
 ### v1.0.19 — Merge / rename employer
 - New **⇄ Merge employers** button on Paychecks: relabel every paycheck (and any matching
   pay schedule) from one employer name to another — e.g. rename "Main Job" to "Director of

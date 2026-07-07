@@ -284,6 +284,14 @@ window.cloverStore = {
     })();
     return state._yearLoading[y];
   },
+  // Force a re-fetch of a year from Firestore (drops the cached copy first), so a
+  // manual "refresh" picks up changes made elsewhere. Flushes any pending save first.
+  async reloadYear(y) {
+    y = String(y);
+    await this.flushYear(+y);
+    delete state.years[y];
+    return this.loadYear(y);
+  },
   scheduleSaveYear(y) {
     y = String(y);
     if (!state._uid) return;

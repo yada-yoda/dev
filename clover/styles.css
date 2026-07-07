@@ -408,7 +408,7 @@ button { font-family: inherit; cursor: pointer; }
 .net-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .sum-hint { font-size: 11px; color: var(--text-faint); margin-top: 4px; }
 .strip-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
-.missing-head { margin-bottom: 12px; }
+.missing-head { margin-bottom: 12px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .missing-head .strip-title { margin-bottom: 2px; }
 .missing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 .missing-item { border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; background: var(--surface); }

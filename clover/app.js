@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.19';
+const VERSION = '1.0.20';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1793,6 +1793,10 @@ function renderPaychecks(view) {
       mhl.appendChild(el('h3', 'strip-title', 'Missing paychecks'));
       mhl.appendChild(el('div', 'muted', missing.length + ' expected pay date' + (missing.length === 1 ? '' : 's') + ' in ' + activeYear + ' not recorded yet — click to add.'));
       mh.appendChild(mhl);
+      const refresh = el('button', 'btn-ghost', '↻ Refresh');
+      refresh.title = 'Re-pull this year and recompute against your pay schedule';
+      refresh.addEventListener('click', () => { store.reloadYear(activeYear); toast('Refreshed'); });
+      mh.appendChild(refresh);
       strip.appendChild(mh);
       const grid = el('div', 'missing-grid');
       missing.slice(0, 24).forEach(({ sch, per }) => {
