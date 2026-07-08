@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.31';
+const VERSION = '1.0.32';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -406,7 +406,11 @@ function sortableTable(cols, rows, sort, onSort, rowClass) {
       const caret = el('span', 'sort-caret', active ? (sort.dir === 'desc' ? '▼' : '▲') : '⇅');
       if (!active) caret.classList.add('idle');
       th.appendChild(caret);
-      th.addEventListener('click', () => onSort({ key: c.key, dir: (active && sort.dir === 'asc') ? 'desc' : 'asc' }));
+      th.title = 'Click to sort · again to flip · a third time to reset';
+      th.addEventListener('click', () => {
+        if (active && sort.dir === 'desc') { onSort(null); return; }   // third click = back to default
+        onSort({ key: c.key, dir: (active && sort.dir === 'asc') ? 'desc' : 'asc' });
+      });
     } else { th.textContent = c.label || ''; }
     htr.appendChild(th);
   });
@@ -624,7 +628,6 @@ function renderAccounts(view) {
   left.appendChild(el('p', 'muted', s.accounts.length + ' account' + (s.accounts.length === 1 ? '' : 's')));
   head.appendChild(left);
   const acctActions = el('div', 'head-actions');
-  acctActions.appendChild(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns'));
   const add = el('button', 'btn-primary', '+ Add account'); add.addEventListener('click', () => accountModal(null));
   acctActions.appendChild(add);
   head.appendChild(acctActions);
@@ -662,8 +665,9 @@ function renderAccounts(view) {
     view.appendChild(cal);
   }
 
+  view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
+  card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
 }
 
@@ -1232,7 +1236,7 @@ function buildSubsCol(store, key, net) {
         if (!isSubActive(r)) flags.appendChild(badge(r.status || 'Inactive', 'red'));
         else if (r.status === 'Trial') flags.appendChild(badge('Trial', 'amber'));
         if (r.autoPay) flags.appendChild(badge('Auto-pay', 'amber'));
-        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority));
+        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
         td.appendChild(flags); return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
@@ -1255,7 +1259,6 @@ function renderSubscriptions(view) {
   left.appendChild(el('p', 'muted', active.length + ' active · ' + all.length + ' total'));
   head.appendChild(left);
   const subActions = el('div', 'head-actions');
-  subActions.appendChild(columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns'));
   subActions.appendChild(importButton('subscriptions'));
   const add = el('button', 'btn-primary', '+ Add subscription'); add.addEventListener('click', () => subscriptionModal(null));
   subActions.appendChild(add);
@@ -1305,8 +1308,9 @@ function renderSubscriptions(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeRecurring(r.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
+  view.appendChild(tableTools(columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns')));
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(cols, rows, subsSort, ns => { subsSort = ns; renderView(currentRoute); }, r => isSubActive(r) ? '' : 'inactive-row'));
+  card.appendChild(sortableTable(cols, rows, subsSort, ns => { subsSort = ns || { key: 'monthly', dir: 'desc' }; renderView(currentRoute); }, r => isSubActive(r) ? '' : 'inactive-row'));
   view.appendChild(card);
 
   // Price-history chart: pick a bill and see how its amount has changed over time.
@@ -1821,6 +1825,8 @@ function columnsButton(tableKey, allCols, defaults, labels, title) {
   return b;
 }
 function paycheckColKeys(store) { return tableColKeys(store, 'paychecks', PAYCHECK_COL_LABELS, PAYCHECK_DEFAULT_COLS); }
+// Right-aligned toolbar rendered directly above a table (columns manager, etc.).
+function tableTools() { const bar = el('div', 'table-tools'); [...arguments].forEach(b => bar.appendChild(b)); return bar; }
 // Build a sortableTable column def for a given paycheck column key.
 function buildPaycheckCol(store, key) {
   switch (key) {
@@ -1914,9 +1920,6 @@ function renderPaychecks(view) {
     mergeBtn.addEventListener('click', () => employerMergeModal());
     pcActions.appendChild(mergeBtn);
   }
-  const colsBtn = el('button', 'btn-ghost', '⚙ Columns');
-  colsBtn.addEventListener('click', () => paycheckColumnsModal());
-  pcActions.appendChild(colsBtn);
   pcActions.appendChild(importButton('paychecks'));
   const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
   pcActions.appendChild(add);
@@ -2028,8 +2031,11 @@ function renderPaychecks(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(p.payDate) + ' · ' + (p.employer || 'paycheck'), () => store.removePaycheck(yearOfPaycheck(p), p.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
+  const pcColsBtn = el('button', 'btn-ghost', '⚙ Columns');
+  pcColsBtn.addEventListener('click', () => paycheckColumnsModal());
+  view.appendChild(tableTools(pcColsBtn));
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(showSel ? cols : cols.slice(1), rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => p.__expected ? 'inactive-row expected-row' : (isPaycheckPaid(p) ? '' : 'inactive-row')));
+  card.appendChild(sortableTable(showSel ? cols : cols.slice(1), rows, paycheckSort, ns => { paycheckSort = ns || { key: 'payDate', dir: 'desc' }; renderView(currentRoute); }, p => p.__expected ? 'inactive-row expected-row' : (isPaycheckPaid(p) ? '' : 'inactive-row')));
   view.appendChild(card);
 }
 
@@ -2388,9 +2394,6 @@ function renderCredit(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
-  right.appendChild(creditTab === 'credit'
-    ? columnsButton('credit', CREDIT_ALL_COLS, CREDIT_ALL_COLS, CREDIT_COL_LABELS, 'Credit score columns')
-    : columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns'));
   const add = el('button', 'btn-primary', creditTab === 'credit' ? '+ Add score' : '+ Add rate');
   add.addEventListener('click', () => creditTab === 'credit' ? creditScoreModal(null) : rateModal(null));
   right.appendChild(add);
@@ -2449,7 +2452,8 @@ function renderCreditTab(view) {
     ...tableColKeys(store, 'credit', CREDIT_COL_LABELS, CREDIT_ALL_COLS).map(k => buildCreditCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => creditScoreModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + (r.provider || 'score'), () => store.removeCreditScore(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
-  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
+  view.appendChild(tableTools(columnsButton('credit', CREDIT_ALL_COLS, CREDIT_ALL_COLS, CREDIT_COL_LABELS, 'Credit score columns')));
+  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null)); view.appendChild(card);
 }
 
 // An entry's institution, with a fallback for any legacy accountId-based rows.
@@ -2487,7 +2491,8 @@ function renderRatesTab(view) {
     ...tableColKeys(store, 'rates', RATES_COL_LABELS, RATES_ALL_COLS).map(k => buildRatesCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
-  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
+  view.appendChild(tableTools(columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns')));
+  const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null)); view.appendChild(card);
 }
 
 function creditScoreModal(existing) {
@@ -3052,7 +3057,6 @@ function renderTaxes(view) {
   left.appendChild(el('p', 'muted', years.length + ' tax year' + (years.length === 1 ? '' : 's') + ' · ' + recs.length + ' filing' + (recs.length === 1 ? '' : 's')));
   head.appendChild(left);
   const actions = el('div', 'head-actions');
-  actions.appendChild(columnsButton('taxes', TAX_ALL_COLS, TAX_DEFAULT_COLS, TAX_COL_LABELS, 'Tax history columns'));
   const add = el('button', 'btn-primary', '+ Add tax return');
   add.addEventListener('click', () => taxModal(null));
   actions.appendChild(add);
@@ -3091,8 +3095,9 @@ function renderTaxes(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove('Tax year ' + r.taxYear + (r.kind === 'amendment' ? ' amendment' : ''), () => store.removeTaxRecord(r.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
+  view.appendChild(tableTools(columnsButton('taxes', TAX_ALL_COLS, TAX_DEFAULT_COLS, TAX_COL_LABELS, 'Tax history columns')));
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(cols, recs, taxesSort, ns => { taxesSort = ns; renderView(currentRoute); }, r => r.kind === 'amendment' ? 'inactive-row' : ''));
+  card.appendChild(sortableTable(cols, recs, taxesSort, ns => { taxesSort = ns || { key: 'taxYear', dir: 'desc' }; renderView(currentRoute); }, r => r.kind === 'amendment' ? 'inactive-row' : ''));
   view.appendChild(card);
 }
 

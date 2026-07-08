@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.32 — Toolbar, colored priorities, sort reset
+- The **⚙ Columns** button now sits directly **above each table, on the right** — same
+  spot on every page (Paychecks, Bills & Subscriptions, Accounts, Credit & Rates, Taxes).
+  Layouts stay saved per account, and Reset to default is inside the manager.
+- **Priority flags are color-coded** on Bills & Subscriptions: Essential red, High amber,
+  Low green.
+- **Sorting can be reset**: click a column a third time to return to the table's default
+  sort (headers say so on hover).
+
 ### v1.0.31 — Schwab dividend import + broker templates
 - The dividend importer now fully understands **Schwab (ex-TD Ameritrade) transaction
   exports**: all their dividend spellings (Qualified Dividend, Non-Qualified Div, Qual Div
