@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.36 — Tax history CSV import / export
+- The Taxes page can now **export your history to CSV**, **import from CSV** (duplicates
+  skipped automatically), and download a **template** showing the exact format — including
+  itemized form costs and the extended/amended fields.
+
 ### v1.0.35 — Employer rows in the income grid + clearer dividend review
 - In the income **Annual grid**, the "↳ Paychecks" row under Wages/Acting now **expands
   to one row per employer**, showing what each employer paid you month by month.

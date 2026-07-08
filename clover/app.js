@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.35';
+const VERSION = '1.0.36';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3251,6 +3251,47 @@ function buildTaxCol(store, key) {
   return null;
 }
 
+// ---- Tax history CSV: export, import (with template) ----
+const TAX_CSV_HEADERS = ['Tax year', 'Filing type', 'Federal form', 'Federal outcome', 'Federal amount', 'State form', 'State outcome', 'State amount', 'Prepared by', 'Prep cost', 'Extended', 'Filed date', 'Form costs', 'Notes'];
+function csvEsc(v) { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function exportTaxesCSV(store) {
+  const rows = [TAX_CSV_HEADERS.join(',')];
+  store.state.taxRecords.forEach(r => rows.push([
+    r.taxYear, r.kind || 'original', r.fedForm, r.fedOutcome, r.fedAmount, r.stateForm, r.stateOutcome, r.stateAmount,
+    r.preparer, r.prepCost, r.extended ? 'yes' : 'no', r.filedDate,
+    (r.formCosts || []).map(f => f.form + ': ' + (f.cost != null ? f.cost : '')).join('; '), r.notes
+  ].map(csvEsc).join(',')));
+  downloadFile('clover-tax-history.csv', rows.join('\n'), 'text/csv');
+}
+const TAX_TEMPLATE_CSV = TAX_CSV_HEADERS.join(',') + '\n'
+  + '2025,original,1040,refund,1250,State 1040,owed,300,Smith CPA,225,no,2026-03-15,"1040: 150; Schedule B: 75",\n'
+  + '2025,amendment,1040-X,refund,120,State 1040-X,none,,Smith CPA,75,no,2026-06-01,,Corrected a missed 1099\n';
+function importTaxesCSV(store, rows) {
+  const g = (r, name) => { const k = Object.keys(r).find(x => x.trim().toLowerCase() === name.toLowerCase()); return k ? String(r[k]).trim() : ''; };
+  const outcome = v => /refund/i.test(v) ? 'refund' : /owed|paid/i.test(v) ? 'owed' : 'none';
+  const num = v => { const n = parseImportAmount(v); return isNaN(n) ? null : n; };
+  const existing = new Set(store.state.taxRecords.map(r => [r.taxYear, r.kind, r.fedAmount, r.stateAmount, r.filedDate].join('|')));
+  let added = 0, skipped = 0;
+  rows.forEach(r => {
+    const taxYear = parseInt(g(r, 'Tax year'), 10);
+    if (!taxYear || taxYear < 1990) { skipped++; return; }
+    const entry = {
+      taxYear, kind: /amend/i.test(g(r, 'Filing type')) ? 'amendment' : 'original',
+      fedForm: g(r, 'Federal form'), fedOutcome: outcome(g(r, 'Federal outcome')), fedAmount: num(g(r, 'Federal amount')),
+      stateForm: g(r, 'State form'), stateOutcome: outcome(g(r, 'State outcome')), stateAmount: num(g(r, 'State amount')),
+      preparer: g(r, 'Prepared by'), prepCost: num(g(r, 'Prep cost')),
+      extended: /^(y|yes|true|1|x)$/i.test(g(r, 'Extended')), filedDate: parseImportDate(g(r, 'Filed date')),
+      formCosts: g(r, 'Form costs').split(';').map(x => { const m = /^(.+?):\s*([\d.]*)$/.exec(x.trim()); return m ? { form: m[1].trim(), cost: m[2] ? parseFloat(m[2]) : null } : null; }).filter(Boolean),
+      notes: g(r, 'Notes')
+    };
+    const key = [entry.taxYear, entry.kind, entry.fedAmount, entry.stateAmount, entry.filedDate].join('|');
+    if (existing.has(key)) { skipped++; return; }
+    existing.add(key);
+    store.saveTaxRecord(entry); added++;
+  });
+  toast('Imported ' + added + ' tax record' + (added === 1 ? '' : 's') + (skipped ? ' · ' + skipped + ' skipped (duplicate or no year)' : ''));
+}
+
 function renderTaxes(view) {
   const store = window.cloverStore, s = store.state;
   const recs = s.taxRecords;
@@ -3261,6 +3302,27 @@ function renderTaxes(view) {
   left.appendChild(el('p', 'muted', years.length + ' tax year' + (years.length === 1 ? '' : 's') + ' · ' + recs.length + ' filing' + (recs.length === 1 ? '' : 's')));
   head.appendChild(left);
   const actions = el('div', 'head-actions');
+  const tmplBtn = el('button', 'btn-ghost', '⬇ Template');
+  tmplBtn.title = 'Download a sample CSV showing the import format';
+  tmplBtn.addEventListener('click', () => downloadFile('clover-tax-history-template.csv', TAX_TEMPLATE_CSV, 'text/csv'));
+  actions.appendChild(tmplBtn);
+  const impLabel = el('label', 'btn-ghost file-btn'); impLabel.textContent = '⬆ Import CSV';
+  const impIn = document.createElement('input'); impIn.type = 'file'; impIn.accept = '.csv,text/csv'; impIn.style.display = 'none';
+  impIn.addEventListener('change', async () => {
+    const file = impIn.files && impIn.files[0]; if (!file) return;
+    let Papa; try { Papa = await ensurePapa(); } catch (e) { toast('CSV parser couldn’t load', 'warn'); return; }
+    Papa.parse(file, {
+      header: true, skipEmptyLines: true,
+      complete: res => { if (!res.data.length) { toast('No rows found in that CSV', 'warn'); return; } importTaxesCSV(store, res.data); },
+      error: () => toast('Couldn’t read that CSV', 'warn')
+    });
+  });
+  impLabel.appendChild(impIn); actions.appendChild(impLabel);
+  if (recs.length) {
+    const expBtn = el('button', 'btn-ghost', '⬇ Export CSV');
+    expBtn.addEventListener('click', () => exportTaxesCSV(store));
+    actions.appendChild(expBtn);
+  }
   const add = el('button', 'btn-primary', '+ Add tax return');
   add.addEventListener('click', () => taxModal(null));
   actions.appendChild(add);
