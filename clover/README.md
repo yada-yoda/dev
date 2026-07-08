@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.42 — Raises: CSV, inflation comparison, employer profiles
+- Raises can be **imported/exported via CSV** (template included).
+- With 3+ raises at an employer, a **YoY vs inflation** table shows each raise's %,
+  that year's US inflation (CPI-U annual average), and the **real** gain/loss after
+  inflation.
+- **Employer profiles** on the Raises page: days/years employed (from a new **hire
+  date** on the pay schedule), total gross/net ever paid, estimated **total hours** and
+  current **gross/net hourly** (from a new hours-per-check field), and the salary change
+  since your first recorded raise.
+
 ### v1.0.41 — Tax returns know their state
 - Tax returns now record the **state filed in**; picking a state fills the state-form
   suggestions with that state's actual forms (e.g. IL → IL-1040, IL-1040-X, Sch IL-WIT,

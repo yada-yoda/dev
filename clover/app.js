@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.41';
+const VERSION = '1.0.42';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2345,6 +2345,8 @@ function payScheduleModal(existing) {
   const fFreq = select(PAY_FREQUENCIES.map(f => ({ value: f.key, label: f.label })), c.frequency || 'biweekly');
   const fAnchor = input(c.anchorDate || '', { type: 'date' });
   const fYearFirst = input(c.yearFirstPay || '', { type: 'date' });
+  const fHire = input(c.hireDate || '', { type: 'date' });
+  const fHours = input(c.hoursPerCheck != null ? c.hoursPerCheck : '', { type: 'number', placeholder: 'e.g. 80' }); fHours.step = '0.25';
   const fDay2 = input(c.day2 != null ? c.day2 : '', { type: 'number', placeholder: 'e.g. 30 (blank = last day)' }); fDay2.min = 1; fDay2.max = 31;
   const fGross = input(c.gross != null ? c.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
   const fNet = input(c.net != null ? c.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
@@ -2365,6 +2367,10 @@ function payScheduleModal(existing) {
   body.appendChild(catRow);
   body.appendChild(field('Pay frequency', fFreq, 'How often you’re paid. Biweekly = every 2 weeks (26/yr); Semimonthly = twice a month (24/yr).'));
   body.appendChild(field('A recent / first pay date', fAnchor, 'Any known real pay date. Clover steps forward and back from this to build the whole schedule (e.g. every other Friday).'));
+  const hireRow = el('div', 'two-col');
+  hireRow.appendChild(field('Hire date (optional)', fHire, 'When you started at this employer — powers the employed-duration stats on the employer profile (Raises page).'));
+  hireRow.appendChild(field('Hours per check (optional)', fHours, 'Typical hours worked per paycheck, if you track them (e.g. 80 for biweekly full-time). Enables total-hours and gross/net hourly breakdowns.'));
+  body.appendChild(hireRow);
   body.appendChild(field('First pay date of this year (optional)', fYearFirst, 'The first paycheck date of the current calendar year, if you know it. Period #1 anchors exactly there and the whole year lines up with your actual pay year — useful when the rhythm shifted from last year, so this year’s gross/net track your real checks rather than a projected calendar.'));
   body.appendChild(day2Field);
   const amtRow = el('div', 'two-col');
@@ -2411,7 +2417,7 @@ function payScheduleModal(existing) {
       const entry = Object.assign(c, {
         name: fName.value.trim() || employer, employer,
         incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
-        anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
+        anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', hireDate: fHire.value || '', hoursPerCheck: fHours.value === '' ? null : parseFloat(fHours.value), day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
         net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked,
         deductions: deductions.filter(x => (x.name || '').trim()).map(x => ({ name: x.name.trim(), amount: x.amount != null && !isNaN(x.amount) ? x.amount : null }))
@@ -2492,6 +2498,103 @@ function buildRaiseCol(store, key) {
   }
   return null;
 }
+// US CPI-U annual average inflation, % (2025 preliminary) — for comparing raises.
+const INFLATION_CPI = { 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2020: 1.2, 2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 2.9, 2025: 2.7 };
+const RAISES_CSV_HEADERS = ['Employer', 'Date', 'New gross per check', 'Previous gross', 'Notes'];
+const RAISES_TEMPLATE_CSV = RAISES_CSV_HEADERS.join(',') + '\n'
+  + 'Main Job,2025-04-04,2100.00,2000.00,Annual review\n'
+  + 'Main Job,2026-04-03,2307.69,2100.00,Promotion\n';
+function exportRaisesCSV(store) {
+  const rows = [RAISES_CSV_HEADERS.join(',')];
+  store.state.raises.forEach(r => rows.push([r.employer, r.date, r.amount, r.prevAmount, r.notes].map(csvEsc).join(',')));
+  downloadFile('clover-raises.csv', rows.join('\n'), 'text/csv');
+}
+function importRaisesCSV(store, rows) {
+  const g = (r, name) => { const k = Object.keys(r).find(x => x.trim().toLowerCase() === name.toLowerCase()); return k ? String(r[k]).trim() : ''; };
+  const existing = new Set(store.state.raises.map(r => (r.employer || '').toLowerCase() + '|' + (r.date || '')));
+  let added = 0, skipped = 0;
+  rows.forEach(r => {
+    const employer = g(r, 'Employer'), date = parseImportDate(g(r, 'Date'));
+    const amount = parseImportAmount(g(r, 'New gross per check'));
+    if (!employer || !date || isNaN(amount)) { skipped++; return; }
+    const key = employer.toLowerCase() + '|' + date;
+    if (existing.has(key)) { skipped++; return; }
+    existing.add(key);
+    const prev = parseImportAmount(g(r, 'Previous gross'));
+    store.saveRaise({ employer, date, amount, prevAmount: isNaN(prev) ? null : prev, notes: g(r, 'Notes') });
+    added++;
+  });
+  toast('Imported ' + added + ' raise' + (added === 1 ? '' : 's') + (skipped ? ' · ' + skipped + ' skipped' : ''));
+}
+// Employer profile: tenure, totals paid, hours, hourly, raise history summary.
+function employerProfileCard(store, emp) {
+  const sch = store.state.paySchedules.find(x => (x.employer || '').toLowerCase() === emp.toLowerCase());
+  let gross = 0, net = 0, regChecks = 0, firstPay = '', lastPay = '';
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(pc => {
+    if ((pc.employer || '').toLowerCase() !== emp.toLowerCase() || !isPaycheckPaid(pc)) return;
+    gross += Number(pc.gross) || 0; net += paycheckNet(pc);
+    if (!pc.checkType || pc.checkType === 'Regular') regChecks++;
+    if (!firstPay || pc.payDate < firstPay) firstPay = pc.payDate;
+    if (pc.payDate > lastPay) lastPay = pc.payDate;
+  }));
+  const raises = store.state.raises.filter(r => (r.employer || '').toLowerCase() === emp.toLowerCase()).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const hire = (sch && sch.hireDate) || firstPay;
+  const employed = sch ? sch.active !== false : (lastPay && daysBetweenISO(todayISO(), lastPay) <= 45);
+  const endD = employed ? todayISO() : lastPay;
+  const days = (hire && endD) ? Math.max(0, daysBetweenISO(endD, hire)) : null;
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', emp + (employed ? '' : ' · former')));
+  const list = el('div', 'mini-list');
+  const row = (l, v, sub) => { const rw = el('div', 'mini-row'); rw.appendChild(el('span', null, l)); const right = el('span'); right.appendChild(el('span', 'strong', v)); if (sub) right.appendChild(el('span', 'muted', ' ' + sub)); rw.appendChild(right); list.appendChild(rw); };
+  if (days != null) row('Employed', days + ' days', '(' + (days / 365.25).toFixed(1) + ' yrs' + (hire === (sch && sch.hireDate) ? ', since ' + fmtDate(hire) : ', from first paycheck') + (employed ? ')' : ', through last paycheck)'));
+  row('Total paid (gross)', money(gross), 'net ' + money(net));
+  row('Regular checks', String(regChecks), '');
+  if (sch && sch.hoursPerCheck) {
+    row('Total hours (est.)', (regChecks * Number(sch.hoursPerCheck)).toLocaleString('en-US'), '@ ' + sch.hoursPerCheck + ' hrs/check');
+    if (sch.gross) row('Hourly now', money(Number(sch.gross) / Number(sch.hoursPerCheck)) + '/hr gross', sch.net ? money(Number(sch.net) / Number(sch.hoursPerCheck)) + '/hr net' : '');
+  }
+  if (raises.length) {
+    const last = raises[raises.length - 1];
+    row('Raises recorded', String(raises.length), 'last ' + fmtDate(last.date));
+    // Salary difference between years (first vs latest recorded amount).
+    if (raises.length >= 2 && raises[0].amount != null && last.amount != null) {
+      const diff = Number(last.amount) - Number(raises[0].amount);
+      row('Since first recorded raise', (diff >= 0 ? '+' : '−') + money(Math.abs(diff)) + '/check', money(raises[0].amount) + ' → ' + money(last.amount));
+    }
+  }
+  card.appendChild(list);
+  return card;
+}
+// YoY raise analysis vs inflation (shown once an employer has 3+ raises).
+function raiseYoYCard(store, emp) {
+  const raises = store.state.raises.filter(r => (r.employer || '').toLowerCase() === emp.toLowerCase() && r.amount != null).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (raises.length < 3) return null;
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'YoY raises vs inflation · ' + emp));
+  const wrap = el('div', 'table-scroll'); const t = el('table', 'data-table');
+  t.innerHTML = '<thead><tr><th>Date</th><th class="num">New gross</th><th class="num">Raise %</th><th class="num">Inflation that year</th><th class="num">Real (vs inflation)</th></tr></thead>';
+  const tb = el('tbody');
+  raises.forEach((r, i) => {
+    const prev = i > 0 ? Number(raises[i - 1].amount) : (r.prevAmount != null ? Number(r.prevAmount) : null);
+    const pct = (prev && prev > 0) ? (Number(r.amount) - prev) / prev * 100 : null;
+    const yr = +String(r.date || '').slice(0, 4);
+    const infl = INFLATION_CPI[yr];
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(r.date)));
+    tr.appendChild(numCell(Number(r.amount) || 0, true));
+    const pctTd = el('td', 'num'); pctTd.appendChild(pct == null ? document.createTextNode('—') : el('span', pct >= 0 ? 'pos' : 'neg', (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%')); tr.appendChild(pctTd);
+    const inTd = el('td', 'num'); inTd.textContent = infl != null ? infl.toFixed(1) + '%' : '—'; tr.appendChild(inTd);
+    const realTd = el('td', 'num');
+    if (pct != null && infl != null) { const real = pct - infl; realTd.appendChild(el('span', real >= 0 ? 'pos' : 'neg', (real >= 0 ? '+' : '−') + Math.abs(real).toFixed(1) + '%')); realTd.title = real >= 0 ? 'Beat inflation' : 'Behind inflation'; }
+    else realTd.textContent = '—';
+    tr.appendChild(realTd);
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap);
+  card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation.'));
+  return card;
+}
+
 function renderRaises(view) {
   const store = window.cloverStore, s = store.state;
   ensureYearsScanned(store);
@@ -2500,6 +2603,18 @@ function renderRaises(view) {
   left.appendChild(el('p', 'muted', 'When each job last raised your pay, and how long between raises.'));
   head.appendChild(left);
   const actions = el('div', 'head-actions');
+  const rTmpl = el('button', 'btn-ghost', '⬇ Template');
+  rTmpl.addEventListener('click', () => downloadFile('clover-raises-template.csv', RAISES_TEMPLATE_CSV, 'text/csv'));
+  actions.appendChild(rTmpl);
+  const rImpLabel = el('label', 'btn-ghost file-btn'); rImpLabel.textContent = '⬆ Import CSV';
+  const rImpIn = document.createElement('input'); rImpIn.type = 'file'; rImpIn.accept = '.csv,text/csv'; rImpIn.style.display = 'none';
+  rImpIn.addEventListener('change', async () => {
+    const file = rImpIn.files && rImpIn.files[0]; if (!file) return;
+    let Papa; try { Papa = await ensurePapa(); } catch (e) { toast('CSV parser couldn’t load', 'warn'); return; }
+    Papa.parse(file, { header: true, skipEmptyLines: true, complete: res => { if (!res.data.length) { toast('No rows found', 'warn'); return; } importRaisesCSV(store, res.data); }, error: () => toast('Couldn’t read that CSV', 'warn') });
+  });
+  rImpLabel.appendChild(rImpIn); actions.appendChild(rImpLabel);
+  if (s.raises.length) { const rExp = el('button', 'btn-ghost', '⬇ Export CSV'); rExp.addEventListener('click', () => exportRaisesCSV(store)); actions.appendChild(rExp); }
   const detect = el('button', 'btn-ghost', '⛏ Detect from paychecks');
   detect.title = 'Scan your recorded paychecks for gross-amount changes and propose them as raises';
   detect.addEventListener('click', () => detectRaisesModal());
@@ -2529,6 +2644,13 @@ function renderRaises(view) {
       'since last raise (' + fmtDate(r.date) + ')' + (employed ? ' · counting' : ' · through last paycheck')));
   });
   view.appendChild(sum);
+
+  // Employer profiles (tenure, totals, hours/hourly) + YoY-vs-inflation analysis.
+  const profEmps = [...new Set(s.raises.map(r => (r.employer || '').trim()).filter(Boolean))];
+  const profGrid = el('div', 'dash-cols');
+  profEmps.slice(0, 4).forEach(emp => profGrid.appendChild(employerProfileCard(store, emp)));
+  if (profEmps.length) view.appendChild(profGrid);
+  profEmps.forEach(emp => { const yoy = raiseYoYCard(store, emp); if (yoy) view.appendChild(yoy); });
 
   const cols = [
     ...tableColKeys(store, 'raises', RAISE_COL_LABELS, RAISE_DEFAULT_COLS).map(k => buildRaiseCol(store, k)).filter(Boolean),
