@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.50';
+const VERSION = '1.0.51';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -76,7 +76,7 @@ wireModal();
 
 // Re-render the active view whenever store data changes.
 if (window.cloverStore) {
-  window.cloverStore.subscribe(() => { storeReady = window.cloverStore.isLoaded(); if (currentRoute) renderView(currentRoute); });
+  window.cloverStore.subscribe(() => { storeReady = window.cloverStore.isLoaded(); refreshYearOptions(); if (currentRoute) renderView(currentRoute); });
 }
 
 window.addEventListener('cloverAuthChanged', (e) => {
@@ -226,15 +226,37 @@ function deniedPanel() {
 }
 
 // ---------- period selectors ----------
+// Every year selector in the app draws from this one list: 2020 through next
+// year automatically (rolls forward each January), plus any years added
+// manually in Settings -> Years (for back-filling older history).
+function yearsAvailable() {
+  const thisYear = new Date().getFullYear();
+  const ys = new Set();
+  for (let y = thisYear + 1; y >= 2020; y--) ys.add(y);
+  const st = window.cloverStore && window.cloverStore.state;
+  (((st && st.settings) || {}).extraYears || []).forEach(y => { if (+y) ys.add(+y); });
+  return [...ys].sort((a, b) => b - a);
+}
+function refreshYearOptions() {
+  const ySel = document.getElementById('sel-year');
+  if (!ySel || !ySel.options.length) return;
+  const want = yearsAvailable();
+  const have = [...ySel.options].map(o => +o.value);
+  if (want.length === have.length && want.every((y, i) => y === have[i])) return;
+  const cur = +ySel.value;
+  ySel.innerHTML = '';
+  want.forEach(y => { const o = document.createElement('option'); o.value = y; o.textContent = y; ySel.appendChild(o); });
+  ySel.value = String(want.includes(cur) ? cur : new Date().getFullYear());
+}
 function buildPeriodSelectors() {
   const ySel = document.getElementById('sel-year');
   const mSel = document.getElementById('sel-month');
   const now = new Date();
   const thisYear = now.getFullYear();
-  for (let y = thisYear + 1; y >= 2020; y--) {
+  yearsAvailable().forEach(y => {
     const o = document.createElement('option'); o.value = y; o.textContent = y;
     if (y === thisYear) o.selected = true; ySel.appendChild(o);
-  }
+  });
   const months = ['All','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   months.forEach((m, i) => {
     const o = document.createElement('option'); o.value = i; o.textContent = m;
@@ -260,15 +282,14 @@ function ensureYearsScanned(store) {
   if (_yearsScanned) return;
   const cur = new Date().getFullYear();
   let allLoaded = true;
-  for (let y = cur + 1; y >= 2020; y--) { if (!store.isYearLoaded(y)) { allLoaded = false; store.loadYear(y); } }
+  for (const y of yearsAvailable()) { if (!store.isYearLoaded(y)) { allLoaded = false; store.loadYear(y); } }
   if (allLoaded) _yearsScanned = true;
 }
 // A row of year tabs for a per-year section, shown only when >1 year has data.
 function yearTabs(store, section) {
   ensureYearsScanned(store);
-  const cur = new Date().getFullYear();
   const years = [];
-  for (let y = cur + 1; y >= 2020; y--) {
+  for (const y of yearsAvailable()) {
     if (!store.isYearLoaded(y)) continue;
     const d = store.yearData(y);
     const has = section === 'income' ? (d.income.length || d.paychecks.length)
@@ -516,7 +537,39 @@ function renderSettings(view) {
     { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
   grid.appendChild(paySchedulesCard());
   grid.appendChild(accountDefaultsCard());
+  grid.appendChild(yearsCard());
   view.appendChild(grid);
+}
+
+function yearsCard() {
+  const store = window.cloverStore;
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Years', 'Which years appear in year dropdowns and tabs'));
+  card.appendChild(el('p', 'muted', '2020 through next year are always available and roll forward automatically every January — nothing to maintain. Add older years here only if you want to back-fill history from before 2020 (e.g. importing old spreadsheets).'));
+  const list = el('div', 'chip-list');
+  const extra = (store.state.settings.extraYears || []).slice().sort((a, b) => b - a);
+  if (!extra.length) list.appendChild(el('div', 'muted', 'No extra years added.'));
+  extra.forEach(y => {
+    const chip = el('div', 'chip');
+    chip.appendChild(el('span', 'chip-name', String(y)));
+    const x = el('button', 'chip-x', '✕'); x.title = 'Remove this year from the dropdowns (its data is kept)';
+    x.addEventListener('click', () => store.removeExtraYear(y));
+    chip.appendChild(x); list.appendChild(chip);
+  });
+  card.appendChild(list);
+  const row = el('div', 'io-actions');
+  const yIn = input('', { type: 'number', placeholder: 'e.g. 2018' }); yIn.min = 1980; yIn.max = 2100; yIn.style.maxWidth = '10em';
+  const add = el('button', 'btn-ghost', '＋ Add year');
+  add.addEventListener('click', () => {
+    const v = Math.floor(+yIn.value);
+    if (!v || v < 1980 || v > 2100) { toast('Enter a year between 1980 and 2100', 'warn'); return; }
+    if (yearsAvailable().includes(v)) { toast(v + ' is already available', 'warn'); yIn.value = ''; return; }
+    store.addExtraYear(v); yIn.value = '';
+    toast(v + ' added to the year dropdowns');
+  });
+  row.appendChild(yIn); row.appendChild(add);
+  card.appendChild(row);
+  return card;
 }
 
 function accountDefaultsCard() {
@@ -1139,19 +1192,29 @@ function incomeModal(existing) {
   divWrap.appendChild(field('Price', fPrice, 'Share price at reinvestment, if applicable.'));
 
   // Reward-specific fields (shown when the category looks like Rewards).
-  const rwSrcList = el('datalist'); rwSrcList.id = 'rw-src-list';
-  // Your reward programs from Settings → catalog come first, then common issuers.
-  [...new Set(((s.catalog && s.catalog.rewardPrograms) || []).map(p => p.name)
-    .concat(['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal']))]
-    .forEach(v => { const o = el('option'); o.value = v; rwSrcList.appendChild(o); });
+  // Program is a real dropdown so your Settings → Reward programs list is
+  // visible up front (a type-ahead suggestion box hid it too well).
+  const rwPrograms = [...new Set(((s.catalog && s.catalog.rewardPrograms) || []).map(pr => pr.name).filter(Boolean))];
+  const rwCommon = ['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal'].filter(v => !rwPrograms.includes(v));
+  const curRwSrc = e.rewardSource || '';
+  const rwKnownSrc = !curRwSrc || rwPrograms.includes(curRwSrc) || rwCommon.includes(curRwSrc);
+  const fRwSel = select([{ value: '', label: '— Select program —' }]
+    .concat(rwPrograms.map(n => ({ value: n, label: n })))
+    .concat(rwCommon.map(n => ({ value: n, label: n })))
+    .concat([{ value: '__other', label: 'Other / type manually…' }]), rwKnownSrc ? curRwSrc : '__other');
+  const fRwOther = input(rwKnownSrc ? '' : curRwSrc, { placeholder: 'Program name' });
+  const rwOtherWrap = el('div'); rwOtherWrap.style.marginTop = '6px';
+  rwOtherWrap.appendChild(fRwOther);
+  rwOtherWrap.style.display = rwKnownSrc ? 'none' : '';
+  fRwSel.addEventListener('change', () => { rwOtherWrap.style.display = fRwSel.value === '__other' ? '' : 'none'; if (fRwSel.value === '__other') fRwOther.focus(); });
+  const rwSrcNode = el('div'); rwSrcNode.appendChild(fRwSel); rwSrcNode.appendChild(rwOtherWrap);
   const rwTypeList = el('datalist'); rwTypeList.id = 'rw-type-list';
   ['Cash back', 'Statement credit', 'Gift card', 'Crypto', 'Points', 'Miles', 'Referral bonus'].forEach(v => { const o = el('option'); o.value = v; rwTypeList.appendChild(o); });
-  body.appendChild(rwSrcList); body.appendChild(rwTypeList);
-  const fRwSrc = input(e.rewardSource || '', { placeholder: 'e.g. Chase, Coinbase, Fetch', list: 'rw-src-list' });
+  body.appendChild(rwTypeList);
   const fRwType = input(e.rewardType || '', { placeholder: 'e.g. Cash back, Gift card', list: 'rw-type-list' });
   const fOrderConf = input(e.orderConf || '', { placeholder: 'optional' });
   const rwWrap = el('div', 'div-fields');
-  rwWrap.appendChild(field('Reward program', fRwSrc, 'Which program or card the reward came from. Your reward programs from Settings appear as suggestions, plus common issuers.'));
+  rwWrap.appendChild(field('Reward program', rwSrcNode, 'Which program or card the reward came from — your reward programs from Settings are listed first, then common issuers. Pick Other to type a new one.'));
   rwWrap.appendChild(field('Reward type', fRwType, 'What kind of reward it is — e.g. Cash back, Statement credit, Gift card, Crypto.'));
   rwWrap.appendChild(field('Order confirmation #', fOrderConf, 'If the reward came with an order or confirmation number (gift-card redemptions often do), keep it here for reference.'));
 
@@ -1223,7 +1286,7 @@ function incomeModal(existing) {
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
-        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim(), orderConf: fOrderConf.value.trim(),
+        rewardSource: (fRwSel.value === '__other' ? fRwOther.value : fRwSel.value).trim(), rewardType: fRwType.value.trim(), orderConf: fOrderConf.value.trim(),
         otherType: fOtType.value.trim(), description: fDesc.value.trim()
       });
       store.saveIncome(activeYear, entry);
@@ -2069,7 +2132,7 @@ function renderPaychecks(view) {
     ensureYearsScanned(store);
     const cur = new Date().getFullYear();
     pays = [];
-    for (let y = cur + 1; y >= 2020; y--) if (store.isYearLoaded(y)) pays = pays.concat(store.yearData(y).paychecks);
+    for (const y of yearsAvailable()) if (store.isYearLoaded(y)) pays = pays.concat(store.yearData(y).paychecks);
   } else {
     if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
     pays = store.yearData(activeYear).paychecks;
@@ -3290,10 +3353,15 @@ function pagePanelState(store, pageKey, defs) {
   const pp = store.state.settings.pagePanels || {};
   const saved = pageKey === 'dashboard' ? (pp.dashboard || store.state.settings.dashPanels) : pp[pageKey];
   if (Array.isArray(saved) && saved.length) {
-    const known = saved.filter(p => defs.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c, w: (p.w === 1 || p.w === 2) ? p.w : 0 }));
-    if (known.length) return known;
+    const entries = saved.filter(p => defs.some(d => d.key === p.k))
+      .map(p => ({ k: p.k, c: !!p.c, w: (p.w === 1 || p.w === 2) ? p.w : 0, off: p.off ? 1 : 0 }));
+    // Panels shipped after this layout was saved won't be in it — surface
+    // them at the end instead of hiding them forever. Removing a panel keeps
+    // an off-flagged entry, so deliberate removals stay removed.
+    defs.forEach(d => { if (!entries.some(p => p.k === d.key)) entries.push({ k: d.key, c: false, w: 0, off: 0 }); });
+    return entries;
   }
-  return defs.map(d => ({ k: d.key, c: false }));
+  return defs.map(d => ({ k: d.key, c: false, w: 0, off: 0 }));
 }
 function dashPanelState(store) { return pagePanelState(store, 'dashboard', DASH_PANEL_DEFS); }
 function dashKpisBody(ctx) {
@@ -3359,7 +3427,7 @@ function dashPanel(store, def, entry, state, ctx, opts) {
     wBtn.addEventListener('click', ev => { ev.stopPropagation(); entry.w = width === 2 ? 1 : 2; save(state); });
     head.appendChild(wBtn);
     const x = el('button', 'dph-x', '✕'); x.title = 'Remove this panel';
-    x.addEventListener('click', ev => { ev.stopPropagation(); save(state.filter(p => p.k !== def.key)); });
+    x.addEventListener('click', ev => { ev.stopPropagation(); entry.off = 1; save(state); });
     head.appendChild(x);
   }
   head.addEventListener('click', () => { entry.c = !entry.c; save(state); });
@@ -3416,15 +3484,16 @@ function renderDashboard(view) {
   if (dashUnlocked) {
     const addRow = el('div', 'dash-add-row');
     addRow.appendChild(el('span', 'muted', 'Drag panels to reorder · ✕ removes · click a header to collapse.'));
-    DASH_PANEL_DEFS.filter(d => !state.some(p => p.k === d.key)).forEach(d => {
+    DASH_PANEL_DEFS.filter(d => state.some(p => p.k === d.key && p.off)).forEach(d => {
       const b = el('button', 'btn-ghost', '＋ ' + d.title);
-      b.addEventListener('click', () => store.setDashPanels(state.concat([{ k: d.key, c: false }])));
+      b.addEventListener('click', () => { const en = state.find(p => p.k === d.key); en.off = 0; store.setDashPanels(state); });
       addRow.appendChild(b);
     });
     view.appendChild(addRow);
   }
   const grid = el('div', 'dash-panels');
   state.forEach(entry => {
+    if (entry.off) return;
     const def = DASH_PANEL_DEFS.find(d => d.key === entry.k); if (!def) return;
     grid.appendChild(dashPanel(store, def, entry, state, ctx));
   });
@@ -4019,15 +4088,16 @@ function renderReports(view) {
   if (reportsUnlocked) {
     const addRow = el('div', 'dash-add-row');
     addRow.appendChild(el('span', 'muted', 'Drag panels to reorder · ✕ removes · click a header to collapse.'));
-    REPORT_PANEL_DEFS.filter(d => !state.some(px => px.k === d.key)).forEach(d => {
+    REPORT_PANEL_DEFS.filter(d => state.some(px => px.k === d.key && px.off)).forEach(d => {
       const b = el('button', 'btn-ghost', '＋ ' + d.title);
-      b.addEventListener('click', () => store.setPagePanels('reports', state.concat([{ k: d.key, c: false }])));
+      b.addEventListener('click', () => { const en = state.find(px => px.k === d.key); en.off = 0; store.setPagePanels('reports', state); });
       addRow.appendChild(b);
     });
     view.appendChild(addRow);
   }
   const grid = el('div', 'dash-panels');
   state.forEach(entry => {
+    if (entry.off) return;
     const def = REPORT_PANEL_DEFS.find(d => d.key === entry.k); if (!def) return;
     grid.appendChild(dashPanel(store, def, entry, state, ctx, opts));
   });
@@ -4053,7 +4123,7 @@ function yoyCell(r, key) {
 }
 function yoyOverview(store) {
   const curYear = new Date().getFullYear();
-  const years = []; for (let y = curYear; y >= 2020; y--) years.push(y);
+  const years = yearsAvailable().filter(y => y <= curYear);
   const missing = years.filter(y => !store.isYearLoaded(y));
   const card = el('div', 'card');
   const yh = el('div', 'view-head');

@@ -45,6 +45,31 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.51 — Recovered items lost to a usage-limit cutoff
+
+Three requests from earlier in the build got dropped when a session hit its
+usage limit; this release closes them out.
+
+- **New dashboard panels now actually show up.** Panels added in later
+  releases (like "💳 Best card to use today" and "Taxes") never appeared if
+  you had already customized your dashboard layout — the saved layout didn't
+  know about them. Saved layouts now surface newly shipped panels at the end
+  automatically, and removing a panel is remembered properly, so deliberate
+  removals stay removed. Same fix applies to Reports panels. One-time note:
+  any panel you removed before this release will reappear once — remove it
+  again and it sticks.
+- **Reward program is now a real dropdown.** When adding a Rewards income
+  entry, the program field previously used a type-ahead suggestion box that
+  hid your list too well. It's now a proper dropdown with your reward
+  programs from Settings listed first, then common issuers, plus an "Other /
+  type manually" option for one-offs.
+- **Years, explained and extendable.** The top-bar year dropdown (and every
+  year tab strip) always covers 2020 through next year and rolls forward
+  automatically every January — nothing to maintain. New Settings → Years
+  card lets you add older years (for back-filling pre-2020 history from old
+  spreadsheets); added years appear everywhere years are offered, and
+  removing one just hides it from the dropdowns without touching its data.
+
 ### v1.0.50 — Default subcategories (HOA gets a home) + missing Bills & Subs columns
 
 - Fresh installs now seed useful default subcategories on the expense

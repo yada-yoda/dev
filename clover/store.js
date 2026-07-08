@@ -85,7 +85,8 @@ function defaults() {
       paycheckCols: null,  // legacy (pre-1.0.24) paycheck column list
       tableCols: {},       // per-table ordered visible-column lists, keyed by table
       dashPanels: null,    // legacy dashboard panel layout [{k, c}]
-      pagePanels: {}       // per-page panel layouts { pageKey: [{k, c}] }
+      pagePanels: {},      // per-page panel layouts { pageKey: [{k, c, w, off}] }
+      extraYears: []       // user-added years beyond the automatic 2020..next-year range
     },
     // The "self" person is renamed at runtime to "Me (<Google first name>)" —
     // the real name is never hard-coded here (public repo); it comes from the
@@ -257,10 +258,21 @@ window.cloverStore = {
     else delete state.settings.tableCols[tableKey];
     scheduleSave(); notify();
   },
-  setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0 })) : null; scheduleSave(); notify(); },
+  setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0, off: p.off ? 1 : 0 })) : null; scheduleSave(); notify(); },
   setPagePanels(pageKey, arr) {
     if (!state.settings.pagePanels) state.settings.pagePanels = {};
-    state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0 })) : null;
+    state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0, off: p.off ? 1 : 0 })) : null;
+    scheduleSave(); notify();
+  },
+  addExtraYear(y) {
+    y = Math.floor(+y);
+    if (!y || y < 1980 || y > 2100) return false;
+    if (!state.settings.extraYears) state.settings.extraYears = [];
+    if (!state.settings.extraYears.includes(y)) { state.settings.extraYears.push(y); scheduleSave(); notify(); }
+    return true;
+  },
+  removeExtraYear(y) {
+    state.settings.extraYears = (state.settings.extraYears || []).filter(v => v !== +y);
     scheduleSave(); notify();
   },
 
