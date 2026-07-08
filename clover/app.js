@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.34';
+const VERSION = '1.0.35';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -57,6 +57,7 @@ let paycheckAllYears = false;      // paychecks "All" tab: show every year at on
 let paycheckView = 'current';      // paychecks table: 'current' (+missing) | 'upcoming'
 let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
+const expandedPcEmployers = new Set();   // income grid: category ids whose Paychecks row shows per-employer detail
 const expandedExpenseGroups = new Set();
 
 // ---------- boot ----------
@@ -867,7 +868,7 @@ function incomeGrid(data) {
   const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += amountOf(e); }); return m; };
   const addRow = (cls, label, monthly, onClick, caret) => {
     const tr = el('tr', cls);
-    const c0 = el('td', cls === 'sub-row' ? 'sub-name' : 'grp-name');
+    const c0 = el('td', cls.includes('sub-row') ? 'sub-name' : 'grp-name');
     if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
     else c0.textContent = label;
     if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
@@ -907,7 +908,24 @@ function incomeGrid(data) {
         const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
         if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
       }
-      if (hasPc) tb.appendChild(addRow('sub-row', '↳ Paychecks', pcMonthly));
+      if (hasPc) {
+        // "Paychecks" itself expands into one row per employer, with each
+        // employer's monthly gross — e.g. Wages → Paychecks → Main Job / gigs.
+        const pcOpen = expandedPcEmployers.has(g.id);
+        tb.appendChild(addRow('sub-row', '↳ Paychecks', pcMonthly,
+          () => { pcOpen ? expandedPcEmployers.delete(g.id) : expandedPcEmployers.add(g.id); renderView(currentRoute); },
+          pcOpen ? '▾' : '▸'));
+        if (pcOpen) {
+          const catChecks = data.paychecks.filter(isPaycheckPaid).filter(p => (p.incomeCategoryId || '') === g.id);
+          const emps = [...new Set(catChecks.map(p => (p.employer || '').trim() || '(no employer)'))].sort((a, b) => a.localeCompare(b));
+          emps.forEach(emp => {
+            const m = new Array(12).fill(0);
+            catChecks.filter(p => ((p.employer || '').trim() || '(no employer)') === emp)
+              .forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p.gross) || 0; });
+            tb.appendChild(addRow('sub-row emp-row', emp, m));
+          });
+        }
+      }
     }
   });
 
@@ -1523,7 +1541,7 @@ function expenseGrid(data) {
   const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += expenseAmount(e); }); return m; };
   const addRow = (cls, label, monthly, onClick, caret) => {
     const tr = el('tr', cls);
-    const c0 = el('td', cls === 'sub-row' ? 'sub-name' : 'grp-name');
+    const c0 = el('td', cls.includes('sub-row') ? 'sub-name' : 'grp-name');
     if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
     else c0.textContent = label;
     if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
@@ -3948,17 +3966,19 @@ const BROKER_PARSERS = [
   {
     key: 'm1', name: 'M1 Finance',
     detect: h => h.includes('Transaction Type') && h.includes('Symbol') && h.includes('Amount'),
+    dateNote: 'Dates shown use each row’s “Date” column (not “Posted Date”).',
     parse: rows => {
       const divs = [], buys = [], fees = [];
-      rows.forEach(r => {
+      rows.forEach((r, i) => {
+        const row = i + 2;   // spreadsheet row number (header = row 1)
         const type = String(r['Transaction Type'] || '').toUpperCase();
         const date = parseImportDate(r['Date'] || r['Posted Date']);
         const symbol = String(r['Symbol'] || '').trim().toUpperCase();
         const amt = parseImportAmount(r['Amount']);
         if (!date || isNaN(amt)) return;
-        if (type === 'DIVIDEND' && amt > 0) divs.push({ date, symbol, amount: amt, action: '', desc: r['Description'] || '' });
+        if (type === 'DIVIDEND' && amt > 0) divs.push({ date, symbol, amount: amt, action: '', desc: r['Description'] || '', row });
         else if (type === 'PURCHASED' && symbol) buys.push({ date, symbol });
-        else if (type === 'OTHER' && symbol && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: r['Description'] || '' });
+        else if (type === 'OTHER' && symbol && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: r['Description'] || '', row });
       });
       return { divs, buys, fees };
     }
@@ -3971,9 +3991,11 @@ const BROKER_PARSERS = [
     // purpose — interest is tracked separately and must not double-log.
     key: 'schwab', name: 'Charles Schwab',
     detect: h => h.includes('Action') && h.includes('Symbol') && h.includes('Amount'),
+    dateNote: 'Dates use the “Date” column; any “as of …” suffix is ignored.',
     parse: rows => {
       const divs = [], buys = [], fees = [];
-      rows.forEach(r => {
+      rows.forEach((r, i) => {
+        const row = i + 2;   // spreadsheet row number (header = row 1)
         const action = String(r['Action'] || '').trim();
         const date = parseImportDate(String(r['Date'] || '').split(' as of')[0]);
         const symbol = String(r['Symbol'] || '').trim().toUpperCase();
@@ -3982,9 +4004,9 @@ const BROKER_PARSERS = [
         if (/reinvest shares/i.test(action) || /^buy$/i.test(action)) { if (symbol) buys.push({ date, symbol }); return; }
         if (/reinvestment adj|cash in lieu|interest|transfer|journaled|litigation|split|sell|misc/i.test(action)) return;
         if (/\bdiv(idend)?\b/i.test(action) && !isNaN(amt) && amt > 0) {
-          divs.push({ date, symbol, amount: amt, action, desc: r['Description'] || '', reinvested: /reinvest/i.test(action) });
+          divs.push({ date, symbol, amount: amt, action, desc: r['Description'] || '', reinvested: /reinvest/i.test(action), row });
         } else if (/fee|adr|foreign tax paid/i.test(action) && !isNaN(amt) && amt < 0 && symbol) {
-          fees.push({ date, symbol, amount: Math.abs(amt), desc: (action + ' — ' + (r['Description'] || '')).trim() });
+          fees.push({ date, symbol, amount: Math.abs(amt), desc: (action + ' — ' + (r['Description'] || '')).trim(), row });
         }
       });
       return { divs, buys, fees };
@@ -4025,22 +4047,26 @@ function analyzeDividendFile(store, rows, headers, filename) {
     if (!explicit) d.reinvested = parsed.buys.some(b => b.symbol === d.symbol && daysBetweenISO(b.date, d.date) >= 0 && daysBetweenISO(b.date, d.date) <= 14);
     d.qualified = /non-?qual/i.test(d.action) ? 'Non-qualified' : /\bqual/i.test(d.action) ? 'Qualified' : '';
   });
-  // Flag duplicates: already recorded (DB) or repeated within the file.
+  // Flag duplicates: already recorded (DB) or repeated within the file. For
+  // in-file repeats, remember the first occurrence's spreadsheet row so the
+  // review can say exactly which two rows to compare.
   const dbKeys = existingDividendKeys(store);
-  const seenInFile = new Set();
+  const firstRowByKey = new Map();
   parsed.divs.forEach((d, i) => {
     d.uid = i; const k = divKey(d);
-    d.dup = dbKeys.has(k) ? 'db' : seenInFile.has(k) ? 'file' : '';
-    seenInFile.add(k);
+    if (dbKeys.has(k)) d.dup = 'db';
+    else if (firstRowByKey.has(k)) { d.dup = 'file'; d.dupRow = firstRowByKey.get(k); }
+    else d.dup = '';
+    if (!firstRowByKey.has(k)) firstRowByKey.set(k, d.row);
   });
-  return { filename, broker: parser.name, divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
+  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
 }
 function dividendReviewCard(store) {
   const st = divImportState, s = store.state;
   ensureYearsScanned(store);
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'Import dividends — ' + st.broker));
-  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.divs.length + ' dividend' + (st.divs.length === 1 ? '' : 's') + ' found · ' + st.buys.length + ' purchases ignored (only used to tag reinvestment) · ' + st.fees.length + ' related fee' + (st.fees.length === 1 ? '' : 's') + '.'));
+  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.divs.length + ' dividend' + (st.divs.length === 1 ? '' : 's') + ' found · ' + st.buys.length + ' purchases ignored (only used to tag reinvestment) · ' + st.fees.length + ' related fee' + (st.fees.length === 1 ? '' : 's') + '.' + (st.dateNote ? ' ' + st.dateNote : '')));
 
   const divCat = s.incomeCategories.find(c => /dividend/i.test(c.name));
   if (!divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
@@ -4059,9 +4085,14 @@ function dividendReviewCard(store) {
     const list = el('div', 'mini-list');
     flagged.forEach(d => {
       const row = el('div', 'mini-row');
-      const left = el('span');
-      left.appendChild(document.createTextNode(fmtDate(d.date) + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' '));
-      left.appendChild(badge(d.dup === 'db' ? 'already recorded' : 'duplicate in file', 'amber'));
+      const left = el('div');
+      const top = el('span');
+      top.appendChild(document.createTextNode(fmtDate(d.date) + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' — CSV row ' + d.row + ' '));
+      top.appendChild(badge(d.dup === 'db' ? 'already recorded' : 'duplicate in file', 'amber'));
+      left.appendChild(top);
+      left.appendChild(el('div', 'acct-sub', d.dup === 'file'
+        ? 'Same date + stock + amount as CSV row ' + d.dupRow + ' (which will import) — open both rows in Excel to compare.'
+        : 'Matches a dividend already recorded in Clover for this date, stock, and amount.'));
       row.appendChild(left);
       const choice = select([{ value: 'skip', label: 'Merge (skip)' }, { value: 'add', label: 'Add as separate' }], st.choices[d.uid] || 'skip');
       choice.addEventListener('change', () => { st.choices[d.uid] = choice.value; renderView(currentRoute); });
@@ -4073,9 +4104,20 @@ function dividendReviewCard(store) {
 
   if (st.fees.length) {
     const feeCats = s.expenseCategories;
-    if (!st.feeCat) { const guess = feeCats.find(c => /invest|stock|fee|other/i.test(c.name)) || feeCats[0]; st.feeCat = guess ? guess.id : ''; }
+    if (!st.feeCat) { const guess = feeCats.find(c => /invest/i.test(c.name)) || feeCats.find(c => /fee/i.test(c.name)) || feeCats.find(c => /other/i.test(c.name)) || feeCats[0]; st.feeCat = guess ? guess.id : ''; }
+    card.appendChild(el('h3', 'strip-title', 'Dividend-related fees (' + st.fees.length + ')'));
+    card.appendChild(el('p', 'muted', 'These are NOT dividends — they’re small debits the broker charged against a dividend-paying stock (ADR management fees, foreign tax). They only import if you tick the box below, as expenses in the category you pick. The broker and stock go in each expense’s note.'));
+    const feeList = el('div', 'mini-list');
+    st.fees.slice(0, 8).forEach(f => {
+      const rw = el('div', 'mini-row');
+      rw.appendChild(el('span', null, fmtDate(f.date) + ' · ' + (f.symbol || '—') + ' · −' + money(f.amount) + ' — CSV row ' + f.row));
+      rw.appendChild(el('span', 'muted', (f.desc || '').slice(0, 60)));
+      feeList.appendChild(rw);
+    });
+    card.appendChild(feeList);
+    if (st.fees.length > 8) card.appendChild(el('div', 'muted', '+ ' + (st.fees.length - 8) + ' more'));
     const feeRow = el('div', 'io-actions');
-    const cb = checkbox('Also import ' + st.fees.length + ' dividend-related fee' + (st.fees.length === 1 ? '' : 's') + ' as expenses', st.includeFees, 'Broker debits tied to a dividend-paying stock (e.g. ADR or foreign-tax fees). Imported as expenses in the category you pick, in the same undoable batch.');
+    const cb = checkbox('Import these ' + st.fees.length + ' fee' + (st.fees.length === 1 ? '' : 's') + ' as expenses', st.includeFees, 'Optional. They join the same undoable import batch as the dividends.');
     cb.__input.addEventListener('change', () => { st.includeFees = cb.__input.checked; });
     feeRow.appendChild(cb);
     const feeSel = select(feeCats.map(c => ({ value: c.id, label: c.name })), st.feeCat);
@@ -4099,7 +4141,8 @@ function dividendReviewCard(store) {
     tb.appendChild(tr);
   });
   pt.appendChild(tb); prevWrap.appendChild(pt);
-  card.appendChild(el('div', 'muted', 'Preview (first ' + Math.min(12, importable.length) + ' of ' + importable.length + ' to import):'));
+  card.appendChild(el('h3', 'strip-title', 'Dividends that will import (' + importable.length + ')'));
+  card.appendChild(el('div', 'muted', 'These go into your Dividends income. Preview of the first ' + Math.min(12, importable.length) + ':'));
   card.appendChild(prevWrap);
   const skippedN = st.divs.length - importable.length;
   card.appendChild(el('p', 'muted', importable.length + ' will import as Dividends income · ' + skippedN + ' merged/skipped as duplicates' + (st.includeFees ? ' · ' + st.fees.length + ' fees as expenses' : '') + '. Reinvested payouts are tagged; the purchases themselves are never imported.'));

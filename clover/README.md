@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.35 — Employer rows in the income grid + clearer dividend review
+- In the income **Annual grid**, the "↳ Paychecks" row under Wages/Acting now **expands
+  to one row per employer**, showing what each employer paid you month by month.
+- The dividend import review is much clearer: every flagged duplicate cites its **CSV row
+  number** and, for in-file repeats, the row it matches ("open both rows in Excel to
+  compare"); the summary says which **date column** is used (M1's "Date", not "Posted
+  Date"); and **dividend-related fees are their own labeled section** — listed with row
+  numbers and an explanation — so they can't be mistaken for the dividends preview below.
+
 ### v1.0.34 — Raises tracker
 - New **Raises** page (under Paychecks): log each raise per employer — date, new gross
   per check, previous gross, change in $ and %, **days between raises**, and an ongoing
