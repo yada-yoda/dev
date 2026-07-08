@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.31 — Schwab dividend import + broker templates
+- The dividend importer now fully understands **Schwab (ex-TD Ameritrade) transaction
+  exports**: all their dividend spellings (Qualified Dividend, Non-Qualified Div, Qual Div
+  Reinvest, Pr Yr Cash Div, Special Qual Div…), reinvestment read straight from the action,
+  qualified/non-qualified captured, ADR/foreign-tax fees offered as expenses — and interest
+  rows deliberately skipped so they can't double-log against your interest history.
+- **Template downloads**: the import screen offers sample M1 Finance and Schwab CSVs so
+  the expected format is never a mystery.
+
 ### v1.0.30 — Taxes dashboard panel, per-form costs, form explanations
 - New **Taxes** dashboard panel: your most recent tax year's **net outcome** (refunds
   minus payments, amendments included, with Extended/Amended badges) plus **lifetime

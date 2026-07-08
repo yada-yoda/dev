@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.30';
+const VERSION = '1.0.31';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3773,6 +3773,11 @@ const BROKER_PARSERS = [
     }
   },
   {
+    // Schwab (ex-TD Ameritrade) transactions export. Dividend actions come in many
+    // abbreviations ("Qualified Dividend", "Non-Qualified Div", "Qual Div Reinvest",
+    // "Pr Yr Cash Div", "Special Qual Div", …) and reinvestment is stated right in
+    // the action, not inferred. Interest rows (Bond/Credit Interest) are skipped on
+    // purpose — interest is tracked separately and must not double-log.
     key: 'schwab', name: 'Charles Schwab',
     detect: h => h.includes('Action') && h.includes('Symbol') && h.includes('Amount'),
     parse: rows => {
@@ -3782,15 +3787,31 @@ const BROKER_PARSERS = [
         const date = parseImportDate(String(r['Date'] || '').split(' as of')[0]);
         const symbol = String(r['Symbol'] || '').trim().toUpperCase();
         const amt = parseImportAmount(r['Amount']);
-        if (!date) return;
-        if (/reinvest shares|^buy$/i.test(action)) { if (symbol) buys.push({ date, symbol }); return; }
-        if (/dividend/i.test(action) && !isNaN(amt) && amt > 0) divs.push({ date, symbol, amount: amt, action, desc: r['Description'] || '' });
-        else if (/fee|adr/i.test(action) && !isNaN(amt) && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: (action + ' ' + (r['Description'] || '')).trim() });
+        if (!date || !action) return;
+        if (/reinvest shares/i.test(action) || /^buy$/i.test(action)) { if (symbol) buys.push({ date, symbol }); return; }
+        if (/reinvestment adj|cash in lieu|interest|transfer|journaled|litigation|split|sell|misc/i.test(action)) return;
+        if (/\bdiv(idend)?\b/i.test(action) && !isNaN(amt) && amt > 0) {
+          divs.push({ date, symbol, amount: amt, action, desc: r['Description'] || '', reinvested: /reinvest/i.test(action) });
+        } else if (/fee|adr|foreign tax paid/i.test(action) && !isNaN(amt) && amt < 0 && symbol) {
+          fees.push({ date, symbol, amount: Math.abs(amt), desc: (action + ' — ' + (r['Description'] || '')).trim() });
+        }
       });
       return { divs, buys, fees };
     }
   }
 ];
+// Sample files (fake data) showing the exact export shape each broker produces —
+// downloadable from the import screen so the expected format is never a mystery.
+const M1_TEMPLATE_CSV = 'Date,Posted Date,Symbol,Description,Transaction Type,Amount,Units,Unit Type,Unit Price,Security Id,Security Id Type\n'
+  + '"Jan 15, 2026","Jan 14, 2026",AAPL,Dividend of 037833100 $1.25 received.,DIVIDEND,$1.25,--,CURRENCY,--,037833100,CUSIP\n'
+  + '"Jan 20, 2026","Jan 20, 2026",AAPL,0.005 shares of AAPL purchased.,PURCHASED,$1.25,0.005,SHARES,$250.00,037833100,CUSIP\n'
+  + '"Feb 3, 2026","Feb 2, 2026",XYZ,Dividend of 000000000 $0.10 debited.,OTHER,-$0.10,--,CURRENCY,--,000000000,CUSIP\n';
+const SCHWAB_TEMPLATE_CSV = '"Date","Action","Symbol","Description","Quantity","Price","Fees & Comm","Amount"\n'
+  + '"01/15/2026","Qualified Dividend","AAPL","APPLE INC","","","","$1.25"\n'
+  + '"01/15/2026","Qual Div Reinvest","KO","THE COCA-COLA CO","","","","$5.40"\n'
+  + '"01/15/2026","Reinvest Shares","KO","THE COCA-COLA CO","0.09","$60.00","","-$5.40"\n'
+  + '"01/20/2026","Non-Qualified Div","XYZ","EXAMPLE FUND","","","","$2.10"\n'
+  + '"01/22/2026","ADR Mgmt Fee","BP","BP P L C","","","","-$0.20"\n';
 function divKey(d) { return d.date + '|' + (d.symbol || '') + '|' + (Number(d.amount) || 0).toFixed(2); }
 // Existing dividend keys across every loaded year (manual entries included, when
 // they carry a symbol) — this is what makes re-imports and overlapping M1 exports safe.
@@ -3806,10 +3827,12 @@ function analyzeDividendFile(store, rows, headers, filename) {
   const parser = BROKER_PARSERS.find(p => p.detect(headers));
   if (!parser) return null;
   const parsed = parser.parse(rows);
-  // Reinvested = a purchase of the same symbol within 14 days after the dividend.
+  // Reinvested: Schwab states it in the action itself (explicit, set by the parser);
+  // M1 doesn't, so there it's inferred from a same-symbol purchase within 14 days.
+  const explicit = parser.key === 'schwab';
   parsed.divs.forEach(d => {
-    d.reinvested = parsed.buys.some(b => b.symbol === d.symbol && daysBetweenISO(b.date, d.date) >= 0 && daysBetweenISO(b.date, d.date) <= 14);
-    d.qualified = /non-?qualified/i.test(d.action) ? 'Non-qualified' : /qualified/i.test(d.action) ? 'Qualified' : '';
+    if (!explicit) d.reinvested = parsed.buys.some(b => b.symbol === d.symbol && daysBetweenISO(b.date, d.date) >= 0 && daysBetweenISO(b.date, d.date) <= 14);
+    d.qualified = /non-?qual/i.test(d.action) ? 'Non-qualified' : /\bqual/i.test(d.action) ? 'Qualified' : '';
   });
   // Flag duplicates: already recorded (DB) or repeated within the file.
   const dbKeys = existingDividendKeys(store);
@@ -3968,6 +3991,17 @@ function importSection() {
     });
     fileLabel.appendChild(fileIn); row.appendChild(fileLabel);
     card.appendChild(row);
+    if (importState.target === 'dividends') {
+      const tRow = el('div', 'io-actions');
+      tRow.appendChild(el('span', 'muted', 'Not sure of the format? Download a sample:'));
+      const m1T = el('button', 'btn-ghost', '⬇ M1 Finance template');
+      m1T.addEventListener('click', () => downloadFile('m1-activity-template.csv', M1_TEMPLATE_CSV, 'text/csv'));
+      tRow.appendChild(m1T);
+      const schT = el('button', 'btn-ghost', '⬇ Schwab template');
+      schT.addEventListener('click', () => downloadFile('schwab-transactions-template.csv', SCHWAB_TEMPLATE_CSV, 'text/csv'));
+      tRow.appendChild(schT);
+      card.appendChild(tRow);
+    }
     return card;
   }
 
