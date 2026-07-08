@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.32';
+const VERSION = '1.0.33';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1337,10 +1337,11 @@ function renderSubscriptions(view) {
   }
 }
 
-function sumCard(label, value, tone) {
+function sumCard(label, value, tone, hint) {
   const c = el('div', 'sum-card');
   c.appendChild(el('div', 'sum-label', label));
   c.appendChild(el('div', 'sum-value ' + (tone || ''), value));
+  if (hint) c.appendChild(el('div', 'sum-hint', hint));
   return c;
 }
 function renewCell(r) {
@@ -1681,9 +1682,17 @@ function expectedPayPeriods(sch, year) {
   const out = [];
   if (sch.frequency === 'weekly' || sch.frequency === 'biweekly') {
     const step = sch.frequency === 'weekly' ? 7 : 14;
-    let d = anchor;                                   // keep the anchor's weekday
-    while (d > jan1) d = addDays(d, -step);
-    while (d < jan1) d = addDays(d, step);
+    // If the year's actual first pay date is known, anchor THIS year's schedule
+    // exactly there — period #1 = that check, and the whole year stays aligned
+    // even if the rhythm shifted from a prior year's anchor.
+    const yfp = parseISODate(sch.yearFirstPay);
+    let d;
+    if (yfp && yfp.getFullYear() === year) d = yfp;
+    else {
+      d = anchor;                                     // keep the anchor's weekday
+      while (d > jan1) d = addDays(d, -step);
+      while (d < jan1) d = addDays(d, step);
+    }
     for (; d <= dec31; d = addDays(d, step)) {
       out.push({ payDate: isoOfDate(d), periodStart: isoOfDate(addDays(d, -step)), periodEnd: isoOfDate(addDays(d, -1)) });
     }
@@ -1930,7 +1939,10 @@ function renderPaychecks(view) {
   const sum = el('div', 'sub-summary');
   sum.appendChild(sumCard(allMode ? 'Gross (all yrs)' : 'Gross YTD', money(grossYTD), 'income'));
   sum.appendChild(sumCard(allMode ? 'Net (all yrs)' : 'Net YTD', money(netYTD), 'income'));
-  sum.appendChild(sumCard('Received', String(paid.length), 'neutral'));
+  // Who paid during this year (or across all years in the All view).
+  const paidEmployers = [...new Set(paid.map(p => (p.employer || '').trim()).filter(Boolean))];
+  const empHint = paidEmployers.length ? (paidEmployers.slice(0, 3).join(' · ') + (paidEmployers.length > 3 ? ' +' + (paidEmployers.length - 3) + ' more' : '')) : '';
+  sum.appendChild(sumCard('Received', String(paid.length), 'neutral', empHint));
   sum.appendChild(sumCard('Outstanding', String(outstanding.length), outstanding.length ? 'expense' : 'neutral'));
   view.appendChild(sum);
 
@@ -2193,6 +2205,7 @@ function payScheduleModal(existing) {
   const fPerson = select(s.persons.map(x => ({ value: x.id, label: x.name })), c.personId || (s.persons[0] && s.persons[0].id));
   const fFreq = select(PAY_FREQUENCIES.map(f => ({ value: f.key, label: f.label })), c.frequency || 'biweekly');
   const fAnchor = input(c.anchorDate || '', { type: 'date' });
+  const fYearFirst = input(c.yearFirstPay || '', { type: 'date' });
   const fDay2 = input(c.day2 != null ? c.day2 : '', { type: 'number', placeholder: 'e.g. 30 (blank = last day)' }); fDay2.min = 1; fDay2.max = 31;
   const fGross = input(c.gross != null ? c.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
   const fNet = input(c.net != null ? c.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
@@ -2213,6 +2226,7 @@ function payScheduleModal(existing) {
   body.appendChild(catRow);
   body.appendChild(field('Pay frequency', fFreq, 'How often you’re paid. Biweekly = every 2 weeks (26/yr); Semimonthly = twice a month (24/yr).'));
   body.appendChild(field('A recent / first pay date', fAnchor, 'Any known real pay date. Clover steps forward and back from this to build the whole schedule (e.g. every other Friday).'));
+  body.appendChild(field('First pay date of this year (optional)', fYearFirst, 'The first paycheck date of the current calendar year, if you know it. Period #1 anchors exactly there and the whole year lines up with your actual pay year — useful when the rhythm shifted from last year, so this year’s gross/net track your real checks rather than a projected calendar.'));
   body.appendChild(day2Field);
   const amtRow = el('div', 'two-col');
   amtRow.appendChild(field('Expected gross', fGross, 'Typical gross per paycheck — prefilled when you record a missing one.'));
@@ -2230,7 +2244,7 @@ function payScheduleModal(existing) {
       const entry = Object.assign(c, {
         name: fName.value.trim() || employer, employer,
         incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
-        anchorDate: fAnchor.value, day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
+        anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
         net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked
       });

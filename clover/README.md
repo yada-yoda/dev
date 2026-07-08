@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.33 — First-pay-of-year anchor + employer tags
+- Pay schedules can record the **first pay date of this year**: period #1 anchors exactly
+  there, so the whole year's expected checks, period numbers, and gross/net line up with
+  your actual pay year even when the rhythm shifted from last year.
+- The **Received** stat card on Paychecks now lists **which employers paid** during the
+  selected year (e.g. "Main Job · Acting Gig").
+
 ### v1.0.32 — Toolbar, colored priorities, sort reset
 - The **⚙ Columns** button now sits directly **above each table, on the right** — same
   spot on every page (Paychecks, Bills & Subscriptions, Accounts, Credit & Rates, Taxes).
