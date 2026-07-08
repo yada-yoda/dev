@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.34 — Raises tracker
+- New **Raises** page (under Paychecks): log each raise per employer — date, new gross
+  per check, previous gross, change in $ and %, **days between raises**, and an ongoing
+  **"days since last raise"** counter per employer while you're still employed there.
+- **⛏ Detect from paychecks** scans your recorded paychecks for gross-per-check changes
+  and proposes them as raises for review — increases pre-checked, decreases (usually a
+  one-off bonus reverting) left unchecked.
+
 ### v1.0.33 — First-pay-of-year anchor + employer tags
 - Pay schedules can record the **first pay date of this year**: period #1 anchors exactly
   there, so the whole year's expected checks, period numbers, and gross/net line up with

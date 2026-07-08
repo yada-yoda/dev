@@ -93,7 +93,10 @@ function defaults() {
     // Tax filing history: {id, taxYear, kind:'original'|'amendment', fedForm, stateForm,
     // fedOutcome:'refund'|'owed'|'none', fedAmount, stateOutcome, stateAmount,
     // prepCost, preparer, extended, filedDate, notes}
-    taxRecords: []
+    taxRecords: [],
+    // Raise history per employer: {id, employer, date, amount (new gross per check),
+    // prevAmount, notes}
+    raises: []
   };
 }
 
@@ -155,7 +158,8 @@ function snapshot() {
     creditScores: state.creditScores,
     rateHistory: state.rateHistory,
     paySchedules: state.paySchedules,
-    taxRecords: state.taxRecords
+    taxRecords: state.taxRecords,
+    raises: state.raises
   };
 }
 
@@ -172,6 +176,7 @@ function apply(data) {
   state.rateHistory = s.rateHistory || [];
   state.paySchedules = s.paySchedules || [];
   state.taxRecords = s.taxRecords || [];
+  state.raises = s.raises || [];
   state._loaded = true;
 }
 
@@ -270,6 +275,12 @@ window.cloverStore = {
     scheduleSave(); notify(); return entry;
   },
   removeTaxRecord(id) { state.taxRecords = state.taxRecords.filter(x => x.id !== id); scheduleSave(); notify(); },
+  saveRaise(entry) {
+    if (entry.id) { const i = state.raises.findIndex(x => x.id === entry.id); if (i >= 0) state.raises[i] = entry; else state.raises.push(entry); }
+    else { entry.id = mkId('raise'); state.raises.push(entry); }
+    scheduleSave(); notify(); return entry;
+  },
+  removeRaise(id) { state.raises = state.raises.filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },

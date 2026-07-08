@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.33';
+const VERSION = '1.0.34';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -18,6 +18,7 @@ const ROUTES = [
   { id: 'dashboard',     label: 'Dashboard',      ico: '◆', phase: 6 },
   { id: 'income',        label: 'Income',         ico: '▲', phase: 2 },
   { id: 'paychecks',     label: 'Paychecks',      ico: '▤', phase: 4 },
+  { id: 'raises',        label: 'Raises',         ico: '↗', phase: 9 },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
   { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
@@ -133,7 +134,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -2279,6 +2280,177 @@ function employerMergeModal() {
       if (to.toLowerCase() === fFrom.value.toLowerCase()) { toast('Pick a different name', 'warn'); return false; }
       const n = store.renameEmployer(fFrom.value, to);
       toast('Renamed ' + n + ' paycheck' + (n === 1 ? '' : 's') + ' to “' + to + '”');
+    }
+  });
+}
+
+// ============================================================
+// Raises — per-employer raise history + time between raises
+// ============================================================
+let raisesSort = { key: 'date', dir: 'desc' };
+const RAISE_COL_LABELS = { employer: 'Employer', date: 'Date', amount: 'New gross / check', prevAmount: 'Previous', change: 'Change', gap: 'Since prior raise', notes: 'Notes' };
+const RAISE_ALL_COLS = ['employer', 'date', 'amount', 'prevAmount', 'change', 'gap', 'notes'];
+const RAISE_DEFAULT_COLS = ['employer', 'date', 'amount', 'prevAmount', 'change', 'gap'];
+function raiseGapDays(store, r) {
+  const prior = store.state.raises
+    .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') < (r.date || ''))
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  return prior ? daysBetweenISO(r.date, prior.date) : null;
+}
+function lastPaycheckDateFor(store, employer) {
+  let last = '';
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(p => {
+    if ((p.employer || '').toLowerCase() === (employer || '').toLowerCase() && (p.payDate || '') > last) last = p.payDate;
+  }));
+  return last;
+}
+function buildRaiseCol(store, key) {
+  switch (key) {
+    case 'employer': return { label: 'Employer', key: 'employer', value: r => r.employer || '', cell: r => el('td', 'strong', r.employer || '—') };
+    case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
+    case 'amount': return { label: 'New gross / check', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0, true) };
+    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => Number(r.prevAmount) || 0, cell: r => numCell(Number(r.prevAmount) || 0) };
+    case 'change': return { label: 'Change', key: 'change', num: true, value: r => (r.prevAmount != null && r.amount != null) ? Number(r.amount) - Number(r.prevAmount) : 0, cell: r => {
+        const td = el('td', 'num');
+        if (r.prevAmount == null || r.prevAmount === '' || r.amount == null) { td.textContent = '—'; return td; }
+        const diff = Number(r.amount) - Number(r.prevAmount);
+        const pct = Number(r.prevAmount) > 0 ? (diff / Number(r.prevAmount) * 100) : null;
+        const span = el('span', diff >= 0 ? 'pos' : 'neg', (diff >= 0 ? '+' : '−') + money(Math.abs(diff)) + (pct != null ? ' (' + (diff >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%)' : ''));
+        td.appendChild(span); return td; } };
+    case 'gap': return { label: 'Since prior raise', key: 'gap', num: true, value: r => { const g = raiseGapDays(store, r); return g == null ? -1 : g; }, cell: r => {
+        const td = el('td', 'num'); const g = raiseGapDays(store, r);
+        td.textContent = g == null ? '—' : (g + ' days'); if (g == null) td.title = 'First recorded raise for this employer';
+        return td; } };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
+  }
+  return null;
+}
+function renderRaises(view) {
+  const store = window.cloverStore, s = store.state;
+  ensureYearsScanned(store);
+  const head = el('div', 'view-head');
+  const left = el('div'); left.appendChild(el('h3', null, 'Raises'));
+  left.appendChild(el('p', 'muted', 'When each job last raised your pay, and how long between raises.'));
+  head.appendChild(left);
+  const actions = el('div', 'head-actions');
+  const detect = el('button', 'btn-ghost', '⛏ Detect from paychecks');
+  detect.title = 'Scan your recorded paychecks for gross-amount changes and propose them as raises';
+  detect.addEventListener('click', () => detectRaisesModal());
+  actions.appendChild(detect);
+  const add = el('button', 'btn-primary', '+ Add raise'); add.addEventListener('click', () => raiseModal(null));
+  actions.appendChild(add);
+  head.appendChild(actions);
+  view.appendChild(head);
+
+  if (!s.raises.length) {
+    view.appendChild(emptyState('No raises recorded yet', 'Add raises by hand, or use “Detect from paychecks” to find where your gross per check changed.', '+ Add raise', () => raiseModal(null)));
+    return;
+  }
+
+  // Per-employer "days since last raise" — ongoing while still employed (active
+  // schedule or a paycheck in the last 45 days), else counted to the last check.
+  const byEmp = {};
+  s.raises.forEach(r => { const k = (r.employer || '').toLowerCase(); if (!byEmp[k] || (r.date || '') > (byEmp[k].date || '')) byEmp[k] = r; });
+  const sum = el('div', 'sub-summary');
+  Object.values(byEmp).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4).forEach(r => {
+    const emp = r.employer || '—';
+    const lastPay = lastPaycheckDateFor(store, emp);
+    const employed = activeSchedules(store).some(sch => (sch.employer || '').toLowerCase() === emp.toLowerCase())
+      || (lastPay && daysBetweenISO(todayISO(), lastPay) <= 45);
+    const days = employed ? daysBetweenISO(todayISO(), r.date) : (lastPay ? Math.max(0, daysBetweenISO(lastPay, r.date)) : null);
+    sum.appendChild(sumCard(emp, days == null ? '—' : (days + 'd'), 'neutral',
+      'since last raise (' + fmtDate(r.date) + ')' + (employed ? ' · counting' : ' · through last paycheck')));
+  });
+  view.appendChild(sum);
+
+  const cols = [
+    ...tableColKeys(store, 'raises', RAISE_COL_LABELS, RAISE_DEFAULT_COLS).map(k => buildRaiseCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: r => {
+        const td = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => raiseModal(r));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove((r.employer || 'raise') + ' · ' + fmtDate(r.date), () => store.removeRaise(r.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  view.appendChild(tableTools(columnsButton('raises', RAISE_ALL_COLS, RAISE_DEFAULT_COLS, RAISE_COL_LABELS, 'Raise columns')));
+  const card = el('div', 'card table-card');
+  card.appendChild(sortableTable(cols, s.raises, raisesSort, ns => { raisesSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
+  view.appendChild(card);
+}
+function raiseModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? Object.assign({}, existing) : { date: todayISO() };
+  const body = el('div', 'form-grid');
+  const empList = el('datalist'); empList.id = 'raise-emp-list';
+  const emps = new Set(s.raises.map(x => x.employer).filter(Boolean));
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(p => { if (p.employer) emps.add(p.employer); }));
+  [...emps].forEach(e => { const o = el('option'); o.value = e; empList.appendChild(o); });
+  body.appendChild(empList);
+  const fEmp = input(r.employer || '', { placeholder: 'Employer', list: 'raise-emp-list' });
+  const fDate = input(r.date || todayISO(), { type: 'date' });
+  const fAmt = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
+  const fPrev = input(r.prevAmount != null ? r.prevAmount : '', { type: 'number', placeholder: '0.00' }); fPrev.step = '0.01';
+  const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional — promotion, annual review, etc.';
+  body.appendChild(field('Employer', fEmp, 'Which job the raise is from — matches your paycheck employer names.'));
+  body.appendChild(field('Effective date', fDate, 'The first pay date at the new amount (or the date the raise took effect).'));
+  const amtRow = el('div', 'two-col');
+  amtRow.appendChild(field('New gross per check', fAmt, 'Your gross per paycheck after the raise.'));
+  amtRow.appendChild(field('Previous gross (optional)', fPrev, 'Gross per paycheck before the raise — enables the change $ and %.'));
+  body.appendChild(amtRow);
+  body.appendChild(field('Notes', fNotes, 'Anything worth remembering — promotion, title change, merit increase.'));
+  openModal({
+    title: existing ? 'Edit raise' : 'Add raise', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      if (!fEmp.value.trim()) { fEmp.focus(); toast('Employer is required', 'warn'); return false; }
+      const amount = parseFloat(fAmt.value);
+      if (isNaN(amount)) { fAmt.focus(); toast('New gross amount is required', 'warn'); return false; }
+      store.saveRaise(Object.assign(r, {
+        employer: fEmp.value.trim(), date: fDate.value || todayISO(), amount,
+        prevAmount: fPrev.value === '' ? null : parseFloat(fPrev.value), notes: fNotes.value.trim()
+      }));
+      toast(existing ? 'Raise updated' : 'Raise added');
+    }
+  });
+}
+// Scan recorded paychecks for gross changes and propose them as raises.
+function detectRaisesModal() {
+  const store = window.cloverStore, s = store.state;
+  ensureYearsScanned(store);
+  const byEmp = {};
+  Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(p => {
+    if (!p.employer || !p.payDate || !(Number(p.gross) > 0) || !isPaycheckPaid(p)) return;
+    (byEmp[p.employer] = byEmp[p.employer] || []).push(p);
+  }));
+  const existing = new Set(s.raises.map(r => (r.employer || '').toLowerCase() + '|' + (r.date || '')));
+  const candidates = [];
+  Object.keys(byEmp).forEach(emp => {
+    const list = byEmp[emp].sort((a, b) => (a.payDate || '').localeCompare(b.payDate || ''));
+    for (let i = 1; i < list.length; i++) {
+      const prev = Number(list[i - 1].gross), cur = Number(list[i].gross);
+      if (Math.abs(cur - prev) < 0.01) continue;
+      if (existing.has(emp.toLowerCase() + '|' + list[i].payDate)) continue;
+      candidates.push({ employer: emp, date: list[i].payDate, amount: cur, prevAmount: prev, up: cur > prev });
+    }
+  });
+  if (!candidates.length) { toast('No unrecorded pay changes found in your paychecks'); return; }
+  const body = el('div');
+  body.appendChild(el('p', 'muted', 'Gross-per-check changes found in your paychecks. Increases are checked by default; decreases usually mean a one-off (bonus reverting, missed hours) — check them only if the pay cut was real.'));
+  const boxes = [];
+  const list = el('div', 'mini-list');
+  candidates.forEach(c => {
+    const row = el('div', 'mini-row');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = c.up; boxes.push({ cb, c });
+    const left = el('span'); left.appendChild(cb);
+    left.appendChild(document.createTextNode(' ' + c.employer + ' · ' + fmtDate(c.date) + ' · ' + money(c.prevAmount) + ' → ' + money(c.amount) + ' '));
+    left.appendChild(el('span', c.up ? 'pos' : 'neg', (c.up ? '+' : '−') + money(Math.abs(c.amount - c.prevAmount))));
+    row.appendChild(left); list.appendChild(row);
+  });
+  body.appendChild(list);
+  openModal({
+    title: 'Detected pay changes (' + candidates.length + ')', body, confirmLabel: 'Add selected',
+    onConfirm: () => {
+      let n = 0;
+      boxes.forEach(({ cb, c }) => { if (cb.checked) { store.saveRaise({ employer: c.employer, date: c.date, amount: c.amount, prevAmount: c.prevAmount, notes: '' }); n++; } });
+      toast(n ? ('Added ' + n + ' raise' + (n === 1 ? '' : 's')) : 'Nothing selected');
     }
   });
 }
