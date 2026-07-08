@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.29';
+const VERSION = '1.0.30';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2697,8 +2697,40 @@ const DASH_PANEL_DEFS = [
   { key: 'incomeDonut', title: 'Income by category (YTD)', build: ctx => donutCard(incomeByCategory(ctx.store, ctx.data)) },
   { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategory(ctx.store, ctx.data)) },
   { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
-  { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) }
+  { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) },
+  { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) }
 ];
+// Last filed year's net outcome + lifetime refund/paid totals from Tax history.
+function dashTaxesBody(ctx) {
+  const card = el('div', 'card');
+  const recs = ctx.s.taxRecords || [];
+  if (!recs.length) { card.appendChild(el('div', 'muted', 'No tax history yet — log your filings under Taxes.')); return card; }
+  const latestYear = Math.max.apply(null, recs.map(r => Number(r.taxYear) || 0));
+  const yearRecs = recs.filter(r => +r.taxYear === latestYear);
+  const outcomeNet = list => list.reduce((a, r) => a
+    + (r.fedOutcome === 'refund' ? Number(r.fedAmount) || 0 : r.fedOutcome === 'owed' ? -(Number(r.fedAmount) || 0) : 0)
+    + (r.stateOutcome === 'refund' ? Number(r.stateAmount) || 0 : r.stateOutcome === 'owed' ? -(Number(r.stateAmount) || 0) : 0), 0);
+  const lastNet = outcomeNet(yearRecs);
+  const refunded = recs.reduce((a, r) => a + (r.fedOutcome === 'refund' ? Number(r.fedAmount) || 0 : 0) + (r.stateOutcome === 'refund' ? Number(r.stateAmount) || 0 : 0), 0);
+  const paid = recs.reduce((a, r) => a + (r.fedOutcome === 'owed' ? Number(r.fedAmount) || 0 : 0) + (r.stateOutcome === 'owed' ? Number(r.stateAmount) || 0 : 0), 0);
+  const list = el('div', 'mini-list');
+  const row = (label, value, cls, badges) => {
+    const rw = el('div', 'mini-row');
+    const left = el('span'); left.appendChild(document.createTextNode(label + ' '));
+    (badges || []).forEach(b => left.appendChild(b));
+    rw.appendChild(left);
+    rw.appendChild(el('span', cls, value));
+    list.appendChild(rw);
+  };
+  const yearBadges = [];
+  if (yearRecs.some(r => r.extended)) yearBadges.push(badge('Extended', 'amber'));
+  if (yearRecs.some(r => r.kind === 'amendment')) yearBadges.push(badge('Amended', 'type'));
+  row('Tax year ' + latestYear + ' net', (lastNet >= 0 ? '+' : '−') + money(Math.abs(lastNet)), lastNet >= 0 ? 'pos' : 'neg', yearBadges);
+  row('Lifetime refunded', '+' + money(refunded), 'pos');
+  row('Lifetime paid', '−' + money(paid), 'neg');
+  card.appendChild(list);
+  return card;
+}
 function dashPanelState(store) {
   const saved = store.state.settings.dashPanels;
   if (Array.isArray(saved) && saved.length) {
@@ -2920,8 +2952,50 @@ function incomeByNamedCategory(store, data, re) {
 // Tax history — per-year filings, amendments, extensions
 // ============================================================
 const FED_FORMS = ['1040', '1040-SR', '1040-NR', '1040-X'];
-const TAX_COL_LABELS = { taxYear: 'Tax year', type: 'Type', fedForm: 'Federal form', fedResult: 'Federal', stateForm: 'State form', stateResult: 'State', preparer: 'Prepared by', prepCost: 'Prep cost', flags: 'Flags', filed: 'Filed', notes: 'Notes' };
-const TAX_ALL_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'flags', 'filed', 'notes'];
+// Plain-English meaning of common tax forms — shown as tooltips wherever a form
+// name appears, so it's clear why a form was used that year.
+const TAX_FORM_INFO = {
+  '1040': 'The standard U.S. individual income tax return.',
+  '1040-SR': 'The 1040 variant for taxpayers 65 and older — larger print, standard-deduction chart.',
+  '1040-NR': 'U.S. income tax return for nonresident aliens.',
+  '1040-X': 'Amended return — corrects a previously filed 1040.',
+  '4868': 'Application for an automatic 6-month filing extension.',
+  'SCHEDULE A': 'Itemized deductions — mortgage interest, state/local taxes, charity, medical.',
+  'SCHEDULE B': 'Interest and ordinary dividends (required when they top $1,500).',
+  'SCHEDULE C': 'Profit or loss from a sole-proprietor business or side gig.',
+  'SCHEDULE D': 'Capital gains and losses from selling investments.',
+  'SCHEDULE E': 'Rental income, royalties, and income from partnerships, S-corps, and trusts.',
+  'SCHEDULE SE': 'Self-employment tax — Social Security/Medicare on self-employment income.',
+  'SCHEDULE 1': 'Additional income and adjustments — unemployment, student-loan interest, etc.',
+  'SCHEDULE 2': 'Additional taxes — alternative minimum tax, premium-credit repayment, etc.',
+  'SCHEDULE 3': 'Additional credits and payments.',
+  '8949': 'Detailed list of capital-asset sales that feeds Schedule D.',
+  '8889': 'Health Savings Account (HSA) contributions and distributions.',
+  '2441': 'Child and dependent care expenses credit.',
+  '8863': 'Education credits — American Opportunity / Lifetime Learning.',
+  '8606': 'Nondeductible IRA contributions (tracks your basis).',
+  'K-1': 'Your share of income from a partnership, S-corp, or trust.'
+};
+function taxFormInfo(form) {
+  if (!form) return '';
+  const f = String(form).trim().toUpperCase().replace(/^FORM\s+/, '');
+  if (TAX_FORM_INFO[f]) return TAX_FORM_INFO[f];
+  const sched = /^SCH(?:EDULE)?\.?\s*([A-Z0-9]+)$/.exec(f);
+  if (sched && TAX_FORM_INFO['SCHEDULE ' + sched[1]]) return TAX_FORM_INFO['SCHEDULE ' + sched[1]];
+  if (/-X$/.test(f)) return 'An amended return — corrects a previously filed version of this form.';
+  if (/^[A-Z]{2}[- ]/.test(f) || /STATE/.test(f)) return 'A state income tax return form.';
+  return '';
+}
+function formCell(formName) {
+  const td = el('td');
+  if (!formName) { td.textContent = '—'; return td; }
+  const info = taxFormInfo(formName);
+  const span = el('span', info ? 'hint-underline' : null, formName);
+  if (info) span.title = info;
+  td.appendChild(span); return td;
+}
+const TAX_COL_LABELS = { taxYear: 'Tax year', type: 'Type', fedForm: 'Federal form', fedResult: 'Federal', stateForm: 'State form', stateResult: 'State', preparer: 'Prepared by', prepCost: 'Prep cost', formCosts: 'Form costs', flags: 'Flags', filed: 'Filed', notes: 'Notes' };
+const TAX_ALL_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'formCosts', 'flags', 'filed', 'notes'];
 const TAX_DEFAULT_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'flags'];
 function taxOutcomeCell(outcome, amount) {
   const td = el('td', 'num');
@@ -2936,12 +3010,27 @@ function buildTaxCol(store, key) {
   switch (key) {
     case 'taxYear': return { label: 'Tax year', key: 'taxYear', num: true, value: r => Number(r.taxYear) || 0, cell: r => { const td = el('td', 'strong'); td.textContent = r.taxYear || '—'; return td; } };
     case 'type': return { label: 'Type', key: 'type', value: r => r.kind === 'amendment' ? 1 : 0, cell: r => { const td = el('td'); td.appendChild(r.kind === 'amendment' ? badge('Amendment', 'amber') : el('span', 'muted', 'Original')); return td; } };
-    case 'fedForm': return { label: 'Federal form', key: 'fedForm', value: r => r.fedForm || '', cell: r => el('td', null, r.fedForm || '—') };
+    case 'fedForm': return { label: 'Federal form', key: 'fedForm', value: r => r.fedForm || '', cell: r => formCell(r.fedForm) };
     case 'fedResult': return { label: 'Federal', key: 'fedResult', num: true, value: r => taxOutcomeSortVal(r.fedOutcome, r.fedAmount), cell: r => taxOutcomeCell(r.fedOutcome, r.fedAmount) };
-    case 'stateForm': return { label: 'State form', key: 'stateForm', value: r => r.stateForm || '', cell: r => el('td', null, r.stateForm || '—') };
+    case 'stateForm': return { label: 'State form', key: 'stateForm', value: r => r.stateForm || '', cell: r => formCell(r.stateForm) };
     case 'stateResult': return { label: 'State', key: 'stateResult', num: true, value: r => taxOutcomeSortVal(r.stateOutcome, r.stateAmount), cell: r => taxOutcomeCell(r.stateOutcome, r.stateAmount) };
     case 'preparer': return { label: 'Prepared by', key: 'preparer', value: r => r.preparer || '', cell: r => el('td', null, r.preparer || '—') };
-    case 'prepCost': return { label: 'Prep cost', key: 'prepCost', num: true, value: r => Number(r.prepCost) || 0, cell: r => numCell(Number(r.prepCost) || 0) };
+    case 'prepCost': return { label: 'Prep cost', key: 'prepCost', num: true, value: r => Number(r.prepCost) || 0, cell: r => {
+        const td = numCell(Number(r.prepCost) || 0);
+        const fc = Array.isArray(r.formCosts) ? r.formCosts.filter(x => x.form) : [];
+        if (fc.length) { td.title = 'Itemized: ' + fc.map(x => x.form + ' ' + money(Number(x.cost) || 0)).join(' · '); td.appendChild(el('div', 'acct-sub', fc.length + ' form' + (fc.length === 1 ? '' : 's') + ' itemized')); }
+        return td; } };
+    case 'formCosts': return { label: 'Form costs', sortable: false, cell: r => {
+        const td = el('td', 'muted');
+        const fc = Array.isArray(r.formCosts) ? r.formCosts.filter(x => x.form) : [];
+        if (!fc.length) { td.textContent = '—'; return td; }
+        fc.forEach((x, i) => {
+          if (i) td.appendChild(document.createTextNode(' · '));
+          const span = el('span', taxFormInfo(x.form) ? 'hint-underline' : null, x.form + ' ' + money(Number(x.cost) || 0));
+          const info = taxFormInfo(x.form); if (info) span.title = info;
+          td.appendChild(span);
+        });
+        return td; } };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
         if (r.extended) flags.appendChild(badge('Extended', 'amber'));
@@ -3037,28 +3126,66 @@ function taxModal(existing, preset) {
   const fCost = input(r.prepCost != null ? r.prepCost : '', { type: 'number', placeholder: '0.00' }); fCost.step = '0.01';
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
+  // Live plain-English hint under the form inputs (what the typed form means).
+  const fedHint = el('div', 'sum-hint'), stHint = el('div', 'sum-hint');
+  const syncHints = () => { fedHint.textContent = taxFormInfo(fFedForm.value) || ''; stHint.textContent = taxFormInfo(fStForm.value) || ''; };
+  fFedForm.addEventListener('input', syncHints); fStForm.addEventListener('input', syncHints);
+
+  // Itemized per-form costs (optional) — what the CPA charged for each form, when
+  // they break it out. Kept separate from the total prep cost (which may already
+  // include these).
+  const allFormsList = el('datalist'); allFormsList.id = 'tax-form-all-list';
+  [...new Set(FED_FORMS.concat(Object.keys(TAX_FORM_INFO)).concat(s.taxRecords.flatMap(x => (x.formCosts || []).map(f => f.form))).filter(Boolean))].forEach(f => { const o = el('option'); o.value = f; allFormsList.appendChild(o); });
+  body.appendChild(allFormsList);
+  let formCosts = Array.isArray(r.formCosts) ? r.formCosts.map(x => ({ form: x.form || '', cost: x.cost })) : [];
+  const fcWrap = el('div');
+  const renderFC = () => {
+    fcWrap.innerHTML = '';
+    formCosts.forEach((fc, i) => {
+      const row = el('div', 'io-actions');
+      const fForm = input(fc.form, { placeholder: 'e.g. Schedule C', list: 'tax-form-all-list' });
+      fForm.addEventListener('input', () => { fc.form = fForm.value; const info = taxFormInfo(fForm.value); fForm.title = info || ''; });
+      const fAmt = input(fc.cost != null ? fc.cost : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
+      fAmt.addEventListener('input', () => { fc.cost = fAmt.value === '' ? null : parseFloat(fAmt.value); });
+      const x = el('button', 'icon-btn danger', '✕'); x.title = 'Remove this form cost';
+      x.addEventListener('click', () => { formCosts.splice(i, 1); renderFC(); });
+      row.appendChild(fForm); row.appendChild(fAmt); row.appendChild(x);
+      fcWrap.appendChild(row);
+    });
+    const addFc = el('button', 'btn-ghost', '＋ Add form cost');
+    addFc.addEventListener('click', () => { formCosts.push({ form: '', cost: null }); renderFC(); });
+    fcWrap.appendChild(addFc);
+  };
+  renderFC();
+
   const yRow = el('div', 'two-col');
   yRow.appendChild(field('Tax year', fYear, 'The year the return covers (not the year you filed it).'));
   yRow.appendChild(field('Filing type', fKind, 'Original return, or an amendment to a year you already filed (e.g. 1040-X).'));
   body.appendChild(yRow);
   const fedRow = el('div', 'cd-fields');
-  fedRow.appendChild(field('Federal form', fFedForm, 'The federal form filed — 1040, 1040-SR, or 1040-X for an amendment.'));
+  const fedField = field('Federal form', fFedForm, 'The federal form filed — 1040, 1040-SR, or 1040-X for an amendment. A plain-English description appears below as you type.');
+  fedField.appendChild(fedHint);
+  fedRow.appendChild(fedField);
   fedRow.appendChild(field('Federal outcome', fFedOut, 'Whether the federal return came back as a refund or you owed.'));
   fedRow.appendChild(field('Federal amount', fFedAmt, 'The refund received or the amount paid, for the federal return.'));
   body.appendChild(fedRow);
   const stRow = el('div', 'cd-fields');
-  stRow.appendChild(field('State form', fStForm, 'The state return form filed, if any.'));
+  const stField = field('State form', fStForm, 'The state return form filed, if any.');
+  stField.appendChild(stHint);
+  stRow.appendChild(stField);
   stRow.appendChild(field('State outcome', fStOut, 'Whether the state return came back as a refund or you owed.'));
   stRow.appendChild(field('State amount', fStAmt, 'The refund received or the amount paid, for the state return.'));
   body.appendChild(stRow);
+  syncHints();
   const meta = el('div', 'two-col');
   meta.appendChild(field('Filed date', fFiled, 'When this return (or amendment) was actually filed.'));
   meta.appendChild(field('Extension', cExt));
   body.appendChild(meta);
   const prepRow = el('div', 'two-col');
   prepRow.appendChild(field('Prepared by', fCpa, 'Who did the taxes — your CPA’s name, a service, or “Self”.'));
-  prepRow.appendChild(field('Prep cost', fCost, 'What the CPA or service charged for this filing.'));
+  prepRow.appendChild(field('Prep cost (total)', fCost, 'What the CPA or service charged in total for this filing. The itemized form costs below are informational — they may already be included in this total, so they aren’t added to it.'));
   body.appendChild(prepRow);
+  body.appendChild(field('Itemized form costs (optional)', fcWrap, 'If the CPA broke out what each form cost (e.g. 1040 $150, Schedule C $75), record it here to understand the bill. Not added to totals — the total prep cost above is what counts.'));
   body.appendChild(field('Notes', fNotes, 'Anything worth remembering — why it was amended, what changed, etc.'));
 
   openModal({
@@ -3075,6 +3202,7 @@ function taxModal(existing, preset) {
         stateAmount: fStAmt.value === '' ? null : parseFloat(fStAmt.value),
         filedDate: fFiled.value || '', extended: cExt.__input.checked,
         preparer: fCpa.value.trim(), prepCost: fCost.value === '' ? null : parseFloat(fCost.value),
+        formCosts: formCosts.filter(x => (x.form || '').trim()).map(x => ({ form: x.form.trim(), cost: x.cost != null && !isNaN(x.cost) ? x.cost : null })),
         notes: fNotes.value.trim()
       });
       store.saveTaxRecord(entry);

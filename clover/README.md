@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.30 — Taxes dashboard panel, per-form costs, form explanations
+- New **Taxes** dashboard panel: your most recent tax year's **net outcome** (refunds
+  minus payments, amendments included, with Extended/Amended badges) plus **lifetime
+  refunded and paid** totals.
+- Tax filings can now record **itemized per-form costs** (e.g. 1040 $150, Schedule C
+  $75) when the CPA breaks out the bill — informational, kept separate from the total
+  prep cost since they may already be included in it.
+- **Every tax form now explains itself**: hover a form name (dotted underline) for a
+  plain-English description of what it's for, and the add/edit form shows the meaning
+  live as you type.
+
 ### v1.0.29 — Import dividends from your broker
 - New **⬆ Import dividends** on the Income page: upload a broker **activity export**
   (M1 Finance now; Schwab format supported for when you have one) and Clover pulls out
