@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.44';
+const VERSION = '1.0.45';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3238,7 +3238,7 @@ function pagePanelState(store, pageKey, defs) {
   const pp = store.state.settings.pagePanels || {};
   const saved = pageKey === 'dashboard' ? (pp.dashboard || store.state.settings.dashPanels) : pp[pageKey];
   if (Array.isArray(saved) && saved.length) {
-    const known = saved.filter(p => defs.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c }));
+    const known = saved.filter(p => defs.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c, w: (p.w === 1 || p.w === 2) ? p.w : 0 }));
     if (known.length) return known;
   }
   return defs.map(d => ({ k: d.key, c: false }));
@@ -3281,7 +3281,8 @@ function dashIncomeMixBody(ctx) {
 function dashPanel(store, def, entry, state, ctx, opts) {
   const unlocked = opts ? opts.unlocked : dashUnlocked;
   const save = opts ? opts.save : (arr => store.setDashPanels(arr));
-  const panel = el('div', 'dash-panel' + (def.span2 ? ' span2' : ''));
+  const width = entry.w || (def.span2 ? 2 : 1);   // snap widths: 1 = half, 2 = full
+  const panel = el('div', 'dash-panel' + (width === 2 ? ' span2' : ''));
   const head = el('div', 'dash-panel-head');
   if (unlocked) {
     panel.draggable = true;
@@ -3301,6 +3302,10 @@ function dashPanel(store, def, entry, state, ctx, opts) {
   head.appendChild(el('h3', 'dph-title', def.title));
   head.appendChild(el('span', 'dph-caret', entry.c ? '▸' : '▾'));
   if (unlocked) {
+    const wBtn = el('button', 'dph-x dph-w', width === 2 ? '⇥ Half' : '⇤ Full');
+    wBtn.title = 'Snap this panel to ' + (width === 2 ? 'half' : 'full') + ' width';
+    wBtn.addEventListener('click', ev => { ev.stopPropagation(); entry.w = width === 2 ? 1 : 2; save(state); });
+    head.appendChild(wBtn);
     const x = el('button', 'dph-x', '✕'); x.title = 'Remove this panel';
     x.addEventListener('click', ev => { ev.stopPropagation(); save(state.filter(p => p.k !== def.key)); });
     head.appendChild(x);

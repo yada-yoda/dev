@@ -239,10 +239,10 @@ window.cloverStore = {
     else delete state.settings.tableCols[tableKey];
     scheduleSave(); notify();
   },
-  setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0 })) : null; scheduleSave(); notify(); },
+  setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0 })) : null; scheduleSave(); notify(); },
   setPagePanels(pageKey, arr) {
     if (!state.settings.pagePanels) state.settings.pagePanels = {};
-    state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0 })) : null;
+    state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2) ? p.w : 0 })) : null;
     scheduleSave(); notify();
   },
 

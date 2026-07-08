@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.45 — Panel resizing (snap)
+- Dashboard and Reports panels can now be **resized** in ✎ Edit layout: a ⇤/⇥ button on
+  each panel header snaps it between **half** and **full** width (no freestyle dragging —
+  it always stays on the grid). Saved with your layout.
+
 ### v1.0.44 — Paycheck-count bubbles
 - In the income grid, the Paychecks rows (and each employer row) now show a small **×N
   bubble** next to each month — so 3-paycheck months stand out (highlighted amber at 3+),

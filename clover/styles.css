@@ -426,6 +426,7 @@ button { font-family: inherit; cursor: pointer; }
 .dph-caret { color: var(--text-faint); font-size: 11px; }
 .dph-drag { color: var(--text-faint); cursor: grab; }
 .dph-x { border: none; background: none; color: var(--expense); cursor: pointer; font-size: 13px; padding: 0 2px; }
+.dph-w { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .dash-panel.dragging { opacity: .5; }
 .dash-add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
 @media (max-width: 900px) { .dash-panels { grid-template-columns: 1fr; } }
