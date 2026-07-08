@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.40';
+const VERSION = '1.0.41';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3321,6 +3321,35 @@ function incomeByNamedCategory(store, data, re) {
 // Tax history — per-year filings, amendments, extensions
 // ============================================================
 const FED_FORMS = ['1040', '1040-SR', '1040-NR', '1040-X'];
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
+const NO_INCOME_TAX_STATES = ['AK','FL','NV','SD','TN','TX','WA','WY'];
+// Primary state return forms (best-known); anything not listed falls back to
+// "<ST>-1040"-style guesses. Purely suggestions — free-typing always works.
+const STATE_FORMS = {
+  IL: ['IL-1040', 'IL-1040-X', 'Sch IL-WIT', 'Sch M', 'Sch ICR', 'Sch NR'],
+  CA: ['540', '540 2EZ', 'Sch CA (540)'],
+  NY: ['IT-201', 'IT-203', 'IT-201-X'],
+  WI: ['Form 1', 'Form 1NPR'],
+  MI: ['MI-1040', 'MI-1040X'],
+  OH: ['IT 1040', 'SD 100'],
+  PA: ['PA-40'],
+  GA: ['Form 500', 'Form 500X'],
+  IN: ['IT-40'],
+  MN: ['M1', 'M1X'],
+  NJ: ['NJ-1040', 'NJ-1040X'],
+  MA: ['Form 1'],
+  AZ: ['Form 140', 'Form 140X'],
+  CO: ['DR 0104'],
+  MO: ['MO-1040'],
+  VA: ['Form 760'],
+  NC: ['D-400']
+};
+function stateFormSuggestions(st) {
+  const S = String(st || '').trim().toUpperCase();
+  if (!S) return [];
+  if (NO_INCOME_TAX_STATES.includes(S)) return [];
+  return STATE_FORMS[S] || [S + '-1040', S + '-1040-X'];
+}
 // Plain-English meaning of common tax forms — shown as tooltips wherever a form
 // name appears, so it's clear why a form was used that year.
 const TAX_FORM_INFO = {
@@ -3363,8 +3392,8 @@ function formCell(formName) {
   if (info) span.title = info;
   td.appendChild(span); return td;
 }
-const TAX_COL_LABELS = { taxYear: 'Tax year', type: 'Type', fedForm: 'Federal form', fedResult: 'Federal', stateForm: 'State form', stateResult: 'State', preparer: 'Prepared by', prepCost: 'Prep cost', formCosts: 'Form costs', flags: 'Flags', filed: 'Filed', notes: 'Notes' };
-const TAX_ALL_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'formCosts', 'flags', 'filed', 'notes'];
+const TAX_COL_LABELS = { taxYear: 'Tax year', type: 'Type', fedForm: 'Federal form', fedResult: 'Federal', stateFiled: 'State filed in', stateForm: 'State form', stateResult: 'State', preparer: 'Prepared by', prepCost: 'Prep cost', formCosts: 'Form costs', flags: 'Flags', filed: 'Filed', notes: 'Notes' };
+const TAX_ALL_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateFiled', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'formCosts', 'flags', 'filed', 'notes'];
 const TAX_DEFAULT_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'flags'];
 function taxOutcomeCell(outcome, amount) {
   const td = el('td', 'num');
@@ -3381,6 +3410,7 @@ function buildTaxCol(store, key) {
     case 'type': return { label: 'Type', key: 'type', value: r => r.kind === 'amendment' ? 1 : 0, cell: r => { const td = el('td'); td.appendChild(r.kind === 'amendment' ? badge('Amendment', 'amber') : el('span', 'muted', 'Original')); return td; } };
     case 'fedForm': return { label: 'Federal form', key: 'fedForm', value: r => r.fedForm || '', cell: r => formCell(r.fedForm) };
     case 'fedResult': return { label: 'Federal', key: 'fedResult', num: true, value: r => taxOutcomeSortVal(r.fedOutcome, r.fedAmount), cell: r => taxOutcomeCell(r.fedOutcome, r.fedAmount) };
+    case 'stateFiled': return { label: 'State filed in', key: 'stateFiled', value: r => r.state || '', cell: r => el('td', 'muted', r.state || '—') };
     case 'stateForm': return { label: 'State form', key: 'stateForm', value: r => r.stateForm || '', cell: r => formCell(r.stateForm) };
     case 'stateResult': return { label: 'State', key: 'stateResult', num: true, value: r => taxOutcomeSortVal(r.stateOutcome, r.stateAmount), cell: r => taxOutcomeCell(r.stateOutcome, r.stateAmount) };
     case 'preparer': return { label: 'Prepared by', key: 'preparer', value: r => r.preparer || '', cell: r => el('td', null, r.preparer || '—') };
@@ -3412,20 +3442,20 @@ function buildTaxCol(store, key) {
 }
 
 // ---- Tax history CSV: export, import (with template) ----
-const TAX_CSV_HEADERS = ['Tax year', 'Filing type', 'Federal form', 'Federal outcome', 'Federal amount', 'State form', 'State outcome', 'State amount', 'Prepared by', 'Prep cost', 'Extended', 'Filed date', 'Form costs', 'Notes'];
+const TAX_CSV_HEADERS = ['Tax year', 'Filing type', 'Federal form', 'Federal outcome', 'Federal amount', 'State filed in', 'State form', 'State outcome', 'State amount', 'Prepared by', 'Prep cost', 'Extended', 'Filed date', 'Form costs', 'Notes'];
 function csvEsc(v) { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
 function exportTaxesCSV(store) {
   const rows = [TAX_CSV_HEADERS.join(',')];
   store.state.taxRecords.forEach(r => rows.push([
-    r.taxYear, r.kind || 'original', r.fedForm, r.fedOutcome, r.fedAmount, r.stateForm, r.stateOutcome, r.stateAmount,
+    r.taxYear, r.kind || 'original', r.fedForm, r.fedOutcome, r.fedAmount, r.state, r.stateForm, r.stateOutcome, r.stateAmount,
     r.preparer, r.prepCost, r.extended ? 'yes' : 'no', r.filedDate,
     (r.formCosts || []).map(f => f.form + ': ' + (f.cost != null ? f.cost : '')).join('; '), r.notes
   ].map(csvEsc).join(',')));
   downloadFile('clover-tax-history.csv', rows.join('\n'), 'text/csv');
 }
 const TAX_TEMPLATE_CSV = TAX_CSV_HEADERS.join(',') + '\n'
-  + '2025,original,1040,refund,1250,State 1040,owed,300,Smith CPA,225,no,2026-03-15,"1040: 150; Schedule B: 75",\n'
-  + '2025,amendment,1040-X,refund,120,State 1040-X,none,,Smith CPA,75,no,2026-06-01,,Corrected a missed 1099\n';
+  + '2025,original,1040,refund,1250,IL,IL-1040,owed,300,Smith CPA,225,no,2026-03-15,"1040: 150; Schedule B: 75",\n'
+  + '2025,amendment,1040-X,refund,120,IL,IL-1040-X,none,,Smith CPA,75,no,2026-06-01,,Corrected a missed 1099\n';
 function importTaxesCSV(store, rows) {
   const g = (r, name) => { const k = Object.keys(r).find(x => x.trim().toLowerCase() === name.toLowerCase()); return k ? String(r[k]).trim() : ''; };
   const outcome = v => /refund/i.test(v) ? 'refund' : /owed|paid/i.test(v) ? 'owed' : 'none';
@@ -3438,7 +3468,7 @@ function importTaxesCSV(store, rows) {
     const entry = {
       taxYear, kind: /amend/i.test(g(r, 'Filing type')) ? 'amendment' : 'original',
       fedForm: g(r, 'Federal form'), fedOutcome: outcome(g(r, 'Federal outcome')), fedAmount: num(g(r, 'Federal amount')),
-      stateForm: g(r, 'State form'), stateOutcome: outcome(g(r, 'State outcome')), stateAmount: num(g(r, 'State amount')),
+      state: g(r, 'State filed in').toUpperCase(), stateForm: g(r, 'State form'), stateOutcome: outcome(g(r, 'State outcome')), stateAmount: num(g(r, 'State amount')),
       preparer: g(r, 'Prepared by'), prepCost: num(g(r, 'Prep cost')),
       extended: /^(y|yes|true|1|x)$/i.test(g(r, 'Extended')), filedDate: parseImportDate(g(r, 'Filed date')),
       formCosts: g(r, 'Form costs').split(';').map(x => { const m = /^(.+?):\s*([\d.]*)$/.exec(x.trim()); return m ? { form: m[1].trim(), cost: m[2] ? parseFloat(m[2]) : null } : null; }).filter(Boolean),
@@ -3536,8 +3566,14 @@ function taxModal(existing, preset) {
   const fedList = el('datalist'); fedList.id = 'fed-form-list';
   [...new Set(FED_FORMS.concat(s.taxRecords.map(x => x.fedForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; fedList.appendChild(o); });
   body.appendChild(fedList);
+  const usList = el('datalist'); usList.id = 'us-states-list';
+  US_STATES.forEach(x => { const o = el('option'); o.value = x; usList.appendChild(o); });
+  body.appendChild(usList);
   const stList = el('datalist'); stList.id = 'state-form-list';
-  [...new Set(s.taxRecords.map(x => x.stateForm).filter(Boolean))].forEach(f => { const o = el('option'); o.value = f; stList.appendChild(o); });
+  const rebuildStateForms = st => {
+    stList.innerHTML = '';
+    [...new Set(stateFormSuggestions(st).concat(s.taxRecords.map(x => x.stateForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; stList.appendChild(o); });
+  };
   body.appendChild(stList);
   const cpaList = el('datalist'); cpaList.id = 'cpa-list';
   [...new Set(s.taxRecords.map(x => x.preparer).filter(Boolean))].forEach(p => { const o = el('option'); o.value = p; cpaList.appendChild(o); });
@@ -3548,6 +3584,14 @@ function taxModal(existing, preset) {
   const fFedForm = input(r.fedForm || '', { placeholder: 'e.g. 1040', list: 'fed-form-list' });
   const fFedOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.fedOutcome || 'refund');
   const fFedAmt = input(r.fedAmount != null ? r.fedAmount : '', { type: 'number', placeholder: '0.00' }); fFedAmt.step = '0.01';
+  const fStateFiled = input(r.state || '', { placeholder: 'e.g. two-letter code', list: 'us-states-list' });
+  const stateHint = el('div', 'sum-hint');
+  const syncStateFiled = () => {
+    rebuildStateForms(fStateFiled.value);
+    const S = fStateFiled.value.trim().toUpperCase();
+    stateHint.textContent = NO_INCOME_TAX_STATES.includes(S) ? 'This state has no income tax — a state return usually isn’t filed.' : '';
+  };
+  fStateFiled.addEventListener('input', syncStateFiled);
   const fStForm = input(r.stateForm || '', { placeholder: 'your state’s return form', list: 'state-form-list' });
   const fStOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.stateOutcome || 'refund');
   const fStAmt = input(r.stateAmount != null ? r.stateAmount : '', { type: 'number', placeholder: '0.00' }); fStAmt.step = '0.01';
@@ -3600,14 +3644,17 @@ function taxModal(existing, preset) {
   fedRow.appendChild(field('Federal outcome', fFedOut, 'Whether the federal return came back as a refund or you owed.'));
   fedRow.appendChild(field('Federal amount', fFedAmt, 'The refund received or the amount paid, for the federal return.'));
   body.appendChild(fedRow);
+  const stateFiledField = field('State filed in', fStateFiled, 'Which state this return was filed in. Picking one fills the State-form suggestions with that state’s forms (e.g. IL → IL-1040, Sch IL-WIT).');
+  stateFiledField.appendChild(stateHint);
+  body.appendChild(stateFiledField);
   const stRow = el('div', 'cd-fields');
-  const stField = field('State form', fStForm, 'The state return form filed, if any.');
+  const stField = field('State form', fStForm, 'The state return form filed, if any. Suggestions come from the “State filed in” above.');
   stField.appendChild(stHint);
   stRow.appendChild(stField);
   stRow.appendChild(field('State outcome', fStOut, 'Whether the state return came back as a refund or you owed.'));
   stRow.appendChild(field('State amount', fStAmt, 'The refund received or the amount paid, for the state return.'));
   body.appendChild(stRow);
-  syncHints();
+  syncHints(); syncStateFiled();
   const meta = el('div', 'two-col');
   meta.appendChild(field('Filed date', fFiled, 'When this return (or amendment) was actually filed.'));
   meta.appendChild(field('Extension', cExt));
@@ -3626,7 +3673,7 @@ function taxModal(existing, preset) {
       const taxYear = parseInt(fYear.value, 10);
       if (!taxYear || taxYear < 1990) { fYear.focus(); toast('Enter the tax year', 'warn'); return false; }
       const entry = Object.assign(r, {
-        taxYear, kind: fKind.value,
+        taxYear, kind: fKind.value, state: fStateFiled.value.trim().toUpperCase(),
         fedForm: fFedForm.value.trim(), fedOutcome: fFedOut.value,
         fedAmount: fFedAmt.value === '' ? null : parseFloat(fFedAmt.value),
         stateForm: fStForm.value.trim(), stateOutcome: fStOut.value,

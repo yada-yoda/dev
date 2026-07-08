@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.41 — Tax returns know their state
+- Tax returns now record the **state filed in**; picking a state fills the state-form
+  suggestions with that state's actual forms (e.g. IL → IL-1040, IL-1040-X, Sch IL-WIT,
+  Sch M, Sch ICR), with a heads-up for no-income-tax states. Optional "State filed in"
+  column, included in the CSV export/import/template.
+
 ### v1.0.40 — Account columns, colored value filters
 - Accounts gained **CD APY**, **CD maturity**, and **Savings APY (latest)** columns (the
   savings rate pulls the newest entry you've recorded under Credit & Rates for that
