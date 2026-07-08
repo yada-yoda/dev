@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.48 — Gross / Net toggle on the income grid
+- The income **Annual grid** now has a **Gross | Net** toggle: Net shows true take-home
+  amounts — paycheck-backed categories (Wages, Acting) switch to their recorded net,
+  while dividends, interest, rewards, and sales are already net so they stay put. The
+  header total follows ("$X net received").
+
 ### v1.0.47 — Dividend import: accounts, specials; per-account grid rows; donut %
 - Duplicate checks are now **account-aware**: importing to a *different* "Record under"
   account treats a matching date/stock/amount as a **new payout** (a note says how many

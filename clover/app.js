@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.47';
+const VERSION = '1.0.48';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -40,6 +40,7 @@ let storeReady = false;
 let activeYear = new Date().getFullYear();
 let activeMonth = 0;                 // 0 = All months
 let incomeTab = 'grid';             // 'grid' | 'list'
+let incomeAmountMode = 'gross';     // annual grid shows 'gross' | 'net' amounts
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
 let accountsFilter = null;   // { key, value } from clicking a value badge
@@ -892,9 +893,12 @@ function renderIncome(view) {
   const left = el('div');
   left.appendChild(el('h3', null, 'Income · ' + activeYear));
   const pcGross = data.paychecks.filter(isPaycheckPaid).reduce((s, p) => s + (Number(p.gross) || 0), 0);
-  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0) + pcGross + salesTotal(data);
+  const useNet = incomeTab === 'grid' && incomeAmountMode === 'net';
+  const received = useNet
+    ? data.income.filter(countable).reduce((s, e) => s + netAmountOf(e), 0) + data.paychecks.filter(isPaycheckPaid).reduce((s, p) => s + paycheckNet(p), 0) + salesTotal(data)
+    : data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0) + pcGross + salesTotal(data);
   const n = data.income.length;
-  left.appendChild(el('p', 'muted', money(received) + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + (pcGross ? ' + paychecks' : '')));
+  left.appendChild(el('p', 'muted', money(received) + (useNet ? ' net' : '') + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + (pcGross ? ' + paychecks' : '')));
   head.appendChild(left);
 
   const right = el('div', 'head-actions');
@@ -905,6 +909,18 @@ function renderIncome(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
+  if (incomeTab === 'grid') {
+    // Gross vs take-home view of the grid. Only paycheck-backed categories (Wages,
+    // Acting) actually change — dividends/interest/rewards/sales are already net.
+    const modeTabs = el('div', 'tabs');
+    [['gross', 'Gross'], ['net', 'Net']].forEach(([m0, label]) => {
+      const b = el('button', 'tab' + (incomeAmountMode === m0 ? ' active' : ''), label);
+      b.title = m0 === 'net' ? 'Show take-home amounts — paychecks use their recorded net (falling back to gross when net wasn’t recorded)' : 'Show gross amounts (before taxes/withholding)';
+      b.addEventListener('click', () => { incomeAmountMode = m0; renderView(currentRoute); });
+      modeTabs.appendChild(b);
+    });
+    right.appendChild(modeTabs);
+  }
   right.appendChild(importButton('income'));
   const divBtn = el('button', 'btn-ghost', '⬆ Import dividends');
   divBtn.title = 'Import dividends from a broker activity export (M1 Finance, Schwab)';
@@ -928,6 +944,8 @@ function pcCountBubble(n, hot) {
 }
 function incomeGrid(data) {
   const store = window.cloverStore, groups = store.state.incomeCategories;
+  const useNet = incomeAmountMode === 'net';
+  const gAmt = e => useNet ? netAmountOf(e) : amountOf(e);
   const entries = data.income.filter(countable);
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table grid-table');
@@ -935,7 +953,7 @@ function incomeGrid(data) {
   const tb = el('tbody');
   const grand = new Array(12).fill(0);
 
-  const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += amountOf(e); }); return m; };
+  const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += gAmt(e); }); return m; };
   const addRow = (cls, label, monthly, onClick, caret, counts) => {
     const tr = el('tr', cls);
     const c0 = el('td', cls.includes('sub-row') ? 'sub-name' : 'grp-name');
@@ -956,7 +974,7 @@ function incomeGrid(data) {
     const monthly = monthsFor(gEntries);
     // Paychecks are the source of truth for wages — roll their gross into the
     // mapped income category (so wages aren't entered twice).
-    const pcMonthly = paycheckMonthsFor(data.paychecks, g.id);
+    const pcMonthly = paycheckMonthsFor(data.paychecks, g.id, useNet);
     const hasPc = pcMonthly.some(v => v > 0);
     for (let i = 0; i < 12; i++) monthly[i] += pcMonthly[i];
     // Sales are the source of truth for the Selling category (like paychecks->Wages).
@@ -1002,7 +1020,7 @@ function incomeGrid(data) {
           emps.forEach(emp => {
             const m = new Array(12).fill(0), cnt = new Array(12).fill(0);
             catChecksAll.filter(p => ((p.employer || '').trim() || '(no employer)') === emp)
-              .forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) { m[mi] += Number(p.gross) || 0; cnt[mi]++; } });
+              .forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) { m[mi] += useNet ? paycheckNet(p) : (Number(p.gross) || 0); cnt[mi]++; } });
             tb.appendChild(addRow('sub-row emp-row', emp, m, null, null, cnt));
           });
         }
@@ -1998,12 +2016,12 @@ function paycheckDaysLate(p) {
   return Math.round((rd - pd) / 86400000);
 }
 // Monthly gross for PAID paychecks mapped to a given income category (by pay-date month).
-function paycheckMonthsFor(paychecks, incomeCatId) {
+function paycheckMonthsFor(paychecks, incomeCatId, useNet) {
   const m = new Array(12).fill(0);
   (paychecks || []).forEach(p => {
     if (!isPaycheckPaid(p)) return;
     if ((p.incomeCategoryId || '') !== incomeCatId) return;
-    const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p.gross) || 0;
+    const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += useNet ? paycheckNet(p) : (Number(p.gross) || 0);
   });
   return m;
 }
