@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.49 — Colored, clickable tags on Bills & Subscriptions
+- The **Category, Frequency, and Account** columns on Bills & Subscriptions now use the
+  same colored value tags as Accounts — each column its own color, each value its own
+  shade — and **clicking a tag filters the table** to that value (e.g. click "Monthly" or
+  "Streaming"), with a clear-filter chip.
+
 ### v1.0.48 — Gross / Net toggle on the income grid
 - The income **Annual grid** now has a **Gross | Net** toggle: Net shows true take-home
   amounts — paycheck-backed categories (Wages, Acting) switch to their recorded net,

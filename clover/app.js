@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.48';
+const VERSION = '1.0.49';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -48,6 +48,7 @@ let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
+let subsBadgeFilter = null;        // { key, value } from clicking a subs value badge
 let taxesSort = { key: 'taxYear', dir: 'desc' };
 let salesSort = { key: 'orderDate', dir: 'desc' };
 let salesImportState = null;   // parsed Poshmark sales awaiting review
@@ -603,15 +604,22 @@ const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'fla
 // Colored value badge: each column gets a base hue, each distinct value a shade —
 // so CD vs Checking (or Ally vs Chase) is recognizable at a glance. Clicking one
 // filters the table to that value.
-const ACCT_BADGE_HUES = { type: 145, institution: 215, owner: 275, beneficiaries: 25 };
+// Colored, clickable value badges — per-column base hue, per-value shade
+// (first-seen order, wraps after 6), click filters the table to that value.
+// Scoped per table: 'accounts' uses accountsFilter, 'subs' uses subsBadgeFilter.
+const BADGE_HUES = {
+  'accounts.type': 145, 'accounts.institution': 215, 'accounts.owner': 275, 'accounts.beneficiaries': 25,
+  'subs.category': 275, 'subs.frequency': 215, 'subs.account': 145
+};
 const _badgeShadeIdx = {};
-function valueBadge(colKey, text) {
+function tableFilterGet(scope) { return scope === 'subs' ? subsBadgeFilter : accountsFilter; }
+function tableFilterSet(scope, f) { if (scope === 'subs') subsBadgeFilter = f; else accountsFilter = f; }
+function valueBadge(scope, colKey, text) {
   if (!text) return el('span', 'muted', '—');
-  // Shades assigned in first-seen order per column, so distinct values get
-  // distinct shades of that column's color (wraps after 6).
-  const m = _badgeShadeIdx[colKey] = _badgeShadeIdx[colKey] || new Map();
+  const full = scope + '.' + colKey;
+  const m = _badgeShadeIdx[full] = _badgeShadeIdx[full] || new Map();
   if (!m.has(text)) m.set(text, m.size);
-  const hue = ACCT_BADGE_HUES[colKey] || 200;
+  const hue = BADGE_HUES[full] || 200;
   const light = 90 - (m.get(text) % 6) * 6;   // 90 -> 60 in 6 steps
   const b = el('span', 'badge val-badge', text);
   b.style.background = 'hsl(' + hue + ', 45%, ' + light + '%)';
@@ -619,7 +627,8 @@ function valueBadge(colKey, text) {
   b.title = 'Click to show only “' + text + '”';
   b.addEventListener('click', ev => {
     ev.stopPropagation();
-    accountsFilter = (accountsFilter && accountsFilter.key === colKey && accountsFilter.value === text) ? null : { key: colKey, value: text };
+    const cur = tableFilterGet(scope);
+    tableFilterSet(scope, (cur && cur.key === colKey && cur.value === text) ? null : { key: colKey, value: text });
     renderView(currentRoute);
   });
   return b;
@@ -641,10 +650,10 @@ function buildAcctCol(store, key) {
           td.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
         }
         return td; } };
-    case 'institution': return { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('institution', a.institution)); return td; } };
-    case 'type': return { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('type', a.type)); return td; } };
+    case 'institution': return { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'institution', a.institution)); return td; } };
+    case 'type': return { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'type', a.type)); return td; } };
     case 'last4': return { label: 'Last 4', key: 'last4', value: a => a.last4 || '', cell: a => el('td', null, a.last4 ? ('••' + a.last4) : '—') };
-    case 'owner': return { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => { const td = el('td'); const n = store.personName(a.personId); td.appendChild(valueBadge('owner', n === '—' ? '' : n)); return td; } };
+    case 'owner': return { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => { const td = el('td'); const n = store.personName(a.personId); td.appendChild(valueBadge('accounts', 'owner', n === '—' ? '' : n)); return td; } };
     case 'flags': return { label: 'Flags', sortable: false, cell: a => {
         const td = el('td'); const flags = el('div', 'flags');
         flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
@@ -655,7 +664,7 @@ function buildAcctCol(store, key) {
         if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
         if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } };
-    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('beneficiaries', (a.beneficiaries || '').trim())); return td; } };
+    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'beneficiaries', (a.beneficiaries || '').trim())); return td; } };
     case 'cdApy': return { label: 'CD APY', key: 'cdApy', num: true, value: a => Number(a.cdApy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.type === 'CD' && a.cdApy != null && a.cdApy !== '') ? (Number(a.cdApy).toFixed(2) + '%') : '—'; return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
     case 'savingsRate': return { label: 'Savings APY (latest)', key: 'savingsRate', num: true, value: a => { const r = latestRateFor(store, a.institution); return r ? Number(r.apy) || 0 : -1; }, cell: a => {
@@ -1352,14 +1361,14 @@ function buildSubsCol(store, key, net) {
         td.appendChild(nm);
         if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
         return td; } };
-    case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => el('td', null, store.expenseGroupName(r.categoryId)) };
+    case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => { const td = el('td'); const n = store.expenseGroupName(r.categoryId); td.appendChild(valueBadge('subs', 'category', n === '—' ? '' : n)); return td; } };
     case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) };
-    case 'frequency': return { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => el('td', null, freqLabel(r)) };
+    case 'frequency': return { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => { const td = el('td'); td.appendChild(valueBadge('subs', 'frequency', freqLabel(r))); return td; } };
     case 'monthly': return { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) };
     case 'annual': return { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) };
     case 'pct': return { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } };
     case 'renews': return { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) };
-    case 'account': return { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') };
+    case 'account': return { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => { const td = el('td'); td.appendChild(valueBadge('subs', 'account', store.accountName(r.accountId) || '')); return td; } };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
@@ -1422,6 +1431,19 @@ function renderSubscriptions(view) {
   let rows = all.slice();
   if (subsStatusFilter === 'active') rows = rows.filter(isSubActive);
   if (subsCatFilter !== 'all') rows = rows.filter(r => r.categoryId === subsCatFilter);
+  if (subsBadgeFilter) {
+    const f = subsBadgeFilter;
+    const valOf = r => f.key === 'category' ? store.expenseGroupName(r.categoryId)
+      : f.key === 'frequency' ? freqLabel(r)
+      : f.key === 'account' ? (store.accountName(r.accountId) || '') : '';
+    rows = rows.filter(r => valOf(r) === f.value);
+    const fb = el('div', 'filter-bar');
+    fb.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (f.key === 'freq' ? 'frequency' : f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { subsBadgeFilter = null; renderView(currentRoute); });
+    fb.appendChild(clear);
+    view.appendChild(fb);
+  }
 
   if (!rows.length) {
     view.appendChild(emptyState('No subscriptions yet',
