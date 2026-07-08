@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.25';
+const VERSION = '1.0.26';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2381,6 +2381,9 @@ function renderCredit(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
+  right.appendChild(creditTab === 'credit'
+    ? columnsButton('credit', CREDIT_ALL_COLS, CREDIT_ALL_COLS, CREDIT_COL_LABELS, 'Credit score columns')
+    : columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns'));
   const add = el('button', 'btn-primary', creditTab === 'credit' ? '+ Add score' : '+ Add rate');
   add.addEventListener('click', () => creditTab === 'credit' ? creditScoreModal(null) : rateModal(null));
   right.appendChild(add);
@@ -2388,6 +2391,27 @@ function renderCredit(view) {
   view.appendChild(head);
 
   if (creditTab === 'credit') renderCreditTab(view); else renderRatesTab(view);
+}
+
+const CREDIT_COL_LABELS = { date: 'Date', score: 'Score', provider: 'Provider' };
+const CREDIT_ALL_COLS = ['date', 'score', 'provider'];
+function buildCreditCol(store, key) {
+  switch (key) {
+    case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
+    case 'score': return { label: 'Score', key: 'score', num: true, value: r => Number(r.score) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = r.score || '—'; return td; } };
+    case 'provider': return { label: 'Provider', key: 'provider', value: r => r.provider || '', cell: r => el('td', null, r.provider || '—') };
+  }
+  return null;
+}
+const RATES_COL_LABELS = { date: 'Date', institution: 'Bank / institution', apy: 'APY' };
+const RATES_ALL_COLS = ['date', 'institution', 'apy'];
+function buildRatesCol(store, key) {
+  switch (key) {
+    case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
+    case 'institution': return { label: 'Bank / institution', key: 'institution', value: r => rateInstitution(store, r), cell: r => el('td', null, rateInstitution(store, r) || '—') };
+    case 'apy': return { label: 'APY', key: 'apy', num: true, value: r => Number(r.apy) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = (r.apy != null && r.apy !== '') ? (Number(r.apy).toFixed(2) + '%') : '—'; return td; } };
+  }
+  return null;
 }
 
 function renderCreditTab(view) {
@@ -2415,9 +2439,7 @@ function renderCreditTab(view) {
   }
 
   const cols = [
-    { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
-    { label: 'Score', key: 'score', num: true, value: r => Number(r.score) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = r.score || '—'; return td; } },
-    { label: 'Provider', key: 'provider', value: r => r.provider || '', cell: r => el('td', null, r.provider || '—') },
+    ...tableColKeys(store, 'credit', CREDIT_COL_LABELS, CREDIT_ALL_COLS).map(k => buildCreditCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => creditScoreModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + (r.provider || 'score'), () => store.removeCreditScore(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
@@ -2455,9 +2477,7 @@ function renderRatesTab(view) {
   }
 
   const cols = [
-    { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) },
-    { label: 'Bank / institution', key: 'institution', value: r => rateInstitution(store, r), cell: r => el('td', null, rateInstitution(store, r) || '—') },
-    { label: 'APY', key: 'apy', num: true, value: r => Number(r.apy) || 0, cell: r => { const td = el('td', 'num strong'); td.textContent = (r.apy != null && r.apy !== '') ? (Number(r.apy).toFixed(2) + '%') : '—'; return td; } },
+    ...tableColKeys(store, 'rates', RATES_COL_LABELS, RATES_ALL_COLS).map(k => buildRatesCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns; renderView(currentRoute); }, null)); view.appendChild(card);
@@ -2861,12 +2881,21 @@ function yearSummary(store, y) {
     rewards: incomeByNamedCategory(store, d, /reward/i)
   };
 }
+const YOY_COL_LABELS = { income: 'Income', expenses: 'Expenses', net: 'Net', dividends: 'Dividends', interest: 'Interest', rewards: 'Rewards' };
+const YOY_ALL_COLS = ['income', 'expenses', 'net', 'dividends', 'interest', 'rewards'];
+function yoyCell(r, key) {
+  if (key === 'net') { const td = numCell(r.net, true); td.classList.add(r.net >= 0 ? 'pos' : 'neg'); return td; }
+  return numCell(r[key], key === 'income');
+}
 function yoyOverview(store) {
   const curYear = new Date().getFullYear();
   const years = []; for (let y = curYear; y >= 2020; y--) years.push(y);
   const missing = years.filter(y => !store.isYearLoaded(y));
   const card = el('div', 'card');
-  card.appendChild(el('h3', 'strip-title', 'Year overview'));
+  const yh = el('div', 'view-head');
+  yh.appendChild(el('h3', 'strip-title', 'Year overview'));
+  yh.appendChild(columnsButton('yoy', YOY_ALL_COLS, YOY_ALL_COLS, YOY_COL_LABELS, 'Year overview columns'));
+  card.appendChild(yh);
   if (missing.length) {
     missing.forEach(y => store.loadYear(y));   // re-renders when each loads
     card.appendChild(el('div', 'muted', 'Loading year data…'));
@@ -2874,19 +2903,15 @@ function yoyOverview(store) {
   }
   const rows = years.map(y => yearSummary(store, y)).filter(r => r.income || r.expenses);
   if (!rows.length) { card.appendChild(el('div', 'muted', 'No data yet — add income and expenses to see year-over-year totals.')); return card; }
+  const keys = tableColKeys(store, 'yoy', YOY_COL_LABELS, YOY_ALL_COLS);
   const wrap = el('div', 'table-scroll');
   const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Year</th><th class="num">Income</th><th class="num">Expenses</th><th class="num">Net</th><th class="num">Dividends</th><th class="num">Interest</th><th class="num">Rewards</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Year</th>' + keys.map(k => '<th class="num">' + YOY_COL_LABELS[k] + '</th>').join('') + '</tr></thead>';
   const tb = el('tbody');
   rows.forEach(r => {
     const tr = el('tr');
     tr.appendChild(el('td', 'strong', String(r.year)));
-    tr.appendChild(numCell(r.income, true));
-    tr.appendChild(numCell(r.expenses));
-    const netTd = numCell(r.net, true); netTd.classList.add(r.net >= 0 ? 'pos' : 'neg'); tr.appendChild(netTd);
-    tr.appendChild(numCell(r.dividends));
-    tr.appendChild(numCell(r.interest));
-    tr.appendChild(numCell(r.rewards));
+    keys.forEach(k => tr.appendChild(yoyCell(r, k)));
     tb.appendChild(tr);
   });
   table.appendChild(tb); wrap.appendChild(table); card.appendChild(wrap);

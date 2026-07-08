@@ -45,6 +45,10 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.26 — Customizable columns on Credit & Rates and Year overview
+- **⚙ Columns** on the Credit scores and Savings rates tables (per-tab), and on the
+  **Year overview** table in Reports (choose which yearly metrics to show).
+
 ### v1.0.25 — Customizable columns on Accounts
 - **⚙ Columns** on the Accounts page too, with optional **Beneficiaries** and **Notes**
   columns.
