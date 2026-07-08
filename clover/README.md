@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.29 — Import dividends from your broker
+- New **⬆ Import dividends** on the Income page: upload a broker **activity export**
+  (M1 Finance now; Schwab format supported for when you have one) and Clover pulls out
+  just the **dividends** — purchases are never imported, but they're used to tag payouts
+  that were **↻ Reinvested** into the same stock.
+- **Duplicate safety**: anything matching an existing entry's date + stock + amount (or
+  repeated inside the file) goes to a review list where you choose **Merge (skip)** or
+  **Add as separate** — so overlapping M1 exports can't double-log dividends.
+- Optionally imports **dividend-related fees** (e.g. that $0.05 ADR debit) as expenses in
+  a category you pick, in the same batch. Everything is one **undoable** import.
+- Qualified / non-qualified is captured when the broker provides it (Schwab does); the
+  symbol and reinvested tag now show in the income List.
+
 ### v1.0.28 — Tax history section
 - New **Taxes** page: log each year's filing — the **federal and state forms** used, whether
   each came back as a **refund or owed** (and how much), **who prepared it** (your CPA) and

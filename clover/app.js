@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.28';
+const VERSION = '1.0.29';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -837,6 +837,10 @@ function renderIncome(view) {
   });
   right.appendChild(tabs);
   right.appendChild(importButton('income'));
+  const divBtn = el('button', 'btn-ghost', '⬆ Import dividends');
+  divBtn.title = 'Import dividends from a broker activity export (M1 Finance, Schwab)';
+  divBtn.addEventListener('click', () => startImport('dividends'));
+  right.appendChild(divBtn);
   const add = el('button', 'btn-primary', '+ Add income'); add.addEventListener('click', () => incomeModal(null));
   right.appendChild(add);
   head.appendChild(right);
@@ -942,8 +946,9 @@ function incomeList(data) {
     tr.appendChild(el('td', null, fmtDate(e.date)));
     tr.appendChild(el('td', null, store.incomeGroupName(e.categoryId)));
     const srcTd = el('td');
-    srcTd.appendChild(document.createTextNode(e.rewardSource || e.otherType || store.subName('income', e.categoryId, e.subId) || '—'));
-    const srcSub = e.rewardType || e.description;
+    srcTd.appendChild(document.createTextNode(e.rewardSource || e.otherType || e.symbol || store.subName('income', e.categoryId, e.subId) || '—'));
+    if (e.reinvested) { srcTd.appendChild(document.createTextNode(' ')); srcTd.appendChild(badge('↻ Reinvested', 'type')); }
+    const srcSub = e.rewardType || e.description || (e.symbol && e.action ? e.action : '');
     if (srcSub) srcTd.appendChild(el('div', 'acct-sub', srcSub));
     tr.appendChild(srcTd);
     tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
@@ -3504,6 +3509,7 @@ let importState = { target: 'income', rows: null, headers: null, mapping: {}, fa
 // Jump to the Import page pre-set to a dataset (used by per-page Import buttons).
 function startImport(target) {
   importState = { target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+  divImportState = null;
   location.hash = '#import';
 }
 function importButton(target) {
@@ -3612,16 +3618,200 @@ function dupKey(target, e) {
   return e.date + '|' + (Number(e.gross) || 0).toFixed(2) + '|' + (e.categoryId || '');
 }
 
+// ============================================================
+// Dividend import — broker activity files (M1 Finance, Schwab)
+// ============================================================
+// M1 exports ALL account activity in one file, so this pipeline keeps only
+// dividend rows (purchases are used solely to tag reinvestment), dedups on
+// date+symbol+amount, and routes anything ambiguous through a review step.
+let divImportState = null;   // { filename, broker, divs, buys, fees, choices, includeFees, feeCat, accountId }
+const BROKER_PARSERS = [
+  {
+    key: 'm1', name: 'M1 Finance',
+    detect: h => h.includes('Transaction Type') && h.includes('Symbol') && h.includes('Amount'),
+    parse: rows => {
+      const divs = [], buys = [], fees = [];
+      rows.forEach(r => {
+        const type = String(r['Transaction Type'] || '').toUpperCase();
+        const date = parseImportDate(r['Date'] || r['Posted Date']);
+        const symbol = String(r['Symbol'] || '').trim().toUpperCase();
+        const amt = parseImportAmount(r['Amount']);
+        if (!date || isNaN(amt)) return;
+        if (type === 'DIVIDEND' && amt > 0) divs.push({ date, symbol, amount: amt, action: '', desc: r['Description'] || '' });
+        else if (type === 'PURCHASED' && symbol) buys.push({ date, symbol });
+        else if (type === 'OTHER' && symbol && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: r['Description'] || '' });
+      });
+      return { divs, buys, fees };
+    }
+  },
+  {
+    key: 'schwab', name: 'Charles Schwab',
+    detect: h => h.includes('Action') && h.includes('Symbol') && h.includes('Amount'),
+    parse: rows => {
+      const divs = [], buys = [], fees = [];
+      rows.forEach(r => {
+        const action = String(r['Action'] || '').trim();
+        const date = parseImportDate(String(r['Date'] || '').split(' as of')[0]);
+        const symbol = String(r['Symbol'] || '').trim().toUpperCase();
+        const amt = parseImportAmount(r['Amount']);
+        if (!date) return;
+        if (/reinvest shares|^buy$/i.test(action)) { if (symbol) buys.push({ date, symbol }); return; }
+        if (/dividend/i.test(action) && !isNaN(amt) && amt > 0) divs.push({ date, symbol, amount: amt, action, desc: r['Description'] || '' });
+        else if (/fee|adr/i.test(action) && !isNaN(amt) && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: (action + ' ' + (r['Description'] || '')).trim() });
+      });
+      return { divs, buys, fees };
+    }
+  }
+];
+function divKey(d) { return d.date + '|' + (d.symbol || '') + '|' + (Number(d.amount) || 0).toFixed(2); }
+// Existing dividend keys across every loaded year (manual entries included, when
+// they carry a symbol) — this is what makes re-imports and overlapping M1 exports safe.
+function existingDividendKeys(store) {
+  const keys = new Set();
+  Object.keys(store.state.years).forEach(yk => {
+    const d = store.state.years[yk]; if (!d || !d.income) return;
+    d.income.forEach(e => { if (e.symbol) keys.add(e.date + '|' + String(e.symbol).toUpperCase() + '|' + (Number(e.gross) || 0).toFixed(2)); });
+  });
+  return keys;
+}
+function analyzeDividendFile(store, rows, headers, filename) {
+  const parser = BROKER_PARSERS.find(p => p.detect(headers));
+  if (!parser) return null;
+  const parsed = parser.parse(rows);
+  // Reinvested = a purchase of the same symbol within 14 days after the dividend.
+  parsed.divs.forEach(d => {
+    d.reinvested = parsed.buys.some(b => b.symbol === d.symbol && daysBetweenISO(b.date, d.date) >= 0 && daysBetweenISO(b.date, d.date) <= 14);
+    d.qualified = /non-?qualified/i.test(d.action) ? 'Non-qualified' : /qualified/i.test(d.action) ? 'Qualified' : '';
+  });
+  // Flag duplicates: already recorded (DB) or repeated within the file.
+  const dbKeys = existingDividendKeys(store);
+  const seenInFile = new Set();
+  parsed.divs.forEach((d, i) => {
+    d.uid = i; const k = divKey(d);
+    d.dup = dbKeys.has(k) ? 'db' : seenInFile.has(k) ? 'file' : '';
+    seenInFile.add(k);
+  });
+  return { filename, broker: parser.name, divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
+}
+function dividendReviewCard(store) {
+  const st = divImportState, s = store.state;
+  ensureYearsScanned(store);
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'Import dividends — ' + st.broker));
+  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.divs.length + ' dividend' + (st.divs.length === 1 ? '' : 's') + ' found · ' + st.buys.length + ' purchases ignored (only used to tag reinvestment) · ' + st.fees.length + ' related fee' + (st.fees.length === 1 ? '' : 's') + '.'));
+
+  const divCat = s.incomeCategories.find(c => /dividend/i.test(c.name));
+  if (!divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
+
+  const optRow = el('div', 'io-actions');
+  const acctSel = select([{ value: '', label: '— no account —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), st.accountId);
+  acctSel.addEventListener('change', () => { st.accountId = acctSel.value; });
+  optRow.appendChild(labelWrap('Deposit account', acctSel));
+  card.appendChild(optRow);
+
+  // Conflict review: choose merge (skip) or keep-as-separate per flagged row.
+  const flagged = st.divs.filter(d => d.dup);
+  if (flagged.length) {
+    card.appendChild(el('h3', 'strip-title', 'Needs review (' + flagged.length + ')'));
+    card.appendChild(el('p', 'muted', 'Same date + stock + amount as an existing entry (or repeated in this file). “Merge” skips it; “Add as separate” imports it anyway (e.g. a genuine second payout).'));
+    const list = el('div', 'mini-list');
+    flagged.forEach(d => {
+      const row = el('div', 'mini-row');
+      const left = el('span');
+      left.appendChild(document.createTextNode(fmtDate(d.date) + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' '));
+      left.appendChild(badge(d.dup === 'db' ? 'already recorded' : 'duplicate in file', 'amber'));
+      row.appendChild(left);
+      const choice = select([{ value: 'skip', label: 'Merge (skip)' }, { value: 'add', label: 'Add as separate' }], st.choices[d.uid] || 'skip');
+      choice.addEventListener('change', () => { st.choices[d.uid] = choice.value; renderView(currentRoute); });
+      row.appendChild(choice);
+      list.appendChild(row);
+    });
+    card.appendChild(list);
+  }
+
+  if (st.fees.length) {
+    const feeCats = s.expenseCategories;
+    if (!st.feeCat) { const guess = feeCats.find(c => /invest|stock|fee|other/i.test(c.name)) || feeCats[0]; st.feeCat = guess ? guess.id : ''; }
+    const feeRow = el('div', 'io-actions');
+    const cb = checkbox('Also import ' + st.fees.length + ' dividend-related fee' + (st.fees.length === 1 ? '' : 's') + ' as expenses', st.includeFees, 'Broker debits tied to a dividend-paying stock (e.g. ADR or foreign-tax fees). Imported as expenses in the category you pick, in the same undoable batch.');
+    cb.__input.addEventListener('change', () => { st.includeFees = cb.__input.checked; });
+    feeRow.appendChild(cb);
+    const feeSel = select(feeCats.map(c => ({ value: c.id, label: c.name })), st.feeCat);
+    feeSel.addEventListener('change', () => { st.feeCat = feeSel.value; });
+    feeRow.appendChild(labelWrap('Fee category', feeSel));
+    card.appendChild(feeRow);
+  }
+
+  const importable = st.divs.filter(d => !d.dup || st.choices[d.uid] === 'add');
+  const prevWrap = el('div', 'table-scroll');
+  const pt = el('table', 'data-table');
+  pt.innerHTML = '<thead><tr><th>Date</th><th>Symbol</th><th class="num">Amount</th><th>Type</th><th>Tags</th></tr></thead>';
+  const tb = el('tbody');
+  importable.slice(0, 12).forEach(d => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(d.date)));
+    tr.appendChild(el('td', 'strong', d.symbol || '—'));
+    tr.appendChild(numCell(d.amount, true));
+    tr.appendChild(el('td', 'muted', d.qualified || '—'));
+    const tags = el('td'); if (d.reinvested) tags.appendChild(badge('↻ Reinvested', 'type')); tr.appendChild(tags);
+    tb.appendChild(tr);
+  });
+  pt.appendChild(tb); prevWrap.appendChild(pt);
+  card.appendChild(el('div', 'muted', 'Preview (first ' + Math.min(12, importable.length) + ' of ' + importable.length + ' to import):'));
+  card.appendChild(prevWrap);
+  const skippedN = st.divs.length - importable.length;
+  card.appendChild(el('p', 'muted', importable.length + ' will import as Dividends income · ' + skippedN + ' merged/skipped as duplicates' + (st.includeFees ? ' · ' + st.fees.length + ' fees as expenses' : '') + '. Reinvested payouts are tagged; the purchases themselves are never imported.'));
+
+  const actions = el('div', 'io-actions');
+  const impBtn = el('button', 'btn-primary', 'Import ' + importable.length + ' dividend' + (importable.length === 1 ? '' : 's'));
+  impBtn.disabled = !importable.length && !(st.includeFees && st.fees.length);
+  impBtn.addEventListener('click', async () => {
+    const me = s.persons[0] && s.persons[0].id;
+    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: 'income', source: st.filename + ' (dividends · ' + st.broker + ')', count: importable.length + (st.includeFees ? st.fees.length : 0) };
+    const byYear = {}, feeByYear = {};
+    importable.forEach(d => {
+      const yr = +d.date.slice(0, 4);
+      (byYear[yr] = byYear[yr] || []).push({
+        date: d.date, gross: d.amount, net: d.amount, categoryId: divCat.id, subId: '',
+        accountId: st.accountId || '', personId: me, status: 'received', taxable: 'yes',
+        symbol: d.symbol || '', action: d.action || d.qualified || '', reinvested: !!d.reinvested,
+        receivedVia: st.broker, notes: ''
+      });
+    });
+    if (st.includeFees && st.feeCat) st.fees.forEach(f => {
+      const yr = +f.date.slice(0, 4);
+      (feeByYear[yr] = feeByYear[yr] || []).push({ date: f.date, amount: f.amount, categoryId: st.feeCat, subId: '', accountId: st.accountId || '', personId: me, notes: ((f.symbol ? f.symbol + ' — ' : '') + f.desc).trim() });
+    });
+    const years = [...new Set(Object.keys(byYear).concat(Object.keys(feeByYear)))];
+    await Promise.all(years.map(y => store.loadYear(y)));
+    Object.keys(byYear).forEach(y => store.importEntries(+y, 'income', byYear[y], batch));
+    Object.keys(feeByYear).forEach(y => store.importEntries(+y, 'expenses', feeByYear[y], batch));
+    toast('Imported ' + importable.length + ' dividends' + (st.includeFees && st.fees.length ? ' + ' + st.fees.length + ' fees' : ''));
+    divImportState = null;
+    importState = { target: 'dividends', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+    renderView(currentRoute);
+  });
+  actions.appendChild(impBtn);
+  const cancel = el('button', 'btn-ghost', 'Cancel');
+  cancel.addEventListener('click', () => { divImportState = null; importState = { target: 'dividends', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' }; renderView(currentRoute); });
+  actions.appendChild(cancel);
+  card.appendChild(actions);
+  return card;
+}
+
 function importSection() {
   const store = window.cloverStore;
+  if (importState.target === 'dividends' && divImportState) return dividendReviewCard(store);
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'Import from CSV'));
 
   if (!importState.rows) {
-    card.appendChild(el('p', 'muted', 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
+    card.appendChild(el('p', 'muted', importState.target === 'dividends'
+      ? 'Upload your broker’s activity export (M1 Finance or Schwab). Clover keeps only the dividends — purchases are ignored (but used to tag reinvestment), duplicates are caught for review, and related fees can come along as expenses.'
+      : 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
     const row = el('div', 'io-actions');
-    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }], importState.target);
-    tSel.addEventListener('change', () => { importState.target = tSel.value; });
+    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }, { value: 'dividends', label: 'Dividends (broker activity)' }], importState.target);
+    tSel.addEventListener('change', () => { importState.target = tSel.value; renderView(currentRoute); });
     row.appendChild(labelWrap('Import as', tSel));
     const fileLabel = el('label', 'btn-primary file-btn'); fileLabel.textContent = 'Choose CSV…';
     const fileIn = document.createElement('input'); fileIn.type = 'file'; fileIn.accept = '.csv,text/csv'; fileIn.style.display = 'none';
@@ -3633,6 +3823,14 @@ function importSection() {
         complete: (res) => {
           const headers = (res.meta && res.meta.fields) || [];
           if (!headers.length || !res.data.length) { toast('No rows found in that CSV', 'warn'); return; }
+          if (importState.target === 'dividends') {
+            const analyzed = analyzeDividendFile(store, res.data, headers, file.name);
+            if (!analyzed) { toast('Couldn’t recognize this broker file — expected an M1 Finance or Schwab activity export', 'warn'); return; }
+            if (!analyzed.divs.length) { toast('No dividend rows found in that file', 'warn'); return; }
+            divImportState = analyzed;
+            renderView(currentRoute);
+            return;
+          }
           const mapping = {}; IMPORT_FIELDS[importState.target].forEach(f => { mapping[f.key] = guessColumn(headers, f.kw); });
           importState = Object.assign(importState, { rows: res.data, headers, mapping, filename: file.name });
           renderView(currentRoute);

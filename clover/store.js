@@ -402,7 +402,9 @@ window.cloverStore = {
     const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : 'paychecks';
     entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
     d.importBatches = d.importBatches || [];
-    d.importBatches.push(batch);
+    // One history entry per batch per year, even when a batch spans targets
+    // (e.g. dividends + their fees land in income AND expensePayments).
+    if (!d.importBatches.some(b => b.id === batch.id)) d.importBatches.push(batch);
     this.scheduleSaveYear(y); notify();
   },
   undoImportBatch(y, batchId) {
