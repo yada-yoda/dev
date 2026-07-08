@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.22';
+const VERSION = '1.0.23';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1722,6 +1722,94 @@ function expectedRows(store, year, recorded, kind) {
   return out;
 }
 
+// ---- Customizable paycheck-table columns (show/hide/reorder) ----
+const PAYCHECK_COL_LABELS = {
+  payDate: 'Pay date', received: 'Received', timing: 'Timing', period: 'Period #',
+  periodStart: 'Period start', periodEnd: 'Period end', gross: 'Gross', net: 'Net',
+  employer: 'Employer', person: 'Person', status: 'Status', method: 'Method', notes: 'Notes'
+};
+const PAYCHECK_ALL_COLS = ['payDate', 'received', 'timing', 'period', 'periodStart', 'periodEnd', 'gross', 'net', 'employer', 'person', 'status', 'method', 'notes'];
+const PAYCHECK_DEFAULT_COLS = ['payDate', 'received', 'timing', 'gross', 'net', 'employer', 'person', 'period', 'status', 'method'];
+function paycheckColKeys(store) {
+  const saved = store.state.settings.paycheckCols;
+  const keys = (Array.isArray(saved) && saved.length) ? saved.filter(k => PAYCHECK_COL_LABELS[k]) : PAYCHECK_DEFAULT_COLS.slice();
+  return keys.length ? keys : PAYCHECK_DEFAULT_COLS.slice();
+}
+// Build a sortableTable column def for a given paycheck column key.
+function buildPaycheckCol(store, key) {
+  switch (key) {
+    case 'payDate': return { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) };
+    case 'received': return { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => el('td', null, p.receivedDate ? fmtDate(p.receivedDate) : '—') };
+    case 'timing': return { label: 'Timing', key: 'timing', value: p => { if (p.__expected) { const du = daysUntil(p.payDate); return du == null ? 100000 : 100000 - du; } const d = paycheckDaysLate(p); return d == null ? 100000 : d; }, cell: p => {
+        const td = el('td');
+        if (p.__expected) { const du = daysUntil(p.payDate); if (du != null && du >= 0) td.appendChild(badge('in ' + du + 'd', du <= 7 ? 'amber' : '')); else td.textContent = '—'; return td; }
+        const b = daysLateBadge(p); if (b) td.appendChild(b); else td.textContent = '—'; return td; } };
+    case 'period': return { label: 'Period #', key: 'period', num: true, value: p => paycheckPeriodNum(store, p) || 0, cell: p => {
+        const td = el('td', 'num');
+        if (p.periodNum) { td.textContent = '#' + p.periodNum; }
+        else { const dp = derivedPeriod(store, p); if (dp) { td.textContent = '#' + dp.periodNum; td.classList.add('muted'); td.title = 'From your pay schedule'; } else td.textContent = '—'; }
+        if (p.periodStart || p.periodEnd) td.title = fmtDate(p.periodStart) + ' – ' + fmtDate(p.periodEnd); return td; } };
+    case 'periodStart': return { label: 'Period start', key: 'periodStart', value: p => p.periodStart || '', cell: p => el('td', null, p.periodStart ? fmtDate(p.periodStart) : '—') };
+    case 'periodEnd': return { label: 'Period end', key: 'periodEnd', value: p => p.periodEnd || '', cell: p => el('td', null, p.periodEnd ? fmtDate(p.periodEnd) : '—') };
+    case 'gross': return { label: 'Gross', key: 'gross', num: true, value: p => Number(p.gross) || 0, cell: p => numCell(Number(p.gross) || 0, true) };
+    case 'net': return { label: 'Net', key: 'net', num: true, value: p => Number(p.net) || 0, cell: p => numCell(Number(p.net) || 0) };
+    case 'employer': return { label: 'Employer', key: 'employer', value: p => p.employer || '', cell: p => {
+        const td = el('td'); td.appendChild(el('div', 'acct-name', p.employer || '—'));
+        const cat = store.incomeGroupName(p.incomeCategoryId); if (cat && cat !== '—') td.appendChild(el('div', 'acct-sub', cat));
+        return td; } };
+    case 'person': return { label: 'Person', key: 'person', value: p => store.personName(p.personId), cell: p => el('td', null, store.personName(p.personId)) };
+    case 'status': return { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
+        const td = el('td'); const st = p.status || 'Received';
+        const tone = st === 'Received' || st === 'Manual deposit' ? 'green' : (st === 'Late' || st === 'Missing' || st === 'Bounced/Returned') ? 'red' : 'amber';
+        td.appendChild(badge(st, tone)); return td; } };
+    case 'method': return { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') };
+    case 'notes': return { label: 'Notes', key: 'notes', value: p => p.notes || '', cell: p => { const td = el('td', 'muted'); td.textContent = p.notes || '—'; return td; } };
+  }
+  return null;
+}
+// Modal: toggle visibility + reorder the paycheck table columns.
+function paycheckColumnsModal() {
+  const store = window.cloverStore;
+  const body = el('div');
+  body.appendChild(el('p', 'muted', 'Check the columns to show, and use ↑ / ↓ to reorder them. (Pay date and the row actions always stay.)'));
+  const listWrap = el('div', 'col-config');
+  const render = () => {
+    listWrap.innerHTML = '';
+    const visible = paycheckColKeys(store);
+    const hidden = PAYCHECK_ALL_COLS.filter(k => !visible.includes(k));
+    visible.forEach((k, i) => listWrap.appendChild(colRow(k, true, i, visible.length)));
+    if (hidden.length) {
+      listWrap.appendChild(el('div', 'col-sep', 'Hidden'));
+      hidden.forEach(k => listWrap.appendChild(colRow(k, false)));
+    }
+  };
+  const move = (k, dir) => { const v = paycheckColKeys(store).slice(); const j = v.indexOf(k); const t = j + dir; if (t < 0 || t >= v.length) return; const tmp = v[t]; v[t] = v[j]; v[j] = tmp; store.setPaycheckCols(v); render(); };
+  const colRow = (k, isVisible, idx, total) => {
+    const row = el('div', 'col-row');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = isVisible;
+    cb.addEventListener('change', () => {
+      let v = paycheckColKeys(store).slice();
+      if (cb.checked) { if (!v.includes(k)) v.push(k); } else { v = v.filter(x => x !== k); if (!v.length) v = ['payDate']; }
+      store.setPaycheckCols(v); render();
+    });
+    row.appendChild(cb);
+    row.appendChild(el('span', 'col-label', PAYCHECK_COL_LABELS[k]));
+    if (isVisible) {
+      const acts = el('div', 'col-acts');
+      const up = el('button', 'icon-btn', '↑'); up.disabled = idx === 0; up.addEventListener('click', () => move(k, -1));
+      const down = el('button', 'icon-btn', '↓'); down.disabled = idx === total - 1; down.addEventListener('click', () => move(k, 1));
+      acts.appendChild(up); acts.appendChild(down); row.appendChild(acts);
+    }
+    return row;
+  };
+  render();
+  body.appendChild(listWrap);
+  const reset = el('button', 'btn-ghost', 'Reset to default');
+  reset.addEventListener('click', () => { store.setPaycheckCols(null); render(); });
+  body.appendChild(reset);
+  openModal({ title: 'Paycheck columns', body, confirmLabel: 'Done', onConfirm: () => {} });
+}
+
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
 function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }
 function paycheckDaysLate(p) {
@@ -1781,6 +1869,9 @@ function renderPaychecks(view) {
     mergeBtn.addEventListener('click', () => employerMergeModal());
     pcActions.appendChild(mergeBtn);
   }
+  const colsBtn = el('button', 'btn-ghost', '⚙ Columns');
+  colsBtn.addEventListener('click', () => paycheckColumnsModal());
+  pcActions.appendChild(colsBtn);
   pcActions.appendChild(importButton('paychecks'));
   const add = el('button', 'btn-primary', '+ Add paycheck'); add.addEventListener('click', () => paycheckModal(null));
   pcActions.appendChild(add);
@@ -1880,29 +1971,7 @@ function renderPaychecks(view) {
         cb.checked = paycheckSel.has(p.id);
         cb.addEventListener('change', () => { cb.checked ? paycheckSel.add(p.id) : paycheckSel.delete(p.id); updatePaycheckSelectionUI(); });
         td.appendChild(cb); return td; } },
-    { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) },
-    { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => el('td', null, p.receivedDate ? fmtDate(p.receivedDate) : '—') },
-    { label: 'Timing', key: 'timing', value: p => { if (p.__expected) { const du = daysUntil(p.payDate); return du == null ? 100000 : 100000 - du; } const d = paycheckDaysLate(p); return d == null ? 100000 : d; }, cell: p => {
-        const td = el('td');
-        if (p.__expected) { const du = daysUntil(p.payDate); if (du != null && du >= 0) td.appendChild(badge('in ' + du + 'd', du <= 7 ? 'amber' : '')); else td.textContent = '—'; return td; }
-        const b = daysLateBadge(p); if (b) td.appendChild(b); else td.textContent = '—'; return td; } },
-    { label: 'Gross', key: 'gross', num: true, value: p => Number(p.gross) || 0, cell: p => numCell(Number(p.gross) || 0, true) },
-    { label: 'Net', key: 'net', num: true, value: p => Number(p.net) || 0, cell: p => numCell(Number(p.net) || 0) },
-    { label: 'Employer', key: 'employer', value: p => p.employer || '', cell: p => {
-        const td = el('td'); td.appendChild(el('div', 'acct-name', p.employer || '—'));
-        const cat = store.incomeGroupName(p.incomeCategoryId); if (cat && cat !== '—') td.appendChild(el('div', 'acct-sub', cat));
-        return td; } },
-    { label: 'Person', key: 'person', value: p => store.personName(p.personId), cell: p => el('td', null, store.personName(p.personId)) },
-    { label: 'Period', key: 'period', num: true, value: p => paycheckPeriodNum(store, p) || 0, cell: p => {
-        const td = el('td', 'num');
-        if (p.periodNum) { td.textContent = '#' + p.periodNum; }
-        else { const dp = derivedPeriod(store, p); if (dp) { td.textContent = '#' + dp.periodNum; td.classList.add('muted'); td.title = 'From your pay schedule'; } else td.textContent = '—'; }
-        if (p.periodStart || p.periodEnd) td.title = fmtDate(p.periodStart) + ' – ' + fmtDate(p.periodEnd); return td; } },
-    { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
-        const td = el('td'); const st = p.status || 'Received';
-        const tone = st === 'Received' || st === 'Manual deposit' ? 'green' : (st === 'Late' || st === 'Missing' || st === 'Bounced/Returned') ? 'red' : 'amber';
-        td.appendChild(badge(st, tone)); return td; } },
-    { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') },
+    ...paycheckColKeys(store).map(k => buildPaycheckCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: p => {
         const td = el('td', 'row-actions');
         if (p.__expected) {

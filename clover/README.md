@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.23 — Customizable paycheck columns
+- New **⚙ Columns** button on Paychecks lets you **show/hide** columns and **reorder** them
+  (↑ / ↓). Adds optional columns too: **Period start**, **Period end**, and **Notes**.
+- Your column choice is saved to your account and applies everywhere the paychecks table
+  shows (current, upcoming, all-years).
+
 ### v1.0.22 — Missing paychecks in the table + Upcoming tab
 - Missing paychecks (expected but not recorded) now appear as **greyed rows right in the
   paychecks table**, each with a **Record** button — instead of a separate panel. They do
