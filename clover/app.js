@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.43';
+const VERSION = '1.0.44';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -919,6 +919,13 @@ function renderIncome(view) {
   view.appendChild(incomeTab === 'grid' ? incomeGrid(data) : incomeList(data));
 }
 
+// Small ×N bubble showing how many paychecks landed in a month (amber at 3+,
+// so extra-paycheck months jump out).
+function pcCountBubble(n, hot) {
+  const b = el('span', 'pc-count' + (hot ? ' hot' : ''), '×' + n);
+  b.title = n + ' paycheck' + (n === 1 ? '' : 's') + (hot ? ' — an extra-paycheck month' : '');
+  return b;
+}
 function incomeGrid(data) {
   const store = window.cloverStore, groups = store.state.incomeCategories;
   const entries = data.income.filter(countable);
@@ -929,15 +936,17 @@ function incomeGrid(data) {
   const grand = new Array(12).fill(0);
 
   const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += amountOf(e); }); return m; };
-  const addRow = (cls, label, monthly, onClick, caret) => {
+  const addRow = (cls, label, monthly, onClick, caret, counts) => {
     const tr = el('tr', cls);
     const c0 = el('td', cls.includes('sub-row') ? 'sub-name' : 'grp-name');
     if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
     else c0.textContent = label;
     if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
     tr.appendChild(c0);
-    monthly.forEach(v => tr.appendChild(numCell(v)));
-    tr.appendChild(numCell(monthly.reduce((a, b) => a + b, 0), true));
+    monthly.forEach((v, i) => { const td = numCell(v); if (counts && counts[i] > 0) td.appendChild(pcCountBubble(counts[i], counts[i] >= 3)); tr.appendChild(td); });
+    const ytdTd = numCell(monthly.reduce((a, b) => a + b, 0), true);
+    if (counts) { const tot = counts.reduce((a, b) => a + b, 0); if (tot > 0) ytdTd.appendChild(pcCountBubble(tot, false)); }
+    tr.appendChild(ytdTd);
     tr.appendChild(numCell(avgOf(monthly), true));
     return tr;
   };
@@ -980,17 +989,19 @@ function incomeGrid(data) {
         // "Paychecks" itself expands into one row per employer, with each
         // employer's monthly gross — e.g. Wages → Paychecks → Main Job / gigs.
         const pcOpen = expandedPcEmployers.has(g.id);
+        const catChecksAll = data.paychecks.filter(isPaycheckPaid).filter(p => (p.incomeCategoryId || '') === g.id);
+        const pcCounts = new Array(12).fill(0);
+        catChecksAll.forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) pcCounts[mi]++; });
         tb.appendChild(addRow('sub-row', '↳ Paychecks', pcMonthly,
           () => { pcOpen ? expandedPcEmployers.delete(g.id) : expandedPcEmployers.add(g.id); renderView(currentRoute); },
-          pcOpen ? '▾' : '▸'));
+          pcOpen ? '▾' : '▸', pcCounts));
         if (pcOpen) {
-          const catChecks = data.paychecks.filter(isPaycheckPaid).filter(p => (p.incomeCategoryId || '') === g.id);
-          const emps = [...new Set(catChecks.map(p => (p.employer || '').trim() || '(no employer)'))].sort((a, b) => a.localeCompare(b));
+          const emps = [...new Set(catChecksAll.map(p => (p.employer || '').trim() || '(no employer)'))].sort((a, b) => a.localeCompare(b));
           emps.forEach(emp => {
-            const m = new Array(12).fill(0);
-            catChecks.filter(p => ((p.employer || '').trim() || '(no employer)') === emp)
-              .forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p.gross) || 0; });
-            tb.appendChild(addRow('sub-row emp-row', emp, m));
+            const m = new Array(12).fill(0), cnt = new Array(12).fill(0);
+            catChecksAll.filter(p => ((p.employer || '').trim() || '(no employer)') === emp)
+              .forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) { m[mi] += Number(p.gross) || 0; cnt[mi]++; } });
+            tb.appendChild(addRow('sub-row emp-row', emp, m, null, null, cnt));
           });
         }
       }

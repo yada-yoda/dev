@@ -441,6 +441,8 @@ button { font-family: inherit; cursor: pointer; }
 .expected-row td { font-style: italic; }
 .hint-underline { border-bottom: 1px dotted var(--text-faint); cursor: help; }
 input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted); cursor: not-allowed; }
+.pc-count { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 8px; font-size: 10px; background: var(--neutral-soft); color: var(--text-muted); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.pc-count.hot { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .val-badge { cursor: pointer; border: none; }
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }

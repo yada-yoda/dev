@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.44 — Paycheck-count bubbles
+- In the income grid, the Paychecks rows (and each employer row) now show a small **×N
+  bubble** next to each month — so 3-paycheck months stand out (highlighted amber at 3+),
+  with a total-count bubble on YTD.
+
 ### v1.0.43 — Reports: year tabs + customizable panels
 - Reports now has **year tabs** (like Paychecks) and the same **✎ Edit layout** panel
   system as the dashboard — drag to reorder, remove/add report panels, collapse by
