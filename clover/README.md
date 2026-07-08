@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.22 — Missing paychecks in the table + Upcoming tab
+- Missing paychecks (expected but not recorded) now appear as **greyed rows right in the
+  paychecks table**, each with a **Record** button — instead of a separate panel. They do
+  **not** count toward Gross/Net/Received totals until you record them.
+- A new **Upcoming** tab switches the table to your **future** scheduled paychecks (with a
+  countdown), so you can see what's coming and record one early if needed.
+- The ↻ Refresh moved up next to the tabs.
+
 ### v1.0.21 — Fix biweekly pay dates drifting a day
 - Fixed a bug where biweekly/weekly pay dates (and weekly/biweekly bill renewals) could
   land a day early after a daylight-saving change — e.g. a Friday payday showing as

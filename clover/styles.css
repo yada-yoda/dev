@@ -418,6 +418,9 @@ button { font-family: inherit; cursor: pointer; }
 .mi-date { font-weight: 600; font-size: 13px; }
 .mi-amt { font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 .mi-rec { margin-top: 6px; height: 28px; font-size: 12px; width: 100%; }
+.pv-tabs { display: flex; align-items: center; gap: 4px; margin-bottom: 14px; }
+.pv-tabs .pv-refresh { margin-left: auto; height: 30px; }
+.expected-row td { font-style: italic; }
 .trend { font-size: 10px; margin-left: 1px; vertical-align: middle; }
 .trend.up { color: var(--expense); }
 .trend.down { color: var(--income); }

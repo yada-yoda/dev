@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.21';
+const VERSION = '1.0.22';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -51,6 +51,7 @@ let paycheckStatusFilter = 'all';
 let paycheckSel = new Set();       // selected paycheck ids for bulk edit
 let paycheckSelYear = null;
 let paycheckAllYears = false;      // paychecks "All" tab: show every year at once
+let paycheckView = 'current';      // paychecks table: 'current' (+missing) | 'upcoming'
 let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
 const expandedExpenseGroups = new Set();
@@ -1694,6 +1695,32 @@ function missingExpectedPaychecks(store, year, recorded) {
   });
   return out.sort((a, b) => b.per.payDate.localeCompare(a.per.payDate));
 }
+// A display-only "expected" paycheck row synthesised from a schedule + period.
+function syntheticPaycheck(sch, per, status) {
+  return {
+    id: '__exp_' + sch.id + '_' + per.payDate, __expected: true,
+    payDate: per.payDate, receivedDate: '', gross: sch.gross, net: sch.net,
+    employer: sch.employer, incomeCategoryId: sch.incomeCategoryId, personId: sch.personId,
+    periodNum: per.periodNum, periodStart: per.periodStart, periodEnd: per.periodEnd,
+    method: '', status: status
+  };
+}
+// Synthetic rows for the table: kind 'missing' (past, unrecorded) or 'upcoming' (future).
+function expectedRows(store, year, recorded, kind) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const out = [];
+  activeSchedules(store).forEach(sch => {
+    expectedPayPeriods(sch, year).forEach(per => {
+      const pd = parseISODate(per.payDate); if (!pd) return;
+      const past = pd <= today;
+      if (kind === 'missing' && !past) return;
+      if (kind === 'upcoming' && past) return;
+      if (kind === 'missing' && recorded.some(p => p.employer && sch.employer && p.employer.toLowerCase() === sch.employer.toLowerCase() && Math.abs(daysBetweenISO(p.payDate, per.payDate)) <= 4)) return;
+      out.push(syntheticPaycheck(sch, per, kind === 'missing' ? 'Missing' : 'Expected'));
+    });
+  });
+  return out;
+}
 
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
 function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }
@@ -1784,94 +1811,81 @@ function renderPaychecks(view) {
     view.appendChild(strip);
   }
 
-  // Missing paychecks: expected pay dates (per your pay schedule) with nothing
-  // recorded yet. Not shown in the All view (it's per-year).
-  if (!allMode) {
-    const missing = missingExpectedPaychecks(store, activeYear, pays);
-    if (missing.length) {
-      const strip = el('div', 'card missing-card');
-      const mh = el('div', 'missing-head');
-      const mhl = el('div');
-      mhl.appendChild(el('h3', 'strip-title', 'Missing paychecks'));
-      mhl.appendChild(el('div', 'muted', missing.length + ' expected pay date' + (missing.length === 1 ? '' : 's') + ' in ' + activeYear + ' not recorded yet — click to add.'));
-      mh.appendChild(mhl);
-      const refresh = el('button', 'btn-ghost', '↻ Refresh');
-      refresh.title = 'Re-pull this year and recompute against your pay schedule';
-      refresh.addEventListener('click', () => { store.reloadYear(activeYear); toast('Refreshed'); });
-      mh.appendChild(refresh);
-      strip.appendChild(mh);
-      const grid = el('div', 'missing-grid');
-      missing.slice(0, 24).forEach(({ sch, per }) => {
-        const item = el('div', 'missing-item');
-        const top = el('div', 'mi-top');
-        top.appendChild(el('span', 'mi-period', '#' + per.periodNum));
-        top.appendChild(el('span', 'mi-emp', sch.name || sch.employer));
-        item.appendChild(top);
-        item.appendChild(el('div', 'mi-date', fmtDate(per.payDate)));
-        item.appendChild(el('div', 'mi-amt', sch.gross ? '~' + money(sch.gross) : '—'));
-        const rec = el('button', 'btn-ghost mi-rec', 'Record');
-        rec.addEventListener('click', () => paycheckModal({
-          payDate: per.payDate, periodNum: per.periodNum, periodStart: per.periodStart, periodEnd: per.periodEnd,
-          employer: sch.employer, incomeCategoryId: sch.incomeCategoryId, personId: sch.personId,
-          gross: sch.gross, net: sch.net, status: 'Received', method: 'Direct deposit'
-        }));
-        item.appendChild(rec);
-        grid.appendChild(item);
-      });
-      strip.appendChild(grid);
-      if (missing.length > 24) strip.appendChild(el('div', 'muted', '+ ' + (missing.length - 24) + ' more — record the recent ones first.'));
-      view.appendChild(strip);
-    }
+  // Recorded vs Upcoming tabs (only meaningful once a pay schedule exists).
+  const schedActive = activeSchedules(store).length > 0;
+  if (!allMode && schedActive) {
+    const pvTabs = el('div', 'tabs pv-tabs');
+    [['current', 'Paychecks'], ['upcoming', 'Upcoming']].forEach(([v, label]) => {
+      const b = el('button', 'tab' + (paycheckView === v ? ' active' : ''), label);
+      b.addEventListener('click', () => { paycheckView = v; renderView(currentRoute); });
+      pvTabs.appendChild(b);
+    });
+    const refresh = el('button', 'btn-ghost pv-refresh', '↻ Refresh');
+    refresh.title = 'Re-pull this year and recompute against your pay schedule';
+    refresh.addEventListener('click', () => { store.reloadYear(activeYear); toast('Refreshed'); });
+    pvTabs.appendChild(refresh);
+    view.appendChild(pvTabs);
   }
+  const upcomingView = !allMode && schedActive && paycheckView === 'upcoming';
 
   const bar = el('div', 'filter-bar');
   const statusSel = select([{ value: 'all', label: 'All statuses' }].concat(PAYCHECK_STATUSES.map(s => ({ value: s, label: s }))), paycheckStatusFilter);
   statusSel.addEventListener('change', () => { paycheckStatusFilter = statusSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Status', statusSel));
+  if (!upcomingView && !allMode && schedActive) bar.appendChild(el('div', 'muted', 'Greyed rows are expected paychecks not recorded yet — they don’t count toward totals.'));
   view.appendChild(bar);
 
-  // Bulk selection is per-year only; in the All view we skip it (edits would span
-  // year docs). Reset selection when the year changes; drop ids that vanished.
-  if (allMode) { paycheckSel = new Set(); paycheckSelYear = null; }
+  // Bulk selection applies only to real recorded paychecks in the single-year current view.
+  const showSel = !allMode && paycheckView === 'current';
+  if (!showSel) { paycheckSel = new Set(); paycheckSelYear = null; }
   else {
     if (paycheckSelYear !== activeYear) { paycheckSel = new Set(); paycheckSelYear = activeYear; }
     const validIds = new Set(pays.map(p => p.id));
     [...paycheckSel].forEach(id => { if (!validIds.has(id)) paycheckSel.delete(id); });
   }
 
-  let rows = pays.slice();
+  // Rows: recorded (+ past-missing) for the current view; future expected for upcoming.
+  let rows;
+  if (upcomingView) rows = expectedRows(store, activeYear, pays, 'upcoming');
+  else if (!allMode && schedActive) rows = pays.concat(expectedRows(store, activeYear, pays, 'missing'));
+  else rows = pays.slice();
   if (paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
 
   if (!rows.length) {
-    view.appendChild(emptyState('No paychecks yet', 'Add your paychecks — main job and any acting/side gigs — to track expected vs. received, days early/late, and wage totals. Wages roll into the Income view automatically.', '+ Add paycheck', () => paycheckModal(null)));
+    if (upcomingView) view.appendChild(el('div', 'card muted pad', 'No upcoming paychecks scheduled.'));
+    else view.appendChild(emptyState('No paychecks yet', 'Add your paychecks — main job and any acting/side gigs — to track expected vs. received, days early/late, and wage totals. Wages roll into the Income view automatically.', '+ Add paycheck', () => paycheckModal(null)));
     return;
   }
 
-  if (!allMode) {
+  if (showSel) {
     const bulkContainer = el('div'); bulkContainer.id = 'pc-bulk-bar';
     if (paycheckSel.size) bulkContainer.appendChild(paycheckBulkBar(store));
     view.appendChild(bulkContainer);
   }
 
+  const realRows = rows.filter(r => !r.__expected);
   const cols = [
     { sortable: false, headCell: () => {
         const cb = document.createElement('input'); cb.type = 'checkbox'; cb.title = 'Select all';
-        cb.checked = rows.length > 0 && rows.every(r => paycheckSel.has(r.id));
+        cb.checked = realRows.length > 0 && realRows.every(r => paycheckSel.has(r.id));
         cb.addEventListener('change', () => {
-          rows.forEach(r => cb.checked ? paycheckSel.add(r.id) : paycheckSel.delete(r.id));
+          realRows.forEach(r => cb.checked ? paycheckSel.add(r.id) : paycheckSel.delete(r.id));
           document.querySelectorAll('#view .data-table tbody .sel-cell input').forEach(box => { box.checked = cb.checked; });
           updatePaycheckSelectionUI();
         });
         return cb; },
       cell: p => {
-        const td = el('td', 'sel-cell'); const cb = document.createElement('input'); cb.type = 'checkbox';
+        const td = el('td', 'sel-cell'); if (p.__expected) return td;
+        const cb = document.createElement('input'); cb.type = 'checkbox';
         cb.checked = paycheckSel.has(p.id);
         cb.addEventListener('change', () => { cb.checked ? paycheckSel.add(p.id) : paycheckSel.delete(p.id); updatePaycheckSelectionUI(); });
         td.appendChild(cb); return td; } },
     { label: 'Pay date', key: 'payDate', value: p => p.payDate || '', cell: p => el('td', null, fmtDate(p.payDate)) },
     { label: 'Received', key: 'received', value: p => p.receivedDate || '', cell: p => el('td', null, p.receivedDate ? fmtDate(p.receivedDate) : '—') },
-    { label: 'Timing', key: 'timing', value: p => { const d = paycheckDaysLate(p); return d == null ? 100000 : d; }, cell: p => {
-        const td = el('td'); const b = daysLateBadge(p); if (b) td.appendChild(b); else td.textContent = '—'; return td; } },
+    { label: 'Timing', key: 'timing', value: p => { if (p.__expected) { const du = daysUntil(p.payDate); return du == null ? 100000 : 100000 - du; } const d = paycheckDaysLate(p); return d == null ? 100000 : d; }, cell: p => {
+        const td = el('td');
+        if (p.__expected) { const du = daysUntil(p.payDate); if (du != null && du >= 0) td.appendChild(badge('in ' + du + 'd', du <= 7 ? 'amber' : '')); else td.textContent = '—'; return td; }
+        const b = daysLateBadge(p); if (b) td.appendChild(b); else td.textContent = '—'; return td; } },
     { label: 'Gross', key: 'gross', num: true, value: p => Number(p.gross) || 0, cell: p => numCell(Number(p.gross) || 0, true) },
     { label: 'Net', key: 'net', num: true, value: p => Number(p.net) || 0, cell: p => numCell(Number(p.net) || 0) },
     { label: 'Employer', key: 'employer', value: p => p.employer || '', cell: p => {
@@ -1891,12 +1905,17 @@ function renderPaychecks(view) {
     { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') },
     { label: '', sortable: false, cell: p => {
         const td = el('td', 'row-actions');
+        if (p.__expected) {
+          const rec = el('button', 'icon-btn', 'Record');
+          rec.addEventListener('click', () => paycheckModal({ payDate: p.payDate, periodNum: p.periodNum, periodStart: p.periodStart, periodEnd: p.periodEnd, employer: p.employer, incomeCategoryId: p.incomeCategoryId, personId: p.personId, gross: p.gross, net: p.net, status: 'Received', method: 'Direct deposit' }));
+          td.appendChild(rec); return td;
+        }
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => paycheckModal(p));
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(p.payDate) + ' · ' + (p.employer || 'paycheck'), () => store.removePaycheck(yearOfPaycheck(p), p.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(allMode ? cols.slice(1) : cols, rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => isPaycheckPaid(p) ? '' : 'inactive-row'));
+  card.appendChild(sortableTable(showSel ? cols : cols.slice(1), rows, paycheckSort, ns => { paycheckSort = ns; renderView(currentRoute); }, p => p.__expected ? 'inactive-row expected-row' : (isPaycheckPaid(p) ? '' : 'inactive-row')));
   view.appendChild(card);
 }
 
