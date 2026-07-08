@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.40 — Account columns, colored value filters
+- Accounts gained **CD APY**, **CD maturity**, and **Savings APY (latest)** columns (the
+  savings rate pulls the newest entry you've recorded under Credit & Rates for that
+  institution, with its recorded date).
+- **Type, Institution, Owner, and Beneficiaries are now colored value badges** — each
+  column has its own color, each distinct value its own shade — and **clicking one
+  filters the table** to that value (e.g. click "CD" to see all CDs), with a clear-filter
+  bar.
+
 ### v1.0.39 — Selling page + Poshmark import
 - New **Selling** page: import your Poshmark **My Sales Report** CSV (avatar → My Sales →
   My Sales Report → email it to yourself) and every completed sale lands in a detailed,

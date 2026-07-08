@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.39';
+const VERSION = '1.0.40';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -42,6 +42,7 @@ let activeMonth = 0;                 // 0 = All months
 let incomeTab = 'grid';             // 'grid' | 'list'
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
+let accountsFilter = null;   // { key, value } from clicking a value badge
 let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
@@ -594,9 +595,40 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
-const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', beneficiaries: 'Beneficiaries', notes: 'Notes' };
-const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'beneficiaries', 'notes'];
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', cdApy: 'CD APY', cdMaturity: 'CD maturity', savingsRate: 'Savings APY (latest)', beneficiaries: 'Beneficiaries', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'cdApy', 'cdMaturity', 'savingsRate', 'beneficiaries', 'notes'];
 const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags'];
+// Colored value badge: each column gets a base hue, each distinct value a shade —
+// so CD vs Checking (or Ally vs Chase) is recognizable at a glance. Clicking one
+// filters the table to that value.
+const ACCT_BADGE_HUES = { type: 145, institution: 215, owner: 275, beneficiaries: 25 };
+const _badgeShadeIdx = {};
+function valueBadge(colKey, text) {
+  if (!text) return el('span', 'muted', '—');
+  // Shades assigned in first-seen order per column, so distinct values get
+  // distinct shades of that column's color (wraps after 6).
+  const m = _badgeShadeIdx[colKey] = _badgeShadeIdx[colKey] || new Map();
+  if (!m.has(text)) m.set(text, m.size);
+  const hue = ACCT_BADGE_HUES[colKey] || 200;
+  const light = 90 - (m.get(text) % 6) * 6;   // 90 -> 60 in 6 steps
+  const b = el('span', 'badge val-badge', text);
+  b.style.background = 'hsl(' + hue + ', 45%, ' + light + '%)';
+  b.style.color = 'hsl(' + hue + ', 55%, 24%)';
+  b.title = 'Click to show only “' + text + '”';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    accountsFilter = (accountsFilter && accountsFilter.key === colKey && accountsFilter.value === text) ? null : { key: colKey, value: text };
+    renderView(currentRoute);
+  });
+  return b;
+}
+// Latest recorded savings APY for an account's institution (from Credit & Rates).
+function latestRateFor(store, institution) {
+  if (!institution) return null;
+  const rows = store.state.rateHistory.filter(r => (rateInstitution(store, r) || '').toLowerCase() === institution.toLowerCase());
+  if (!rows.length) return null;
+  return rows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+}
 function buildAcctCol(store, key) {
   switch (key) {
     case 'name': return { label: 'Name', key: 'name', value: a => a.name, cell: a => {
@@ -607,10 +639,10 @@ function buildAcctCol(store, key) {
           td.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
         }
         return td; } };
-    case 'institution': return { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => el('td', null, a.institution || '—') };
-    case 'type': return { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(badge(a.type || '—', 'type')); return td; } };
+    case 'institution': return { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('institution', a.institution)); return td; } };
+    case 'type': return { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('type', a.type)); return td; } };
     case 'last4': return { label: 'Last 4', key: 'last4', value: a => a.last4 || '', cell: a => el('td', null, a.last4 ? ('••' + a.last4) : '—') };
-    case 'owner': return { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => el('td', null, store.personName(a.personId)) };
+    case 'owner': return { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => { const td = el('td'); const n = store.personName(a.personId); td.appendChild(valueBadge('owner', n === '—' ? '' : n)); return td; } };
     case 'flags': return { label: 'Flags', sortable: false, cell: a => {
         const td = el('td'); const flags = el('div', 'flags');
         flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
@@ -621,7 +653,16 @@ function buildAcctCol(store, key) {
         if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
         if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } };
-    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td', 'muted'); td.textContent = (a.beneficiaries || '').trim() || '—'; return td; } };
+    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('beneficiaries', (a.beneficiaries || '').trim())); return td; } };
+    case 'cdApy': return { label: 'CD APY', key: 'cdApy', num: true, value: a => Number(a.cdApy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.type === 'CD' && a.cdApy != null && a.cdApy !== '') ? (Number(a.cdApy).toFixed(2) + '%') : '—'; return td; } };
+    case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
+    case 'savingsRate': return { label: 'Savings APY (latest)', key: 'savingsRate', num: true, value: a => { const r = latestRateFor(store, a.institution); return r ? Number(r.apy) || 0 : -1; }, cell: a => {
+        const td = el('td', 'num');
+        const r = /savings|cd/i.test(a.type || '') ? latestRateFor(store, a.institution) : null;
+        if (!r) { td.textContent = '—'; return td; }
+        td.textContent = Number(r.apy).toFixed(2) + '%';
+        td.appendChild(el('div', 'acct-sub', 'recorded ' + fmtDate(r.date)));
+        return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: a => a.notes || '', cell: a => { const td = el('td', 'muted'); td.textContent = a.notes || '—'; return td; } };
   }
   return null;
@@ -657,9 +698,21 @@ function renderAccounts(view) {
   const bestCal = bestCardCallout(store);
   if (bestCal) view.appendChild(bestCal);
 
+  let acctRows = s.accounts;
+  if (accountsFilter) {
+    const f = accountsFilter;
+    const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? (a.beneficiaries || '').trim() : (a[f.key] || '');
+    acctRows = s.accounts.filter(a => valOf(a) === f.value);
+    const bar = el('div', 'filter-bar');
+    bar.appendChild(el('span', 'muted', 'Showing ' + acctRows.length + ' account' + (acctRows.length === 1 ? '' : 's') + ' where ' + (ACCT_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { accountsFilter = null; renderView(currentRoute); });
+    bar.appendChild(clear);
+    view.appendChild(bar);
+  }
   view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
   const card = el('div', 'card table-card');
-  card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
+  card.appendChild(sortableTable(cols, acctRows, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
 }
 
