@@ -45,6 +45,10 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.25 — Customizable columns on Accounts
+- **⚙ Columns** on the Accounts page too, with optional **Beneficiaries** and **Notes**
+  columns.
+
 ### v1.0.24 — Customizable columns on Bills & Subscriptions
 - The **⚙ Columns** manager (show/hide/reorder) now also works on **Bills & Subscriptions**,
   with optional **Person** and **Notes** columns. Column layouts are saved per table.

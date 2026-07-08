@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.24';
+const VERSION = '1.0.25';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -582,14 +582,50 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', beneficiaries: 'Beneficiaries', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'beneficiaries', 'notes'];
+const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags'];
+function buildAcctCol(store, key) {
+  switch (key) {
+    case 'name': return { label: 'Name', key: 'name', value: a => a.name, cell: a => {
+        const td = el('td'); td.appendChild(el('div', 'acct-name', a.name));
+        if (a.previousAccountId) {
+          const prev = store.account(a.previousAccountId);
+          const lbl = prev ? (prev.name + (prev.last4 ? ' ••' + prev.last4 : '')) : 'a previous account';
+          td.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
+        }
+        return td; } };
+    case 'institution': return { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => el('td', null, a.institution || '—') };
+    case 'type': return { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(badge(a.type || '—', 'type')); return td; } };
+    case 'last4': return { label: 'Last 4', key: 'last4', value: a => a.last4 || '', cell: a => el('td', null, a.last4 ? ('••' + a.last4) : '—') };
+    case 'owner': return { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => el('td', null, store.personName(a.personId)) };
+    case 'flags': return { label: 'Flags', sortable: false, cell: a => {
+        const td = el('td'); const flags = el('div', 'flags');
+        flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
+        if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
+        if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
+        if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
+        const fl = ccFloatToday(a);
+        if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
+        if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
+        td.appendChild(flags); return td; } };
+    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td', 'muted'); td.textContent = (a.beneficiaries || '').trim() || '—'; return td; } };
+    case 'notes': return { label: 'Notes', key: 'notes', value: a => a.notes || '', cell: a => { const td = el('td', 'muted'); td.textContent = a.notes || '—'; return td; } };
+  }
+  return null;
+}
+
 function renderAccounts(view) {
   const store = window.cloverStore, s = store.state;
   const head = el('div', 'view-head');
   const left = el('div'); left.appendChild(el('h3', null, 'Accounts'));
   left.appendChild(el('p', 'muted', s.accounts.length + ' account' + (s.accounts.length === 1 ? '' : 's')));
   head.appendChild(left);
+  const acctActions = el('div', 'head-actions');
+  acctActions.appendChild(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns'));
   const add = el('button', 'btn-primary', '+ Add account'); add.addEventListener('click', () => accountModal(null));
-  head.appendChild(add);
+  acctActions.appendChild(add);
+  head.appendChild(acctActions);
   view.appendChild(head);
 
   if (!s.accounts.length) {
@@ -600,28 +636,7 @@ function renderAccounts(view) {
   }
 
   const cols = [
-    { label: 'Name', key: 'name', value: a => a.name, cell: a => {
-        const td = el('td'); td.appendChild(el('div', 'acct-name', a.name));
-        if (a.previousAccountId) {
-          const prev = store.account(a.previousAccountId);
-          const lbl = prev ? (prev.name + (prev.last4 ? ' ••' + prev.last4 : '')) : 'a previous account';
-          td.appendChild(el('div', 'acct-sub', '↳ rollover of ' + lbl));
-        }
-        return td; } },
-    { label: 'Institution', key: 'institution', value: a => a.institution || '', cell: a => el('td', null, a.institution || '—') },
-    { label: 'Type', key: 'type', value: a => a.type || '', cell: a => { const td = el('td'); td.appendChild(badge(a.type || '—', 'type')); return td; } },
-    { label: 'Last 4', key: 'last4', value: a => a.last4 || '', cell: a => el('td', null, a.last4 ? ('••' + a.last4) : '—') },
-    { label: 'Owner', key: 'owner', value: a => store.personName(a.personId), cell: a => el('td', null, store.personName(a.personId)) },
-    { label: 'Flags', sortable: false, cell: a => {
-        const td = el('td'); const flags = el('div', 'flags');
-        flags.appendChild(a.active === false ? badge('Inactive', 'red') : badge('Active', 'green'));
-        if (store.successorOf(a.id)) flags.appendChild(badge('Rolled over'));
-        if (a.usedForAutopay) flags.appendChild(badge('Auto-pay', 'amber'));
-        if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
-        const fl = ccFloatToday(a);
-        if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
-        if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
-        td.appendChild(flags); return td; } },
+    ...tableColKeys(store, 'accounts', ACCT_COL_LABELS, ACCT_DEFAULT_COLS).map(k => buildAcctCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: a => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => accountModal(a));
