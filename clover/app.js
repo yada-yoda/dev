@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.36';
+const VERSION = '1.0.37';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1677,6 +1677,10 @@ function expenseModal(existing) {
 // ============================================================
 const PAYCHECK_STATUSES = ['Received', 'Expected', 'Late', 'Missing', 'Bounced/Returned', 'Manual deposit'];
 const PAYCHECK_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
+const PAYCHECK_KINDS = ['Regular', 'Bonus', 'Reimbursement', 'Adjustment', 'Other one-time'];
+// Common gross-to-net line items for the pay-stub sample (generic names — state
+// withholding varies by state, so it's just "State Withholding").
+const DEDUCTION_SUGGESTIONS = ['Federal Withholding', 'Social Security Employee', 'Medicare Employee', 'Medicare Employee Addl Tax', 'State Withholding', '401(k)', 'Roth 401(k)', 'Health Insurance', 'Dental Insurance', 'Vision Insurance', 'HSA', 'FSA', 'Life Insurance', 'Garnishment'];
 const PAY_FREQUENCIES = [
   { key: 'weekly', label: 'Weekly (52 / yr)' },
   { key: 'biweekly', label: 'Biweekly (26 / yr)' },
@@ -1881,7 +1885,9 @@ function buildPaycheckCol(store, key) {
     case 'status': return { label: 'Status', key: 'status', value: p => p.status || 'Received', cell: p => {
         const td = el('td'); const st = p.status || 'Received';
         const tone = st === 'Received' || st === 'Manual deposit' ? 'green' : (st === 'Late' || st === 'Missing' || st === 'Bounced/Returned') ? 'red' : 'amber';
-        td.appendChild(badge(st, tone)); return td; } };
+        td.appendChild(badge(st, tone));
+        if (p.checkType && p.checkType !== 'Regular') { td.appendChild(document.createTextNode(' ')); td.appendChild(badge(p.checkType, 'type')); }
+        return td; } };
     case 'method': return { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: p => p.notes || '', cell: p => { const td = el('td', 'muted'); td.textContent = p.notes || '—'; return td; } };
   }
@@ -2068,6 +2074,39 @@ function renderPaychecks(view) {
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(showSel ? cols : cols.slice(1), rows, paycheckSort, ns => { paycheckSort = ns || { key: 'payDate', dir: 'desc' }; renderView(currentRoute); }, p => p.__expected ? 'inactive-row expected-row' : (isPaycheckPaid(p) ? '' : 'inactive-row')));
   view.appendChild(card);
+
+  // Where the gross goes: the schedule's pay-stub sample × regular checks received
+  // this year, per line item (salary assumption — one-time checks excluded).
+  if (!allMode && paycheckView === 'current') {
+    activeSchedules(store).filter(sch => Array.isArray(sch.deductions) && sch.deductions.length).forEach(sch => {
+      const checks = pays.filter(p => isPaycheckPaid(p) && (p.employer || '').toLowerCase() === (sch.employer || '').toLowerCase() && (!p.checkType || p.checkType === 'Regular'));
+      if (!checks.length) return;
+      const n = checks.length;
+      const dcard = el('div', 'card');
+      dcard.appendChild(el('h3', 'strip-title', 'Where the gross goes · ' + (sch.name || sch.employer) + ' · ' + activeYear));
+      dcard.appendChild(el('p', 'muted', 'Your pay-stub sample × ' + n + ' regular paycheck' + (n === 1 ? '' : 's') + ' received this year. Assumes a salary (every regular check about the same); bonus and other one-time checks are excluded.'));
+      const wrap = el('div', 'table-scroll'); const t = el('table', 'data-table');
+      t.innerHTML = '<thead><tr><th>Line item</th><th class="num">Per check</th><th class="num">' + activeYear + ' so far</th></tr></thead>';
+      const tb = el('tbody');
+      let per = 0;
+      sch.deductions.forEach(d0 => {
+        const amt = Number(d0.amount) || 0; per += amt;
+        const tr = el('tr'); tr.appendChild(el('td', null, d0.name || '—')); tr.appendChild(numCell(amt)); tr.appendChild(numCell(amt * n, true)); tb.appendChild(tr);
+      });
+      const totalTr = el('tr', 'total-row');
+      totalTr.appendChild(el('td', 'grp-name', 'Total deductions'));
+      totalTr.appendChild(numCell(per, true)); totalTr.appendChild(numCell(per * n, true));
+      tb.appendChild(totalTr);
+      t.appendChild(tb); wrap.appendChild(t); dcard.appendChild(wrap);
+      if (sch.gross) {
+        const calcNet = Number(sch.gross) - per;
+        const diff = (sch.net != null && sch.net !== '') ? calcNet - Number(sch.net) : null;
+        dcard.appendChild(el('div', 'sum-hint', 'Gross ' + money(sch.gross) + ' − deductions ' + money(per) + ' = ' + money(calcNet) + ' net per check' +
+          (diff != null ? (Math.abs(diff) > 1 ? ' — differs from the schedule’s expected net (' + money(sch.net) + ') by ' + money(Math.abs(diff)) + '; update the stub sample or the expected net.' : ' — matches the schedule’s expected net.') : '')));
+      }
+      view.appendChild(dcard);
+    });
+  }
 }
 
 // In-place refresh of the bulk bar + select-all state (no full table re-render,
@@ -2126,6 +2165,7 @@ function paycheckModal(existing) {
   const fPeriodEnd = input(p.periodEnd || '', { type: 'date' });
   const fStatus = select(PAYCHECK_STATUSES, p.status || 'Received');
   const fMethod = select(PAYCHECK_METHODS, p.method || 'Direct deposit');
+  const fKind = select(PAYCHECK_KINDS, p.checkType || 'Regular');
   const fNotes = document.createElement('textarea'); fNotes.value = p.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   const dateRow = el('div', 'two-col');
@@ -2148,6 +2188,7 @@ function paycheckModal(existing) {
   stRow.appendChild(field('Status', fStatus, 'Received/Manual deposit count toward wage totals; Expected/Late/Missing/Bounced do not.'));
   stRow.appendChild(field('Method', fMethod, 'How you got paid — direct deposit, check, office pickup, etc.'));
   body.appendChild(stRow);
+  body.appendChild(field('Check type', fKind, 'Most checks are Regular — on a salary, every regular check is about the same. Mark bonuses, reimbursements, or other one-time checks so they don’t skew the deductions breakdown or raise detection.'));
   body.appendChild(field('Notes', fNotes, 'Anything unusual — bounced check, wrong amount, deposit delay, etc.'));
 
   const isEdit = !!(existing && existing.id);
@@ -2162,7 +2203,7 @@ function paycheckModal(existing) {
         employer: fEmp.value.trim(), incomeCategoryId: fCat.value, personId: fPerson.value,
         periodNum: fPeriodNum.value === '' ? null : parseInt(fPeriodNum.value, 10),
         periodStart: fPeriodStart.value || '', periodEnd: fPeriodEnd.value || '',
-        status: fStatus.value, method: fMethod.value, notes: fNotes.value.trim()
+        status: fStatus.value, method: fMethod.value, checkType: fKind.value, notes: fNotes.value.trim()
       });
       // A paycheck belongs to the year of its pay date, not whatever year is
       // being viewed — this keeps All-view edits and cross-year adds correct.
@@ -2251,6 +2292,34 @@ function payScheduleModal(existing) {
   amtRow.appendChild(field('Expected gross', fGross, 'Typical gross per paycheck — prefilled when you record a missing one.'));
   amtRow.appendChild(field('Expected net', fNet, 'Typical take-home per paycheck.'));
   body.appendChild(amtRow);
+
+  // Pay-stub sample: where each check's gross goes before net. One sample covers
+  // the year because this assumes a SALARY — every regular check about the same.
+  const dedList = el('datalist'); dedList.id = 'deduct-list';
+  DEDUCTION_SUGGESTIONS.forEach(n => { const o = el('option'); o.value = n; dedList.appendChild(o); });
+  body.appendChild(dedList);
+  let deductions = Array.isArray(c.deductions) ? c.deductions.map(x => ({ name: x.name || '', amount: x.amount })) : [];
+  const dedWrap = el('div');
+  const renderDed = () => {
+    dedWrap.innerHTML = '';
+    deductions.forEach((d0, i) => {
+      const row = el('div', 'io-actions');
+      const fName2 = input(d0.name, { placeholder: 'e.g. Federal Withholding', list: 'deduct-list' });
+      fName2.addEventListener('input', () => { d0.name = fName2.value; });
+      const fAmt2 = input(d0.amount != null ? d0.amount : '', { type: 'number', placeholder: '0.00' }); fAmt2.step = '0.01';
+      fAmt2.addEventListener('input', () => { d0.amount = fAmt2.value === '' ? null : parseFloat(fAmt2.value); });
+      const x = el('button', 'icon-btn danger', '✕'); x.title = 'Remove this line item';
+      x.addEventListener('click', () => { deductions.splice(i, 1); renderDed(); });
+      row.appendChild(fName2); row.appendChild(fAmt2); row.appendChild(x);
+      dedWrap.appendChild(row);
+    });
+    const addDed = el('button', 'btn-ghost', '＋ Add line item');
+    addDed.addEventListener('click', () => { deductions.push({ name: '', amount: null }); renderDed(); });
+    dedWrap.appendChild(addDed);
+  };
+  renderDed();
+  body.appendChild(field('Paycheck deductions (per check, optional)', dedWrap, 'From a recent pay stub: where each check’s gross goes before net — federal withholding, Social Security, Medicare (plus the additional Medicare tax if it applies), state withholding, 401(k), insurance… Add your own line items for anything employer-specific. This assumes a salary, where every regular check is about the same; mark one-time checks (bonus, reimbursement) with a Check type on the paycheck so they’re excluded.'));
+
   body.appendChild(field('Status', cActive));
   syncFreq(); syncEmp();
 
@@ -2265,7 +2334,8 @@ function payScheduleModal(existing) {
         incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
         anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
-        net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked
+        net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked,
+        deductions: deductions.filter(x => (x.name || '').trim()).map(x => ({ name: x.name.trim(), amount: x.amount != null && !isNaN(x.amount) ? x.amount : null }))
       });
       store.savePaySchedule(entry);
       toast(existing ? 'Schedule updated' : 'Schedule added');
@@ -2436,6 +2506,7 @@ function detectRaisesModal() {
   const byEmp = {};
   Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(p => {
     if (!p.employer || !p.payDate || !(Number(p.gross) > 0) || !isPaycheckPaid(p)) return;
+    if (p.checkType && p.checkType !== 'Regular') return;   // bonuses etc. aren't raises
     (byEmp[p.employer] = byEmp[p.employer] || []).push(p);
   }));
   const existing = new Set(s.raises.map(r => (r.employer || '').toLowerCase() + '|' + (r.date || '')));

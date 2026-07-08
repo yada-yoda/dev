@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.37 — Paycheck deductions breakdown
+- Pay schedules can hold a **pay-stub sample**: the per-check line items between gross and
+  net (Federal Withholding, Social Security, Medicare + the additional Medicare tax, State
+  Withholding, 401(k), insurance… plus your own custom items). A **"Where the gross goes"**
+  card on Paychecks multiplies the sample by the regular checks received that year, so you
+  can see what each deduction cost you per year — and it checks that gross − deductions
+  matches your expected net.
+- Paychecks now have a **Check type** (Regular / Bonus / Reimbursement / Adjustment /
+  one-time) shown as a badge. This assumes a **salary** — every regular check about the
+  same — and one-time checks are excluded from the deductions math and raise detection.
+
 ### v1.0.36 — Tax history CSV import / export
 - The Taxes page can now **export your history to CSV**, **import from CSV** (duplicates
   skipped automatically), and download a **template** showing the exact format — including
