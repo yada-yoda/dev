@@ -440,6 +440,7 @@ button { font-family: inherit; cursor: pointer; }
 .pv-tabs .pv-refresh { margin-left: auto; height: 30px; }
 .expected-row td { font-style: italic; }
 .hint-underline { border-bottom: 1px dotted var(--text-faint); cursor: help; }
+input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted); cursor: not-allowed; }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
 .trend { font-size: 10px; margin-left: 1px; vertical-align: middle; }
@@ -473,7 +474,7 @@ button { font-family: inherit; cursor: pointer; }
 .report-chart { height: 260px; position: relative; }
 .report-chart canvas { max-width: 100%; }
 .table-scroll { overflow-x: auto; }
-.io-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+.io-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .file-btn { display: inline-flex; align-items: center; cursor: pointer; }
 .help-list { margin: 8px 0 12px 18px; padding: 0; }
 .help-list li { font-size: 13px; color: var(--text); margin-bottom: 7px; line-height: 1.5; }

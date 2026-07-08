@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.37';
+const VERSION = '1.0.38';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -650,27 +650,32 @@ function renderAccounts(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
-  // "Best card to use today" — the active credit card whose purchase-today has the most float.
-  const cardsWithFloat = s.accounts
-    .filter(a => a.type === 'Credit Card' && a.active !== false && ccFloatToday(a) != null)
-    .map(a => ({ a, float: ccFloatToday(a) }))
-    .sort((x, y) => y.float - x.float);
-  if (cardsWithFloat.length) {
-    const best = cardsWithFloat[0];
-    const cal = el('div', 'callout');
-    cal.innerHTML = '💳 <strong>Best card to use today:</strong> ' + best.a.name +
-      (best.a.last4 ? ' ••' + best.a.last4 : '') + ' — <strong>' + best.float + ' days</strong> until a purchase made today is due.';
-    if (cardsWithFloat.length > 1) {
-      const rest = cardsWithFloat.slice(1).map(c => c.a.name + ' (' + c.float + 'd)').join(', ');
-      cal.appendChild(el('div', 'callout-sub', 'Others: ' + rest));
-    }
-    view.appendChild(cal);
-  }
+  const bestCal = bestCardCallout(store);
+  if (bestCal) view.appendChild(bestCal);
 
   view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, s.accounts, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
+}
+
+// "Best card to use today" — the active credit card whose purchase-today has the
+// most float. Shared by the Accounts page and the dashboard panel.
+function bestCardCallout(store) {
+  const cardsWithFloat = store.state.accounts
+    .filter(a => a.type === 'Credit Card' && a.active !== false && ccFloatToday(a) != null)
+    .map(a => ({ a, float: ccFloatToday(a) }))
+    .sort((x, y) => y.float - x.float);
+  if (!cardsWithFloat.length) return null;
+  const best = cardsWithFloat[0];
+  const cal = el('div', 'callout');
+  cal.innerHTML = '💳 <strong>Best card to use today:</strong> ' + best.a.name +
+    (best.a.last4 ? ' ••' + best.a.last4 : '') + ' — <strong>' + best.float + ' days</strong> until a purchase made today is due.';
+  if (cardsWithFloat.length > 1) {
+    const rest = cardsWithFloat.slice(1).map(c => c.a.name + ' (' + c.float + 'd)').join(', ');
+    cal.appendChild(el('div', 'callout-sub', 'Others: ' + rest));
+  }
+  return cal;
 }
 
 // Credit-card float: days until a purchase made TODAY would be due.
@@ -861,7 +866,7 @@ function incomeGrid(data) {
   const entries = data.income.filter(countable);
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table grid-table');
-  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num">Avg</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num" title="Average per month, across the months that have amounts">Avg / mo</th></tr></thead>';
   const tb = el('tbody');
   const grand = new Array(12).fill(0);
 
@@ -1032,15 +1037,20 @@ function incomeModal(existing) {
 
   // Reward-specific fields (shown when the category looks like Rewards).
   const rwSrcList = el('datalist'); rwSrcList.id = 'rw-src-list';
-  ['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal'].forEach(v => { const o = el('option'); o.value = v; rwSrcList.appendChild(o); });
+  // Your reward programs from Settings → catalog come first, then common issuers.
+  [...new Set(((s.catalog && s.catalog.rewardPrograms) || []).map(p => p.name)
+    .concat(['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal']))]
+    .forEach(v => { const o = el('option'); o.value = v; rwSrcList.appendChild(o); });
   const rwTypeList = el('datalist'); rwTypeList.id = 'rw-type-list';
   ['Cash back', 'Statement credit', 'Gift card', 'Crypto', 'Points', 'Miles', 'Referral bonus'].forEach(v => { const o = el('option'); o.value = v; rwTypeList.appendChild(o); });
   body.appendChild(rwSrcList); body.appendChild(rwTypeList);
   const fRwSrc = input(e.rewardSource || '', { placeholder: 'e.g. Chase, Coinbase, Fetch', list: 'rw-src-list' });
   const fRwType = input(e.rewardType || '', { placeholder: 'e.g. Cash back, Gift card', list: 'rw-type-list' });
+  const fOrderConf = input(e.orderConf || '', { placeholder: 'optional' });
   const rwWrap = el('div', 'div-fields');
-  rwWrap.appendChild(field('Reward source', fRwSrc, 'Which program or card the reward came from — e.g. Chase, Amex, Coinbase, Fetch, Ebates.'));
+  rwWrap.appendChild(field('Reward program', fRwSrc, 'Which program or card the reward came from. Your reward programs from Settings appear as suggestions, plus common issuers.'));
   rwWrap.appendChild(field('Reward type', fRwType, 'What kind of reward it is — e.g. Cash back, Statement credit, Gift card, Crypto.'));
+  rwWrap.appendChild(field('Order confirmation #', fOrderConf, 'If the reward came with an order or confirmation number (gift-card redemptions often do), keep it here for reference.'));
 
   // Other-income fields (shown when the category looks like Other) — e.g. lawsuit
   // settlements, gifts, stimulus, rebates, winnings.
@@ -1055,10 +1065,17 @@ function incomeModal(existing) {
 
   const syncCat = () => {
     const g = s.incomeCategories.find(c => c.id === fCat.value);
+    const isRw = !!(g && /reward/i.test(g.name));
     divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none';
-    rwWrap.style.display = (g && /reward/i.test(g.name)) ? '' : 'none';
+    rwWrap.style.display = isRw ? '' : 'none';
     otWrap.style.display = (g && /other/i.test(g.name)) ? '' : 'none';
+    // Rewards are take-home by definition: you enter the NET, and Gross is greyed
+    // out and mirrors it (they're always equal for rewards).
+    fGross.readOnly = isRw;
+    fGross.classList.toggle('mirrored', isRw);
+    if (isRw) { if (!fNet.value && fGross.value) fNet.value = fGross.value; fGross.value = fNet.value; }
   };
+  fNet.addEventListener('input', () => { if (fGross.readOnly) fGross.value = fNet.value; });
   fCat.addEventListener('change', () => { rebuildSubs(); syncCat(); });
   rebuildSubs(); syncCat();
 
@@ -1103,7 +1120,7 @@ function incomeModal(existing) {
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
-        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim(),
+        rewardSource: fRwSrc.value.trim(), rewardType: fRwType.value.trim(), orderConf: fOrderConf.value.trim(),
         otherType: fOtType.value.trim(), description: fDesc.value.trim()
       });
       store.saveIncome(activeYear, entry);
@@ -1534,7 +1551,7 @@ function expenseGrid(data) {
   const entries = data.expensePayments;
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table grid-table');
-  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num">Avg</th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num" title="Average per month, across the months that have amounts">Avg / mo</th></tr></thead>';
   const tb = el('tbody');
   const grand = new Array(12).fill(0);
 
@@ -2978,7 +2995,8 @@ const DASH_PANEL_DEFS = [
   { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategory(ctx.store, ctx.data)) },
   { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
   { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) },
-  { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) }
+  { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) },
+  { key: 'bestCard', title: '💳 Best card to use today', build: ctx => bestCardCallout(ctx.store) || el('div', 'card muted', 'Add credit cards with statement close + due days (on the Accounts page) to see which card gives a purchase the longest float.') }
 ];
 // Last filed year's net outcome + lifetime refund/paid totals from Tax history.
 function dashTaxesBody(ctx) {
@@ -4099,17 +4117,18 @@ const BROKER_PARSERS = [
   {
     key: 'm1', name: 'M1 Finance',
     detect: h => h.includes('Transaction Type') && h.includes('Symbol') && h.includes('Amount'),
-    dateNote: 'Dates shown use each row’s “Date” column (not “Posted Date”).',
+    dateNote: 'Dates shown use each row’s “Date” column; the “Posted Date” is kept too and tells same-day payouts apart (e.g. the same dividend hitting two of your accounts at that broker).',
     parse: rows => {
       const divs = [], buys = [], fees = [];
       rows.forEach((r, i) => {
         const row = i + 2;   // spreadsheet row number (header = row 1)
         const type = String(r['Transaction Type'] || '').toUpperCase();
         const date = parseImportDate(r['Date'] || r['Posted Date']);
+        const postedDate = parseImportDate(r['Posted Date']);
         const symbol = String(r['Symbol'] || '').trim().toUpperCase();
         const amt = parseImportAmount(r['Amount']);
         if (!date || isNaN(amt)) return;
-        if (type === 'DIVIDEND' && amt > 0) divs.push({ date, symbol, amount: amt, action: '', desc: r['Description'] || '', row });
+        if (type === 'DIVIDEND' && amt > 0) divs.push({ date, postedDate, symbol, amount: amt, action: '', desc: r['Description'] || '', row });
         else if (type === 'PURCHASED' && symbol) buys.push({ date, symbol });
         else if (type === 'OTHER' && symbol && amt < 0) fees.push({ date, symbol, amount: Math.abs(amt), desc: r['Description'] || '', row });
       });
@@ -4186,11 +4205,16 @@ function analyzeDividendFile(store, rows, headers, filename) {
   const dbKeys = existingDividendKeys(store);
   const firstRowByKey = new Map();
   parsed.divs.forEach((d, i) => {
-    d.uid = i; const k = divKey(d);
+    d.uid = i;
+    const k = divKey(d);
+    // In-file repeats also compare the posted date: the same date+stock+amount with
+    // DIFFERENT posted dates is two real payouts (e.g. two accounts at the broker),
+    // not a duplicate — so those import without being flagged.
+    const kf = k + '|' + (d.postedDate || '');
     if (dbKeys.has(k)) d.dup = 'db';
-    else if (firstRowByKey.has(k)) { d.dup = 'file'; d.dupRow = firstRowByKey.get(k); }
+    else if (firstRowByKey.has(kf)) { d.dup = 'file'; d.dupRow = firstRowByKey.get(kf); }
     else d.dup = '';
-    if (!firstRowByKey.has(k)) firstRowByKey.set(k, d.row);
+    if (!firstRowByKey.has(kf)) firstRowByKey.set(kf, d.row);
   });
   return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
 }
@@ -4207,8 +4231,9 @@ function dividendReviewCard(store) {
   const optRow = el('div', 'io-actions');
   const acctSel = select([{ value: '', label: '— no account —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), st.accountId);
   acctSel.addEventListener('change', () => { st.accountId = acctSel.value; });
-  optRow.appendChild(labelWrap('Deposit account', acctSel));
+  optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
+  card.appendChild(el('p', 'muted', 'This tags every imported dividend as belonging to one of YOUR Clover accounts (e.g. your brokerage account on the Accounts page). The broker’s file doesn’t say which internal account paid — if you keep more than one account at this broker, either import the whole file under one Clover account, or run the import twice with separate per-account exports if the broker offers them.'));
 
   // Conflict review: choose merge (skip) or keep-as-separate per flagged row.
   const flagged = st.divs.filter(d => d.dup);
@@ -4220,7 +4245,7 @@ function dividendReviewCard(store) {
       const row = el('div', 'mini-row');
       const left = el('div');
       const top = el('span');
-      top.appendChild(document.createTextNode(fmtDate(d.date) + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' — CSV row ' + d.row + ' '));
+      top.appendChild(document.createTextNode(fmtDate(d.date) + (d.postedDate && d.postedDate !== d.date ? ' (posted ' + fmtDate(d.postedDate) + ')' : '') + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' — CSV row ' + d.row + ' '));
       top.appendChild(badge(d.dup === 'db' ? 'already recorded' : 'duplicate in file', 'amber'));
       left.appendChild(top);
       left.appendChild(el('div', 'acct-sub', d.dup === 'file'

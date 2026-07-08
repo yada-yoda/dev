@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.38 — Import fixes, best-card panel, reward polish
+- **M1 duplicate fix**: same-day payouts with different **Posted Dates** (e.g. the same
+  dividend hitting two of your M1 accounts) are no longer flagged as duplicates — the
+  posted date now tells them apart, and review lines show both dates.
+- The dividend import's account picker is now "**Record dividends under**" with an
+  explanation: it tags the dividends to one of *your* Clover accounts (the broker file
+  doesn't say which internal account paid).
+- **💳 Best card to use today** is now a dashboard panel (add it via ✎ Edit layout if
+  you've customized your dashboard).
+- Rewards: the **program** field suggests your reward programs from Settings, a new
+  **Order confirmation #** field, and **Gross is greyed out and mirrors Net** (rewards
+  are always take-home).
+- The income grid's "Avg" column is now labeled **"Avg / mo"** (with an explanation on
+  hover), and the template-download row on Import/Export aligns properly.
+
 ### v1.0.37 — Paycheck deductions breakdown
 - Pay schedules can hold a **pay-stub sample**: the per-check line items between gross and
   net (Federal Withholding, Social Security, Medicare + the additional Medicare tax, State
