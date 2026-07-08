@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.20';
+const VERSION = '1.0.21';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1133,9 +1133,7 @@ function nextRenewalDate(sub) {
   let guard = 0;
   if (!stepMonths) {
     const step = sub.frequency === 'biweekly' ? 14 : 7;
-    const jumps = Math.floor((today - d) / (step * 86400000));
-    d = new Date(d.getTime() + jumps * step * 86400000);
-    while (d < today && guard++ < 500) d = new Date(d.getTime() + step * 86400000);
+    while (d < today && guard++ < 800) d = addDays(d, step);
   } else {
     const day = +m[3]; let ty = +m[1], tm = +m[2] - 1;
     while (d < today && guard++ < 1200) {
@@ -1157,9 +1155,10 @@ function renewalDaysInMonth(sub, year, month) {
   if (!stepMonths) {
     const step = sub.frequency === 'biweekly' ? 14 : 7;
     const monthStart = new Date(year, month, 1);
-    const days = []; let d = new Date(anchor), guard = 0;
-    if (d < monthStart) { const gap = Math.ceil((monthStart - d) / (step * 86400000)); d = new Date(d.getTime() + gap * step * 86400000); }
-    while (d <= monthEnd && guard++ < 10) { if (d >= anchor) days.push(d.getDate()); d = new Date(d.getTime() + step * 86400000); }
+    const days = []; let d = anchor, guard = 0;
+    while (d < monthStart && guard++ < 4000) d = addDays(d, step);
+    guard = 0;
+    while (d <= monthEnd && guard++ < 10) { if (d >= anchor) days.push(d.getDate()); d = addDays(d, step); }
     return days;
   }
   const anchorIdx = anchor.getFullYear() * 12 + anchor.getMonth(), targetIdx = year * 12 + month;
@@ -1630,6 +1629,9 @@ function payFreqLabel(key) { const f = PAY_FREQUENCIES.find(x => x.key === key);
 function parseISODate(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
 function isoOfDate(d) { const p = k => String(k).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function daysBetweenISO(a, b) { const da = parseISODate(a), db = parseISODate(b); if (!da || !db) return 1e9; return Math.round((da - db) / 86400000); }
+// Calendar-day math (DST-safe — stays at local midnight, unlike adding raw ms which
+// drifts a Friday to Thursday 11pm across a spring-forward boundary).
+function addDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n); }
 
 // All expected pay dates for a schedule within a calendar year, ordered, with a
 // period number (ordinal within the year) and the pay-period start/end.
@@ -1638,12 +1640,12 @@ function expectedPayPeriods(sch, year) {
   const jan1 = new Date(year, 0, 1), dec31 = new Date(year, 11, 31);
   const out = [];
   if (sch.frequency === 'weekly' || sch.frequency === 'biweekly') {
-    const step = sch.frequency === 'weekly' ? 7 : 14, ms = step * 86400000;
-    let d = new Date(anchor.getTime() + Math.round((jan1 - anchor) / ms) * ms);
-    while (d > jan1) d = new Date(d.getTime() - ms);
-    while (d < jan1) d = new Date(d.getTime() + ms);
-    for (; d <= dec31; d = new Date(d.getTime() + ms)) {
-      out.push({ payDate: isoOfDate(d), periodStart: isoOfDate(new Date(d.getTime() - ms)), periodEnd: isoOfDate(new Date(d.getTime() - 86400000)) });
+    const step = sch.frequency === 'weekly' ? 7 : 14;
+    let d = anchor;                                   // keep the anchor's weekday
+    while (d > jan1) d = addDays(d, -step);
+    while (d < jan1) d = addDays(d, step);
+    for (; d <= dec31; d = addDays(d, step)) {
+      out.push({ payDate: isoOfDate(d), periodStart: isoOfDate(addDays(d, -step)), periodEnd: isoOfDate(addDays(d, -1)) });
     }
   } else if (sch.frequency === 'monthly') {
     const day = anchor.getDate();

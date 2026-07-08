@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.21 — Fix biweekly pay dates drifting a day
+- Fixed a bug where biweekly/weekly pay dates (and weekly/biweekly bill renewals) could
+  land a day early after a daylight-saving change — e.g. a Friday payday showing as
+  Thursday in the second half of the year. Dates now step by whole calendar days and stay
+  on the weekday of your first pay date, so entering that date is all it takes.
+
 ### v1.0.20 — Refresh button on missing paychecks
 - The Missing-paychecks panel has a **↻ Refresh** button that re-pulls the year's data and
   recomputes against your pay schedule — handy if a change (like merging employers, or a
