@@ -64,7 +64,9 @@ function defaults() {
       netMonthlyIncome: 0,   // reference figure for "% of net income" on subscriptions
       // which flags start checked when adding a NEW account
       accountDefaults: { active: true, usedForIncome: false, usedForExpenses: false, usedForAutopay: false, rewardsCard: false },
-      paycheckCols: null   // ordered list of visible paycheck columns (null = default)
+      paycheckCols: null,  // legacy (pre-1.0.24) paycheck column list
+      tableCols: {},       // per-table ordered visible-column lists, keyed by table
+      dashPanels: null     // dashboard panel order/visibility [{k, c}] (null = default)
     },
     // The "self" person is renamed at runtime to "Me (<Google first name>)" —
     // the real name is never hard-coded here (public repo); it comes from the
@@ -219,6 +221,13 @@ window.cloverStore = {
   netMonthlyIncome() { return Number(state.settings.netMonthlyIncome) || 0; },
   setNetMonthlyIncome(v) { state.settings.netMonthlyIncome = Number(v) || 0; scheduleSave(); notify(); },
   setPaycheckCols(arr) { state.settings.paycheckCols = (Array.isArray(arr) && arr.length) ? arr.slice() : null; scheduleSave(); notify(); },
+  setTableCols(tableKey, arr) {
+    if (!state.settings.tableCols) state.settings.tableCols = {};
+    if (Array.isArray(arr) && arr.length) state.settings.tableCols[tableKey] = arr.slice();
+    else delete state.settings.tableCols[tableKey];
+    scheduleSave(); notify();
+  },
+  setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0 })) : null; scheduleSave(); notify(); },
 
   // --- recurring / subscriptions ---
   saveRecurring(item) {

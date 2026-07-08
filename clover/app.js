@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.23';
+const VERSION = '1.0.24';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1185,6 +1185,38 @@ function trendIcon(sub) {
   const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
 }
 
+const SUBS_COL_LABELS = { name: 'Name', category: 'Category', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', person: 'Person', flags: 'Flags', notes: 'Notes' };
+const SUBS_ALL_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'person', 'flags', 'notes'];
+const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
+function buildSubsCol(store, key, net) {
+  switch (key) {
+    case 'name': return { label: 'Name', key: 'name', value: r => r.name, cell: r => {
+        const td = el('td'); const nm = el('div', 'acct-name'); nm.appendChild(document.createTextNode(r.name));
+        const ti = trendIcon(r); if (ti) { nm.appendChild(document.createTextNode(' ')); nm.appendChild(ti); }
+        td.appendChild(nm);
+        if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
+        return td; } };
+    case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => el('td', null, store.expenseGroupName(r.categoryId)) };
+    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) };
+    case 'frequency': return { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => el('td', null, freqLabel(r)) };
+    case 'monthly': return { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) };
+    case 'annual': return { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) };
+    case 'pct': return { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } };
+    case 'renews': return { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) };
+    case 'account': return { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') };
+    case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
+    case 'flags': return { label: 'Flags', sortable: false, cell: r => {
+        const td = el('td'); const flags = el('div', 'flags');
+        if (!isSubActive(r)) flags.appendChild(badge(r.status || 'Inactive', 'red'));
+        else if (r.status === 'Trial') flags.appendChild(badge('Trial', 'amber'));
+        if (r.autoPay) flags.appendChild(badge('Auto-pay', 'amber'));
+        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority));
+        td.appendChild(flags); return td; } };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
+  }
+  return null;
+}
+
 function renderSubscriptions(view) {
   destroyCharts();
   const store = window.cloverStore, s = store.state;
@@ -1201,6 +1233,7 @@ function renderSubscriptions(view) {
   left.appendChild(el('p', 'muted', active.length + ' active · ' + all.length + ' total'));
   head.appendChild(left);
   const subActions = el('div', 'head-actions');
+  subActions.appendChild(columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns'));
   subActions.appendChild(importButton('subscriptions'));
   const add = el('button', 'btn-primary', '+ Add subscription'); add.addEventListener('click', () => subscriptionModal(null));
   subActions.appendChild(add);
@@ -1243,27 +1276,7 @@ function renderSubscriptions(view) {
   }
 
   const cols = [
-    { label: 'Name', key: 'name', value: r => r.name, cell: r => {
-        const td = el('td'); const nm = el('div', 'acct-name'); nm.appendChild(document.createTextNode(r.name));
-        const ti = trendIcon(r); if (ti) { nm.appendChild(document.createTextNode(' ')); nm.appendChild(ti); }
-        td.appendChild(nm);
-        if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
-        return td; } },
-    { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => el('td', null, store.expenseGroupName(r.categoryId)) },
-    { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) },
-    { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => el('td', null, freqLabel(r)) },
-    { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) },
-    { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) },
-    { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } },
-    { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) },
-    { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => el('td', null, store.accountName(r.accountId) || '—') },
-    { label: 'Flags', sortable: false, cell: r => {
-        const td = el('td'); const flags = el('div', 'flags');
-        if (!isSubActive(r)) flags.appendChild(badge(r.status || 'Inactive', 'red'));
-        else if (r.status === 'Trial') flags.appendChild(badge('Trial', 'amber'));
-        if (r.autoPay) flags.appendChild(badge('Auto-pay', 'amber'));
-        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority));
-        td.appendChild(flags); return td; } },
+    ...tableColKeys(store, 'subs', SUBS_COL_LABELS, SUBS_DEFAULT_COLS).map(k => buildSubsCol(store, k, net)).filter(Boolean),
     { label: '', sortable: false, cell: r => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => subscriptionModal(r));
@@ -1730,11 +1743,62 @@ const PAYCHECK_COL_LABELS = {
 };
 const PAYCHECK_ALL_COLS = ['payDate', 'received', 'timing', 'period', 'periodStart', 'periodEnd', 'gross', 'net', 'employer', 'person', 'status', 'method', 'notes'];
 const PAYCHECK_DEFAULT_COLS = ['payDate', 'received', 'timing', 'gross', 'net', 'employer', 'person', 'period', 'status', 'method'];
-function paycheckColKeys(store) {
-  const saved = store.state.settings.paycheckCols;
-  const keys = (Array.isArray(saved) && saved.length) ? saved.filter(k => PAYCHECK_COL_LABELS[k]) : PAYCHECK_DEFAULT_COLS.slice();
-  return keys.length ? keys : PAYCHECK_DEFAULT_COLS.slice();
+// ---- Generic table-column customization (show/hide/reorder), saved per table ----
+function tableColKeys(store, tableKey, labels, defaults) {
+  let saved = (store.state.settings.tableCols || {})[tableKey];
+  if (tableKey === 'paychecks' && !(Array.isArray(saved) && saved.length)) saved = store.state.settings.paycheckCols;   // legacy home
+  const keys = (Array.isArray(saved) && saved.length) ? saved.filter(k => labels[k]) : defaults.slice();
+  return keys.length ? keys : defaults.slice();
 }
+function tableColumnsModal(tableKey, allCols, defaults, labels, title) {
+  const store = window.cloverStore;
+  const body = el('div');
+  body.appendChild(el('p', 'muted', 'Check the columns to show, and use ↑ / ↓ to reorder them.'));
+  const listWrap = el('div', 'col-config');
+  const cur = () => tableColKeys(store, tableKey, labels, defaults);
+  const setCols = arr => store.setTableCols(tableKey, arr);
+  const move = (k, dir) => { const v = cur().slice(); const j = v.indexOf(k); const t = j + dir; if (t < 0 || t >= v.length) return; const tmp = v[t]; v[t] = v[j]; v[j] = tmp; setCols(v); render(); };
+  const colRow = (k, isVisible, idx, total) => {
+    const row = el('div', 'col-row');
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = isVisible;
+    cb.addEventListener('change', () => {
+      let v = cur().slice();
+      if (cb.checked) { if (!v.includes(k)) v.push(k); } else { v = v.filter(x => x !== k); if (!v.length) v = [allCols[0]]; }
+      setCols(v); render();
+    });
+    row.appendChild(cb);
+    row.appendChild(el('span', 'col-label', labels[k]));
+    if (isVisible) {
+      const acts = el('div', 'col-acts');
+      const up = el('button', 'icon-btn', '↑'); up.disabled = idx === 0; up.addEventListener('click', () => move(k, -1));
+      const down = el('button', 'icon-btn', '↓'); down.disabled = idx === total - 1; down.addEventListener('click', () => move(k, 1));
+      acts.appendChild(up); acts.appendChild(down); row.appendChild(acts);
+    }
+    return row;
+  };
+  const render = () => {
+    listWrap.innerHTML = '';
+    const visible = cur();
+    const hidden = allCols.filter(k => !visible.includes(k));
+    visible.forEach((k, i) => listWrap.appendChild(colRow(k, true, i, visible.length)));
+    if (hidden.length) {
+      listWrap.appendChild(el('div', 'col-sep', 'Hidden'));
+      hidden.forEach(k => listWrap.appendChild(colRow(k, false)));
+    }
+  };
+  render();
+  body.appendChild(listWrap);
+  const reset = el('button', 'btn-ghost', 'Reset to default');
+  reset.addEventListener('click', () => { setCols(null); if (tableKey === 'paychecks') store.setPaycheckCols(null); render(); });
+  body.appendChild(reset);
+  openModal({ title: title || 'Columns', body, confirmLabel: 'Done', onConfirm: () => {} });
+}
+function columnsButton(tableKey, allCols, defaults, labels, title) {
+  const b = el('button', 'btn-ghost', '⚙ Columns');
+  b.addEventListener('click', () => tableColumnsModal(tableKey, allCols, defaults, labels, title));
+  return b;
+}
+function paycheckColKeys(store) { return tableColKeys(store, 'paychecks', PAYCHECK_COL_LABELS, PAYCHECK_DEFAULT_COLS); }
 // Build a sortableTable column def for a given paycheck column key.
 function buildPaycheckCol(store, key) {
   switch (key) {
@@ -1767,48 +1831,7 @@ function buildPaycheckCol(store, key) {
   }
   return null;
 }
-// Modal: toggle visibility + reorder the paycheck table columns.
-function paycheckColumnsModal() {
-  const store = window.cloverStore;
-  const body = el('div');
-  body.appendChild(el('p', 'muted', 'Check the columns to show, and use ↑ / ↓ to reorder them. (Pay date and the row actions always stay.)'));
-  const listWrap = el('div', 'col-config');
-  const render = () => {
-    listWrap.innerHTML = '';
-    const visible = paycheckColKeys(store);
-    const hidden = PAYCHECK_ALL_COLS.filter(k => !visible.includes(k));
-    visible.forEach((k, i) => listWrap.appendChild(colRow(k, true, i, visible.length)));
-    if (hidden.length) {
-      listWrap.appendChild(el('div', 'col-sep', 'Hidden'));
-      hidden.forEach(k => listWrap.appendChild(colRow(k, false)));
-    }
-  };
-  const move = (k, dir) => { const v = paycheckColKeys(store).slice(); const j = v.indexOf(k); const t = j + dir; if (t < 0 || t >= v.length) return; const tmp = v[t]; v[t] = v[j]; v[j] = tmp; store.setPaycheckCols(v); render(); };
-  const colRow = (k, isVisible, idx, total) => {
-    const row = el('div', 'col-row');
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = isVisible;
-    cb.addEventListener('change', () => {
-      let v = paycheckColKeys(store).slice();
-      if (cb.checked) { if (!v.includes(k)) v.push(k); } else { v = v.filter(x => x !== k); if (!v.length) v = ['payDate']; }
-      store.setPaycheckCols(v); render();
-    });
-    row.appendChild(cb);
-    row.appendChild(el('span', 'col-label', PAYCHECK_COL_LABELS[k]));
-    if (isVisible) {
-      const acts = el('div', 'col-acts');
-      const up = el('button', 'icon-btn', '↑'); up.disabled = idx === 0; up.addEventListener('click', () => move(k, -1));
-      const down = el('button', 'icon-btn', '↓'); down.disabled = idx === total - 1; down.addEventListener('click', () => move(k, 1));
-      acts.appendChild(up); acts.appendChild(down); row.appendChild(acts);
-    }
-    return row;
-  };
-  render();
-  body.appendChild(listWrap);
-  const reset = el('button', 'btn-ghost', 'Reset to default');
-  reset.addEventListener('click', () => { store.setPaycheckCols(null); render(); });
-  body.appendChild(reset);
-  openModal({ title: 'Paycheck columns', body, confirmLabel: 'Done', onConfirm: () => {} });
-}
+function paycheckColumnsModal() { tableColumnsModal('paychecks', PAYCHECK_ALL_COLS, PAYCHECK_DEFAULT_COLS, PAYCHECK_COL_LABELS, 'Paycheck columns'); }
 
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
 function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }

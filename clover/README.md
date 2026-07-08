@@ -45,6 +45,10 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.24 — Customizable columns on Bills & Subscriptions
+- The **⚙ Columns** manager (show/hide/reorder) now also works on **Bills & Subscriptions**,
+  with optional **Person** and **Notes** columns. Column layouts are saved per table.
+
 ### v1.0.23 — Customizable paycheck columns
 - New **⚙ Columns** button on Paychecks lets you **show/hide** columns and **reorder** them
   (↑ / ↓). Adds optional columns too: **Period start**, **Period end**, and **Notes**.
