@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.38';
+const VERSION = '1.0.39';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -19,6 +19,7 @@ const ROUTES = [
   { id: 'income',        label: 'Income',         ico: '▲', phase: 2 },
   { id: 'paychecks',     label: 'Paychecks',      ico: '▤', phase: 4 },
   { id: 'raises',        label: 'Raises',         ico: '↗', phase: 9 },
+  { id: 'selling',       label: 'Selling',        ico: '▧', phase: 9 },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
   { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
@@ -46,6 +47,8 @@ let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
 let taxesSort = { key: 'taxYear', dir: 'desc' };
+let salesSort = { key: 'orderDate', dir: 'desc' };
+let salesImportState = null;   // parsed Poshmark sales awaiting review
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
@@ -135,7 +138,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -267,6 +270,7 @@ function yearTabs(store, section) {
     const d = store.yearData(y);
     const has = section === 'income' ? (d.income.length || d.paychecks.length)
       : section === 'expenses' ? d.expensePayments.length
+      : section === 'selling' ? ((d.sales || []).length)
       : d.paychecks.length;
     if (has) years.push(y);
   }
@@ -834,7 +838,7 @@ function renderIncome(view) {
   const left = el('div');
   left.appendChild(el('h3', null, 'Income · ' + activeYear));
   const pcGross = data.paychecks.filter(isPaycheckPaid).reduce((s, p) => s + (Number(p.gross) || 0), 0);
-  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0) + pcGross;
+  const received = data.income.filter(countable).reduce((s, e) => s + amountOf(e), 0) + pcGross + salesTotal(data);
   const n = data.income.length;
   left.appendChild(el('p', 'muted', money(received) + ' received · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') + (pcGross ? ' + paychecks' : '')));
   head.appendChild(left);
@@ -892,6 +896,10 @@ function incomeGrid(data) {
     const pcMonthly = paycheckMonthsFor(data.paychecks, g.id);
     const hasPc = pcMonthly.some(v => v > 0);
     for (let i = 0; i < 12; i++) monthly[i] += pcMonthly[i];
+    // Sales are the source of truth for the Selling category (like paychecks->Wages).
+    const slMonthly = /selling/i.test(g.name) ? salesMonthsArr(data) : null;
+    const hasSl = !!(slMonthly && slMonthly.some(v => v > 0));
+    if (slMonthly) for (let i = 0; i < 12; i++) monthly[i] += slMonthly[i];
     monthly.forEach((v, i) => grand[i] += v);
     const open = expandedIncomeGroups.has(g.id);
     tb.appendChild(addRow('grp-row', g.name, monthly,
@@ -913,6 +921,7 @@ function incomeGrid(data) {
         const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
         if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
       }
+      if (hasSl) tb.appendChild(addRow('sub-row', '↳ Sales', slMonthly));
       if (hasPc) {
         // "Paychecks" itself expands into one row per employer, with each
         // employer's monthly gross — e.g. Wages → Paychecks → Main Job / gigs.
@@ -2857,11 +2866,16 @@ function kpiCard(label, value, tone, hint) {
 function incomeForMonth(data, mi) {
   let sum = data.income.filter(countable).filter(e => monthIdx(e.date) === mi).reduce((a, e) => a + amountOf(e), 0);
   sum += data.paychecks.filter(isPaycheckPaid).filter(p => monthIdx(p.payDate) === mi).reduce((a, p) => a + (Number(p.gross) || 0), 0);
+  sum += salesMonthsArr(data)[mi] || 0;
   return sum;
 }
+function salesEarn(x) { return Number(x.earnings) || 0; }
+function salesMonthsArr(data) { const m = new Array(12).fill(0); (data.sales || []).forEach(x => { const mi = monthIdx(x.orderDate); if (mi >= 0) m[mi] += salesEarn(x); }); return m; }
+function salesTotal(data) { return (data.sales || []).reduce((a, x) => a + salesEarn(x), 0); }
 function incomeYTDall(data) {
   let sum = data.income.filter(countable).reduce((a, e) => a + amountOf(e), 0);
   sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + (Number(p.gross) || 0), 0);
+  sum += salesTotal(data);
   return sum;
 }
 // Take-home (after-tax) versions: use the net figure where recorded, else fall
@@ -2872,11 +2886,13 @@ function paycheckNet(p) { return (p.net != null && p.net !== '') ? (Number(p.net
 function incomeNetForMonth(data, mi) {
   let sum = data.income.filter(countable).filter(e => monthIdx(e.date) === mi).reduce((a, e) => a + netAmountOf(e), 0);
   sum += data.paychecks.filter(isPaycheckPaid).filter(p => monthIdx(p.payDate) === mi).reduce((a, p) => a + paycheckNet(p), 0);
+  sum += salesMonthsArr(data)[mi] || 0;   // sale earnings are already net of fees
   return sum;
 }
 function incomeNetYTDall(data) {
   let sum = data.income.filter(countable).reduce((a, e) => a + netAmountOf(e), 0);
   sum += data.paychecks.filter(isPaycheckPaid).reduce((a, p) => a + paycheckNet(p), 0);
+  sum += salesTotal(data);   // sale earnings are already net of fees
   return sum;
 }
 // Auto basis for "% of income" / "should be left" so the user never types it in.
@@ -2912,6 +2928,8 @@ function incomeByCategory(store, data) {
   const m = {};
   data.income.filter(countable).forEach(e => { const g = store.incomeGroupName(e.categoryId); m[g] = (m[g] || 0) + amountOf(e); });
   data.paychecks.filter(isPaycheckPaid).forEach(p => { const g = store.incomeGroupName(p.incomeCategoryId); m[g] = (m[g] || 0) + (Number(p.gross) || 0); });
+  const sellName = (store.state.incomeCategories.find(c => /selling/i.test(c.name)) || {}).name || 'Selling';
+  (data.sales || []).forEach(x => { m[sellName] = (m[sellName] || 0) + salesEarn(x); });
   return m;
 }
 function expenseByCategory(store, data) {
@@ -3998,6 +4016,7 @@ let importState = { target: 'income', rows: null, headers: null, mapping: {}, fa
 function startImport(target) {
   importState = { target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
   divImportState = null;
+  salesImportState = null;
   location.hash = '#import';
 }
 function importButton(target) {
@@ -4342,18 +4361,264 @@ function dividendReviewCard(store) {
   return card;
 }
 
+// ============================================================
+// Selling — Poshmark sales report import + sales table
+// Get the file: Poshmark → your avatar → My Sales → My Sales Report
+// (poshmark.com/activity_report/sales) → have the report emailed.
+// The export has ~12 preamble lines before the header and a Totals
+// footer; only completed sales appear in it.
+// ============================================================
+const SALES_COL_LABELS = { platform: 'Platform', listingDate: 'Listed', orderDate: 'Order date', sku: 'SKU', orderId: 'Order Id', title: 'Listing title', department: 'Department', category: 'Category', subcategory: 'Subcategory', brand: 'Brand', color: 'Color', size: 'Size', bundle: 'Bundle?', offer: 'Offer?', nwt: 'NWT', costPrice: 'Cost', orderPrice: 'Order price', shipDiscount: 'Ship discount', upgradeFee: 'Upgrade fee', packagingFee: 'Packaging fee', earnings: 'Your earnings', profit: 'Profit', buyerState: 'Buyer state', buyerZip: 'Buyer ZIP', buyer: 'Buyer', salesTax: 'Sales tax (buyer)', notes: 'Notes', otherInfo: 'Other info' };
+const SALES_ALL_COLS = ['platform', 'listingDate', 'orderDate', 'sku', 'orderId', 'title', 'department', 'category', 'subcategory', 'brand', 'color', 'size', 'bundle', 'offer', 'nwt', 'costPrice', 'orderPrice', 'shipDiscount', 'upgradeFee', 'packagingFee', 'earnings', 'profit', 'buyerState', 'buyerZip', 'buyer', 'salesTax', 'notes', 'otherInfo'];
+const SALES_DEFAULT_COLS = ['orderDate', 'title', 'brand', 'size', 'costPrice', 'orderPrice', 'earnings', 'profit', 'buyer'];
+const POSHMARK_HEADER = 'Listing Date,Order Date,SKU,Order Id,Listing Title,Department,Category,Subcategory,Brand,Color,Size,Bundle Order?,Offer Order,NWT,Cost Price,Order Price,Lowest Set Price,Seller Shipping Discount,Upgraded Shipping Label Fee,Packaging Fee,Your Earnings,Buyer State,Buyer Zip Code,Buyer Username,Sales Tax (Paid by Buyer),Notes,Other Info';
+const POSHMARK_TEMPLATE_CSV = 'Poshmark Sales Report,"","","",""\n01/01/2026 - 12/31/2026\n""\n'
+  + POSHMARK_HEADER + '\n'
+  + '01/05/2025,02/10/2026,SKU1,orderid0001,Vintage Denim Jacket,Men,Jackets & Coats,"",ExampleBrand,Blue,L,N,Y,N,$8.00,$30.00,$0.00,$0.00,$0.00,$0.00,$24.00,AZ,85001,buyer123,$2.10,$0.00,""\n'
+  + '03/12/2025,03/01/2026,"",orderid0002,Board Game Sealed,Home,Games,"",ExampleBrand,"Red,White",OS,N,N,Y,"",$18.00,$0.00,$0.00,$0.00,$0.00,$14.40,CA,90001,buyer456,$1.50,$0.00,""\n'
+  + 'Totals,"","","","","","","","","","","","","","",$48.00,$0.00,"","","",$38.40\n';
+function saleProfit(x) { return (x.earnings != null && x.costPrice != null) ? (Number(x.earnings) || 0) - (Number(x.costPrice) || 0) : null; }
+function saleKey(x) { return (x.orderId || '') + '|' + (x.title || '') + '|' + (Number(x.orderPrice) || 0).toFixed(2); }
+function existingSaleKeys(store) {
+  const keys = new Set();
+  Object.keys(store.state.years).forEach(yk => (((store.state.years[yk] || {}).sales) || []).forEach(x => keys.add(saleKey(x))));
+  return keys;
+}
+// rows = raw array-rows (header:false) since the export has a preamble.
+function analyzeSalesFile(store, rows, filename) {
+  const hi = rows.findIndex(r => Array.isArray(r) && String(r[0]).trim() === 'Listing Date' && r.some(x => String(x).trim() === 'Order Id'));
+  if (hi < 0) return null;
+  const H = rows[hi].map(x => String(x || '').trim());
+  const idx = name => H.indexOf(name);
+  const I = { listingDate: idx('Listing Date'), orderDate: idx('Order Date'), sku: idx('SKU'), orderId: idx('Order Id'), title: idx('Listing Title'), department: idx('Department'), category: idx('Category'), subcategory: idx('Subcategory'), brand: idx('Brand'), color: idx('Color'), size: idx('Size'), bundle: idx('Bundle Order?'), offer: idx('Offer Order'), nwt: idx('NWT'), costPrice: idx('Cost Price'), orderPrice: idx('Order Price'), shipDiscount: idx('Seller Shipping Discount'), upgradeFee: idx('Upgraded Shipping Label Fee'), packagingFee: idx('Packaging Fee'), earnings: idx('Your Earnings') >= 0 ? idx('Your Earnings') : idx('Net Earnings'), buyerState: idx('Buyer State'), buyerZip: idx('Buyer Zip Code'), buyer: idx('Buyer Username'), salesTax: idx('Sales Tax (Paid by Buyer)'), notes: idx('Notes'), otherInfo: idx('Other Info') };
+  const existing = existingSaleKeys(store);
+  const sales = []; let dupes = 0;
+  for (let i = hi + 1; i < rows.length; i++) {
+    const r = rows[i]; if (!Array.isArray(r)) continue;
+    if (String(r[0]).trim() === 'Totals') break;
+    const c = j => (j >= 0 && r[j] != null) ? String(r[j]).trim() : '';
+    if (!c(I.orderId)) continue;
+    const num = j => { const n = parseImportAmount(c(j)); return isNaN(n) ? null : n; };
+    const sale = {
+      platform: 'Poshmark',
+      listingDate: parseImportDate(c(I.listingDate)), orderDate: parseImportDate(c(I.orderDate)),
+      sku: c(I.sku), orderId: c(I.orderId), title: c(I.title),
+      department: c(I.department), category: c(I.category), subcategory: c(I.subcategory),
+      brand: c(I.brand), color: c(I.color), size: c(I.size),
+      bundle: /^y/i.test(c(I.bundle)), offer: /^y/i.test(c(I.offer)), nwt: /^y/i.test(c(I.nwt)),
+      costPrice: num(I.costPrice), orderPrice: num(I.orderPrice),
+      shipDiscount: num(I.shipDiscount), upgradeFee: num(I.upgradeFee), packagingFee: num(I.packagingFee),
+      earnings: num(I.earnings),
+      buyerState: c(I.buyerState), buyerZip: c(I.buyerZip), buyer: c(I.buyer),
+      salesTax: num(I.salesTax), notes: c(I.notes), otherInfo: c(I.otherInfo)
+    };
+    if (!sale.orderDate) continue;
+    const k = saleKey(sale);
+    if (existing.has(k)) { dupes++; continue; }
+    existing.add(k);
+    sales.push(sale);
+  }
+  return { filename, sales, dupes };
+}
+function salesReviewCard(store) {
+  const st = salesImportState;
+  ensureYearsScanned(store);
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'Import Poshmark sales'));
+  const orderTotal = st.sales.reduce((a, x) => a + (Number(x.orderPrice) || 0), 0);
+  const earnTotal = st.sales.reduce((a, x) => a + salesEarn(x), 0);
+  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.sales.length + ' completed sale' + (st.sales.length === 1 ? '' : 's') + ' to import · ' + st.dupes + ' duplicate' + (st.dupes === 1 ? '' : 's') + ' skipped (already imported) · order total ' + money(orderTotal) + ' · your earnings ' + money(earnTotal) + '. Earnings roll into your Selling income automatically.'));
+  const prevWrap = el('div', 'table-scroll'); const pt = el('table', 'data-table');
+  pt.innerHTML = '<thead><tr><th>Order date</th><th>Title</th><th>Brand</th><th class="num">Order price</th><th class="num">Your earnings</th></tr></thead>';
+  const tb = el('tbody');
+  st.sales.slice(0, 10).forEach(x => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, fmtDate(x.orderDate)));
+    tr.appendChild(el('td', null, (x.title || '—').slice(0, 48)));
+    tr.appendChild(el('td', 'muted', x.brand || '—'));
+    tr.appendChild(numCell(Number(x.orderPrice) || 0));
+    tr.appendChild(numCell(salesEarn(x), true));
+    tb.appendChild(tr);
+  });
+  pt.appendChild(tb); prevWrap.appendChild(pt);
+  card.appendChild(el('div', 'muted', 'Preview (first ' + Math.min(10, st.sales.length) + ' of ' + st.sales.length + '):'));
+  card.appendChild(prevWrap);
+  const actions = el('div', 'io-actions');
+  const impBtn = el('button', 'btn-primary', 'Import ' + st.sales.length + ' sale' + (st.sales.length === 1 ? '' : 's'));
+  impBtn.disabled = !st.sales.length;
+  impBtn.addEventListener('click', async () => {
+    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: 'sales', source: st.filename + ' (Poshmark)', count: st.sales.length };
+    const byYear = {};
+    st.sales.forEach(x => { const yr = +x.orderDate.slice(0, 4); (byYear[yr] = byYear[yr] || []).push(x); });
+    const years = Object.keys(byYear);
+    await Promise.all(years.map(y => store.loadYear(y)));
+    years.forEach(y => store.importEntries(+y, 'sales', byYear[y], batch));
+    toast('Imported ' + st.sales.length + ' sales');
+    salesImportState = null;
+    importState = { target: 'selling', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
+    location.hash = '#selling';
+  });
+  actions.appendChild(impBtn);
+  const cancel = el('button', 'btn-ghost', 'Cancel');
+  cancel.addEventListener('click', () => { salesImportState = null; importState = { target: 'selling', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' }; renderView(currentRoute); });
+  actions.appendChild(cancel);
+  card.appendChild(actions);
+  return card;
+}
+function buildSalesCol(store, key) {
+  const txt = (get, cls) => ({ label: SALES_COL_LABELS[key], key, value: r => get(r) || '', cell: r => el('td', cls || null, get(r) || '—') });
+  const moneyCol = (get, strong) => ({ label: SALES_COL_LABELS[key], key, num: true, value: r => Number(get(r)) || 0, cell: r => { const v = get(r); const td = el('td', 'num'); td.textContent = v == null ? '—' : money(Number(v) || 0); if (strong) td.classList.add('strong'); return td; } });
+  const flag = get => ({ label: SALES_COL_LABELS[key], key, value: r => get(r) ? 1 : 0, cell: r => el('td', 'muted', get(r) ? 'Yes' : '—') });
+  switch (key) {
+    case 'platform': return txt(r => r.platform);
+    case 'listingDate': return { label: 'Listed', key, value: r => r.listingDate || '', cell: r => el('td', 'muted', r.listingDate ? fmtDate(r.listingDate) : '—') };
+    case 'orderDate': return { label: 'Order date', key, value: r => r.orderDate || '', cell: r => el('td', null, fmtDate(r.orderDate)) };
+    case 'sku': return txt(r => r.sku, 'muted');
+    case 'orderId': return txt(r => r.orderId, 'muted');
+    case 'title': return { label: 'Listing title', key, value: r => r.title || '', cell: r => { const td = el('td'); td.appendChild(el('div', 'acct-name', r.title || '—')); return td; } };
+    case 'department': return txt(r => r.department);
+    case 'category': return txt(r => r.category);
+    case 'subcategory': return txt(r => r.subcategory);
+    case 'brand': return txt(r => r.brand);
+    case 'color': return txt(r => r.color, 'muted');
+    case 'size': return txt(r => r.size);
+    case 'bundle': return flag(r => r.bundle);
+    case 'offer': return flag(r => r.offer);
+    case 'nwt': return flag(r => r.nwt);
+    case 'costPrice': return moneyCol(r => r.costPrice);
+    case 'orderPrice': return moneyCol(r => r.orderPrice);
+    case 'shipDiscount': return moneyCol(r => r.shipDiscount);
+    case 'upgradeFee': return moneyCol(r => r.upgradeFee);
+    case 'packagingFee': return moneyCol(r => r.packagingFee);
+    case 'earnings': return moneyCol(r => r.earnings, true);
+    case 'profit': return { label: 'Profit', key, num: true, value: r => saleProfit(r) == null ? -1e9 : saleProfit(r), cell: r => { const p = saleProfit(r); const td = el('td', 'num'); if (p == null) { td.textContent = '—'; td.title = 'Needs a cost price'; return td; } const span = el('span', p >= 0 ? 'pos' : 'neg', (p >= 0 ? '+' : '−') + money(Math.abs(p))); td.appendChild(span); return td; } };
+    case 'buyerState': return txt(r => r.buyerState, 'muted');
+    case 'buyerZip': return txt(r => r.buyerZip, 'muted');
+    case 'buyer': return txt(r => r.buyer, 'muted');
+    case 'salesTax': return moneyCol(r => r.salesTax);
+    case 'notes': return txt(r => r.notes, 'muted');
+    case 'otherInfo': return txt(r => r.otherInfo, 'muted');
+  }
+  return null;
+}
+function exportSalesCSV(store) {
+  const cols = SALES_ALL_COLS.filter(k => k !== 'profit');
+  const rows = [cols.map(k => SALES_COL_LABELS[k]).join(',')];
+  Object.keys(store.state.years).sort().forEach(yk => (((store.state.years[yk] || {}).sales) || []).forEach(x => {
+    rows.push(cols.map(k => csvEsc(typeof x[k] === 'boolean' ? (x[k] ? 'Y' : 'N') : x[k])).join(','));
+  }));
+  downloadFile('clover-sales.csv', rows.join('\n'), 'text/csv');
+}
+function saleModal(existing) {
+  const store = window.cloverStore;
+  const r = Object.assign({}, existing);
+  const oldYear = +String(r.orderDate || '').slice(0, 4);
+  const body = el('div', 'form-grid');
+  const fDate = input(r.orderDate || todayISO(), { type: 'date' });
+  const fTitle = input(r.title || '', { placeholder: 'Listing title' });
+  const fBrand = input(r.brand || '', { placeholder: 'Brand' });
+  const fSize = input(r.size || '', { placeholder: 'Size' });
+  const fOrder = input(r.orderPrice != null ? r.orderPrice : '', { type: 'number', placeholder: '0.00' }); fOrder.step = '0.01';
+  const fEarn = input(r.earnings != null ? r.earnings : '', { type: 'number', placeholder: '0.00' }); fEarn.step = '0.01';
+  const fCost = input(r.costPrice != null ? r.costPrice : '', { type: 'number', placeholder: '0.00' }); fCost.step = '0.01';
+  const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+  body.appendChild(field('Order date', fDate, 'When the sale happened.'));
+  body.appendChild(field('Listing title', fTitle));
+  const tr1 = el('div', 'two-col'); tr1.appendChild(field('Brand', fBrand)); tr1.appendChild(field('Size', fSize)); body.appendChild(tr1);
+  const tr2 = el('div', 'cd-fields');
+  tr2.appendChild(field('Order price', fOrder, 'What the buyer paid for the item.'));
+  tr2.appendChild(field('Your earnings', fEarn, 'What you actually received after fees — this is what rolls into Selling income.'));
+  tr2.appendChild(field('Cost price', fCost, 'What the item cost you — enables the Profit column.'));
+  body.appendChild(tr2);
+  body.appendChild(field('Notes', fNotes));
+  openModal({
+    title: 'Edit sale', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      Object.assign(r, {
+        orderDate: fDate.value || todayISO(), title: fTitle.value.trim(), brand: fBrand.value.trim(), size: fSize.value.trim(),
+        orderPrice: fOrder.value === '' ? null : parseFloat(fOrder.value),
+        earnings: fEarn.value === '' ? null : parseFloat(fEarn.value),
+        costPrice: fCost.value === '' ? null : parseFloat(fCost.value),
+        notes: fNotes.value.trim()
+      });
+      const newYear = +r.orderDate.slice(0, 4);
+      if (oldYear && newYear !== oldYear) store.removeSale(oldYear, r.id);
+      const doSave = () => store.saveSale(newYear, r);
+      if (store.isYearLoaded(newYear)) doSave(); else store.loadYear(newYear).then(doSave);
+      toast('Sale updated');
+    }
+  });
+}
+function renderSelling(view) {
+  const store = window.cloverStore;
+  if (!store.isYearLoaded(activeYear)) { view.appendChild(loadingPanel()); store.loadYear(activeYear); return; }
+  const data = store.yearData(activeYear);
+  const sales = data.sales || [];
+
+  const head = el('div', 'view-head');
+  const left = el('div'); left.appendChild(el('h3', null, 'Selling · ' + activeYear));
+  left.appendChild(el('p', 'muted', sales.length + ' sale' + (sales.length === 1 ? '' : 's') + ' — earnings roll into Selling income automatically.'));
+  head.appendChild(left);
+  const actions = el('div', 'head-actions');
+  const tmpl = el('button', 'btn-ghost', '⬇ Template');
+  tmpl.title = 'Download a sample of the Poshmark sales-report format';
+  tmpl.addEventListener('click', () => downloadFile('poshmark-sales-template.csv', POSHMARK_TEMPLATE_CSV, 'text/csv'));
+  actions.appendChild(tmpl);
+  if (sales.length) { const exp = el('button', 'btn-ghost', '⬇ Export CSV'); exp.addEventListener('click', () => exportSalesCSV(store)); actions.appendChild(exp); }
+  const imp = el('button', 'btn-primary', '⬆ Import sales');
+  imp.title = 'Import a Poshmark “My Sales Report” CSV (avatar → My Sales → My Sales Report)';
+  imp.addEventListener('click', () => startImport('selling'));
+  actions.appendChild(imp);
+  head.appendChild(actions);
+  view.appendChild(head);
+  const yt = yearTabs(store, 'selling'); if (yt) view.appendChild(yt);
+
+  if (!sales.length) {
+    view.appendChild(emptyState('No sales yet for ' + activeYear, 'Import your Poshmark sales report: on Poshmark, click your avatar → My Sales → My Sales Report, and have the report emailed to you. Then import the CSV here.', '⬆ Import sales', () => startImport('selling')));
+    return;
+  }
+
+  const orderTotal = sales.reduce((a, x) => a + (Number(x.orderPrice) || 0), 0);
+  const earnTotal = sales.reduce((a, x) => a + salesEarn(x), 0);
+  const withCost = sales.filter(x => x.costPrice != null);
+  const costTotal = withCost.reduce((a, x) => a + (Number(x.costPrice) || 0), 0);
+  const sum = el('div', 'sub-summary');
+  sum.appendChild(sumCard('Items sold', String(sales.length), 'neutral'));
+  sum.appendChild(sumCard('Order total', money(orderTotal), 'neutral'));
+  sum.appendChild(sumCard('Your earnings', money(earnTotal), 'income'));
+  sum.appendChild(sumCard('Cost basis', money(costTotal), 'expense', withCost.length < sales.length ? withCost.length + ' of ' + sales.length + ' have a cost price' : ''));
+  sum.appendChild(sumCard('Est. profit', money(earnTotal - costTotal), (earnTotal - costTotal) < 0 ? 'expense' : 'income', 'earnings − cost basis'));
+  view.appendChild(sum);
+
+  const cols = [
+    ...tableColKeys(store, 'sales', SALES_COL_LABELS, SALES_DEFAULT_COLS).map(k => buildSalesCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: r => {
+        const td = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => saleModal(r));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove((r.title || 'sale') + ' · ' + fmtDate(r.orderDate), () => store.removeSale(activeYear, r.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  view.appendChild(tableTools(columnsButton('sales', SALES_ALL_COLS, SALES_DEFAULT_COLS, SALES_COL_LABELS, 'Selling columns')));
+  const card = el('div', 'card table-card');
+  card.appendChild(sortableTable(cols, sales, salesSort, ns => { salesSort = ns || { key: 'orderDate', dir: 'desc' }; renderView(currentRoute); }, null));
+  view.appendChild(card);
+}
+
 function importSection() {
   const store = window.cloverStore;
   if (importState.target === 'dividends' && divImportState) return dividendReviewCard(store);
+  if (importState.target === 'selling' && salesImportState) return salesReviewCard(store);
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'Import from CSV'));
 
   if (!importState.rows) {
     card.appendChild(el('p', 'muted', importState.target === 'dividends'
       ? 'Upload your broker’s activity export (M1 Finance or Schwab). Clover keeps only the dividends — purchases are ignored (but used to tag reinvestment), duplicates are caught for review, and related fees can come along as expenses.'
+      : importState.target === 'selling'
+      ? 'Upload your Poshmark “My Sales Report” CSV (on Poshmark: your avatar → My Sales → My Sales Report → email the report to yourself). Duplicates are skipped automatically and earnings roll into your Selling income.'
       : 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
     const row = el('div', 'io-actions');
-    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }, { value: 'dividends', label: 'Dividends (broker activity)' }], importState.target);
+    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }, { value: 'dividends', label: 'Dividends (broker activity)' }, { value: 'selling', label: 'Poshmark sales' }], importState.target);
     tSel.addEventListener('change', () => { importState.target = tSel.value; renderView(currentRoute); });
     row.appendChild(labelWrap('Import as', tSel));
     const fileLabel = el('label', 'btn-primary file-btn'); fileLabel.textContent = 'Choose CSV…';
@@ -4361,9 +4626,18 @@ function importSection() {
     fileIn.addEventListener('change', async () => {
       const file = fileIn.files && fileIn.files[0]; if (!file) return;
       let Papa; try { Papa = await ensurePapa(); } catch (e) { toast('CSV parser couldn’t load', 'warn'); return; }
+      const isSalesFile = importState.target === 'selling';
       Papa.parse(file, {
-        header: true, skipEmptyLines: true,
+        header: !isSalesFile, skipEmptyLines: true,
         complete: (res) => {
+          if (isSalesFile) {
+            const analyzed = analyzeSalesFile(store, res.data, file.name);
+            if (!analyzed) { toast('Couldn’t find the Poshmark sales header in that file — use the exact “My Sales Report” export', 'warn'); return; }
+            if (!analyzed.sales.length && !analyzed.dupes) { toast('No completed sales found in that file', 'warn'); return; }
+            salesImportState = analyzed;
+            renderView(currentRoute);
+            return;
+          }
           const headers = (res.meta && res.meta.fields) || [];
           if (!headers.length || !res.data.length) { toast('No rows found in that CSV', 'warn'); return; }
           if (importState.target === 'dividends') {
@@ -4392,6 +4666,14 @@ function importSection() {
       const schT = el('button', 'btn-ghost', '⬇ Schwab template');
       schT.addEventListener('click', () => downloadFile('schwab-transactions-template.csv', SCHWAB_TEMPLATE_CSV, 'text/csv'));
       tRow.appendChild(schT);
+      card.appendChild(tRow);
+    }
+    if (importState.target === 'selling') {
+      const tRow = el('div', 'io-actions');
+      tRow.appendChild(el('span', 'muted', 'Not sure of the format? Download a sample:'));
+      const pmT = el('button', 'btn-ghost', '⬇ Poshmark template');
+      pmT.addEventListener('click', () => downloadFile('poshmark-sales-template.csv', POSHMARK_TEMPLATE_CSV, 'text/csv'));
+      tRow.appendChild(pmT);
       card.appendChild(tRow);
     }
     return card;

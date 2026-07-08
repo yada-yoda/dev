@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.39 — Selling page + Poshmark import
+- New **Selling** page: import your Poshmark **My Sales Report** CSV (avatar → My Sales →
+  My Sales Report → email it to yourself) and every completed sale lands in a detailed,
+  customizable table — listing/order dates, SKU, order id, title, department/category,
+  brand, color, size, bundle/offer/NWT flags, cost, order price, shipping/label/packaging
+  fees, **your earnings**, a computed **Profit** column, buyer info, sales tax, and notes.
+- Duplicates (same order id + title + price) are skipped automatically, sales route to
+  the right **year**, imports are **undoable**, and a **template** + **CSV export** are
+  built in.
+- **Earnings roll into your Selling income automatically** (like paychecks → Wages), with
+  a "↳ Sales" row in the income grid.
+
 ### v1.0.38 — Import fixes, best-card panel, reward polish
 - **M1 duplicate fix**: same-day payouts with different **Posted Dates** (e.g. the same
   dividend hitting two of your M1 accounts) are no longer flagged as duplicates — the

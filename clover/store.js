@@ -115,7 +115,7 @@ const subscribers = new Set();
 let saveTimer = null;
 const yearSaveTimers = {};
 
-function emptyYear() { return { income: [], paychecks: [], expensePayments: [], importBatches: [] }; }
+function emptyYear() { return { income: [], paychecks: [], expensePayments: [], sales: [], importBatches: [] }; }
 
 // Coalesce synchronous notify() calls into one microtask render, so a burst of
 // mutations (e.g. loading several years at once) can't cause re-entrant renders.
@@ -281,6 +281,14 @@ window.cloverStore = {
     scheduleSave(); notify(); return entry;
   },
   removeRaise(id) { state.raises = state.raises.filter(x => x.id !== id); scheduleSave(); notify(); },
+  saveSale(y, entry) {
+    const d = state.years[String(y)]; if (!d) return null;
+    d.sales = d.sales || [];
+    if (entry.id) { const i = d.sales.findIndex(x => x.id === entry.id); if (i >= 0) d.sales[i] = entry; else d.sales.push(entry); }
+    else { entry.id = mkId('sale'); d.sales.push(entry); }
+    this.scheduleSaveYear(y); notify(); return entry;
+  },
+  removeSale(y, id) { const d = state.years[String(y)]; if (!d) return; d.sales = (d.sales || []).filter(x => x.id !== id); this.scheduleSaveYear(y); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },
@@ -410,7 +418,7 @@ window.cloverStore = {
       d.importBatches = d.importBatches || []; d.importBatches.push(batch);
       scheduleSave(); this.scheduleSaveYear(y); notify(); return;
     }
-    const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : 'paychecks';
+    const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : target === 'sales' ? 'sales' : 'paychecks';
     entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
     d.importBatches = d.importBatches || [];
     // One history entry per batch per year, even when a batch spans targets
@@ -422,7 +430,7 @@ window.cloverStore = {
     // A batch can span multiple years — remove it from every loaded year.
     Object.keys(state.years).forEach(yr => {
       const d = state.years[yr];
-      ['income', 'expensePayments', 'paychecks'].forEach(k => { d[k] = d[k].filter(e => e.batchId !== batchId); });
+      ['income', 'expensePayments', 'paychecks', 'sales'].forEach(k => { d[k] = (d[k] || []).filter(e => e.batchId !== batchId); });
       d.importBatches = (d.importBatches || []).filter(b => b.id !== batchId);
       this.scheduleSaveYear(yr);
     });
