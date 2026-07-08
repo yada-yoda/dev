@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.28 — Tax history section
+- New **Taxes** page: log each year's filing — the **federal and state forms** used, whether
+  each came back as a **refund or owed** (and how much), **who prepared it** (your CPA) and
+  **what they charged**, whether you **filed an extension**, and the filed date.
+- **Amendments**: an **Amend** button on any year prefills a 1040-X / state-X amendment for
+  that year with its own numbers; the original row gets an "Amended" badge.
+- Summary cards total refunds, payments, and prep costs across all years; the table is
+  sortable with customizable columns like the rest of the app.
+
 ### v1.0.27 — Customizable dashboard + Income mix panel
 - The **Dashboard is now made of panels** you control: click **✎ Edit layout** to drag
   panels into a new order, remove ones you don't want (✕), and add them back (＋). Click

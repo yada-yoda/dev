@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.27';
+const VERSION = '1.0.28';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -23,6 +23,7 @@ const ROUTES = [
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
   { sep: true },
   { id: 'credit',        label: 'Credit & Rates', ico: '％', phase: 5 },
+  { id: 'taxes',         label: 'Taxes',          ico: '§', phase: 9 },
   { id: 'reports',       label: 'Reports',        ico: '▥', phase: 7 },
   { id: 'calendar',      label: 'Calendar',       ico: '▣', phase: 7 },
   { sep: true },
@@ -43,6 +44,7 @@ let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
+let taxesSort = { key: 'taxYear', dir: 'desc' };
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
@@ -131,7 +133,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -2907,6 +2909,173 @@ function incomeByNamedCategory(store, data, re) {
   let s = data.income.filter(countable).filter(e => e.categoryId === cat.id).reduce((a, e) => a + amountOf(e), 0);
   s += data.paychecks.filter(isPaycheckPaid).filter(p => p.incomeCategoryId === cat.id).reduce((a, p) => a + (Number(p.gross) || 0), 0);
   return s;
+}
+
+// ============================================================
+// Tax history — per-year filings, amendments, extensions
+// ============================================================
+const FED_FORMS = ['1040', '1040-SR', '1040-NR', '1040-X'];
+const TAX_COL_LABELS = { taxYear: 'Tax year', type: 'Type', fedForm: 'Federal form', fedResult: 'Federal', stateForm: 'State form', stateResult: 'State', preparer: 'Prepared by', prepCost: 'Prep cost', flags: 'Flags', filed: 'Filed', notes: 'Notes' };
+const TAX_ALL_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'flags', 'filed', 'notes'];
+const TAX_DEFAULT_COLS = ['taxYear', 'type', 'fedForm', 'fedResult', 'stateForm', 'stateResult', 'preparer', 'prepCost', 'flags'];
+function taxOutcomeCell(outcome, amount) {
+  const td = el('td', 'num');
+  if (!outcome || outcome === 'none' || amount == null || amount === '') { td.textContent = '—'; return td; }
+  const span = el('span', outcome === 'refund' ? 'pos' : 'neg', (outcome === 'refund' ? '+' : '−') + money(Number(amount) || 0));
+  span.title = outcome === 'refund' ? 'Refunded to you' : 'You paid / owed';
+  td.appendChild(span); return td;
+}
+function taxOutcomeSortVal(outcome, amount) { const a = Number(amount) || 0; return outcome === 'refund' ? a : outcome === 'owed' ? -a : 0; }
+function yearHasAmendment(store, taxYear) { return store.state.taxRecords.some(x => x.kind === 'amendment' && +x.taxYear === +taxYear); }
+function buildTaxCol(store, key) {
+  switch (key) {
+    case 'taxYear': return { label: 'Tax year', key: 'taxYear', num: true, value: r => Number(r.taxYear) || 0, cell: r => { const td = el('td', 'strong'); td.textContent = r.taxYear || '—'; return td; } };
+    case 'type': return { label: 'Type', key: 'type', value: r => r.kind === 'amendment' ? 1 : 0, cell: r => { const td = el('td'); td.appendChild(r.kind === 'amendment' ? badge('Amendment', 'amber') : el('span', 'muted', 'Original')); return td; } };
+    case 'fedForm': return { label: 'Federal form', key: 'fedForm', value: r => r.fedForm || '', cell: r => el('td', null, r.fedForm || '—') };
+    case 'fedResult': return { label: 'Federal', key: 'fedResult', num: true, value: r => taxOutcomeSortVal(r.fedOutcome, r.fedAmount), cell: r => taxOutcomeCell(r.fedOutcome, r.fedAmount) };
+    case 'stateForm': return { label: 'State form', key: 'stateForm', value: r => r.stateForm || '', cell: r => el('td', null, r.stateForm || '—') };
+    case 'stateResult': return { label: 'State', key: 'stateResult', num: true, value: r => taxOutcomeSortVal(r.stateOutcome, r.stateAmount), cell: r => taxOutcomeCell(r.stateOutcome, r.stateAmount) };
+    case 'preparer': return { label: 'Prepared by', key: 'preparer', value: r => r.preparer || '', cell: r => el('td', null, r.preparer || '—') };
+    case 'prepCost': return { label: 'Prep cost', key: 'prepCost', num: true, value: r => Number(r.prepCost) || 0, cell: r => numCell(Number(r.prepCost) || 0) };
+    case 'flags': return { label: 'Flags', sortable: false, cell: r => {
+        const td = el('td'); const flags = el('div', 'flags');
+        if (r.extended) flags.appendChild(badge('Extended', 'amber'));
+        if (r.kind !== 'amendment' && yearHasAmendment(window.cloverStore, r.taxYear)) flags.appendChild(badge('Amended', 'type'));
+        td.appendChild(flags); return td; } };
+    case 'filed': return { label: 'Filed', key: 'filed', value: r => r.filedDate || '', cell: r => el('td', null, r.filedDate ? fmtDate(r.filedDate) : '—') };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
+  }
+  return null;
+}
+
+function renderTaxes(view) {
+  const store = window.cloverStore, s = store.state;
+  const recs = s.taxRecords;
+
+  const head = el('div', 'view-head');
+  const left = el('div'); left.appendChild(el('h3', null, 'Tax history'));
+  const years = [...new Set(recs.map(r => +r.taxYear).filter(Boolean))];
+  left.appendChild(el('p', 'muted', years.length + ' tax year' + (years.length === 1 ? '' : 's') + ' · ' + recs.length + ' filing' + (recs.length === 1 ? '' : 's')));
+  head.appendChild(left);
+  const actions = el('div', 'head-actions');
+  actions.appendChild(columnsButton('taxes', TAX_ALL_COLS, TAX_DEFAULT_COLS, TAX_COL_LABELS, 'Tax history columns'));
+  const add = el('button', 'btn-primary', '+ Add tax return');
+  add.addEventListener('click', () => taxModal(null));
+  actions.appendChild(add);
+  head.appendChild(actions);
+  view.appendChild(head);
+
+  if (!recs.length) {
+    view.appendChild(emptyState('No tax history yet', 'Log each year’s federal and state filing — the forms used, what was refunded or owed, what the CPA charged, plus extensions and amendments.', '+ Add tax return', () => taxModal(null)));
+    return;
+  }
+
+  const refunded = recs.reduce((a, r) => a + (r.fedOutcome === 'refund' ? Number(r.fedAmount) || 0 : 0) + (r.stateOutcome === 'refund' ? Number(r.stateAmount) || 0 : 0), 0);
+  const paid = recs.reduce((a, r) => a + (r.fedOutcome === 'owed' ? Number(r.fedAmount) || 0 : 0) + (r.stateOutcome === 'owed' ? Number(r.stateAmount) || 0 : 0), 0);
+  const prep = recs.reduce((a, r) => a + (Number(r.prepCost) || 0), 0);
+  const sum = el('div', 'sub-summary');
+  sum.appendChild(sumCard('Refunded (all yrs)', money(refunded), 'income'));
+  sum.appendChild(sumCard('Paid / owed (all yrs)', money(paid), 'expense'));
+  sum.appendChild(sumCard('Prep costs (all yrs)', money(prep), 'expense'));
+  sum.appendChild(sumCard('Years filed', String(years.length), 'neutral'));
+  view.appendChild(sum);
+
+  const cols = [
+    ...tableColKeys(store, 'taxes', TAX_COL_LABELS, TAX_DEFAULT_COLS).map(k => buildTaxCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: r => {
+        const td = el('td', 'row-actions');
+        if (r.kind !== 'amendment') {
+          const amend = el('button', 'icon-btn', 'Amend');
+          amend.title = 'Add an amendment for tax year ' + r.taxYear;
+          amend.addEventListener('click', () => taxModal(null, {
+            taxYear: r.taxYear, kind: 'amendment', fedForm: '1040-X',
+            stateForm: r.stateForm ? (r.stateForm.replace(/-X$/i, '') + '-X') : '', preparer: r.preparer
+          }));
+          td.appendChild(amend);
+        }
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => taxModal(r));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove('Tax year ' + r.taxYear + (r.kind === 'amendment' ? ' amendment' : ''), () => store.removeTaxRecord(r.id)));
+        td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  const card = el('div', 'card table-card');
+  card.appendChild(sortableTable(cols, recs, taxesSort, ns => { taxesSort = ns; renderView(currentRoute); }, r => r.kind === 'amendment' ? 'inactive-row' : ''));
+  view.appendChild(card);
+}
+
+function taxModal(existing, preset) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? Object.assign({}, existing)
+    : Object.assign({ taxYear: new Date().getFullYear() - 1, kind: 'original', fedForm: '1040', fedOutcome: 'refund', stateOutcome: 'refund', extended: false }, preset || {});
+  const body = el('div', 'form-grid');
+
+  const fedList = el('datalist'); fedList.id = 'fed-form-list';
+  [...new Set(FED_FORMS.concat(s.taxRecords.map(x => x.fedForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; fedList.appendChild(o); });
+  body.appendChild(fedList);
+  const stList = el('datalist'); stList.id = 'state-form-list';
+  [...new Set(s.taxRecords.map(x => x.stateForm).filter(Boolean))].forEach(f => { const o = el('option'); o.value = f; stList.appendChild(o); });
+  body.appendChild(stList);
+  const cpaList = el('datalist'); cpaList.id = 'cpa-list';
+  [...new Set(s.taxRecords.map(x => x.preparer).filter(Boolean))].forEach(p => { const o = el('option'); o.value = p; cpaList.appendChild(o); });
+  body.appendChild(cpaList);
+
+  const fYear = input(r.taxYear || '', { type: 'number', placeholder: 'e.g. ' + (new Date().getFullYear() - 1) }); fYear.min = 1990; fYear.max = 2100;
+  const fKind = select([{ value: 'original', label: 'Original return' }, { value: 'amendment', label: 'Amendment' }], r.kind || 'original');
+  const fFedForm = input(r.fedForm || '', { placeholder: 'e.g. 1040', list: 'fed-form-list' });
+  const fFedOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.fedOutcome || 'refund');
+  const fFedAmt = input(r.fedAmount != null ? r.fedAmount : '', { type: 'number', placeholder: '0.00' }); fFedAmt.step = '0.01';
+  const fStForm = input(r.stateForm || '', { placeholder: 'your state’s return form', list: 'state-form-list' });
+  const fStOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.stateOutcome || 'refund');
+  const fStAmt = input(r.stateAmount != null ? r.stateAmount : '', { type: 'number', placeholder: '0.00' }); fStAmt.step = '0.01';
+  const fFiled = input(r.filedDate || '', { type: 'date' });
+  const cExt = checkbox('Filed an extension', !!r.extended, 'You filed for an extension this year (e.g. Form 4868), moving the filing deadline out.');
+  const fCpa = input(r.preparer || '', { placeholder: 'CPA / preparer, or “Self”', list: 'cpa-list' });
+  const fCost = input(r.prepCost != null ? r.prepCost : '', { type: 'number', placeholder: '0.00' }); fCost.step = '0.01';
+  const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
+
+  const yRow = el('div', 'two-col');
+  yRow.appendChild(field('Tax year', fYear, 'The year the return covers (not the year you filed it).'));
+  yRow.appendChild(field('Filing type', fKind, 'Original return, or an amendment to a year you already filed (e.g. 1040-X).'));
+  body.appendChild(yRow);
+  const fedRow = el('div', 'cd-fields');
+  fedRow.appendChild(field('Federal form', fFedForm, 'The federal form filed — 1040, 1040-SR, or 1040-X for an amendment.'));
+  fedRow.appendChild(field('Federal outcome', fFedOut, 'Whether the federal return came back as a refund or you owed.'));
+  fedRow.appendChild(field('Federal amount', fFedAmt, 'The refund received or the amount paid, for the federal return.'));
+  body.appendChild(fedRow);
+  const stRow = el('div', 'cd-fields');
+  stRow.appendChild(field('State form', fStForm, 'The state return form filed, if any.'));
+  stRow.appendChild(field('State outcome', fStOut, 'Whether the state return came back as a refund or you owed.'));
+  stRow.appendChild(field('State amount', fStAmt, 'The refund received or the amount paid, for the state return.'));
+  body.appendChild(stRow);
+  const meta = el('div', 'two-col');
+  meta.appendChild(field('Filed date', fFiled, 'When this return (or amendment) was actually filed.'));
+  meta.appendChild(field('Extension', cExt));
+  body.appendChild(meta);
+  const prepRow = el('div', 'two-col');
+  prepRow.appendChild(field('Prepared by', fCpa, 'Who did the taxes — your CPA’s name, a service, or “Self”.'));
+  prepRow.appendChild(field('Prep cost', fCost, 'What the CPA or service charged for this filing.'));
+  body.appendChild(prepRow);
+  body.appendChild(field('Notes', fNotes, 'Anything worth remembering — why it was amended, what changed, etc.'));
+
+  openModal({
+    title: existing ? 'Edit tax return' : (r.kind === 'amendment' ? 'Add amendment · tax year ' + r.taxYear : 'Add tax return'),
+    body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const taxYear = parseInt(fYear.value, 10);
+      if (!taxYear || taxYear < 1990) { fYear.focus(); toast('Enter the tax year', 'warn'); return false; }
+      const entry = Object.assign(r, {
+        taxYear, kind: fKind.value,
+        fedForm: fFedForm.value.trim(), fedOutcome: fFedOut.value,
+        fedAmount: fFedAmt.value === '' ? null : parseFloat(fFedAmt.value),
+        stateForm: fStForm.value.trim(), stateOutcome: fStOut.value,
+        stateAmount: fStAmt.value === '' ? null : parseFloat(fStAmt.value),
+        filedDate: fFiled.value || '', extended: cExt.__input.checked,
+        preparer: fCpa.value.trim(), prepCost: fCost.value === '' ? null : parseFloat(fCost.value),
+        notes: fNotes.value.trim()
+      });
+      store.saveTaxRecord(entry);
+      toast(existing ? 'Tax return updated' : (entry.kind === 'amendment' ? 'Amendment added' : 'Tax return added'));
+    }
+  });
 }
 
 function renderReports(view) {

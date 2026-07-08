@@ -89,7 +89,11 @@ function defaults() {
     // Expected-payroll schedules: {id, name, employer, incomeCategoryId, personId,
     // frequency, anchorDate, day2, gross, net, active} — drive missing-paycheck
     // detection + auto period numbers.
-    paySchedules: []
+    paySchedules: [],
+    // Tax filing history: {id, taxYear, kind:'original'|'amendment', fedForm, stateForm,
+    // fedOutcome:'refund'|'owed'|'none', fedAmount, stateOutcome, stateAmount,
+    // prepCost, preparer, extended, filedDate, notes}
+    taxRecords: []
   };
 }
 
@@ -150,7 +154,8 @@ function snapshot() {
     catalog: state.catalog,
     creditScores: state.creditScores,
     rateHistory: state.rateHistory,
-    paySchedules: state.paySchedules
+    paySchedules: state.paySchedules,
+    taxRecords: state.taxRecords
   };
 }
 
@@ -166,6 +171,7 @@ function apply(data) {
   state.creditScores = s.creditScores || [];
   state.rateHistory = s.rateHistory || [];
   state.paySchedules = s.paySchedules || [];
+  state.taxRecords = s.taxRecords || [];
   state._loaded = true;
 }
 
@@ -258,6 +264,12 @@ window.cloverStore = {
     scheduleSave(); notify(); return entry;
   },
   removePaySchedule(id) { state.paySchedules = state.paySchedules.filter(x => x.id !== id); scheduleSave(); notify(); },
+  saveTaxRecord(entry) {
+    if (entry.id) { const i = state.taxRecords.findIndex(x => x.id === entry.id); if (i >= 0) state.taxRecords[i] = entry; else state.taxRecords.push(entry); }
+    else { entry.id = mkId('tax'); state.taxRecords.push(entry); }
+    scheduleSave(); notify(); return entry;
+  },
+  removeTaxRecord(id) { state.taxRecords = state.taxRecords.filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- catalog lists (list = 'institutions' | 'rewardPrograms' | 'giftCardTypes') ---
   addCatalog(list, name) { state.catalog[list].push({ id: mkId('item'), name: name.trim() }); scheduleSave(); notify(); },
