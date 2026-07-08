@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.27 — Customizable dashboard + Income mix panel
+- The **Dashboard is now made of panels** you control: click **✎ Edit layout** to drag
+  panels into a new order, remove ones you don't want (✕), and add them back (＋). Click
+  any panel header to collapse/expand it. Your layout is saved to your account.
+- New **Income mix (YTD)** panel: how much of this year's income comes from **interest,
+  dividends, and investments** — in dollars and as a share of both **gross** and
+  **take-home (net)** income.
+
 ### v1.0.26 — Customizable columns on Credit & Rates and Year overview
 - **⚙ Columns** on the Credit scores and Savings rates tables (per-tab), and on the
   **Year overview** table in Reports (choose which yearly metrics to show).

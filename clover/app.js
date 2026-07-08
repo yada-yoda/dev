@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.26';
+const VERSION = '1.0.27';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2615,9 +2615,8 @@ function expenseByCategory(store, data) {
   data.expensePayments.forEach(e => { const g = store.expenseGroupName(e.categoryId); m[g] = (m[g] || 0) + expenseAmount(e); });
   return m;
 }
-function donutCard(title, map) {
+function donutCard(map) {
   const card = el('div', 'card');
-  card.appendChild(el('h3', 'strip-title', title));
   const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (!entries.length) { card.appendChild(el('div', 'muted', 'No data yet.')); return card; }
   const wrap = el('div', 'donut-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
@@ -2631,7 +2630,6 @@ function buildWarnings(store, data, s) {
   const overdue = data.paychecks.filter(p => !isPaycheckPaid(p) && p.status !== 'Bounced/Returned' && (p.status === 'Late' || p.status === 'Missing' || (p.payDate && daysUntil(p.payDate) < 0)));
   if (!renewSoon.length && !overdue.length) return null;
   const strip = el('div', 'card warn-strip');
-  strip.appendChild(el('h3', 'strip-title', '⚠ Attention'));
   const list = el('div', 'warn-list');
   renewSoon.slice(0, 6).forEach(x => {
     const w = el('div', 'warn-item');
@@ -2650,7 +2648,6 @@ function buildWarnings(store, data, s) {
 }
 function upcomingRenewalsCard(store, s) {
   const card = el('div', 'card');
-  card.appendChild(el('h3', 'strip-title', 'Upcoming renewals'));
   const items = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(nextRenewalDate(r)) })).filter(x => x.d != null && x.d >= 0).sort((a, b) => a.d - b.d).slice(0, 8);
   if (!items.length) { card.appendChild(el('div', 'muted', 'No upcoming renewals.')); return card; }
   const list = el('div', 'mini-list');
@@ -2666,7 +2663,6 @@ function upcomingRenewalsCard(store, s) {
 }
 function recentActivityCard(store, data) {
   const card = el('div', 'card');
-  card.appendChild(el('h3', 'strip-title', 'Recent activity'));
   const items = [];
   data.income.forEach(e => items.push({ date: e.date, label: store.incomeGroupName(e.categoryId), amt: amountOf(e), kind: 'in' }));
   data.paychecks.filter(isPaycheckPaid).forEach(p => items.push({ date: p.payDate, label: p.employer || 'Paycheck', amt: Number(p.gross) || 0, kind: 'in' }));
@@ -2682,6 +2678,91 @@ function recentActivityCard(store, data) {
     list.appendChild(row);
   });
   card.appendChild(list); return card;
+}
+
+// ---- Dashboard panels: add/remove, drag-reorder (when unlocked), collapse ----
+let dashUnlocked = false;
+let dashDragKey = null;
+const DASH_PANEL_DEFS = [
+  { key: 'kpis', title: 'Key numbers', span2: true, build: ctx => dashKpisBody(ctx) },
+  { key: 'warnings', title: '⚠ Attention', span2: true, build: ctx => buildWarnings(ctx.store, ctx.data, ctx.s) || el('div', 'card muted', 'Nothing needs attention right now.') },
+  { key: 'incomeMix', title: 'Income mix (YTD)', span2: true, build: ctx => dashIncomeMixBody(ctx) },
+  { key: 'incomeDonut', title: 'Income by category (YTD)', build: ctx => donutCard(incomeByCategory(ctx.store, ctx.data)) },
+  { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategory(ctx.store, ctx.data)) },
+  { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
+  { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) }
+];
+function dashPanelState(store) {
+  const saved = store.state.settings.dashPanels;
+  if (Array.isArray(saved) && saved.length) {
+    const known = saved.filter(p => DASH_PANEL_DEFS.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c }));
+    if (known.length) return known;
+  }
+  return DASH_PANEL_DEFS.map(d => ({ k: d.key, c: false }));
+}
+function dashKpisBody(ctx) {
+  const kpis = el('div', 'sub-summary');
+  kpis.appendChild(kpiCard('Income · ' + ctx.monthName, money(ctx.incThisMonth), 'income'));
+  kpis.appendChild(kpiCard('Spending · ' + ctx.monthName, money(ctx.spendThisMonth), 'expense'));
+  kpis.appendChild(kpiCard('Recurring / mo', money(ctx.recurringMonthly), 'expense', money(ctx.recurringAnnual) + ' / yr'));
+  kpis.appendChild(kpiCard('Net · ' + ctx.monthName, money(ctx.netThisMonth), ctx.netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
+  kpis.appendChild(kpiCard('Should be left / mo', money(ctx.shouldLeft), ctx.shouldLeft < 0 ? 'expense' : 'income', 'avg take-home − bills − avg spend'));
+  kpis.appendChild(kpiCard('Projected income', money(ctx.projAnnualIncome), 'income', 'annualized from YTD'));
+  kpis.appendChild(kpiCard('Projected expenses', money(ctx.projAnnualExpense), 'expense', 'subs + annualized spend'));
+  return kpis;
+}
+// Share of the year's income that interest / dividends / investments make up,
+// against both gross and take-home (net) income.
+function dashIncomeMixBody(ctx) {
+  const card = el('div', 'card');
+  if (!ctx.incYTD) { card.appendChild(el('div', 'muted', 'No income yet this year.')); return card; }
+  const rows = [['Interest', /interest/i], ['Dividends', /dividend/i], ['Investments', /invest/i]]
+    .map(([label, re]) => ({ label, amt: incomeByNamedCategory(ctx.store, ctx.data, re) }));
+  const wrap = el('div', 'table-scroll');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Source</th><th class="num">YTD</th><th class="num">% of gross income</th><th class="num">% of net income</th></tr></thead>';
+  const tb = el('tbody');
+  rows.forEach(r => {
+    const tr = el('tr');
+    tr.appendChild(el('td', 'strong', r.label));
+    tr.appendChild(numCell(r.amt, true));
+    const pg = el('td', 'num'); pg.textContent = ctx.incYTD > 0 && r.amt ? (r.amt / ctx.incYTD * 100).toFixed(2) + '%' : '—'; tr.appendChild(pg);
+    const pn = el('td', 'num'); pn.textContent = ctx.netYTD > 0 && r.amt ? (r.amt / ctx.netYTD * 100).toFixed(2) + '%' : '—'; tr.appendChild(pn);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); wrap.appendChild(table); card.appendChild(wrap);
+  card.appendChild(el('div', 'sum-hint', 'How much of this year’s income comes from interest, dividends, and investments — as a share of gross and of take-home (net) income.'));
+  return card;
+}
+function dashPanel(store, def, entry, state, ctx) {
+  const panel = el('div', 'dash-panel' + (def.span2 ? ' span2' : ''));
+  const head = el('div', 'dash-panel-head');
+  if (dashUnlocked) {
+    panel.draggable = true;
+    head.appendChild(el('span', 'dph-drag', '⠿'));
+    panel.addEventListener('dragstart', () => { dashDragKey = def.key; panel.classList.add('dragging'); });
+    panel.addEventListener('dragend', () => { dashDragKey = null; panel.classList.remove('dragging'); });
+    panel.addEventListener('dragover', e => e.preventDefault());
+    panel.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!dashDragKey || dashDragKey === def.key) return;
+      const v = state.slice();
+      const from = v.findIndex(p => p.k === dashDragKey), to = v.findIndex(p => p.k === def.key);
+      const moved = v.splice(from, 1)[0]; v.splice(to, 0, moved);
+      store.setDashPanels(v);
+    });
+  }
+  head.appendChild(el('h3', 'dph-title', def.title));
+  head.appendChild(el('span', 'dph-caret', entry.c ? '▸' : '▾'));
+  if (dashUnlocked) {
+    const x = el('button', 'dph-x', '✕'); x.title = 'Remove this panel';
+    x.addEventListener('click', ev => { ev.stopPropagation(); store.setDashPanels(state.filter(p => p.k !== def.key)); });
+    head.appendChild(x);
+  }
+  head.addEventListener('click', () => { entry.c = !entry.c; store.setDashPanels(state); });
+  panel.appendChild(head);
+  if (!entry.c) { const body = el('div', 'dash-panel-body'); body.appendChild(def.build(ctx)); panel.appendChild(body); }
+  return panel;
 }
 
 function renderDashboard(view) {
@@ -2716,34 +2797,35 @@ function renderDashboard(view) {
   const incomeBasis = (autoNet && autoNet > 0) ? autoNet : (monthsElapsed > 0 ? netYTD / monthsElapsed : incNetThisMonth);
   const shouldLeft = incomeBasis - recurringMonthly - avgSpend;
 
+  const ctx = { store, s, data, monthName, incThisMonth, spendThisMonth, recurringMonthly, recurringAnnual, netThisMonth, shouldLeft, projAnnualIncome, projAnnualExpense, incYTD, netYTD };
+
   const head = el('div', 'view-head');
   const left = el('div'); left.appendChild(el('h3', null, 'Dashboard'));
   left.appendChild(el('p', 'muted', monthName + ' ' + activeYear + ' snapshot'));
   head.appendChild(left);
+  const lockBtn = el('button', 'btn-ghost', dashUnlocked ? '✓ Done editing' : '✎ Edit layout');
+  lockBtn.title = dashUnlocked ? 'Lock the layout' : 'Unlock to reorder, remove, or add panels';
+  lockBtn.addEventListener('click', () => { dashUnlocked = !dashUnlocked; renderView(currentRoute); });
+  head.appendChild(lockBtn);
   view.appendChild(head);
 
-  const kpis = el('div', 'sub-summary');
-  kpis.appendChild(kpiCard('Income · ' + monthName, money(incThisMonth), 'income'));
-  kpis.appendChild(kpiCard('Spending · ' + monthName, money(spendThisMonth), 'expense'));
-  kpis.appendChild(kpiCard('Recurring / mo', money(recurringMonthly), 'expense', money(recurringAnnual) + ' / yr'));
-  kpis.appendChild(kpiCard('Net · ' + monthName, money(netThisMonth), netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
-  kpis.appendChild(kpiCard('Should be left / mo', money(shouldLeft), shouldLeft < 0 ? 'expense' : 'income', 'avg take-home − bills − avg spend'));
-  kpis.appendChild(kpiCard('Projected income', money(projAnnualIncome), 'income', 'annualized from YTD'));
-  kpis.appendChild(kpiCard('Projected expenses', money(projAnnualExpense), 'expense', 'subs + annualized spend'));
-  view.appendChild(kpis);
-
-  const warns = buildWarnings(store, data, s);
-  if (warns) view.appendChild(warns);
-
-  const chartsRow = el('div', 'dash-charts');
-  chartsRow.appendChild(donutCard('Income by category (YTD)', incomeByCategory(store, data)));
-  chartsRow.appendChild(donutCard('Expenses by category (YTD)', expenseByCategory(store, data)));
-  view.appendChild(chartsRow);
-
-  const bottom = el('div', 'dash-cols');
-  bottom.appendChild(upcomingRenewalsCard(store, s));
-  bottom.appendChild(recentActivityCard(store, data));
-  view.appendChild(bottom);
+  const state = dashPanelState(store);
+  if (dashUnlocked) {
+    const addRow = el('div', 'dash-add-row');
+    addRow.appendChild(el('span', 'muted', 'Drag panels to reorder · ✕ removes · click a header to collapse.'));
+    DASH_PANEL_DEFS.filter(d => !state.some(p => p.k === d.key)).forEach(d => {
+      const b = el('button', 'btn-ghost', '＋ ' + d.title);
+      b.addEventListener('click', () => store.setDashPanels(state.concat([{ k: d.key, c: false }])));
+      addRow.appendChild(b);
+    });
+    view.appendChild(addRow);
+  }
+  const grid = el('div', 'dash-panels');
+  state.forEach(entry => {
+    const def = DASH_PANEL_DEFS.find(d => d.key === entry.k); if (!def) return;
+    grid.appendChild(dashPanel(store, def, entry, state, ctx));
+  });
+  view.appendChild(grid);
 }
 
 // ============================================================
