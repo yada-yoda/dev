@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.45';
+const VERSION = '1.0.46';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2317,7 +2317,7 @@ function paySchedulesCard() {
     const row = el('div', 'mini-row');
     const left = el('div');
     left.appendChild(el('div', null, (sch.name || sch.employer || 'Schedule') + (sch.active === false ? ' (inactive)' : '')));
-    left.appendChild(el('div', 'muted', payFreqLabel(sch.frequency) + (sch.anchorDate ? ' · from ' + fmtDate(sch.anchorDate) : '')));
+    left.appendChild(el('div', 'muted', payFreqLabel(sch.frequency) + (sch.anchorDate ? ' · from ' + fmtDate(sch.anchorDate) : '') + (sch.taxForm && sch.taxForm !== 'none' ? ' · ' + sch.taxForm : '')));
     row.appendChild(left);
     const right = el('span', 'mini-right');
     const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => payScheduleModal(sch));
@@ -2362,6 +2362,7 @@ function payScheduleModal(existing) {
   const fDay2 = input(c.day2 != null ? c.day2 : '', { type: 'number', placeholder: 'e.g. 30 (blank = last day)' }); fDay2.min = 1; fDay2.max = 31;
   const fGross = input(c.gross != null ? c.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
   const fNet = input(c.net != null ? c.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
+  const fTaxForm = select([{ value: 'W-2', label: 'W-2 (employee)' }, { value: '1099-NEC', label: '1099-NEC (contractor / gig)' }, { value: '1099-MISC', label: '1099-MISC' }, { value: 'none', label: 'None / cash' }], c.taxForm || 'W-2');
   const cActive = checkbox('Active', c.active !== false, 'Only active schedules flag missing paychecks and fill period numbers.');
 
   const day2Field = field('Second pay day of month', fDay2, 'For semimonthly pay, the second day each month (the first comes from the anchor date). Blank = last day of the month.');
@@ -2417,6 +2418,7 @@ function payScheduleModal(existing) {
   renderDed();
   body.appendChild(field('Paycheck deductions (per check, optional)', dedWrap, 'From a recent pay stub: where each check’s gross goes before net — federal withholding, Social Security, Medicare (plus the additional Medicare tax if it applies), state withholding, 401(k), insurance… Add your own line items for anything employer-specific. This assumes a salary, where every regular check is about the same; mark one-time checks (bonus, reimbursement) with a Check type on the paycheck so they’re excluded.'));
 
+  body.appendChild(field('Pay reported on', fTaxForm, 'How this employer reports your pay for taxes — W-2 for employees, 1099-NEC for contract or gig work. Drives the “Expected tax forms” checklist on the Taxes page.'));
   body.appendChild(field('Status', cActive));
   syncFreq(); syncEmp();
 
@@ -2431,7 +2433,7 @@ function payScheduleModal(existing) {
         incomeCategoryId: fCat.value, personId: fPerson.value, frequency: fFreq.value,
         anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', hireDate: fHire.value || '', hoursPerCheck: fHours.value === '' ? null : parseFloat(fHours.value), day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
-        net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked,
+        net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked, taxForm: fTaxForm.value,
         deductions: deductions.filter(x => (x.name || '').trim()).map(x => ({ name: x.name.trim(), amount: x.amount != null && !isNaN(x.amount) ? x.amount : null }))
       });
       store.savePaySchedule(entry);
@@ -2558,6 +2560,7 @@ function employerProfileCard(store, emp) {
   card.appendChild(el('h3', 'strip-title', emp + (employed ? '' : ' · former')));
   const list = el('div', 'mini-list');
   const row = (l, v, sub) => { const rw = el('div', 'mini-row'); rw.appendChild(el('span', null, l)); const right = el('span'); right.appendChild(el('span', 'strong', v)); if (sub) right.appendChild(el('span', 'muted', ' ' + sub)); rw.appendChild(right); list.appendChild(rw); };
+  if (sch && sch.taxForm && sch.taxForm !== 'none') row('Pay reported on', sch.taxForm, '');
   if (days != null) row('Employed', days + ' days', '(' + (days / 365.25).toFixed(1) + ' yrs' + (hire === (sch && sch.hireDate) ? ', since ' + fmtDate(hire) : ', from first paycheck') + (employed ? ')' : ', through last paycheck)'));
   row('Total paid (gross)', money(gross), 'net ' + money(net));
   row('Regular checks', String(regChecks), '');
@@ -3515,7 +3518,14 @@ const TAX_FORM_INFO = {
   '2441': 'Child and dependent care expenses credit.',
   '8863': 'Education credits — American Opportunity / Lifetime Learning.',
   '8606': 'Nondeductible IRA contributions (tracks your basis).',
-  'K-1': 'Your share of income from a partnership, S-corp, or trust.'
+  'K-1': 'Your share of income from a partnership, S-corp, or trust.',
+  'W-2': 'Wage statement from an employer — wages paid and taxes withheld for the year.',
+  '1099-NEC': 'Nonemployee compensation — contract/gig pay of $600+ from one payer.',
+  '1099-MISC': 'Miscellaneous income — settlements, prizes, and other $600+ payments.',
+  '1099-INT': 'Interest income — banks send one when they paid you $10+ in interest.',
+  '1099-DIV': 'Dividends and distributions — brokers send one at $10+ in dividends.',
+  '1099-B': 'Broker proceeds — sales of stocks/funds during the year.',
+  '1099-K': 'Payment-card / marketplace payouts (e.g. Poshmark) — thresholds vary by year and state.'
 };
 function taxFormInfo(form) {
   if (!form) return '';
@@ -3625,6 +3635,90 @@ function importTaxesCSV(store, rows) {
   toast('Imported ' + added + ' tax record' + (added === 1 ? '' : 's') + (skipped ? ' · ' + skipped + ' skipped (duplicate or no year)' : ''));
 }
 
+// Expected tax forms for a year, derived from what's tracked: employers (W-2/1099
+// from their pay schedule), interest (1099-INT), dividends (1099-DIV), investment
+// sales (1099-B), marketplace sales (1099-K), settlements (1099-MISC).
+let taxFormsYear = null;
+function expectedFormBadge(form) {
+  const b = el('span', 'badge type hint-underline', form);
+  const info = taxFormInfo(form); if (info) b.title = info;
+  return b;
+}
+function expectedTaxFormsCard(store) {
+  const s = store.state;
+  const cur = new Date().getFullYear();
+  const yr = taxFormsYear || cur;
+  const card = el('div', 'card');
+  const headRow = el('div', 'view-head');
+  headRow.appendChild(el('h3', 'strip-title', 'Expected tax forms · ' + yr));
+  const ySel = select([cur, cur - 1, cur - 2, cur - 3].map(y => ({ value: String(y), label: String(y) })), String(yr));
+  ySel.addEventListener('change', () => { taxFormsYear = +ySel.value; renderView(currentRoute); });
+  headRow.appendChild(ySel);
+  card.appendChild(headRow);
+  if (!store.isYearLoaded(yr)) { store.loadYear(yr); card.appendChild(el('div', 'muted', 'Loading year data…')); return card; }
+  const d = store.yearData(yr);
+  const list = el('div', 'mini-list');
+  const item = (form, text, sub) => {
+    const rw = el('div', 'mini-row');
+    const left = el('div');
+    const top = el('span'); top.appendChild(expectedFormBadge(form)); top.appendChild(document.createTextNode(' ' + text));
+    left.appendChild(top);
+    if (sub) left.appendChild(el('div', 'acct-sub', sub));
+    rw.appendChild(left); list.appendChild(rw);
+  };
+  // Employers — from that year's paid checks + each employer's schedule.
+  const empGross = {};
+  d.paychecks.filter(isPaycheckPaid).forEach(pc => { const e = (pc.employer || '').trim(); if (e) empGross[e] = (empGross[e] || 0) + (Number(pc.gross) || 0); });
+  Object.keys(empGross).sort().forEach(emp => {
+    const sch = s.paySchedules.find(x => (x.employer || '').toLowerCase() === emp.toLowerCase());
+    const form = sch && sch.taxForm;
+    if (form === 'none') { item('W-2', emp + ' — ' + money(empGross[emp]) + ' gross', 'Marked “None / cash” on the pay schedule — no form expected.'); return; }
+    if (form) item(form, 'from ' + emp + ' — ' + money(empGross[emp]) + ' gross');
+    else item('W-2', 'or 1099-NEC from ' + emp + ' — ' + money(empGross[emp]) + ' gross', 'Set “Pay reported on” in this employer’s pay schedule to pin this down.');
+  });
+  // Interest → 1099-INT
+  const intCat = s.incomeCategories.find(c => /interest/i.test(c.name));
+  if (intCat) {
+    const ints = d.income.filter(countable).filter(e => e.categoryId === intCat.id);
+    const total = ints.reduce((a, e) => a + amountOf(e), 0);
+    if (total >= 10) {
+      const banks = [...new Set(ints.map(e => store.accountName(e.accountId)).filter(x => x && x !== '—'))];
+      item('1099-INT', 'interest totaled ' + money(total), 'Each bank that paid you $10+ sends one' + (banks.length ? ' — ' + banks.slice(0, 3).join(', ') + (banks.length > 3 ? ' +' + (banks.length - 3) + ' more' : '') : '') + '.');
+    }
+  }
+  // Dividends → 1099-DIV
+  const divCat = s.incomeCategories.find(c => /dividend/i.test(c.name));
+  if (divCat) {
+    const divs = d.income.filter(countable).filter(e => e.categoryId === divCat.id);
+    const total = divs.reduce((a, e) => a + amountOf(e), 0);
+    if (total >= 10) {
+      const brokers = [...new Set(divs.map(e => e.receivedVia).filter(Boolean))];
+      item('1099-DIV', 'dividends totaled ' + money(total), 'Each broker that paid $10+ sends one' + (brokers.length ? ' — ' + brokers.slice(0, 3).join(', ') : '') + '. A 1099-B comes along if you also sold shares there.');
+    }
+  }
+  // Investments (sales of securities) → possible 1099-B
+  const invCat = s.incomeCategories.find(c => /invest/i.test(c.name));
+  if (invCat && d.income.filter(countable).some(e => e.categoryId === invCat.id)) {
+    item('1099-B', 'investment income was logged', 'Brokers report sale proceeds on a 1099-B (often combined with the 1099-DIV).');
+  }
+  // Marketplace sales → possible 1099-K
+  if ((d.sales || []).length) {
+    const earn = (d.sales || []).reduce((a, x) => a + (Number(x.earnings) || 0), 0);
+    item('1099-K', (d.sales || []).length + ' marketplace sales — ' + money(earn) + ' earnings', 'Poshmark and payment platforms issue a 1099-K above the year’s reporting threshold (varies by year and state).');
+  }
+  // Settlements → possible 1099-MISC
+  const otherCat = s.incomeCategories.find(c => /other/i.test(c.name));
+  if (otherCat) {
+    const suits = d.income.filter(countable).filter(e => e.categoryId === otherCat.id && /lawsuit|settle/i.test(e.otherType || ''));
+    const total = suits.reduce((a, e) => a + amountOf(e), 0);
+    if (total >= 600) item('1099-MISC', 'settlements totaled ' + money(total), 'Settlements of $600+ often come with a 1099-MISC from the payer.');
+  }
+  if (!list.children.length) card.appendChild(el('div', 'muted', 'Nothing tracked for ' + yr + ' yet — forms will appear here as income does.'));
+  else card.appendChild(list);
+  card.appendChild(el('div', 'sum-hint', 'A filing-season checklist based on what you’ve tracked in Clover — hover a form for what it means. Not tax advice.'));
+  return card;
+}
+
 function renderTaxes(view) {
   const store = window.cloverStore, s = store.state;
   const recs = s.taxRecords;
@@ -3661,6 +3755,7 @@ function renderTaxes(view) {
   actions.appendChild(add);
   head.appendChild(actions);
   view.appendChild(head);
+  view.appendChild(expectedTaxFormsCard(store));
 
   if (!recs.length) {
     view.appendChild(emptyState('No tax history yet', 'Log each year’s federal and state filing — the forms used, what was refunded or owed, what the CPA charged, plus extensions and amendments.', '+ Add tax return', () => taxModal(null)));

@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.46 — Expected tax forms checklist
+- The Taxes page now shows **"Expected tax forms"** for a chosen year, derived from what
+  you've tracked: a **W-2 or 1099-NEC per employer** (set "Pay reported on" in each pay
+  schedule — it also shows on the employer profile), **1099-INT** when banks paid $10+
+  interest (banks named), **1099-DIV** per broker, a possible **1099-B** for investment
+  sales, **1099-K** for marketplace sales (Poshmark), and **1099-MISC** for settlements
+  of $600+. Hover any form for a plain-English explanation. A checklist, not tax advice.
+
 ### v1.0.45 — Panel resizing (snap)
 - Dashboard and Reports panels can now be **resized** in ✎ Edit layout: a ⇤/⇥ button on
   each panel header snaps it between **half** and **full** width (no freestyle dragging —
