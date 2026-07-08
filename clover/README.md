@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.50 — Default subcategories (HOA gets a home) + missing Bills & Subs columns
+
+- Fresh installs now seed useful default subcategories on the expense
+  categories (Utility → Electric/Gas/Water/Sewer/Trash, Insurance →
+  Auto/Home/Renters/Life/Health/Pet, Auto → Fuel/Maintenance/Registration/
+  Parking & Tolls, and so on), so you don't have to build the obvious lists
+  by hand. The old "Mortgage / Rent" seed group is now **Housing**, with
+  Mortgage, Rent, **HOA**, Property Tax, and Home Maintenance subcategories —
+  giving HOA dues a proper home. Existing data is untouched: seeds only apply
+  the first time an account is set up, so add any of these you want from
+  Settings → Categories (e.g. an "HOA" subcategory under your housing group).
+- The Bills & Subscriptions ⚙ Columns manager was missing several fields the
+  edit form already captures. Added **Subcategory** (colored clickable tag,
+  filters the table like Category), **Vendor**, **Backup account**,
+  **Priority**, and **Status** as optional columns — all sortable, all
+  hidden by default so nothing shifts until you turn them on.
+
 ### v1.0.49 — Colored, clickable tags on Bills & Subscriptions
 - The **Category, Frequency, and Account** columns on Bills & Subscriptions now use the
   same colored value tags as Accounts — each column its own color, each value its own

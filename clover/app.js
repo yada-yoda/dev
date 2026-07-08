@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.49';
+const VERSION = '1.0.50';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -609,7 +609,7 @@ const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'fla
 // Scoped per table: 'accounts' uses accountsFilter, 'subs' uses subsBadgeFilter.
 const BADGE_HUES = {
   'accounts.type': 145, 'accounts.institution': 215, 'accounts.owner': 275, 'accounts.beneficiaries': 25,
-  'subs.category': 275, 'subs.frequency': 215, 'subs.account': 145
+  'subs.category': 275, 'subs.subcategory': 25, 'subs.frequency': 215, 'subs.account': 145
 };
 const _badgeShadeIdx = {};
 function tableFilterGet(scope) { return scope === 'subs' ? subsBadgeFilter : accountsFilter; }
@@ -1350,8 +1350,8 @@ function trendIcon(sub) {
   const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
 }
 
-const SUBS_COL_LABELS = { name: 'Name', category: 'Category', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', person: 'Person', flags: 'Flags', notes: 'Notes' };
-const SUBS_ALL_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'person', 'flags', 'notes'];
+const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', flags: 'Flags', notes: 'Notes' };
+const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'flags', 'notes'];
 const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
 function buildSubsCol(store, key, net) {
   switch (key) {
@@ -1369,6 +1369,11 @@ function buildSubsCol(store, key, net) {
     case 'pct': return { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } };
     case 'renews': return { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) };
     case 'account': return { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => { const td = el('td'); td.appendChild(valueBadge('subs', 'account', store.accountName(r.accountId) || '')); return td; } };
+    case 'subcategory': return { label: 'Subcategory', key: 'subcategory', value: r => store.subName('expense', r.categoryId, r.subId) || '', cell: r => { const td = el('td'); const n = store.subName('expense', r.categoryId, r.subId); td.appendChild(valueBadge('subs', 'subcategory', n && n !== '—' ? n : '')); return td; } };
+    case 'vendor': return { label: 'Vendor', key: 'vendor', value: r => r.vendor || '', cell: r => el('td', 'muted', r.vendor || '—') };
+    case 'backupAccount': return { label: 'Backup account', key: 'backupAccount', value: r => store.accountName(r.backupAccountId) || '', cell: r => el('td', 'muted', store.accountName(r.backupAccountId) || '—') };
+    case 'priority': return { label: 'Priority', key: 'priority', value: r => r.priority || '', cell: r => { const td = el('td'); if (!r.priority) { td.textContent = '—'; return td; } td.appendChild(badge(r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : '')); return td; } };
+    case 'status': return { label: 'Status', key: 'status', value: r => r.status || 'Active', cell: r => { const td = el('td'); const st = r.status || 'Active'; td.appendChild(badge(st, isSubActive(r) ? (st === 'Trial' ? 'amber' : 'green') : 'red')); return td; } };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
@@ -1434,6 +1439,7 @@ function renderSubscriptions(view) {
   if (subsBadgeFilter) {
     const f = subsBadgeFilter;
     const valOf = r => f.key === 'category' ? store.expenseGroupName(r.categoryId)
+      : f.key === 'subcategory' ? (store.subName('expense', r.categoryId, r.subId) || '')
       : f.key === 'frequency' ? freqLabel(r)
       : f.key === 'account' ? (store.accountName(r.accountId) || '') : '';
     rows = rows.filter(r => valOf(r) === f.value);

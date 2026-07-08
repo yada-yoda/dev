@@ -38,10 +38,24 @@ const SEED_INCOME_GROUPS = [
   'Wages', 'Acting', 'Side Jobs', 'Dividends', 'Investments', 'Interest',
   'Passive / Affiliate', 'Rewards', 'Selling', 'Other'
 ];
+// Expense groups seed with useful default subcategories (only applied on first
+// run — existing users keep their own lists and can add these in Settings).
 const SEED_EXPENSE_GROUPS = [
-  'Mortgage / Rent', 'Utility', 'Insurance', 'Streaming', 'Membership',
-  'Software', 'Medical', 'Pet', 'Phone', 'Internet', 'Credit Card', 'Loan',
-  'Tax', 'Auto', 'Food', 'Entertainment', 'Other'
+  { name: 'Housing', subs: ['Mortgage', 'Rent', 'HOA', 'Property Tax', 'Home Maintenance'] },
+  { name: 'Utility', subs: ['Electric', 'Gas', 'Water', 'Sewer', 'Trash'] },
+  { name: 'Insurance', subs: ['Auto', 'Home', 'Renters', 'Life', 'Health', 'Pet'] },
+  { name: 'Streaming', subs: ['Video', 'Music', 'Sports'] },
+  { name: 'Membership', subs: ['Gym', 'Warehouse Club', 'Professional'] },
+  { name: 'Software', subs: ['Apps & Services', 'Domains & Hosting', 'Cloud Storage'] },
+  { name: 'Medical', subs: ['Doctor', 'Dental', 'Vision', 'Pharmacy'] },
+  { name: 'Pet', subs: ['Food', 'Vet', 'Grooming', 'Supplies'] },
+  'Phone', 'Internet', 'Credit Card',
+  { name: 'Loan', subs: ['Student', 'Personal', 'Auto'] },
+  { name: 'Tax', subs: ['Federal', 'State', 'Property'] },
+  { name: 'Auto', subs: ['Fuel', 'Maintenance', 'Registration', 'Parking & Tolls'] },
+  { name: 'Food', subs: ['Groceries', 'Dining Out', 'Delivery'] },
+  { name: 'Entertainment', subs: ['Games', 'Events', 'Hobbies'] },
+  'Other'
 ];
 
 export const ACCOUNT_TYPES = [
@@ -49,8 +63,12 @@ export const ACCOUNT_TYPES = [
   'Retirement', 'Cash App / Payment', 'Other'
 ];
 
-function seedGroups(names) {
-  return names.map((name, i) => ({ id: mkId('cat'), name, order: i, subs: [] }));
+function seedGroups(items) {
+  return items.map((it, i) => {
+    const name = typeof it === 'string' ? it : it.name;
+    const subs = (typeof it === 'string' ? [] : (it.subs || [])).map(sn => ({ id: mkId('sub'), name: sn }));
+    return { id: mkId('cat'), name, order: i, subs };
+  });
 }
 function seedList(names) {
   return names.map(name => ({ id: mkId('item'), name }));
