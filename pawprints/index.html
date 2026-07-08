@@ -229,7 +229,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.49.2';
+const APP_VERSION = 'v0.50.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -416,7 +416,9 @@ const TREND_METRICS = [
   { k:'walkdist',label:'Walk miles',icon:'walk', auto:'area', hint:'Total miles walked per day.' },
   { k:'weight',  label:'Weight',  icon:'weight', auto:'line', hint:'Weigh-ins over time. Gaps are normal — the line connects your recorded points.' }
 ];
-const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds'];
+const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds','Other'];
+// Category dropdown = built-ins + any custom categories from Settings, with "Other" kept last.
+function catOptions(){ const c = (data.settings && data.settings.customCategories) || []; return [...new Set([...INV_CATEGORIES.filter(x=>x!=='Other'), ...c, 'Other'])]; }
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
 const CC_BRANDS = ['Visa','Mastercard','Amex','Discover','Other'];
 const UNIT_OPTIONS = ['bag','box','can','case','pouch','bottle','jar','tub','tube','count','pack','lb','oz','kg','g'];
@@ -426,7 +428,8 @@ const LIST_KINDS = {
   potty: { key:'customPottyPlaces', input:'list-potty', word:'location' },
   food:  { key:'customFoodPlaces',  input:'list-food',  word:'location' },
   unit:  { key:'customUnits',       input:'list-unit',  word:'unit' },
-  groomservice: { key:'customGroomServices', input:'list-groomservice', word:'service' }
+  groomservice: { key:'customGroomServices', input:'list-groomservice', word:'service' },
+  category: { key:'customCategories', input:'list-category', word:'category' }
 };
 const DOG_SYMPTOMS = ['Vomiting','Diarrhea','Lethargy','Loss of Appetite','Limping','Itching/Scratching','Coughing','Sneezing','Runny Nose','Watery Eyes','Ear Infection','Hot Spot','Bad Breath','Excessive Drinking','Shaking','Whining/Pain','Bloody Stool','Hair Loss','Swelling','Seizure'];
 const SEVERITY = ['Mild','Moderate','Severe'];
@@ -1050,6 +1053,7 @@ function settingsListsHTML(){
   h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The lists below customize the dropdowns you choose from while logging. Built-in options are always there — add your own here for ones you use often.</div>';
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
   h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a feeding (e.g. kitchen, crate).');
+  h += listEditor('Supply categories', 'category', s.customCategories||[], INV_CATEGORIES, 'Shows up in the Category dropdown when you add a supply, and as a filter tab on the Supplies list (e.g. Toys, Health, Apparel).');
   h += listEditor('Supply units', 'unit', s.customUnits||[], UNIT_OPTIONS, 'Shows up in the Unit dropdown when you add a supply (e.g. flat, roll, dose).');
   h += listEditor('Grooming services', 'groomservice', s.customGroomServices||[], GROOM_SERVICES, 'Shows up as a service tag when you log grooming.');
   const favs = s.walkFavorites || [];
@@ -2158,8 +2162,9 @@ function invModal(id, pre){
   if(!editing) draftInit('supply');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   const unitList = [...new Set([...(it && it.unit ? [it.unit] : []), ...unitOptions()])];
+  const catList = [...new Set([...catOptions(), ...(it && it.category ? [it.category] : [])])];
   openModal('<h3>🛒 '+(editing?'Edit item':(pre?'Duplicate supply':'Add supply'))+'</h3>'
-    +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(INV_CATEGORIES, it?it.category:'Food')+'</select></div>'
+    +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(catList, it?it.category:'Food')+'</select></div>'
     +'<div><label class="label">Brand</label><input class="input" id="iv-brand" value="'+(it?esc(it.brand||''):'')+'" placeholder="Blue Buffalo"></div></div>'
     +'<label class="label">Item name</label><input class="input" id="iv-name" value="'+(it?esc(it.name||''):'')+'" placeholder="Chicken & rice 30lb bag">'
     +'<div class="grid-2"><div><label class="label">Qty</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
@@ -3182,7 +3187,9 @@ function renderSupplies(){
     + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(ytd)+'</div><div class="stat-label">Spent this year</div></div>'
     + '<div class="card stat-card"><div class="stat-value" style="color:'+(low.length?'var(--warning)':'var(--text-secondary)')+'">'+low.length+'</div><div class="stat-label">Running low</div></div></div>';
   if(low.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('restock',18)+' Restock list</h3>'+low.map(i=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('supplies',18)+'</span><span style="flex:1">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span><button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
-  const cats = ['all',...INV_CATEGORIES];
+  // Filter tabs: all built-in + custom categories, plus any category present on an item (legacy).
+  const presentCats = all.map(i=>i.category).filter(Boolean);
+  const cats = ['all', ...new Set([...catOptions(), ...presentCats])];
   html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
   const shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
   if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';

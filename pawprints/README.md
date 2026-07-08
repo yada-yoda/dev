@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.49.2**
+**Current Version: v0.50.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.50.0** — **Custom supply categories** — supplies now include an **Other** category, and you
+  can add your own categories under **Settings → Lists & preferences → Supply categories** (e.g.
+  Toys, Health, Apparel). Custom categories appear in the Add-supply dropdown and as filter tabs on
+  the Supplies list, and any category on an item always shows as a filter even if later removed.
 - **v0.49.2** — **7d & 14d ranges on Insights** — the Spending and Potty breakdown range toggles
   now offer 7d and 14d in addition to 30d / 90d / YTD.
 - **v0.49.1** — **Fixed walking-badge notifications** — the "🎉 Badge unlocked" / "🌟 Prestige"
