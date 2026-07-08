@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.47 — Dividend import: accounts, specials; per-account grid rows; donut %
+- Duplicate checks are now **account-aware**: importing to a *different* "Record under"
+  account treats a matching date/stock/amount as a **new payout** (a note says how many
+  such rows were recognized), and switching the account re-evaluates the review live.
+- **Special dividends** are recognized (e.g. Schwab "Special Dividend"), labeled in the
+  preview, and never collide with a regular dividend of the same amount on the same day —
+  in the file or against what's already recorded.
+- The income grid's **Dividends** row now expands **per account** (each M1 account and
+  Schwab on its own row), falling back to the broker name when no account is linked.
+- The dashboard **income/expense donuts show each slice's %** in the legend.
+
 ### v1.0.46 — Expected tax forms checklist
 - The Taxes page now shows **"Expected tax forms"** for a chosen year, derived from what
   you've tracked: a **W-2 or 1099-NEC per employer** (set "Pay reported on" in each pay

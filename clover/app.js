@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.46';
+const VERSION = '1.0.47';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -969,12 +969,14 @@ function incomeGrid(data) {
       () => { open ? expandedIncomeGroups.delete(g.id) : expandedIncomeGroups.add(g.id); renderView(currentRoute); },
       open ? '▾' : '▸'));
     if (open) {
-      const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name);
-      if (rewardCat || interestCat) {
-        // Break the group down by reward source (Rewards) or bank/institution
-        // (Interest) instead of subcategory, one row per source per month.
+      const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name), dividendCat = /dividend/i.test(g.name);
+      if (rewardCat || interestCat || dividendCat) {
+        // Break the group down by reward source (Rewards), bank (Interest), or
+        // account→broker (Dividends: each M1 account and Schwab on its own row).
         const keyOf = rewardCat
           ? (e => (e.rewardSource || '').trim() || '(unspecified)')
+          : dividendCat
+          ? (e => store.accountName(e.accountId) || (e.receivedVia || '').trim() || '(no account)')
           : (e => store.accountName(e.accountId) || (e.notes || '').trim() || '(unspecified)');
         const byKey = new Map();
         gEntries.forEach(e => { const k = keyOf(e); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(e); });
@@ -3131,8 +3133,9 @@ function donutCard(map) {
   const card = el('div', 'card');
   const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (!entries.length) { card.appendChild(el('div', 'muted', 'No data yet.')); return card; }
+  const total = entries.reduce((a, e) => a + e[1], 0);
   const wrap = el('div', 'donut-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
-  buildDoughnut(cv, { labels: entries.map(e => e[0]), data: entries.map(e => e[1]) });
+  buildDoughnut(cv, { labels: entries.map(e => e[0] + ' · ' + (total > 0 ? (e[1] / total * 100).toFixed(1) : '0.0') + '%'), data: entries.map(e => e[1]) });
   return card;
 }
 function buildWarnings(store, data, s) {
@@ -4552,13 +4555,22 @@ const SCHWAB_TEMPLATE_CSV = '"Date","Action","Symbol","Description","Quantity","
 function divKey(d) { return d.date + '|' + (d.symbol || '') + '|' + (Number(d.amount) || 0).toFixed(2); }
 // Existing dividend keys across every loaded year (manual entries included, when
 // they carry a symbol) — this is what makes re-imports and overlapping M1 exports safe.
-function existingDividendKeys(store) {
-  const keys = new Set();
+// date|symbol|amount → the set of Clover accountIds ('' = none) that already hold
+// that dividend. Lets the review treat "same payout, DIFFERENT account" as new.
+function existingDividendAccountsByKey(store) {
+  const map = new Map();
   Object.keys(store.state.years).forEach(yk => {
     const d = store.state.years[yk]; if (!d || !d.income) return;
-    d.income.forEach(e => { if (e.symbol) keys.add(e.date + '|' + String(e.symbol).toUpperCase() + '|' + (Number(e.gross) || 0).toFixed(2)); });
+    d.income.forEach(e => {
+      if (!e.symbol) return;
+      // Special dividends are keyed separately — a special and a regular payout of
+      // the same amount on the same day are two different dividends.
+      const k = e.date + '|' + String(e.symbol).toUpperCase() + '|' + (Number(e.gross) || 0).toFixed(2) + '|' + (/special/i.test(e.action || '') ? 'S' : '');
+      if (!map.has(k)) map.set(k, new Set());
+      map.get(k).add(e.accountId || '');
+    });
   });
-  return keys;
+  return map;
 }
 function analyzeDividendFile(store, rows, headers, filename) {
   const parser = BROKER_PARSERS.find(p => p.detect(headers));
@@ -4571,22 +4583,22 @@ function analyzeDividendFile(store, rows, headers, filename) {
     if (!explicit) d.reinvested = parsed.buys.some(b => b.symbol === d.symbol && daysBetweenISO(b.date, d.date) >= 0 && daysBetweenISO(b.date, d.date) <= 14);
     d.qualified = /non-?qual/i.test(d.action) ? 'Non-qualified' : /\bqual/i.test(d.action) ? 'Qualified' : '';
   });
-  // Flag duplicates: already recorded (DB) or repeated within the file. For
-  // in-file repeats, remember the first occurrence's spreadsheet row so the
-  // review can say exactly which two rows to compare.
-  const dbKeys = existingDividendKeys(store);
+  // Flag duplicates. DB matches are ACCOUNT-AWARE (resolved against the selected
+  // "record under" account at review time): the same payout under a different
+  // Clover account is a new entry, not a duplicate. In-file repeats compare the
+  // posted date AND the special-dividend flag — the same date+stock+amount can be
+  // two real payouts (two accounts at the broker, or a special on top of a
+  // regular dividend).
+  const dbMap = existingDividendAccountsByKey(store);
   const firstRowByKey = new Map();
   parsed.divs.forEach((d, i) => {
     d.uid = i;
-    const k = divKey(d);
-    // In-file repeats also compare the posted date: the same date+stock+amount with
-    // DIFFERENT posted dates is two real payouts (e.g. two accounts at the broker),
-    // not a duplicate — so those import without being flagged.
+    d.special = !!d.special || /special/i.test(d.action || '');
+    const k = divKey(d) + '|' + (d.special ? 'S' : '');
     const kf = k + '|' + (d.postedDate || '');
-    if (dbKeys.has(k)) d.dup = 'db';
-    else if (firstRowByKey.has(kf)) { d.dup = 'file'; d.dupRow = firstRowByKey.get(kf); }
-    else d.dup = '';
-    if (!firstRowByKey.has(kf)) firstRowByKey.set(kf, d.row);
+    d.dbAccts = dbMap.has(k) ? [...dbMap.get(k)] : null;
+    if (firstRowByKey.has(kf)) { d.dupFile = true; d.dupRow = firstRowByKey.get(kf); }
+    else firstRowByKey.set(kf, d.row);
   });
   return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
 }
@@ -4602,13 +4614,17 @@ function dividendReviewCard(store) {
 
   const optRow = el('div', 'io-actions');
   const acctSel = select([{ value: '', label: '— no account —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), st.accountId);
-  acctSel.addEventListener('change', () => { st.accountId = acctSel.value; });
+  acctSel.addEventListener('change', () => { st.accountId = acctSel.value; renderView(currentRoute); });
   optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
   card.appendChild(el('p', 'muted', 'This tags every imported dividend as belonging to one of YOUR Clover accounts (e.g. your brokerage account on the Accounts page). The broker’s file doesn’t say which internal account paid — if you keep more than one account at this broker, either import the whole file under one Clover account, or run the import twice with separate per-account exports if the broker offers them.'));
 
-  // Conflict review: choose merge (skip) or keep-as-separate per flagged row.
-  const flagged = st.divs.filter(d => d.dup);
+  // Conflict review — DB duplicates are judged against the CURRENTLY selected
+  // account, so switching "Record dividends under" re-evaluates them live.
+  const isDbDup = d => !!(d.dbAccts && d.dbAccts.includes(st.accountId || ''));
+  const crossAcct = st.divs.filter(d => d.dbAccts && !isDbDup(d)).length;
+  if (crossAcct) card.appendChild(el('p', 'muted', crossAcct + ' row' + (crossAcct === 1 ? ' matches' : 's match') + ' a dividend already recorded under a DIFFERENT account — treated as new payouts for this account, not duplicates.'));
+  const flagged = st.divs.filter(d => isDbDup(d) || d.dupFile);
   if (flagged.length) {
     card.appendChild(el('h3', 'strip-title', 'Needs review (' + flagged.length + ')'));
     card.appendChild(el('p', 'muted', 'Same date + stock + amount as an existing entry (or repeated in this file). “Merge” skips it; “Add as separate” imports it anyway (e.g. a genuine second payout).'));
@@ -4618,11 +4634,11 @@ function dividendReviewCard(store) {
       const left = el('div');
       const top = el('span');
       top.appendChild(document.createTextNode(fmtDate(d.date) + (d.postedDate && d.postedDate !== d.date ? ' (posted ' + fmtDate(d.postedDate) + ')' : '') + ' · ' + (d.symbol || '—') + ' · ' + money(d.amount) + ' — CSV row ' + d.row + ' '));
-      top.appendChild(badge(d.dup === 'db' ? 'already recorded' : 'duplicate in file', 'amber'));
+      top.appendChild(badge(isDbDup(d) ? 'already recorded' : 'duplicate in file', 'amber'));
       left.appendChild(top);
-      left.appendChild(el('div', 'acct-sub', d.dup === 'file'
-        ? 'Same date + stock + amount as CSV row ' + d.dupRow + ' (which will import) — open both rows in Excel to compare.'
-        : 'Matches a dividend already recorded in Clover for this date, stock, and amount.'));
+      left.appendChild(el('div', 'acct-sub', isDbDup(d)
+        ? 'Matches a dividend already recorded under this same account for this date, stock, and amount.'
+        : 'Same date + stock + amount as CSV row ' + d.dupRow + ' (which will import) — open both rows in Excel to compare.'));
       row.appendChild(left);
       const choice = select([{ value: 'skip', label: 'Merge (skip)' }, { value: 'add', label: 'Add as separate' }], st.choices[d.uid] || 'skip');
       choice.addEventListener('change', () => { st.choices[d.uid] = choice.value; renderView(currentRoute); });
@@ -4656,7 +4672,7 @@ function dividendReviewCard(store) {
     card.appendChild(feeRow);
   }
 
-  const importable = st.divs.filter(d => !d.dup || st.choices[d.uid] === 'add');
+  const importable = st.divs.filter(d => (!isDbDup(d) && !d.dupFile) || st.choices[d.uid] === 'add');
   const prevWrap = el('div', 'table-scroll');
   const pt = el('table', 'data-table');
   pt.innerHTML = '<thead><tr><th>Date</th><th>Symbol</th><th class="num">Amount</th><th>Type</th><th>Tags</th></tr></thead>';
@@ -4666,7 +4682,7 @@ function dividendReviewCard(store) {
     tr.appendChild(el('td', null, fmtDate(d.date)));
     tr.appendChild(el('td', 'strong', d.symbol || '—'));
     tr.appendChild(numCell(d.amount, true));
-    tr.appendChild(el('td', 'muted', d.qualified || '—'));
+    tr.appendChild(el('td', 'muted', [(d.special ? 'Special' : ''), (d.qualified || '')].filter(Boolean).join(' · ') || '—'));
     const tags = el('td'); if (d.reinvested) tags.appendChild(badge('↻ Reinvested', 'type')); tr.appendChild(tags);
     tb.appendChild(tr);
   });
