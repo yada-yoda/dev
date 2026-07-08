@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.52 — Columns button shares the filter row
+
+On Paychecks and Bills & Subscriptions, the ⚙ Columns button sat alone on
+its own row below the filters, wasting a strip of vertical space. It now
+sits on the same row as the filter dropdowns, kept to the right. Pages
+without a filter row (Accounts, Taxes, Selling, etc.) keep the button on
+its own right-aligned row as before.
+
 ### v1.0.51 — Recovered items lost to a usage-limit cutoff
 
 Three requests from earlier in the build got dropped when a session hit its

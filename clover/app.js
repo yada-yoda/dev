@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.51';
+const VERSION = '1.0.52';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1529,7 +1529,9 @@ function renderSubscriptions(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeRecurring(r.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
-  view.appendChild(tableTools(columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns')));
+  const subsColsBtn = columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns');
+  subsColsBtn.style.marginLeft = 'auto';   // share the filter row instead of its own row
+  bar.appendChild(subsColsBtn);
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, rows, subsSort, ns => { subsSort = ns || { key: 'monthly', dir: 'desc' }; renderView(currentRoute); }, r => isSubActive(r) ? '' : 'inactive-row'));
   view.appendChild(card);
@@ -2272,7 +2274,8 @@ function renderPaychecks(view) {
   ];
   const pcColsBtn = el('button', 'btn-ghost', '⚙ Columns');
   pcColsBtn.addEventListener('click', () => paycheckColumnsModal());
-  view.appendChild(tableTools(pcColsBtn));
+  pcColsBtn.style.marginLeft = 'auto';   // share the filter row instead of its own row
+  bar.appendChild(pcColsBtn);
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(showSel ? cols : cols.slice(1), rows, paycheckSort, ns => { paycheckSort = ns || { key: 'payDate', dir: 'desc' }; renderView(currentRoute); }, p => p.__expected ? 'inactive-row expected-row' : (isPaycheckPaid(p) ? '' : 'inactive-row')));
   view.appendChild(card);
