@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.42';
+const VERSION = '1.0.43';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -272,6 +272,7 @@ function yearTabs(store, section) {
     const has = section === 'income' ? (d.income.length || d.paychecks.length)
       : section === 'expenses' ? d.expensePayments.length
       : section === 'selling' ? ((d.sales || []).length)
+      : section === 'reports' ? (d.income.length || d.paychecks.length || d.expensePayments.length || (d.sales || []).length)
       : d.paychecks.length;
     if (has) years.push(y);
   }
@@ -3222,14 +3223,16 @@ function dashTaxesBody(ctx) {
   card.appendChild(list);
   return card;
 }
-function dashPanelState(store) {
-  const saved = store.state.settings.dashPanels;
+function pagePanelState(store, pageKey, defs) {
+  const pp = store.state.settings.pagePanels || {};
+  const saved = pageKey === 'dashboard' ? (pp.dashboard || store.state.settings.dashPanels) : pp[pageKey];
   if (Array.isArray(saved) && saved.length) {
-    const known = saved.filter(p => DASH_PANEL_DEFS.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c }));
+    const known = saved.filter(p => defs.some(d => d.key === p.k)).map(p => ({ k: p.k, c: !!p.c }));
     if (known.length) return known;
   }
-  return DASH_PANEL_DEFS.map(d => ({ k: d.key, c: false }));
+  return defs.map(d => ({ k: d.key, c: false }));
 }
+function dashPanelState(store) { return pagePanelState(store, 'dashboard', DASH_PANEL_DEFS); }
 function dashKpisBody(ctx) {
   const kpis = el('div', 'sub-summary');
   kpis.appendChild(kpiCard('Income · ' + ctx.monthName, money(ctx.incThisMonth), 'income'));
@@ -3264,10 +3267,12 @@ function dashIncomeMixBody(ctx) {
   card.appendChild(el('div', 'sum-hint', 'How much of this year’s income comes from interest, dividends, and investments — as a share of gross and of take-home (net) income.'));
   return card;
 }
-function dashPanel(store, def, entry, state, ctx) {
+function dashPanel(store, def, entry, state, ctx, opts) {
+  const unlocked = opts ? opts.unlocked : dashUnlocked;
+  const save = opts ? opts.save : (arr => store.setDashPanels(arr));
   const panel = el('div', 'dash-panel' + (def.span2 ? ' span2' : ''));
   const head = el('div', 'dash-panel-head');
-  if (dashUnlocked) {
+  if (unlocked) {
     panel.draggable = true;
     head.appendChild(el('span', 'dph-drag', '⠿'));
     panel.addEventListener('dragstart', () => { dashDragKey = def.key; panel.classList.add('dragging'); });
@@ -3279,17 +3284,17 @@ function dashPanel(store, def, entry, state, ctx) {
       const v = state.slice();
       const from = v.findIndex(p => p.k === dashDragKey), to = v.findIndex(p => p.k === def.key);
       const moved = v.splice(from, 1)[0]; v.splice(to, 0, moved);
-      store.setDashPanels(v);
+      save(v);
     });
   }
   head.appendChild(el('h3', 'dph-title', def.title));
   head.appendChild(el('span', 'dph-caret', entry.c ? '▸' : '▾'));
-  if (dashUnlocked) {
+  if (unlocked) {
     const x = el('button', 'dph-x', '✕'); x.title = 'Remove this panel';
-    x.addEventListener('click', ev => { ev.stopPropagation(); store.setDashPanels(state.filter(p => p.k !== def.key)); });
+    x.addEventListener('click', ev => { ev.stopPropagation(); save(state.filter(p => p.k !== def.key)); });
     head.appendChild(x);
   }
-  head.addEventListener('click', () => { entry.c = !entry.c; store.setDashPanels(state); });
+  head.addEventListener('click', () => { entry.c = !entry.c; save(state); });
   panel.appendChild(head);
   if (!entry.c) { const body = el('div', 'dash-panel-body'); body.appendChild(def.build(ctx)); panel.appendChild(body); }
   return panel;
@@ -3811,6 +3816,22 @@ function taxModal(existing, preset) {
   });
 }
 
+let reportsUnlocked = false;
+function reportBody(builder) {
+  const card = el('div', 'card');
+  const wrap = el('div', 'report-chart'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
+  builder(cv);
+  return card;
+}
+const REPORT_PANEL_DEFS = [
+  { key: 'incExp', title: 'Income vs Expenses', build: ctx => reportBody(cv => buildBarChart(cv, { labels: MONTHS, datasets: [ { label: 'Income', data: ctx.inc, backgroundColor: '#16a34a' }, { label: 'Expenses', data: ctx.exp, backgroundColor: '#dc2626' } ] })) },
+  { key: 'cashflow', title: 'Net cashflow by month', build: ctx => reportBody(cv => buildBarChart(cv, { labels: MONTHS, datasets: [{ label: 'Net', data: ctx.net, backgroundColor: ctx.net.map(v => v >= 0 ? '#16a34a' : '#dc2626') }] })) },
+  { key: 'wages', title: 'Wages: gross vs net', build: ctx => reportBody(cv => buildBarChart(cv, { labels: MONTHS, datasets: [ { label: 'Gross', data: ctx.wGross, backgroundColor: '#2563eb' }, { label: 'Net', data: ctx.wNet, backgroundColor: '#16a34a' } ] })) },
+  { key: 'incCat', title: 'Income by category', build: ctx => reportBody(cv => doughnutInto(cv, incomeByCategory(ctx.store, ctx.data))) },
+  { key: 'expCat', title: 'Expenses by category', build: ctx => reportBody(cv => doughnutInto(cv, expenseByCategoryFull(ctx.store, ctx.data))) },
+  { key: 'expMethod', title: 'Expenses by payment method', build: ctx => reportBody(cv => doughnutInto(cv, expenseByAccount(ctx.store, ctx.data))) },
+  { key: 'yoy', title: 'Year overview', span2: true, build: ctx => { const c = yoyOverview(ctx.store); const t = c.querySelector('.strip-title'); if (t) t.remove(); return c; } }
+];
 function renderReports(view) {
   destroyCharts();
   const store = window.cloverStore;
@@ -3820,38 +3841,37 @@ function renderReports(view) {
   const head = el('div', 'view-head');
   const left = el('div');
   left.appendChild(el('h3', null, 'Reports · ' + activeYear));
-  left.appendChild(el('p', 'muted', 'Charts follow the year selector in the top bar'));
+  left.appendChild(el('p', 'muted', 'Charts follow the selected year'));
   head.appendChild(left);
+  const lockBtn = el('button', 'btn-ghost', reportsUnlocked ? '✓ Done editing' : '✎ Edit layout');
+  lockBtn.title = reportsUnlocked ? 'Lock the layout' : 'Unlock to reorder, remove, or add report panels';
+  lockBtn.addEventListener('click', () => { reportsUnlocked = !reportsUnlocked; renderView(currentRoute); });
+  head.appendChild(lockBtn);
   view.appendChild(head);
+  const yt = yearTabs(store, 'reports'); if (yt) view.appendChild(yt);
 
   const inc = monthlyIncomeTotals(store, data);
   const exp = monthlyExpenseTotals(store, data, true);
-  const net = inc.map((v, i) => v - exp[i]);
-  const wGross = wageMonthly(data, 'gross');
-  const wNet = wageMonthly(data, 'net');
+  const ctx = { store, data, inc, exp, net: inc.map((v, i) => v - exp[i]), wGross: wageMonthly(data, 'gross'), wNet: wageMonthly(data, 'net') };
 
-  const gallery = el('div', 'report-gallery');
-  gallery.appendChild(reportCard('Income vs Expenses', cv => buildBarChart(cv, {
-    labels: MONTHS, datasets: [
-      { label: 'Income', data: inc, backgroundColor: '#16a34a' },
-      { label: 'Expenses', data: exp, backgroundColor: '#dc2626' }
-    ]
-  })));
-  gallery.appendChild(reportCard('Net cashflow by month', cv => buildBarChart(cv, {
-    labels: MONTHS, datasets: [{ label: 'Net', data: net, backgroundColor: net.map(v => v >= 0 ? '#16a34a' : '#dc2626') }]
-  })));
-  gallery.appendChild(reportCard('Wages: gross vs net', cv => buildBarChart(cv, {
-    labels: MONTHS, datasets: [
-      { label: 'Gross', data: wGross, backgroundColor: '#2563eb' },
-      { label: 'Net', data: wNet, backgroundColor: '#16a34a' }
-    ]
-  })));
-  gallery.appendChild(reportCard('Income by category', cv => doughnutInto(cv, incomeByCategory(store, data))));
-  gallery.appendChild(reportCard('Expenses by category', cv => doughnutInto(cv, expenseByCategoryFull(store, data))));
-  gallery.appendChild(reportCard('Expenses by payment method', cv => doughnutInto(cv, expenseByAccount(store, data))));
-  view.appendChild(gallery);
-
-  view.appendChild(yoyOverview(store));
+  const state = pagePanelState(store, 'reports', REPORT_PANEL_DEFS);
+  const opts = { unlocked: reportsUnlocked, save: arr => store.setPagePanels('reports', arr) };
+  if (reportsUnlocked) {
+    const addRow = el('div', 'dash-add-row');
+    addRow.appendChild(el('span', 'muted', 'Drag panels to reorder · ✕ removes · click a header to collapse.'));
+    REPORT_PANEL_DEFS.filter(d => !state.some(px => px.k === d.key)).forEach(d => {
+      const b = el('button', 'btn-ghost', '＋ ' + d.title);
+      b.addEventListener('click', () => store.setPagePanels('reports', state.concat([{ k: d.key, c: false }])));
+      addRow.appendChild(b);
+    });
+    view.appendChild(addRow);
+  }
+  const grid = el('div', 'dash-panels');
+  state.forEach(entry => {
+    const def = REPORT_PANEL_DEFS.find(d => d.key === entry.k); if (!def) return;
+    grid.appendChild(dashPanel(store, def, entry, state, ctx, opts));
+  });
+  view.appendChild(grid);
 }
 
 function yearSummary(store, y) {

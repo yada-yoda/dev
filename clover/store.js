@@ -66,7 +66,8 @@ function defaults() {
       accountDefaults: { active: true, usedForIncome: false, usedForExpenses: false, usedForAutopay: false, rewardsCard: false },
       paycheckCols: null,  // legacy (pre-1.0.24) paycheck column list
       tableCols: {},       // per-table ordered visible-column lists, keyed by table
-      dashPanels: null     // dashboard panel order/visibility [{k, c}] (null = default)
+      dashPanels: null,    // legacy dashboard panel layout [{k, c}]
+      pagePanels: {}       // per-page panel layouts { pageKey: [{k, c}] }
     },
     // The "self" person is renamed at runtime to "Me (<Google first name>)" —
     // the real name is never hard-coded here (public repo); it comes from the
@@ -239,6 +240,11 @@ window.cloverStore = {
     scheduleSave(); notify();
   },
   setDashPanels(arr) { state.settings.dashPanels = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0 })) : null; scheduleSave(); notify(); },
+  setPagePanels(pageKey, arr) {
+    if (!state.settings.pagePanels) state.settings.pagePanels = {};
+    state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0 })) : null;
+    scheduleSave(); notify();
+  },
 
   // --- recurring / subscriptions ---
   saveRecurring(item) {

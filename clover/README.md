@@ -45,6 +45,11 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.43 — Reports: year tabs + customizable panels
+- Reports now has **year tabs** (like Paychecks) and the same **✎ Edit layout** panel
+  system as the dashboard — drag to reorder, remove/add report panels, collapse by
+  header. Layout saved per account.
+
 ### v1.0.42 — Raises: CSV, inflation comparison, employer profiles
 - Raises can be **imported/exported via CSV** (template included).
 - With 3+ raises at an employer, a **YoY vs inflation** table shows each raise's %,
