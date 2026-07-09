@@ -230,7 +230,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.51.0';
+const APP_VERSION = 'v0.51.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3469,12 +3469,15 @@ function trendControlsHTML(){
     + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'
     + spanLine;
 }
-// Resolve trendRange to a day count — 'all' spans from the earliest logged entry to today.
+// Resolve trendRange to a day count — 'all' spans from the first entry OF THE CHARTED METRIC to
+// today (so e.g. the walk trend starts at your first walk, not an earlier weigh-in or feeding).
 function trendSpanDays(){
   if(trendRange!=='all') return +trendRange;
-  const times = [...petLogs('feed'),...petLogs('potty'),...petLogs('walk'),...petLogs('weight')].map(l=>new Date(l.dateTime).getTime()).filter(t=>!isNaN(t));
-  if(!times.length) return 7;
-  return Math.max(7, Math.floor((Date.now()-Math.min(...times))/86400000)+1);
+  const type = trendMetric==='feeding' ? 'feed' : (trendMetric==='walkdist' ? 'walk' : trendMetric);
+  const dates = petLogs(type).map(l=>(l.dateTime||'').slice(0,10)).filter(Boolean).sort();
+  if(!dates.length) return 7;
+  const d = daysBetween(dates[0], todayISO());
+  return Math.max(7, (d==null?0:d) + 1); // inclusive of the first entry's day
 }
 function setTrend(kind, val){
   if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=(val==='all'?'all':+val);

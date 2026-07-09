@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.51.0**
+**Current Version: v0.51.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.51.1** — **Fixed Trends "Lifetime" start date** — Lifetime now spans from the first entry of
+  the metric you're charting (e.g. the walk trend starts at your first walk), instead of the
+  earliest of *any* activity — so it no longer began weeks early on an unrelated weigh-in or feeding.
+  Also fixed a 1-day rounding issue that could clip the earliest entry off the chart.
 - **v0.51.0** — **Lifetime range + date spans on Insights** — every range selector (Spending, Potty
   breakdown, and the Trends chart) now has a **Lifetime** option for all-time data, and shows the
   exact **date span** (from → to) of the selected range underneath — so it's always clear what
