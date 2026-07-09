@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.66 — Clickable Priority / Status / Flags filters with live stat cards
+
+- The Priority, Status, and Flags badges on Bills & Subscriptions are now
+  clickable, like the colored Category/Frequency/Account tags — click
+  "Essential", "Trial", or "Auto-pay" to show only those bills (click
+  again or hit ✕ Clear filter to undo).
+- The stat cards now follow whatever the table is showing: filter to
+  Essential and Total monthly / Total annual / Left after subs / % of net
+  income all recompute from just the displayed (active) bills, with a
+  "filtered view" note so a narrowed total is never mistaken for the full
+  picture.
+
 ### v1.0.65 — Employment type on raises
 
 Each raise can now state the employment type as of that pay change —

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.65';
+const VERSION = '1.0.66';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1439,6 +1439,29 @@ function trendIcon(sub) {
   const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
 }
 
+// The flag labels a bill carries (must mirror the Flags column cell).
+function subFlags(r) {
+  const out = [];
+  if (!isSubActive(r)) out.push(r.status || 'Inactive');
+  else if (r.status === 'Trial') out.push('Trial');
+  if (r.autoPay) out.push('Auto-pay');
+  if (r.priority && r.priority !== 'Medium') out.push(r.priority);
+  return out;
+}
+// A tone badge (Essential red, Trial amber, …) that filters the subs table
+// to its value on click — same toggle/chip behavior as the colored value tags.
+function subsFilterBadge(colKey, text, tone) {
+  const b = badge(text, tone);
+  b.style.cursor = 'pointer';
+  b.title = 'Click to show only “' + text + '”';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const cur = subsBadgeFilter;
+    subsBadgeFilter = (cur && cur.key === colKey && cur.value === text) ? null : { key: colKey, value: text };
+    renderView(currentRoute);
+  });
+  return b;
+}
 const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
 const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'apr', 'flags', 'notes'];
 const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
@@ -1464,18 +1487,18 @@ function buildSubsCol(store, key, net) {
     case 'subcategory': return { label: 'Subcategory', key: 'subcategory', value: r => store.subName('expense', r.categoryId, r.subId) || '', cell: r => { const td = el('td'); const n = store.subName('expense', r.categoryId, r.subId); td.appendChild(valueBadge('subs', 'subcategory', n && n !== '—' ? n : '')); return td; } };
     case 'vendor': return { label: 'Vendor', key: 'vendor', value: r => r.vendor || '', cell: r => el('td', 'muted', r.vendor || '—') };
     case 'backupAccount': return { label: 'Backup account', key: 'backupAccount', value: r => store.accountName(r.backupAccountId) || '', cell: r => el('td', 'muted', store.accountName(r.backupAccountId) || '—') };
-    case 'priority': return { label: 'Priority', key: 'priority', value: r => r.priority || '', cell: r => { const td = el('td'); if (!r.priority) { td.textContent = '—'; return td; } td.appendChild(badge(r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : '')); return td; } };
-    case 'status': return { label: 'Status', key: 'status', value: r => r.status || 'Active', cell: r => { const td = el('td'); const st = r.status || 'Active'; td.appendChild(badge(st, isSubActive(r) ? (st === 'Trial' ? 'amber' : 'green') : 'red')); return td; } };
+    case 'priority': return { label: 'Priority', key: 'priority', value: r => r.priority || '', cell: r => { const td = el('td'); if (!r.priority) { td.textContent = '—'; return td; } td.appendChild(subsFilterBadge('priority', r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : '')); return td; } };
+    case 'status': return { label: 'Status', key: 'status', value: r => r.status || 'Active', cell: r => { const td = el('td'); const st = r.status || 'Active'; td.appendChild(subsFilterBadge('status', st, isSubActive(r) ? (st === 'Trial' ? 'amber' : 'green') : 'red')); return td; } };
     case 'links': return { label: 'Links', key: 'links', sortable: false, value: () => '', cell: r => { const td = el('td'); const mk = (url, txt) => { const a = el('a', null, txt); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.marginRight = '8px'; td.appendChild(a); }; if (r.url) mk(r.url, 'Site ↗'); if (r.payUrl) mk(r.payUrl, 'Pay ↗'); if (!r.url && !r.payUrl) td.textContent = '—'; return td; } };
     case 'customerNo': return { label: 'Customer #', key: 'customerNo', value: r => r.customerNo || '', cell: r => { const td = el('td'); if (!r.customerNo) { td.textContent = '—'; return td; } const full = String(r.customerNo); const masked = '•••• ' + full.slice(-4); const span = el('span', null, masked); span.title = 'Click to reveal'; span.style.cursor = 'pointer'; let shown = false; span.addEventListener('click', ev => { ev.stopPropagation(); shown = !shown; span.textContent = shown ? full : masked; span.title = shown ? 'Click to hide' : 'Click to reveal'; }); td.appendChild(span); return td; } };
     case 'apr': return { label: 'APR %', key: 'apr', num: true, value: r => r.apr != null ? Number(r.apr) : -1, cell: r => el('td', 'num', (r.apr != null && r.apr !== '') ? (Number(r.apr).toFixed(2) + '%') : '—') };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
-        if (!isSubActive(r)) flags.appendChild(badge(r.status || 'Inactive', 'red'));
-        else if (r.status === 'Trial') flags.appendChild(badge('Trial', 'amber'));
-        if (r.autoPay) flags.appendChild(badge('Auto-pay', 'amber'));
-        if (r.priority && r.priority !== 'Medium') flags.appendChild(badge(r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
+        if (!isSubActive(r)) flags.appendChild(subsFilterBadge('flags', r.status || 'Inactive', 'red'));
+        else if (r.status === 'Trial') flags.appendChild(subsFilterBadge('flags', 'Trial', 'amber'));
+        if (r.autoPay) flags.appendChild(subsFilterBadge('flags', 'Auto-pay', 'amber'));
+        if (r.priority && r.priority !== 'Medium') flags.appendChild(subsFilterBadge('flags', r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
         td.appendChild(flags); return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
@@ -1487,8 +1510,30 @@ function renderSubscriptions(view) {
   const store = window.cloverStore, s = store.state;
   const all = s.recurring;
   const active = all.filter(isSubActive);
-  const totalMonthly = active.reduce((sum, r) => sum + monthlyEquiv(r), 0);
-  const totalAnnual = active.reduce((sum, r) => sum + annualCost(r), 0);
+  // Filters run FIRST so the stat cards reflect what's actually displayed.
+  let rows = all.slice();
+  if (subsStatusFilter === 'active') rows = rows.filter(isSubActive);
+  if (subsCatFilter !== 'all') rows = rows.filter(r => r.categoryId === subsCatFilter);
+  let chipBar = null;
+  if (subsBadgeFilter) {
+    const f = subsBadgeFilter;
+    const valOf = r => f.key === 'category' ? store.expenseGroupName(r.categoryId)
+      : f.key === 'subcategory' ? (store.subName('expense', r.categoryId, r.subId) || '')
+      : f.key === 'frequency' ? freqLabel(r)
+      : f.key === 'account' ? (store.accountName(r.accountId) || '')
+      : f.key === 'priority' ? (r.priority || '')
+      : f.key === 'status' ? (r.status || 'Active') : '';
+    rows = rows.filter(r => f.key === 'flags' ? subFlags(r).includes(f.value) : valOf(r) === f.value);
+    chipBar = el('div', 'filter-bar');
+    chipBar.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (f.key === 'flags' ? 'flagged' : f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { subsBadgeFilter = null; renderView(currentRoute); });
+    chipBar.appendChild(clear);
+  }
+  const narrowed = !!(subsBadgeFilter || subsCatFilter !== 'all');
+  const shownActive = rows.filter(isSubActive);
+  const totalMonthly = shownActive.reduce((sum, r) => sum + monthlyEquiv(r), 0);
+  const totalAnnual = shownActive.reduce((sum, r) => sum + annualCost(r), 0);
   const autoNet = avgNetMonthlyIncome(store);   // null while a year doc loads
   const net = autoNet || 0;
 
@@ -1510,12 +1555,13 @@ function renderSubscriptions(view) {
   netCard.appendChild(el('div', 'sum-value income', autoNet == null ? '…' : (net > 0 ? money(net) : '–')));
   netCard.appendChild(el('div', 'sum-hint', 'net pay ÷ 12 (annualized)'));
   sum.appendChild(netCard);
-  sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense'));
-  sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense'));
+  const fHint = narrowed ? 'filtered view — active rows shown below' : undefined;
+  sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense', fHint));
+  sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense', fHint));
   if (net > 0) {
     const unalloc = net - totalMonthly;
-    sum.appendChild(sumCard('Left after subs', money(unalloc), unalloc < 0 ? 'expense' : 'income'));
-    sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral'));
+    sum.appendChild(sumCard('Left after subs', money(unalloc), unalloc < 0 ? 'expense' : 'income', fHint));
+    sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral', fHint));
   }
   view.appendChild(sum);
 
@@ -1527,24 +1573,7 @@ function renderSubscriptions(view) {
   catSel.addEventListener('change', () => { subsCatFilter = catSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Category', catSel));
   view.appendChild(bar);
-
-  let rows = all.slice();
-  if (subsStatusFilter === 'active') rows = rows.filter(isSubActive);
-  if (subsCatFilter !== 'all') rows = rows.filter(r => r.categoryId === subsCatFilter);
-  if (subsBadgeFilter) {
-    const f = subsBadgeFilter;
-    const valOf = r => f.key === 'category' ? store.expenseGroupName(r.categoryId)
-      : f.key === 'subcategory' ? (store.subName('expense', r.categoryId, r.subId) || '')
-      : f.key === 'frequency' ? freqLabel(r)
-      : f.key === 'account' ? (store.accountName(r.accountId) || '') : '';
-    rows = rows.filter(r => valOf(r) === f.value);
-    const fb = el('div', 'filter-bar');
-    fb.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (f.key === 'freq' ? 'frequency' : f.key) + ' = “' + f.value + '”'));
-    const clear = el('button', 'btn-ghost', '✕ Clear filter');
-    clear.addEventListener('click', () => { subsBadgeFilter = null; renderView(currentRoute); });
-    fb.appendChild(clear);
-    view.appendChild(fb);
-  }
+  if (chipBar) view.appendChild(chipBar);
 
   if (!rows.length) {
     view.appendChild(emptyState('No subscriptions yet',
