@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.62 — Source drill-downs on Expenses (and Income's Other) + projected income panel
+
+- **Expense categories now show where the money came from.** Expanding a
+  category adds one row per source account under the existing subcategory
+  rows — e.g. Investments → a row per brokerage the fees were charged to.
+- **Drill-down rows are a shade lighter** (label and numbers) so it's clear
+  they're detail that's already counted in the rows above — applied to the
+  new expense source rows and the income grid's source breakdowns
+  (Rewards / Interest / Dividends).
+- **Income's "Other" category breaks down by source too** — one row per
+  type/description (Lawsuit, Gift, Rebate, a case name…), like Rewards and
+  Interest already did.
+- **New dashboard panel: 📈 Projected annual income** — projected gross and
+  net for the year, from the average of the months elapsed so far (avg / mo
+  × 12). It appears at the end of your dashboard automatically; drag it
+  where you want it.
+
 ### v1.0.61 — Broker-import fees on by default
 
 "Import these fees as expenses" is now ticked by default (untick to leave

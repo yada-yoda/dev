@@ -448,6 +448,9 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
+/* Source drill-down rows: a shade lighter — already counted in the rows above. */
+.grid-table .drill-row td { color: var(--text-faint); }
+.grid-table tr.sub-row.drill-row td.sub-name { color: var(--text-faint); }
 .trend { font-size: 10px; margin-left: 1px; vertical-align: middle; }
 .rec-mark { font-size: 10px; color: var(--text-faint); margin-left: 3px; }
 /* Decision dropdowns still on their empty default — don't let them get missed. */

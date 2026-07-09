@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.61';
+const VERSION = '1.0.62';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1066,18 +1066,21 @@ function incomeGrid(data) {
       () => { open ? expandedIncomeGroups.delete(g.id) : expandedIncomeGroups.add(g.id); renderView(currentRoute); },
       open ? '▾' : '▸'));
     if (open) {
-      const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name), dividendCat = /dividend/i.test(g.name);
-      if (rewardCat || interestCat || dividendCat) {
-        // Break the group down by reward source (Rewards), bank (Interest), or
-        // account→broker (Dividends: each M1 account and Schwab on its own row).
+      const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name), dividendCat = /dividend/i.test(g.name), otherCat = /other/i.test(g.name);
+      if (rewardCat || interestCat || dividendCat || otherCat) {
+        // Break the group down by reward source (Rewards), bank (Interest),
+        // account→broker (Dividends: each M1 account and Schwab on its own
+        // row), or what it was (Other: lawsuit/gift/rebate + description).
         const keyOf = rewardCat
           ? (e => (e.rewardSource || '').trim() || '(unspecified)')
           : dividendCat
           ? (e => store.accountName(e.accountId) || (e.receivedVia || '').trim() || '(no account)')
+          : otherCat
+          ? (e => (e.otherType || '').trim() || (e.description || '').trim() || '(unspecified)')
           : (e => store.accountName(e.accountId) || (e.notes || '').trim() || '(unspecified)');
         const byKey = new Map();
         gEntries.forEach(e => { const k = keyOf(e); if (!byKey.has(k)) byKey.set(k, []); byKey.get(k).push(e); });
-        [...byKey.keys()].sort((a, b) => a.localeCompare(b)).forEach(k => tb.appendChild(addRow('sub-row', k, monthsFor(byKey.get(k)))));
+        [...byKey.keys()].sort((a, b) => a.localeCompare(b)).forEach(k => tb.appendChild(addRow('sub-row drill-row', k, monthsFor(byKey.get(k)))));
       } else {
         g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
         const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
@@ -1863,6 +1866,16 @@ function expenseGrid(data) {
       if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
       const recNone = recBy ? recBy.none : new Array(12).fill(0);
       if (recNone.some(v => v > 0)) tb.appendChild(addRow('sub-row', '↻ Recurring bills (no subcategory)', recNone, null, null, recNone.map(v => v > 0)));
+      // Where the logged money actually came from — one row per source account
+      // (lighter shade: these amounts are already counted in the rows above).
+      if (gEntries.length) {
+        const srcKey = e => store.accountName(e.accountId) || '(no account)';
+        const bySrc = new Map();
+        gEntries.forEach(e => { const k = srcKey(e); if (!bySrc.has(k)) bySrc.set(k, []); bySrc.get(k).push(e); });
+        const keys = [...bySrc.keys()].sort((a, b) => a.localeCompare(b));
+        if (keys.length > 1 || keys[0] !== '(no account)')
+          keys.forEach(k => tb.appendChild(addRow('sub-row drill-row', '↳ ' + k, monthsFor(bySrc.get(k)))));
+      }
     }
   });
 
@@ -3414,7 +3427,15 @@ const DASH_PANEL_DEFS = [
   { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
   { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) },
   { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) },
-  { key: 'bestCard', title: '💳 Best card to use today', build: ctx => bestCardCallout(ctx.store) || el('div', 'card muted', 'Add credit cards with statement close + due days (on the Accounts page) to see which card gives a purchase the longest float.') }
+  { key: 'bestCard', title: '💳 Best card to use today', build: ctx => bestCardCallout(ctx.store) || el('div', 'card muted', 'Add credit cards with statement close + due days (on the Accounts page) to see which card gives a purchase the longest float.') },
+  { key: 'projIncome', title: '📈 Projected annual income', build: ctx => {
+      const wrap = el('div', 'sub-summary');
+      const me = ctx.monthsElapsed > 0 ? ctx.monthsElapsed : 1;
+      const avgG = ctx.incYTD / me, avgN = ctx.netYTD / me;
+      wrap.appendChild(kpiCard('Projected gross / yr', money(avgG * 12), 'income', 'avg ' + money(avgG) + ' / mo so far × 12'));
+      wrap.appendChild(kpiCard('Projected net / yr', money(avgN * 12), 'income', 'avg ' + money(avgN) + ' / mo take-home × 12'));
+      return wrap;
+    } }
 ];
 // Last filed year's net outcome + lifetime refund/paid totals from Tax history.
 function dashTaxesBody(ctx) {
@@ -3566,7 +3587,7 @@ function renderDashboard(view) {
   const incomeBasis = (autoNet && autoNet > 0) ? autoNet : (monthsElapsed > 0 ? netYTD / monthsElapsed : incNetThisMonth);
   const shouldLeft = incomeBasis - recurringMonthly - avgSpend;
 
-  const ctx = { store, s, data, monthName, incThisMonth, spendThisMonth, recurringMonthly, recurringAnnual, netThisMonth, shouldLeft, projAnnualIncome, projAnnualExpense, incYTD, netYTD };
+  const ctx = { store, s, data, monthName, incThisMonth, spendThisMonth, recurringMonthly, recurringAnnual, netThisMonth, shouldLeft, projAnnualIncome, projAnnualExpense, incYTD, netYTD, monthsElapsed };
 
   const head = el('div', 'view-head');
   const left = el('div'); left.appendChild(el('h3', null, 'Dashboard'));
