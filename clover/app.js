@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.57';
+const VERSION = '1.0.58';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -535,6 +535,8 @@ function renderSettings(view) {
     { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id), onRename: (id, v) => store.renameCatalog('rewardPrograms', id, v) }));
   grid.appendChild(simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
     { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
+  grid.appendChild(simpleListCard('Tax forms', 'Form names offered in the tax-history pickers — update here if the IRS changes things (see irs.gov/forms-instructions-and-publications)', s.catalog.taxForms || [],
+    { addLabel: 'Add tax form', onAdd: v => store.addCatalog('taxForms', v), onRemove: id => store.removeCatalog('taxForms', id), onRename: (id, v) => store.renameCatalog('taxForms', id, v) }));
   grid.appendChild(paySchedulesCard());
   grid.appendChild(accountDefaultsCard());
   grid.appendChild(yearsCard());
@@ -3629,6 +3631,8 @@ function incomeByNamedCategory(store, data, re) {
 // Tax history — per-year filings, amendments, extensions
 // ============================================================
 const FED_FORMS = ['1040', '1040-SR', '1040-NR', '1040-X'];
+// User-editable form list from Settings → Tax forms (catalog.taxForms).
+const catalogTaxForms = s => ((s.catalog && s.catalog.taxForms) || []).map(f => f.name).filter(Boolean);
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'];
 const NO_INCOME_TAX_STATES = ['AK','FL','NV','SD','TN','TX','WA','WY'];
 // Primary state return forms (best-known); anything not listed falls back to
@@ -3964,7 +3968,7 @@ function taxModal(existing, preset) {
   const body = el('div', 'form-grid');
 
   const fedList = el('datalist'); fedList.id = 'fed-form-list';
-  [...new Set(FED_FORMS.concat(s.taxRecords.map(x => x.fedForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; fedList.appendChild(o); });
+  [...new Set(catalogTaxForms(s).concat(FED_FORMS).concat(s.taxRecords.map(x => x.fedForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; fedList.appendChild(o); });
   body.appendChild(fedList);
   const usList = el('datalist'); usList.id = 'us-states-list';
   US_STATES.forEach(x => { const o = el('option'); o.value = x; usList.appendChild(o); });
@@ -3972,7 +3976,7 @@ function taxModal(existing, preset) {
   const stList = el('datalist'); stList.id = 'state-form-list';
   const rebuildStateForms = st => {
     stList.innerHTML = '';
-    [...new Set(stateFormSuggestions(st).concat(s.taxRecords.map(x => x.stateForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; stList.appendChild(o); });
+    [...new Set(stateFormSuggestions(st).concat(catalogTaxForms(s)).concat(s.taxRecords.map(x => x.stateForm).filter(Boolean)))].forEach(f => { const o = el('option'); o.value = f; stList.appendChild(o); });
   };
   body.appendChild(stList);
   const cpaList = el('datalist'); cpaList.id = 'cpa-list';
@@ -4010,7 +4014,7 @@ function taxModal(existing, preset) {
   // they break it out. Kept separate from the total prep cost (which may already
   // include these).
   const allFormsList = el('datalist'); allFormsList.id = 'tax-form-all-list';
-  [...new Set(FED_FORMS.concat(Object.keys(TAX_FORM_INFO)).concat(s.taxRecords.flatMap(x => (x.formCosts || []).map(f => f.form))).filter(Boolean))].forEach(f => { const o = el('option'); o.value = f; allFormsList.appendChild(o); });
+  [...new Set(catalogTaxForms(s).concat(FED_FORMS).concat(Object.keys(TAX_FORM_INFO)).concat(s.taxRecords.flatMap(x => (x.formCosts || []).map(f => f.form))).filter(Boolean))].forEach(f => { const o = el('option'); o.value = f; allFormsList.appendChild(o); });
   body.appendChild(allFormsList);
   let formCosts = Array.isArray(r.formCosts) ? r.formCosts.map(x => ({ form: x.form || '', cost: x.cost })) : [];
   const fcWrap = el('div');

@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.58 — Money Market & Cash / Sweep account types + editable tax-forms list
+
+- **Two new account types**: Money Market and Cash / Sweep — for things
+  like a broker's insured money market that holds your uninvested cash.
+- **Tax forms are now a managed list.** Settings → Tax forms holds the form
+  names offered by every tax-history picker (federal form, state form, and
+  itemized form costs). It ships seeded with common federal forms and you
+  can add, rename, or remove entries if the IRS changes things — see
+  irs.gov/forms-instructions-and-publications for the official catalog.
+
 ### v1.0.57 — Ameriprise activity import (dividends, money-market interest, fees)
 
 The broker import now recognizes Ameriprise portfolio-activity CSVs

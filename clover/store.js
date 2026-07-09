@@ -59,8 +59,8 @@ const SEED_EXPENSE_GROUPS = [
 ];
 
 export const ACCOUNT_TYPES = [
-  'Checking', 'Savings', 'CD', 'Credit Card', 'Brokerage',
-  'Retirement', 'Cash App / Payment', 'Other'
+  'Checking', 'Savings', 'Money Market', 'CD', 'Credit Card', 'Brokerage',
+  'Cash / Sweep', 'Retirement', 'Cash App / Payment', 'Other'
 ];
 
 // One-time additive migration for accounts created before v1.0.50's seed
@@ -92,6 +92,11 @@ function seedGroups(items) {
     return { id: mkId('cat'), name, order: i, subs };
   });
 }
+const SEED_TAX_FORMS = [
+  '1040', '1040-SR', '1040-NR', '1040-X', 'Schedule 1', 'Schedule 2', 'Schedule 3',
+  'Schedule A', 'Schedule B', 'Schedule C', 'Schedule D', 'Schedule E', 'Schedule SE',
+  'Form 8949', 'Form 8889', 'Form 2441', 'Form 8863'
+];
 function seedList(names) {
   return names.map(name => ({ id: mkId('item'), name }));
 }
@@ -124,7 +129,10 @@ function defaults() {
     catalog: {
       institutions: seedList(SEED_INSTITUTIONS),
       rewardPrograms: seedList(SEED_REWARD_PROGRAMS),
-      giftCardTypes: seedList(SEED_GIFT_CARD_TYPES)
+      giftCardTypes: seedList(SEED_GIFT_CARD_TYPES),
+      // Federal forms offered in tax-history pickers — editable in Settings
+      // so the list can keep up if the IRS changes things.
+      taxForms: seedList(SEED_TAX_FORMS)
     },
     creditScores: [],   // {id, date, score, provider}
     rateHistory: [],    // {id, date, accountId, apy}
