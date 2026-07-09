@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.60 — Import decisions you can't miss + interest gets its own account
+
+- **Unset decision dropdowns now glow.** Selects in the import flow that
+  still sit on their empty default ("— no account —") get an amber
+  border + soft glow until you make a choice, so they can't be scrolled
+  past. The glow clears the moment you pick something.
+- **Money-market interest asks for its own account.** The interest section
+  of the broker import previously reused the dividends account silently.
+  It now has its own "Record interest under" picker — the cash / sweep
+  account is often a different Clover account than the brokerage — and
+  the automatic already-recorded skip is judged against that account.
+
 ### v1.0.59 — One-time bills, smarter bill fields, links & masked account numbers
 
 - **One-time bills.** The Frequency dropdown gains "One-time (not

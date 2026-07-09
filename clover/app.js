@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.59';
+const VERSION = '1.0.60';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -947,6 +947,15 @@ function numCell(v, strong) { const td = el('td', 'num' + (v ? '' : ' zero') + (
 function todayISO() { const d = new Date(); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function fmtDate(iso) { if (!iso) return '—'; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso; return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function labelWrap(label, node) { const w = el('label', 'inline-field'); w.appendChild(el('span', null, label)); w.appendChild(node); return w; }
+// Draw the eye to a decision dropdown that still sits on its empty default —
+// amber glow until a real choice is made (used on import-flow selects that are
+// easy to scroll past but change where data lands).
+function attnWhenEmpty(sel) {
+  const sync = () => sel.classList.toggle('attn-empty', !sel.value);
+  sel.addEventListener('change', sync);
+  sync();
+  return sel;
+}
 // Account <option>s for modals — always alphabetical, however accounts were added.
 function accountOptions(s, noneLabel) {
   return [{ value: '', label: noneLabel || '—' }].concat(
@@ -4894,7 +4903,7 @@ function analyzeDividendFile(store, rows, headers, filename) {
     const k = t.date + '|' + (Number(t.amount) || 0).toFixed(2);
     t.dbAccts = intMap.has(k) ? [...intMap.get(k)] : null;
   });
-  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, interest: parsed.interest || [], choices: {}, includeFees: false, includeInterest: true, feeCat: '', accountId: '' };
+  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, interest: parsed.interest || [], choices: {}, includeFees: false, includeInterest: true, feeCat: '', accountId: '', intAccountId: '' };
 }
 function dividendReviewCard(store) {
   const st = divImportState, s = store.state;
@@ -4907,7 +4916,7 @@ function dividendReviewCard(store) {
   if (st.divs.length && !divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
 
   const optRow = el('div', 'io-actions');
-  const acctSel = select(accountOptions(s, '— no account —'), st.accountId);
+  const acctSel = attnWhenEmpty(select(accountOptions(s, '— no account —'), st.accountId));
   acctSel.addEventListener('change', () => { st.accountId = acctSel.value; renderView(currentRoute); });
   optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
@@ -4966,13 +4975,21 @@ function dividendReviewCard(store) {
     card.appendChild(feeRow);
   }
 
-  // Money-market / sweep-account interest — imports as Interest income.
+  // Money-market / sweep-account interest — imports as Interest income under
+  // its OWN account pick (the sweep account is often a different Clover
+  // account than the brokerage the dividends belong to).
   const intCat = s.incomeCategories.find(c => /interest/i.test(c.name));
-  const importableInt = (st.interest || []).filter(t => !(t.dbAccts || []).includes(st.accountId || ''));
+  const importableInt = (st.interest || []).filter(t => !(t.dbAccts || []).includes(st.intAccountId || ''));
   if ((st.interest || []).length) {
     card.appendChild(el('h3', 'strip-title', 'Money-market interest (' + st.interest.length + ')'));
     const skippedInt = st.interest.length - importableInt.length;
-    card.appendChild(el('p', 'muted', 'Interest paid by the broker’s cash / sweep account (e.g. the insured money market). These import as Interest income under the account picked above.' + (skippedInt ? ' ' + skippedInt + ' already recorded for that account will be skipped automatically.' : '')));
+    card.appendChild(el('p', 'muted', 'Interest paid by the broker’s cash / sweep account (e.g. the insured money market). These import as Interest income.' + (skippedInt ? ' ' + skippedInt + ' already recorded for the account picked below will be skipped automatically.' : '')));
+    const iAcctRow = el('div', 'io-actions');
+    const iAcctSel = attnWhenEmpty(select(accountOptions(s, '— no account —'), st.intAccountId || ''));
+    iAcctSel.addEventListener('change', () => { st.intAccountId = iAcctSel.value; renderView(currentRoute); });
+    iAcctRow.appendChild(labelWrap('Record interest under', iAcctSel));
+    card.appendChild(iAcctRow);
+    card.appendChild(el('p', 'muted', 'Which of YOUR Clover accounts this interest belongs to — often the money market / cash-sweep account itself, which may be a different account than the brokerage the dividends go under.'));
     const il = el('div', 'mini-list');
     st.interest.slice(0, 8).forEach(t => {
       const rw = el('div', 'mini-row');
@@ -5033,7 +5050,7 @@ function dividendReviewCard(store) {
       const yr = +t.date.slice(0, 4);
       (byYear[yr] = byYear[yr] || []).push({
         date: t.date, gross: t.amount, net: t.amount, categoryId: intCat.id, subId: '',
-        accountId: st.accountId || '', personId: me, status: 'received', taxable: 'yes',
+        accountId: st.intAccountId || '', personId: me, status: 'received', taxable: 'yes',
         receivedVia: st.broker, notes: (t.desc || '').slice(0, 120)
       });
     });

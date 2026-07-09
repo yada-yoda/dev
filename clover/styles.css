@@ -450,6 +450,8 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
 .trend { font-size: 10px; margin-left: 1px; vertical-align: middle; }
 .rec-mark { font-size: 10px; color: var(--text-faint); margin-left: 3px; }
+/* Decision dropdowns still on their empty default — don't let them get missed. */
+select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18); }
 .ded-amt { display: inline-flex; align-items: center; gap: 4px; }
 .ded-minus { color: var(--text-muted); font-weight: 600; }
 .trend.up { color: var(--expense); }
