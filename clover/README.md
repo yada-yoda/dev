@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.55 — Account dropdowns are always alphabetical
+
+Every account dropdown — Add income, Add expense, a bill's payment and
+backup accounts, and the dividend import's "record under" picker — now
+sorts accounts A→Z automatically, no matter what order they were added in.
+(The institution picker has been alphabetical since v0.3.1; accounts had
+been left in insertion order.)
+
 ### v1.0.54 — Deduction amounts obviously auto-subtract + Year overview wage deductions
 
 - **Deduction amounts are entered as positive numbers** — Clover subtracts

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.54';
+const VERSION = '1.0.55';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -945,6 +945,12 @@ function numCell(v, strong) { const td = el('td', 'num' + (v ? '' : ' zero') + (
 function todayISO() { const d = new Date(); const p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
 function fmtDate(iso) { if (!iso) return '—'; const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso; return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
 function labelWrap(label, node) { const w = el('label', 'inline-field'); w.appendChild(el('span', null, label)); w.appendChild(node); return w; }
+// Account <option>s for modals — always alphabetical, however accounts were added.
+function accountOptions(s, noneLabel) {
+  return [{ value: '', label: noneLabel || '—' }].concat(
+    s.accounts.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+      .map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') })));
+}
 
 function renderIncome(view) {
   const store = window.cloverStore;
@@ -1169,7 +1175,7 @@ function incomeModal(existing) {
     fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); });
     if (e.subId) fSub.value = e.subId;
   };
-  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), e.accountId || '');
+  const fAcct = select(accountOptions(s), e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fGross = input(e.gross != null ? e.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
   const fNet = input(e.net != null ? e.net : '', { type: 'number', placeholder: 'optional' }); fNet.step = '0.01';
@@ -1601,8 +1607,8 @@ function subscriptionModal(existing) {
   const syncInterval = () => { intervalWrap.style.display = (fFreq.value === 'everyNMonths' || fFreq.value === 'everyNYears') ? '' : 'none'; };
   fFreq.addEventListener('change', syncInterval);
   const fRenew = input(r.renewalDate || '', { type: 'date' });
-  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.accountId || '');
-  const fBackup = select([{ value: '', label: '— None —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), r.backupAccountId || '');
+  const fAcct = select(accountOptions(s), r.accountId || '');
+  const fBackup = select(accountOptions(s, '— None —'), r.backupAccountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
   const fPriority = select(PRIORITIES, r.priority || 'Medium');
   const fStatus = select(SUB_STATUSES, r.status || 'Active');
@@ -1874,7 +1880,7 @@ function expenseModal(existing) {
     const bill = s.recurring.find(r => r.id === fBill.value);
     if (bill) { fCat.value = bill.categoryId || ''; rebuildSubs(); if (bill.subId) fSub.value = bill.subId; }
   });
-  const fAcct = select([{ value: '', label: '—' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), e.accountId || '');
+  const fAcct = select(accountOptions(s), e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
@@ -4771,7 +4777,7 @@ function dividendReviewCard(store) {
   if (!divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
 
   const optRow = el('div', 'io-actions');
-  const acctSel = select([{ value: '', label: '— no account —' }].concat(s.accounts.map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') }))), st.accountId);
+  const acctSel = select(accountOptions(s, '— no account —'), st.accountId);
   acctSel.addEventListener('change', () => { st.accountId = acctSel.value; renderView(currentRoute); });
   optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
