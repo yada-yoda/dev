@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.78';
+const VERSION = '1.0.79';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1440,6 +1440,11 @@ function trendIcon(sub) {
   const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
 }
 
+// Budget placeholders show ~ before their amounts — estimated, not actual.
+function estCell(td, r) {
+  if (r.budgetEst && td.firstChild) { td.insertBefore(document.createTextNode('~'), td.firstChild); td.title = 'Budget estimate — a placeholder for an expected future cost'; }
+  return td;
+}
 // The flag labels a bill carries (must mirror the Flags column cell).
 function subFlags(r) {
   const out = [];
@@ -1447,6 +1452,7 @@ function subFlags(r) {
   else if (r.status === 'Trial') out.push('Trial');
   if (r.autoPay) out.push('Auto-pay');
   if (r.priority && r.priority !== 'Medium') out.push(r.priority);
+  if (r.budgetEst) out.push('Budget est.');
   if (r.notPaidYear === new Date().getFullYear()) out.push('Not paid this year');
   return out;
 }
@@ -1479,10 +1485,10 @@ function buildSubsCol(store, key, net) {
         }
         return td; } };
     case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => { const td = el('td'); const n = store.expenseGroupName(r.categoryId); td.appendChild(valueBadge('subs', 'category', n === '—' ? '' : n)); return td; } };
-    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) };
+    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => estCell(numCell(Number(r.amount) || 0), r) };
     case 'frequency': return { label: 'Frequency', key: 'freq', value: r => freqLabel(r), cell: r => { const td = el('td'); td.appendChild(valueBadge('subs', 'frequency', freqLabel(r))); return td; } };
-    case 'monthly': return { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => numCell(monthlyEquiv(r), true) };
-    case 'annual': return { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => numCell(annualCost(r)) };
+    case 'monthly': return { label: 'Monthly', key: 'monthly', num: true, value: r => monthlyEquiv(r), cell: r => estCell(numCell(monthlyEquiv(r), true), r) };
+    case 'annual': return { label: 'Annual', key: 'annual', num: true, value: r => annualCost(r), cell: r => estCell(numCell(annualCost(r)), r) };
     case 'pct': return { label: '% net', key: 'pct', num: true, value: r => net > 0 ? monthlyEquiv(r) / net * 100 : 0, cell: r => { const td = el('td', 'num'); td.textContent = net > 0 ? (monthlyEquiv(r) / net * 100).toFixed(2) + '%' : '—'; return td; } };
     case 'renews': return { label: 'Renews', key: 'renews', value: r => { const d = daysUntil(isSubActive(r) ? nextRenewalDate(r) : r.renewalDate); return d == null ? 999999 : d; }, cell: r => renewCell(r) };
     case 'account': return { label: 'Account', key: 'account', value: r => store.accountName(r.accountId), cell: r => { const td = el('td'); td.appendChild(valueBadge('subs', 'account', store.accountName(r.accountId) || '')); return td; } };
@@ -1501,6 +1507,7 @@ function buildSubsCol(store, key, net) {
         else if (r.status === 'Trial') flags.appendChild(subsFilterBadge('flags', 'Trial', 'amber'));
         if (r.autoPay) flags.appendChild(subsFilterBadge('flags', 'Auto-pay', 'amber'));
         if (r.priority && r.priority !== 'Medium') flags.appendChild(subsFilterBadge('flags', r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
+        if (r.budgetEst) { const b = subsFilterBadge('flags', 'Budget est.', 'type'); b.title = 'A budget placeholder — an expected future cost counted in the totals, not an actual bill. ' + b.title; flags.appendChild(b); }
         if (r.notPaidYear === new Date().getFullYear()) { const b = subsFilterBadge('flags', 'Not paid this year', 'amber'); b.title = 'Excluded from the totals until January — nothing is due this calendar year. ' + b.title; flags.appendChild(b); }
         td.appendChild(flags); return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
@@ -1689,6 +1696,7 @@ function subscriptionModal(existing) {
   const fPriority = select(PRIORITIES, r.priority || 'Medium');
   const fStatus = select(SUB_STATUSES, r.status || 'Active');
   const cAuto = checkbox('Auto-pay', r.autoPay, 'Charged automatically — no manual action needed.');
+  const cBudget = checkbox('Budget placeholder', r.budgetEst, 'A future or expected cost, not a real bill yet — e.g. you know a utility will jump from $27 to $180 once you move in. It counts toward Total monthly/annual so your budgeting and income planning reflect it, and it’s tagged “Budget est.” everywhere so it can’t be mistaken for an actual bill.');
   const fUrl = input(r.url || '', { placeholder: 'https:// (optional)' });
   const fPayUrl = input(r.payUrl || '', { placeholder: 'https:// (optional)' });
   // Customer/account number stays masked unless the field is focused.
@@ -1725,7 +1733,7 @@ function subscriptionModal(existing) {
   body.appendChild(metaRow);
   const pRow = el('div', 'two-col');
   pRow.appendChild(field('Person', fPerson, 'Who this belongs to.'));
-  const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cAuto);
+  const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cAuto); flagsWrap.appendChild(cBudget);
   pRow.appendChild(field('Flags', flagsWrap));
   body.appendChild(pRow);
   const custField = field('Account / customer #', fCust, 'Your customer, account, policy, or member number with this vendor. Kept masked except the last 4 digits until you click into the field (or click it in the table).');
@@ -1778,7 +1786,7 @@ function subscriptionModal(existing) {
         name, vendor: fVendor.value.trim(), categoryId: fCat.value, subId: fSub.value || '',
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
         renewalDate: fRenew.value || '', notPaidYear: cPaidYr.__input.checked ? null : new Date().getFullYear(), accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
-        personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked,
+        personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked, budgetEst: cBudget.__input.checked,
         url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(),
         apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
       });

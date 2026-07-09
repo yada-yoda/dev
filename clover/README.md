@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.79 — Budget placeholders
+
+New "Budget placeholder" checkbox on bills — for a future cost you know is
+coming (the $27 utility that becomes $180 once you move in). It counts
+toward Total monthly / annual and the expense grid so your budgeting and
+income planning reflect reality-to-be, but it can't be mistaken for an
+actual bill: its amounts render with a ~ prefix, and it carries a
+clickable "Budget est." tag (filter to see all your placeholders at once,
+with the stat cards following).
+
 ### v1.0.78 — Salary years fill the Year gross / Year net columns
 
 For annual-salary raises and year records, the salary and its net are the
