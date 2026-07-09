@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.61 — Broker-import fees on by default
+
+"Import these fees as expenses" is now ticked by default (untick to leave
+them out), and the Fee category dropdown gets the same amber attention
+glow — it's pre-filled with your investment-fee category as a best guess,
+and the glow stays until you've clicked or changed it, so the guess never
+slips through unseen.
+
 ### v1.0.60 — Import decisions you can't miss + interest gets its own account
 
 - **Unset decision dropdowns now glow.** Selects in the import flow that

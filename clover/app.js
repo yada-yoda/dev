@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.60';
+const VERSION = '1.0.61';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4903,7 +4903,7 @@ function analyzeDividendFile(store, rows, headers, filename) {
     const k = t.date + '|' + (Number(t.amount) || 0).toFixed(2);
     t.dbAccts = intMap.has(k) ? [...intMap.get(k)] : null;
   });
-  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, interest: parsed.interest || [], choices: {}, includeFees: false, includeInterest: true, feeCat: '', accountId: '', intAccountId: '' };
+  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, interest: parsed.interest || [], choices: {}, includeFees: true, includeInterest: true, feeCat: '', accountId: '', intAccountId: '' };
 }
 function dividendReviewCard(store) {
   const st = divImportState, s = store.state;
@@ -4966,11 +4966,16 @@ function dividendReviewCard(store) {
     card.appendChild(feeList);
     if (st.fees.length > 8) card.appendChild(el('div', 'muted', '+ ' + (st.fees.length - 8) + ' more'));
     const feeRow = el('div', 'io-actions');
-    const cb = checkbox('Import these ' + st.fees.length + ' fee' + (st.fees.length === 1 ? '' : 's') + ' as expenses', st.includeFees, 'Optional. They join the same undoable import batch as the dividends.');
-    cb.__input.addEventListener('change', () => { st.includeFees = cb.__input.checked; });
+    const cb = checkbox('Import these ' + st.fees.length + ' fee' + (st.fees.length === 1 ? '' : 's') + ' as expenses', st.includeFees, 'On by default — they join the same undoable import batch as the dividends. Untick to leave them out.');
+    cb.__input.addEventListener('change', () => { st.includeFees = cb.__input.checked; renderView(currentRoute); });
     feeRow.appendChild(cb);
     const feeSel = select(feeCats.map(c => ({ value: c.id, label: c.name })), st.feeCat);
-    feeSel.addEventListener('change', () => { st.feeCat = feeSel.value; });
+    // Glows until acknowledged — it's pre-filled with a best guess, so draw the
+    // eye to confirm the category is right (a focus or change clears it).
+    if (!st.feeCatTouched) feeSel.classList.add('attn-empty');
+    const feeTouch = () => { st.feeCatTouched = true; feeSel.classList.remove('attn-empty'); };
+    feeSel.addEventListener('focus', feeTouch);
+    feeSel.addEventListener('change', () => { st.feeCat = feeSel.value; feeTouch(); });
     feeRow.appendChild(labelWrap('Fee category', feeSel));
     card.appendChild(feeRow);
   }
