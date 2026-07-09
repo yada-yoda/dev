@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.55';
+const VERSION = '1.0.56';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4216,7 +4216,19 @@ function calendarEvents(store, year, month) {
   const yd = store.yearData(year);
   (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
   store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + ' renews · ' + money(Number(r.amount) || 0), tone: 'amber' })); });
-  store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => { const d = dateInMonth(a.cdMaturity, year, month); if (d) events.push({ day: d, type: 'CD matures', label: a.name + (a.last4 ? ' ••' + a.last4 : '') + ' matures', tone: 'blue' }); });
+  store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => {
+    const name = a.name + (a.last4 ? ' ••' + a.last4 : '');
+    const d = dateInMonth(a.cdMaturity, year, month);
+    if (d) events.push({ day: d, type: 'CD matures', label: name + ' matures', tone: 'blue' });
+    // Heads-up a week ahead — time to decide on rollover vs. withdrawal
+    // before the bank's auto-renew window closes.
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(a.cdMaturity);
+    if (m) {
+      const r = addDays(new Date(+m[1], +m[2] - 1, +m[3]), -7);
+      if (r.getFullYear() === year && r.getMonth() === month)
+        events.push({ day: r.getDate(), type: 'CD reminder', label: name + ' matures in 7 days (' + fmtDate(a.cdMaturity) + ')', tone: 'amber' });
+    }
+  });
   return events;
 }
 

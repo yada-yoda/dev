@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.56 — CD maturity reminders a week ahead
+
+CD maturity dates were already on the Calendar; now each CD also gets an
+amber reminder event 7 days before it matures ("… matures in 7 days
+(Jul 20, 2026)") — enough lead time to decide on rolling over vs.
+withdrawing before the bank's auto-renew window closes. Reminders cross
+month boundaries correctly (an Aug 3 maturity reminds on Jul 27).
+
 ### v1.0.55 — Account dropdowns are always alphabetical
 
 Every account dropdown — Add income, Add expense, a bill's payment and
