@@ -92,6 +92,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .range-seg{display:inline-flex;gap:4px;flex-shrink:0}
 .range-seg button{padding:4px 10px;border-radius:8px;font-size:12px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer}
 .range-seg button.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
+.range-span{font-size:11px;color:var(--text-secondary);margin:-4px 0 12px;font-variant-numeric:tabular-nums}
 .label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
 .input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
 .input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
@@ -229,7 +230,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.50.0';
+const APP_VERSION = 'v0.51.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3310,12 +3311,17 @@ function renderNextBadgeToday(){
     + '<div style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary);flex-shrink:0">'+earned.length+'/'+WALK_BADGES.length+'</div></div></div>';
 }
 // Range toggle (30d / 90d / YTD) for the Spending and Potty breakdown cards.
-const RANGES = [{k:'7',label:'7d'},{k:'14',label:'14d'},{k:'30',label:'30d'},{k:'90',label:'90d'},{k:'ytd',label:'YTD'}];
+const RANGES = [{k:'7',label:'7d'},{k:'14',label:'14d'},{k:'30',label:'30d'},{k:'90',label:'90d'},{k:'ytd',label:'YTD'},{k:'all',label:'Lifetime'}];
 let spendRange = 'ytd', pottyRange = '30';
 function rangeInfo(k){
+  if(k==='all') return { ms:0, label:'entire history' };
   if(k==='ytd'){ const y=new Date().getFullYear(); return { ms:new Date(y+'-01-01T00:00').getTime(), label:'year so far' }; }
   const days = parseInt(k,10)||30; return { ms:Date.now()-days*86400000, label:'last '+days+' days' };
 }
+// "Jun 9, 2026 → Jul 9, 2026" span shown under an active range toggle. earliestMs anchors the
+// "from" side for the Lifetime range (falls back to today when there's no data).
+function fmtSpan(fromMs, toMs){ const f = d => new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); return f(fromMs)+' → '+f(toMs); }
+function rangeSpanLine(k, earliestMs){ const from = (k==='all') ? (earliestMs||Date.now()) : rangeInfo(k).ms; return '<div class="range-span">'+fmtSpan(from, Date.now())+'</div>'; }
 function rangeToggle(kind, cur){
   const fn = kind==='spend' ? 'setSpendRange' : 'setPottyRange';
   return '<div class="range-seg">'+RANGES.map(r=>'<button class="'+(cur===r.k?'active':'')+'" onclick="'+fn+'(\''+r.k+'\')">'+r.label+'</button>').join('')+'</div>';
@@ -3368,8 +3374,12 @@ function renderSpendCard(){
   const spendGroom = petArr('grooming').filter(g=>inR(g.date)).reduce((s,g)=>s+(num(g.cost)||0),0);
   const spendSupplies = petArr('inventory').filter(i=>inR(i.purchaseDate)).reduce((s,i)=>s+(num(i.cost)||0),0);
   const spendTotal = spendVet+spendGroom+spendSupplies;
+  const dateMs = d => d ? new Date(d+'T00:00').getTime() : NaN;
+  const allDates = [...petArr('vetVisits').map(v=>dateMs(v.date)), ...petArr('grooming').map(g=>dateMs(g.date)), ...petArr('inventory').map(i=>dateMs(i.purchaseDate))].filter(t=>!isNaN(t));
+  const earliest = allDates.length ? Math.min(...allDates) : Date.now();
   const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
   return '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('spend',18)+' Spending — '+money(spendTotal)+'</h3>'+rangeToggle('spend', spendRange)+'</div>'
+    + rangeSpanLine(spendRange, earliest)
     + (spendTotal>0
         ? bar(svgIcon('vet',16)+' Vet', spendVet, 'var(--blue)') + bar(svgIcon('groom',16)+' Grooming', spendGroom, 'var(--accent)') + bar(svgIcon('supplies',16)+' Food & supplies', spendSupplies, 'var(--success)')
         : '<p style="font-size:12px;color:var(--text-secondary);margin:0">No spending recorded in the '+R.label+'.</p>')
@@ -3381,7 +3391,9 @@ function renderPottyCard(){
   if(!all.length) return '';
   const R = rangeInfo(pottyRange);
   const potty = all.filter(p=>p.dateTime && new Date(p.dateTime).getTime() >= R.ms);
-  const head = '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('potty',18)+' Potty breakdown</h3>'+rangeToggle('potty', pottyRange)+'</div>';
+  const allMs = all.map(p=>new Date(p.dateTime).getTime()).filter(t=>!isNaN(t));
+  const earliest = allMs.length ? Math.min(...allMs) : Date.now();
+  const head = '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('potty',18)+' Potty breakdown</h3>'+rangeToggle('potty', pottyRange)+'</div>'+rangeSpanLine(pottyRange, earliest);
   if(!potty.length) return head + '<p style="font-size:12px;color:var(--text-secondary);margin:0">No potty breaks in the '+R.label+'.</p></div>';
   const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
   // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
@@ -3450,12 +3462,22 @@ function trendControlsHTML(){
   const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
   const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
   const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
-  const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d']].map(([v,l])=>seg('range',v,l)).join('');
+  const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d'],['all','Lifetime']].map(([v,l])=>seg('range',v,l)).join('');
+  const days = trendSpanDays();
+  const spanLine = '<div class="range-span" style="margin:0 0 10px">'+fmtSpan(Date.now()-(days-1)*86400000, Date.now())+'</div>';
   return '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>';
+    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'
+    + spanLine;
+}
+// Resolve trendRange to a day count — 'all' spans from the earliest logged entry to today.
+function trendSpanDays(){
+  if(trendRange!=='all') return +trendRange;
+  const times = [...petLogs('feed'),...petLogs('potty'),...petLogs('walk'),...petLogs('weight')].map(l=>new Date(l.dateTime).getTime()).filter(t=>!isNaN(t));
+  if(!times.length) return 7;
+  return Math.max(7, Math.floor((Date.now()-Math.min(...times))/86400000)+1);
 }
 function setTrend(kind, val){
-  if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=+val;
+  if(kind==='metric') trendMetric=val; else if(kind==='style') trendStyle=val; else if(kind==='range') trendRange=(val==='all'?'all':+val);
   // Refresh only the Trends controls + its chart — leave the weight chart above untouched.
   const c = document.getElementById('trend-controls'); if(c) c.innerHTML = trendControlsHTML();
   const h = document.getElementById('trend-hint'); if(h) h.textContent = (TREND_METRICS.find(m=>m.k===trendMetric)||{}).hint || '';
@@ -3465,7 +3487,7 @@ function shortDay(iso){ const p=(iso||'').split('-'); return p.length===3 ? (+p[
 function hexA(h, a){ h=(h||'').replace('#',''); if(h.length===3) h=h.split('').map(c=>c+c).join(''); const n=parseInt(h,16); if(isNaN(n)) return h; return 'rgba('+((n>>16)&255)+','+((n>>8)&255)+','+(n&255)+','+a+')'; }
 function trendDays(n){ const out=[]; const now=new Date(); for(let i=n-1;i>=0;i--){ const d=new Date(now.getTime()-i*86400000); out.push(`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`); } return out; }
 function trendData(){
-  const days=trendDays(trendRange), idx={}; days.forEach((d,i)=>idx[d]=i);
+  const days=trendDays(trendSpanDays()), idx={}; days.forEach((d,i)=>idx[d]=i);
   const css=getComputedStyle(document.documentElement), C=(n,f)=>css.getPropertyValue(n).trim()||f;
   const teal=C('--accent-2','#2dd4bf'), orange=C('--accent','#f4a261'), purple=C('--accent-purple','#a371f7');
   const meta=TREND_METRICS.find(m=>m.k===trendMetric)||TREND_METRICS[0];

@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.50.0**
+**Current Version: v0.51.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -83,6 +83,10 @@ covers both.
 
 ## Version History
 
+- **v0.51.0** — **Lifetime range + date spans on Insights** — every range selector (Spending, Potty
+  breakdown, and the Trends chart) now has a **Lifetime** option for all-time data, and shows the
+  exact **date span** (from → to) of the selected range underneath — so it's always clear what
+  window you're looking at. The Trends chart's Lifetime spans from your earliest logged entry.
 - **v0.50.0** — **Custom supply categories** — supplies now include an **Other** category, and you
   can add your own categories under **Settings → Lists & preferences → Supply categories** (e.g.
   Toys, Health, Apparel). Custom categories appear in the Add-supply dropdown and as filter tabs on
