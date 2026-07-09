@@ -45,6 +45,24 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.67 — Raises: sortable YoY table, inferred previous, duration that reads right
+
+- **The YoY-vs-inflation table caught up to the table standards** — sortable
+  headers with the 3-click cycle and its own ⚙ Columns manager.
+- **Inflation data extended back to 2010** (2010–2014 CPI-U annual averages
+  added), so raises from those years get their Real (vs inflation) figure.
+- **Previous is inferred when left blank.** A raise without a Previous
+  amount now assumes the same employer's prior recorded raise (same
+  per-check/annual/hourly basis) was the previous pay — shown slightly
+  muted with an explanation on hover — which also fills in the Change $/%.
+  A new "Doesn't follow the prior raise" checkbox on the raise turns the
+  inference off when the comparison doesn't apply, and rides along in the
+  CSV as a "Standalone" column.
+- **"Since prior raise" became "At this pay."** The duration column now
+  reads the way you'd expect: how long each pay level lasted, measured to
+  the employer's next raise — and the latest raise counts up to today
+  ("1,644 days · counting") since nothing has replaced it yet.
+
 ### v1.0.66 — Clickable Priority / Status / Flags filters with live stat cards
 
 - The Priority, Status, and Flags badges on Bills & Subscriptions are now

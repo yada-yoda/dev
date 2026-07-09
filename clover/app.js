@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.66';
+const VERSION = '1.0.67';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2726,7 +2726,27 @@ function employerMergeModal() {
 // Raises — per-employer raise history + time between raises
 // ============================================================
 let raisesSort = { key: 'date', dir: 'desc' };
-const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'Since prior raise', notes: 'Notes' };
+let raiseYoYSort = { key: 'date', dir: 'asc' };
+// Effective previous amount for a raise: the entered one, else inferred from
+// the prior same-employer raise on the same basis — unless the raise is
+// marked standalone (noPrev, e.g. a job/role change makes them incomparable).
+function raisePrev(store, r) {
+  if (r.prevAmount != null && r.prevAmount !== '') return { v: Number(r.prevAmount), derived: false };
+  if (r.noPrev) return null;
+  const prior = store.state.raises
+    .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') < (r.date || '') && (x.basis || 'check') === (r.basis || 'check') && x.amount != null)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+  return prior ? { v: Number(prior.amount), derived: true } : null;
+}
+// How long this pay level lasted: until the employer's NEXT raise, or counting
+// up to today for the latest one.
+function raiseDurationDays(store, r) {
+  const next = store.state.raises
+    .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') > (r.date || ''))
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
+  return { days: daysBetweenISO(next ? next.date : todayISO(), r.date), ongoing: !next };
+}
+const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', notes: 'Notes' };
 const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'notes'];
 const RAISE_DEFAULT_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'prevAmount', 'change', 'gap'];
 function raiseGapDays(store, r) {
@@ -2751,32 +2771,35 @@ function buildRaiseCol(store, key) {
     case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
     case 'amount': return { label: 'New gross', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => { const td = numCell(Number(r.amount) || 0, true); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
     case 'net': return { label: 'New net', key: 'net', num: true, value: r => r.net != null ? Number(r.net) : 0, cell: r => { if (r.net == null || r.net === '') return el('td', 'num', '—'); const td = numCell(Number(r.net)); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
-    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => Number(r.prevAmount) || 0, cell: r => { const td = numCell(Number(r.prevAmount) || 0); if (r.prevAmount != null && r.prevAmount !== '') td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
-    case 'change': return { label: 'Change', key: 'change', num: true, value: r => (r.prevAmount != null && r.amount != null) ? Number(r.amount) - Number(r.prevAmount) : 0, cell: r => {
+    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => { const pv = raisePrev(store, r); return pv ? pv.v : 0; }, cell: r => { const pv = raisePrev(store, r); if (!pv) return el('td', 'num', '—'); const td = numCell(pv.v); td.appendChild(el('span', 'muted', raiseSuf(r))); if (pv.derived) { td.classList.add('muted'); td.title = 'Inferred from this employer’s prior raise (tick “doesn’t follow the prior raise” on the raise to stop this)'; } return td; } };
+    case 'change': return { label: 'Change', key: 'change', num: true, value: r => { const pv = raisePrev(store, r); return (pv && r.amount != null) ? Number(r.amount) - pv.v : 0; }, cell: r => {
         const td = el('td', 'num');
-        if (r.prevAmount == null || r.prevAmount === '' || r.amount == null) { td.textContent = '—'; return td; }
-        const diff = Number(r.amount) - Number(r.prevAmount);
-        const pct = Number(r.prevAmount) > 0 ? (diff / Number(r.prevAmount) * 100) : null;
+        const pv = raisePrev(store, r);
+        if (!pv || r.amount == null) { td.textContent = '—'; return td; }
+        const diff = Number(r.amount) - pv.v;
+        const pct = pv.v > 0 ? (diff / pv.v * 100) : null;
         const span = el('span', diff >= 0 ? 'pos' : 'neg', (diff >= 0 ? '+' : '−') + money(Math.abs(diff)) + (pct != null ? ' (' + (diff >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%)' : ''));
+        if (pv.derived) span.title = 'Previous inferred from this employer’s prior raise';
         td.appendChild(span); return td; } };
-    case 'gap': return { label: 'Since prior raise', key: 'gap', num: true, value: r => { const g = raiseGapDays(store, r); return g == null ? -1 : g; }, cell: r => {
-        const td = el('td', 'num'); const g = raiseGapDays(store, r);
-        td.textContent = g == null ? '—' : (g + ' days'); if (g == null) td.title = 'First recorded raise for this employer';
+    case 'gap': return { label: 'At this pay', key: 'gap', num: true, value: r => raiseDurationDays(store, r).days, cell: r => {
+        const td = el('td', 'num'); const d = raiseDurationDays(store, r);
+        td.textContent = d.days + ' days' + (d.ongoing ? ' · counting' : '');
+        td.title = d.ongoing ? 'Still at this pay — counting up until the next raise' : 'How long this pay level lasted before the next raise';
         return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
   return null;
 }
 // US CPI-U annual average inflation, % (2025 preliminary) — for comparing raises.
-const INFLATION_CPI = { 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2020: 1.2, 2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 2.9, 2025: 2.7 };
-const RAISES_CSV_HEADERS = ['Employer', 'Position title', 'Employment type', 'Date', 'Amounts are', 'New gross', 'New net', 'Previous gross', 'Notes'];
+const INFLATION_CPI = { 2010: 1.6, 2011: 3.2, 2012: 2.1, 2013: 1.5, 2014: 1.6, 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2020: 1.2, 2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 2.9, 2025: 2.7 };
+const RAISES_CSV_HEADERS = ['Employer', 'Position title', 'Employment type', 'Date', 'Amounts are', 'New gross', 'New net', 'Previous gross', 'Standalone', 'Notes'];
 const RAISES_TEMPLATE_CSV = RAISES_CSV_HEADERS.join(',') + '\n'
   + 'Main Job,Support Tech,Full-time,2025-04-04,Per paycheck,2100.00,1650.00,2000.00,Annual review\n'
   + 'Main Job,Senior Support Tech,Full-time,2026-04-03,Annual salary,62000.00,47000.00,56000.00,Promotion with title change\n'
   + 'Weekend Gig,Crew Lead,Part-time,2026-05-10,Hourly rate,19.50,16.25,17.00,Hourly bump\n';
 function exportRaisesCSV(store) {
   const rows = [RAISES_CSV_HEADERS.join(',')];
-  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.empType, r.date, r.basis === 'annual' ? 'Annual salary' : r.basis === 'hourly' ? 'Hourly rate' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.notes].map(csvEsc).join(',')));
+  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.empType, r.date, r.basis === 'annual' ? 'Annual salary' : r.basis === 'hourly' ? 'Hourly rate' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.noPrev ? 'Yes' : '', r.notes].map(csvEsc).join(',')));
   downloadFile('clover-raises.csv', rows.join('\n'), 'text/csv');
 }
 function importRaisesCSV(store, rows) {
@@ -2795,7 +2818,7 @@ function importRaisesCSV(store, rows) {
     const net = parseImportAmount(g(r, 'New net'));
     const basisRaw = g(r, 'Amounts are');
     const basis = /hour|\bhr\b/i.test(basisRaw) ? 'hourly' : /annual|salary|year/i.test(basisRaw) ? 'annual' : 'check';
-    store.saveRaise({ employer, title: g(r, 'Position title') || g(r, 'Position') || g(r, 'Title'), empType: g(r, 'Employment type') || g(r, 'Employment'), date, basis, amount, net: isNaN(net) ? null : net, prevAmount: isNaN(prev) ? null : prev, notes: g(r, 'Notes') });
+    store.saveRaise({ employer, title: g(r, 'Position title') || g(r, 'Position') || g(r, 'Title'), empType: g(r, 'Employment type') || g(r, 'Employment'), date, basis, amount, net: isNaN(net) ? null : net, prevAmount: isNaN(prev) ? null : prev, noPrev: /^y|^true/i.test(g(r, 'Standalone')), notes: g(r, 'Notes') });
     added++;
   });
   toast('Imported ' + added + ' raise' + (added === 1 ? '' : 's') + (skipped ? ' · ' + skipped + ' skipped' : ''));
@@ -2847,31 +2870,41 @@ function employerProfileCard(store, emp) {
   return card;
 }
 // YoY raise analysis vs inflation (shown once an employer has 3+ raises).
+const RYOY_COL_LABELS = { date: 'Date', amount: 'New gross', pct: 'Raise %', inflation: 'Inflation that year', real: 'Real (vs inflation)' };
+const RYOY_ALL_COLS = ['date', 'amount', 'pct', 'inflation', 'real'];
+function buildRaiseYoYCol(key) {
+  const pctCell = (v, titles) => { const td = el('td', 'num'); if (v == null) { td.textContent = '—'; return td; } const sp = el('span', v >= 0 ? 'pos' : 'neg', (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%'); if (titles) td.title = v >= 0 ? titles[0] : titles[1]; td.appendChild(sp); return td; };
+  switch (key) {
+    case 'date': return { label: 'Date', key: 'date', value: x => x.date || '', cell: x => el('td', null, fmtDate(x.date)) };
+    case 'amount': return { label: 'New gross', key: 'amount', num: true, value: x => Number(x.amount) || 0, cell: x => { const td = numCell(Number(x.amount) || 0, true); td.appendChild(el('span', 'muted', raiseSuf(x))); return td; } };
+    case 'pct': return { label: 'Raise %', key: 'pct', num: true, value: x => x.pct == null ? -1e9 : x.pct, cell: x => pctCell(x.pct) };
+    case 'inflation': return { label: 'Inflation that year', key: 'inflation', num: true, value: x => x.infl == null ? -1e9 : x.infl, cell: x => el('td', 'num', x.infl != null ? x.infl.toFixed(1) + '%' : '—') };
+    case 'real': return { label: 'Real (vs inflation)', key: 'real', num: true, value: x => x.real == null ? -1e9 : x.real, cell: x => pctCell(x.real, ['Beat inflation', 'Behind inflation']) };
+  }
+  return null;
+}
 function raiseYoYCard(store, emp) {
   const raises = store.state.raises.filter(r => (r.employer || '').toLowerCase() === emp.toLowerCase() && r.amount != null).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   if (raises.length < 3) return null;
   const card = el('div', 'card');
-  card.appendChild(el('h3', 'strip-title', 'YoY raises vs inflation · ' + emp));
-  const wrap = el('div', 'table-scroll'); const t = el('table', 'data-table');
-  t.innerHTML = '<thead><tr><th>Date</th><th class="num">New gross</th><th class="num">Raise %</th><th class="num">Inflation that year</th><th class="num">Real (vs inflation)</th></tr></thead>';
-  const tb = el('tbody');
-  raises.forEach((r, i) => {
-    const prev = i > 0 ? Number(raises[i - 1].amount) : (r.prevAmount != null ? Number(r.prevAmount) : null);
+  const yh = el('div', 'view-head');
+  yh.appendChild(el('h3', 'strip-title', 'YoY raises vs inflation · ' + emp));
+  yh.appendChild(columnsButton('raiseYoY', RYOY_ALL_COLS, RYOY_ALL_COLS, RYOY_COL_LABELS, 'YoY raise columns'));
+  card.appendChild(yh);
+  // Precompute the chain: each raise's % over the prior one (same basis, and
+  // not across a raise marked standalone), inflation for its calendar year,
+  // and the real (inflation-adjusted) %.
+  const rows = raises.map((r, i) => {
+    const prior = i > 0 && !r.noPrev && (raises[i - 1].basis || 'check') === (r.basis || 'check') ? Number(raises[i - 1].amount) : null;
+    const prev = (r.prevAmount != null && r.prevAmount !== '') ? Number(r.prevAmount) : prior;
     const pct = (prev && prev > 0) ? (Number(r.amount) - prev) / prev * 100 : null;
-    const yr = +String(r.date || '').slice(0, 4);
-    const infl = INFLATION_CPI[yr];
-    const tr = el('tr');
-    tr.appendChild(el('td', null, fmtDate(r.date)));
-    tr.appendChild(numCell(Number(r.amount) || 0, true));
-    const pctTd = el('td', 'num'); pctTd.appendChild(pct == null ? document.createTextNode('—') : el('span', pct >= 0 ? 'pos' : 'neg', (pct >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%')); tr.appendChild(pctTd);
-    const inTd = el('td', 'num'); inTd.textContent = infl != null ? infl.toFixed(1) + '%' : '—'; tr.appendChild(inTd);
-    const realTd = el('td', 'num');
-    if (pct != null && infl != null) { const real = pct - infl; realTd.appendChild(el('span', real >= 0 ? 'pos' : 'neg', (real >= 0 ? '+' : '−') + Math.abs(real).toFixed(1) + '%')); realTd.title = real >= 0 ? 'Beat inflation' : 'Behind inflation'; }
-    else realTd.textContent = '—';
-    tr.appendChild(realTd);
-    tb.appendChild(tr);
+    const infl = INFLATION_CPI[+String(r.date || '').slice(0, 4)];
+    return { date: r.date, amount: r.amount, basis: r.basis, pct, infl: infl != null ? infl : null, real: (pct != null && infl != null) ? pct - infl : null };
   });
-  t.appendChild(tb); wrap.appendChild(t); card.appendChild(wrap);
+  const cols = tableColKeys(store, 'raiseYoY', RYOY_COL_LABELS, RYOY_ALL_COLS).map(k => buildRaiseYoYCol(k)).filter(Boolean);
+  const wrap = el('div', 'table-scroll');
+  wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'asc' }; renderView(currentRoute); }, null));
+  card.appendChild(wrap);
   card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation.'));
   return card;
 }
@@ -2963,6 +2996,7 @@ function raiseModal(existing) {
   const fAmt = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
   const fNet = input(r.net != null ? r.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
   const fPrev = input(r.prevAmount != null ? r.prevAmount : '', { type: 'number', placeholder: '0.00' }); fPrev.step = '0.01';
+  const cNoPrev = checkbox('Doesn’t follow the prior raise', r.noPrev, 'Normally, when Previous is left blank, Clover infers it from this employer’s prior recorded raise. Tick this when that comparison doesn’t apply — e.g. a different role or pay structure.');
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional — promotion, annual review, etc.';
   body.appendChild(field('Employer', fEmp, 'Which job the raise is from — matches your paycheck employer names.'));
   const tRow = el('div', 'two-col');
@@ -2979,7 +3013,11 @@ function raiseModal(existing) {
   amtRow.appendChild(amtField);
   amtRow.appendChild(netField);
   body.appendChild(amtRow);
-  body.appendChild(field('Previous gross (optional)', fPrev, 'Gross before the raise, same basis — enables the change $ and %.'));
+  const prevRow = el('div', 'two-col');
+  prevRow.appendChild(field('Previous gross (optional)', fPrev, 'Gross before the raise, same basis — enables the change $ and %. Left blank, it\u2019s inferred from this employer\u2019s prior recorded raise.'));
+  const npWrap = el('div', 'check-row'); npWrap.appendChild(cNoPrev);
+  prevRow.appendChild(field('If blank', npWrap));
+  body.appendChild(prevRow);
   const amtLbl = amtField.querySelector('span').childNodes[0];
   const netLbl = netField.querySelector('span').childNodes[0];
   const syncBasis = () => {
@@ -2998,7 +3036,7 @@ function raiseModal(existing) {
       store.saveRaise(Object.assign(r, {
         employer: fEmp.value.trim(), title: fTitle.value.trim(), empType: fEmpType.value, date: fDate.value || todayISO(),
         basis: fBasis.value, amount, net: fNet.value === '' ? null : parseFloat(fNet.value),
-        prevAmount: fPrev.value === '' ? null : parseFloat(fPrev.value), notes: fNotes.value.trim()
+        prevAmount: fPrev.value === '' ? null : parseFloat(fPrev.value), noPrev: cNoPrev.__input.checked, notes: fNotes.value.trim()
       }));
       toast(existing ? 'Raise updated' : 'Raise added');
     }
