@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.74 — Flat-year records, orphaned-category rescue, inflation verdicts
+
+- **"No new raise — year record only."** A new checkbox on the raise form
+  logs a year where pay stayed flat: same gross/net, plus that year's
+  hours and totals. These rows render in a lighter grey in both tables
+  (data points, not raises), don't break the "At this pay" duration or the
+  raise count, and show as +0% against that year's inflation in the YoY
+  table — the honest picture of what a flat year cost you in real terms.
+- **Bills with a deleted category are visible again.** A bill or logged
+  expense pointing at a category that no longer exists (deleted or merged
+  in Settings) used to vanish from the expense grid silently — the likely
+  cause of streaming bills not showing. They now appear in a
+  "⚠ No matching category" row, counted in totals, with a hover explaining
+  to edit them and re-pick a category.
+- **Verdict column** on the YoY table: a green "Beat inflation" or red
+  "Didn't beat inflation" tag next to the Real figure.
+
 ### v1.0.73 — Real-vs-inflation now spans the whole stretch at the old pay
 
 Spotted by use: a raise in 2022 after flat pay since 2018 was being
