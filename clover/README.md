@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.78 — Salary years fill the Year gross / Year net columns
+
+For annual-salary raises and year records, the salary and its net are the
+year figures — but the All Raises table's Year gross / Year net columns
+only read the hourly-entry fields, so salary years showed "—" there while
+the numbers sat under New gross / New net. Those columns now mirror the
+salary figures (slightly muted, with a hover note), matching how the YoY
+table and the Actual $/hr math already treated them.
+
 ### v1.0.77 — Actual $/hr, honest raise cards, and panels that pack tight
 
 - **Actual $/hr columns on All Raises** (default): year gross ÷ hours

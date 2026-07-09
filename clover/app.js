@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.77';
+const VERSION = '1.0.78';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2877,8 +2877,8 @@ function buildRaiseCol(store, key) {
         td.title = d.ongoing ? 'Still at this pay — counting up until the next raise' : 'How long this pay level lasted before the next raise';
         return td; } };
     case 'hoursYear': return { label: 'Hours (yr)', key: 'hoursYear', num: true, value: r => r.hoursYear != null ? Number(r.hoursYear) : -1, cell: r => el('td', 'num', r.hoursYear != null && r.hoursYear !== '' ? Number(r.hoursYear).toLocaleString('en-US') : '—') };
-    case 'yearGross': return { label: 'Year gross', key: 'yearGross', num: true, value: r => r.yearGross != null ? Number(r.yearGross) : -1, cell: r => r.yearGross != null && r.yearGross !== '' ? numCell(Number(r.yearGross)) : el('td', 'num', '—') };
-    case 'yearNet': return { label: 'Year net', key: 'yearNet', num: true, value: r => r.yearNet != null ? Number(r.yearNet) : -1, cell: r => r.yearNet != null && r.yearNet !== '' ? numCell(Number(r.yearNet)) : el('td', 'num', '—') };
+    case 'yearGross': return { label: 'Year gross', key: 'yearGross', num: true, value: r => { const f = raiseYearFig(r, 'gross'); return f != null ? f : -1; }, cell: r => { const f = raiseYearFig(r, 'gross'); if (f == null) return el('td', 'num', '—'); const td = numCell(f); if (r.basis === 'annual') { td.classList.add('muted'); td.title = 'The annual salary itself — for salary years the year figure is the salary'; } return td; } };
+    case 'yearNet': return { label: 'Year net', key: 'yearNet', num: true, value: r => { const f = raiseYearFig(r, 'net'); return f != null ? f : -1; }, cell: r => { const f = raiseYearFig(r, 'net'); if (f == null) return el('td', 'num', '—'); const td = numCell(f); if (r.basis === 'annual') { td.classList.add('muted'); td.title = 'Mirrored from the annual net — for salary years the year figure is the salary’s net'; } return td; } };
     case 'actGross': return { label: 'Actual $/hr (gross)', key: 'actGross', num: true, value: r => { const f = raiseYearFig(r, 'gross'), hh = Number(r.hoursYear); return (f != null && hh > 0) ? f / hh : -1; }, cell: r => { const f = raiseYearFig(r, 'gross'), hh = Number(r.hoursYear); if (f == null || !(hh > 0)) return el('td', 'num', '—'); const td = el('td', 'num', '$' + (f / hh).toFixed(2)); td.title = money(f) + ' year gross ÷ ' + hh.toLocaleString('en-US') + ' hours worked'; return td; } };
     case 'actNet': return { label: 'Actual $/hr (net)', key: 'actNet', num: true, value: r => { const f = raiseYearFig(r, 'net'), hh = Number(r.hoursYear); return (f != null && hh > 0) ? f / hh : -1; }, cell: r => { const f = raiseYearFig(r, 'net'), hh = Number(r.hoursYear); if (f == null || !(hh > 0)) return el('td', 'num', '—'); const td = el('td', 'num', '$' + (f / hh).toFixed(2)); td.title = money(f) + ' year net ÷ ' + hh.toLocaleString('en-US') + ' hours worked'; return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
