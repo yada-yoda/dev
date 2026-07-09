@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.72';
+const VERSION = '1.0.73';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2904,7 +2904,7 @@ function employerProfileCard(store, emp) {
   return card;
 }
 // YoY raise analysis vs inflation (shown once an employer has 3+ raises).
-const RYOY_COL_LABELS = { date: 'Date', basis: 'Amounts are', empType: 'Employment', amount: 'New gross', yearGross: 'Year gross', yearNet: 'Year net', hours: 'Hours (yr)', hoursDelta: 'Hours vs prior yr', pct: 'Raise %', inflation: 'Inflation that year', real: 'Real (vs inflation)' };
+const RYOY_COL_LABELS = { date: 'Date', basis: 'Amounts are', empType: 'Employment', amount: 'New gross', yearGross: 'Year gross', yearNet: 'Year net', hours: 'Hours (yr)', hoursDelta: 'Hours vs prior yr', pct: 'Raise %', inflation: 'Inflation since prior raise', real: 'Real (vs inflation)' };
 const RYOY_ALL_COLS = ['date', 'basis', 'empType', 'amount', 'yearGross', 'yearNet', 'hours', 'hoursDelta', 'pct', 'inflation', 'real'];
 const RYOY_DEFAULT_COLS = ['date', 'basis', 'empType', 'amount', 'yearGross', 'hours', 'hoursDelta', 'pct', 'inflation', 'real'];
 function basisLabel(b) { return b === 'annual' ? 'Annual salary' : b === 'hourly' ? 'Hourly rate' : 'Per paycheck'; }
@@ -2934,8 +2934,8 @@ function buildRaiseYoYCol(key) {
     case 'hours': return { label: 'Hours (yr)', key: 'hours', num: true, value: x => x.hours != null ? Number(x.hours) : -1, cell: x => el('td', 'num', x.hours != null && x.hours !== '' ? Number(x.hours).toLocaleString('en-US') : '—') };
     case 'hoursDelta': return { label: 'Hours vs prior yr', key: 'hoursDelta', num: true, value: x => x.hoursDelta == null ? -1e9 : x.hoursDelta, cell: x => { const td = pctCell(x.hoursDelta, ['Worked more hours than the prior recorded year', 'Worked fewer hours than the prior recorded year']); return td; } };
     case 'pct': return { label: 'Raise %', key: 'pct', num: true, value: x => x.pct == null ? -1e9 : x.pct, cell: x => { const td = pctCell(x.pct); if (x.pct != null && x.pctAnnualized) td.title = 'Compared on annual totals (hourly year vs salary)'; return td; } };
-    case 'inflation': return { label: 'Inflation that year', key: 'inflation', num: true, value: x => x.infl == null ? -1e9 : x.infl, cell: x => el('td', 'num', x.infl != null ? x.infl.toFixed(1) + '%' : '—') };
-    case 'real': return { label: 'Real (vs inflation)', key: 'real', num: true, value: x => x.real == null ? -1e9 : x.real, cell: x => pctCell(x.real, ['Beat inflation', 'Behind inflation']) };
+    case 'inflation': return { label: 'Inflation since prior raise', key: 'inflation', num: true, value: x => x.infl == null ? -1e9 : x.infl, cell: x => { const td = el('td', 'num'); if (x.infl == null) { td.textContent = '—'; return td; } td.textContent = x.infl.toFixed(1) + '%'; if (x.inflFrom !== x.inflTo) { td.appendChild(el('span', 'muted', ' over ' + (x.inflTo - x.inflFrom + 1) + ' yrs')); td.title = 'CPI-U compounded across ' + x.inflFrom + '–' + x.inflTo + ' — the whole stretch at the old pay'; } else td.title = 'CPI-U annual average for ' + x.inflTo; return td; } };
+    case 'real': return { label: 'Real (vs inflation)', key: 'real', num: true, value: x => x.real == null ? -1e9 : x.real, cell: x => pctCell(x.real, ['Beat the cumulative inflation since the prior raise', 'Behind the cumulative inflation since the prior raise']) };
   }
   return null;
 }
@@ -2976,16 +2976,28 @@ function raiseYoYCard(store, emp) {
     let hoursDelta = null;
     if (r.hoursYear != null && r.hoursYear !== '' && prevR && prevR.hoursYear != null && prevR.hoursYear !== '' && Number(prevR.hoursYear) > 0)
       hoursDelta = (Number(r.hoursYear) - Number(prevR.hoursYear)) / Number(prevR.hoursYear) * 100;
-    const infl = INFLATION_CPI[+String(r.date || '').slice(0, 4)];
+    // Inflation ACCUMULATES across the whole span at the old pay: a raise in
+    // 2022 after flat pay since 2018 is measured against 2019–2022 price
+    // growth compounded, not just 2022's. Real % uses the proper ratio,
+    // (1 + raise) / (1 + inflation) − 1.
+    const yr = +String(r.date || '').slice(0, 4);
+    const prevYr = prevR ? +String(prevR.date || '').slice(0, 4) : null;
+    const spanYears = [];
+    if (prevYr != null && yr > prevYr) { for (let y = prevYr + 1; y <= yr; y++) spanYears.push(y); }
+    else spanYears.push(yr);
+    let cum = 1, inflOk = true;
+    spanYears.forEach(y => { const v = INFLATION_CPI[y]; if (v == null) inflOk = false; else cum *= (1 + v / 100); });
+    const infl = inflOk ? (cum - 1) * 100 : null;
+    const real = (pct != null && infl != null) ? ((1 + pct / 100) / (1 + infl / 100) - 1) * 100 : null;
     return { date: r.date, amount: r.amount, basis: r.basis, empType: r.empType,
       annualG: annualOf(r), annualDerived: r.basis === 'annual', yearNet: r.basis === 'annual' ? r.net : r.yearNet, hours: r.hoursYear, hoursDelta,
-      pct, pctAnnualized, infl: infl != null ? infl : null, real: (pct != null && infl != null) ? pct - infl : null };
+      pct, pctAnnualized, infl, inflFrom: spanYears[0], inflTo: spanYears[spanYears.length - 1], real };
   });
   const cols = tableColKeys(store, 'raiseYoY', RYOY_COL_LABELS, RYOY_DEFAULT_COLS).map(k => buildRaiseYoYCol(k)).filter(Boolean);
   const wrap = el('div', 'table-scroll');
   wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
   card.appendChild(wrap);
-  card.appendChild(el('div', 'sum-hint', 'Inflation is itself a year-over-year figure — the % change in US consumer prices (CPI-U annual average) vs the prior year (2025 preliminary) — so it’s on the same YoY basis as your raise %. “Real” = raise % minus inflation. Year gross for an hourly year is the recorded total paid; for a salary year it’s the salary itself — those annual figures are what let an hourly year compare against a salary.'));
+  card.appendChild(el('div', 'sum-hint', 'Inflation compounds the US CPI-U annual averages (2025 preliminary) across every year since the prior raise — pay that stayed flat 2018→2022 is measured against 2019–2022 price growth, not just 2022’s. “Real” adjusts the raise for that cumulative inflation: (1 + raise) ÷ (1 + inflation) − 1. Year gross for an hourly year is the recorded total paid; for a salary year it’s the salary itself — those annual figures are what let an hourly year compare against a salary.'));
   return card;
 }
 

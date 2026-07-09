@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.73 — Real-vs-inflation now spans the whole stretch at the old pay
+
+Spotted by use: a raise in 2022 after flat pay since 2018 was being
+compared against 2022's inflation alone, making it look like it beat
+inflation by a mile when prices had actually been climbing for four years.
+The inflation column is now **"Inflation since prior raise"** — the CPI-U
+annual averages compounded across every year since the previous raise
+("16.5% over 4 yrs", hover for the exact span) — and Real uses the proper
+ratio adjustment, (1 + raise) ÷ (1 + inflation) − 1. Raises in consecutive
+years behave as before (single-year inflation).
+
 ### v1.0.72 — Clarify that inflation is already YoY
 
 The YoY-raises footnote now says explicitly that the inflation column is
