@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.81 — Zero stat cards say $0.00
+
+"Spending · Jul" showing just a line was the app's grid convention for
+zero ("–") leaking onto a big stat card, where it reads like something's
+broken. The dashboard Key numbers now show an explicit $0.00 when a value
+is zero, and the Spending card explains its scope — logged expenses only;
+recurring bills live in the "Recurring / mo" card and both feed the
+"Net" math.
+
 ### v1.0.80 — Stat-card progress bars, raises panels, cancelable layout edits
 
 - **Progress bars on the Bills & Subscriptions cards.** Total monthly,

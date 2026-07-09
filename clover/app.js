@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.80';
+const VERSION = '1.0.81';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3848,13 +3848,16 @@ function pagePanelState(store, pageKey, defs) {
 function dashPanelState(store) { return pagePanelState(store, 'dashboard', DASH_PANEL_DEFS); }
 function dashKpisBody(ctx) {
   const kpis = el('div', 'sub-summary');
-  kpis.appendChild(kpiCard('Income · ' + ctx.monthName, money(ctx.incThisMonth), 'income'));
-  kpis.appendChild(kpiCard('Spending · ' + ctx.monthName, money(ctx.spendThisMonth), 'expense'));
-  kpis.appendChild(kpiCard('Recurring / mo', money(ctx.recurringMonthly), 'expense', money(ctx.recurringAnnual) + ' / yr'));
-  kpis.appendChild(kpiCard('Net · ' + ctx.monthName, money(ctx.netThisMonth), ctx.netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
-  kpis.appendChild(kpiCard('Should be left / mo', money(ctx.shouldLeft), ctx.shouldLeft < 0 ? 'expense' : 'income', 'avg take-home − bills − avg spend'));
-  kpis.appendChild(kpiCard('Projected income', money(ctx.projAnnualIncome), 'income', 'annualized from YTD'));
-  kpis.appendChild(kpiCard('Projected expenses', money(ctx.projAnnualExpense), 'expense', 'subs + annualized spend'));
+  // On big stat cards a zero shows as $0.00 — the grid's "–" convention reads
+  // like a broken card here.
+  const m0 = v => (Number(v) || 0) === 0 ? '$0.00' : money(v);
+  kpis.appendChild(kpiCard('Income · ' + ctx.monthName, m0(ctx.incThisMonth), 'income'));
+  kpis.appendChild(kpiCard('Spending · ' + ctx.monthName, m0(ctx.spendThisMonth), 'expense', 'logged expenses only — bills are in Recurring / mo'));
+  kpis.appendChild(kpiCard('Recurring / mo', m0(ctx.recurringMonthly), 'expense', money(ctx.recurringAnnual) + ' / yr'));
+  kpis.appendChild(kpiCard('Net · ' + ctx.monthName, m0(ctx.netThisMonth), ctx.netThisMonth < 0 ? 'expense' : 'income', 'take-home − spend − bills'));
+  kpis.appendChild(kpiCard('Should be left / mo', m0(ctx.shouldLeft), ctx.shouldLeft < 0 ? 'expense' : 'income', 'avg take-home − bills − avg spend'));
+  kpis.appendChild(kpiCard('Projected income', m0(ctx.projAnnualIncome), 'income', 'annualized from YTD'));
+  kpis.appendChild(kpiCard('Projected expenses', m0(ctx.projAnnualExpense), 'expense', 'subs + annualized spend'));
   return kpis;
 }
 // Share of the year's income that interest / dividends / investments make up,
