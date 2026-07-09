@@ -449,6 +449,7 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
 .trend { font-size: 10px; margin-left: 1px; vertical-align: middle; }
+.rec-mark { font-size: 10px; color: var(--text-faint); margin-left: 3px; }
 .trend.up { color: var(--expense); }
 .trend.down { color: var(--income); }
 .trend.flat { color: var(--text-faint); }

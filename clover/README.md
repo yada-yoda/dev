@@ -45,6 +45,29 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.53 — Expense grid: subcategories, honest past years, and Housing for everyone
+
+- **Recurring bills now land on their subcategory rows.** In the expense
+  annual grid, a bill assigned to a subcategory (e.g. HOA dues under
+  Housing → HOA) shows its monthly estimate on that subcategory's row
+  instead of a lump "Recurring bills" line. Bills without a subcategory
+  stay in a "↻ Recurring bills (no subcategory)" row. Every amount that
+  includes a recurring estimate gets a small ↻ marker (hover it for the
+  explanation), so estimates and logged actuals are distinguishable at a
+  glance.
+- **Year switching on Expenses actually changes the numbers now.** Bills
+  have no start/end history, so their estimates were being projected into
+  past years identically — switching from 2026 to 2023 looked like nothing
+  happened. Recurring estimates now apply from the current year forward;
+  past years show logged expenses only, with a note explaining why. Reports
+  charts follow the same rule.
+- **"Mortgage / Rent" is now "Housing" for existing data too.** v1.0.50's
+  seed rename and default subcategories only applied to brand-new accounts.
+  A one-time migration now renames your "Mortgage / Rent" group to Housing
+  (skipped if you already made your own Housing group) and adds the missing
+  default subcategories (HOA, Property Tax, etc.) to seed-named categories —
+  purely additive, never touching or renaming anything you created.
+
 ### v1.0.52 — Columns button shares the filter row
 
 On Paychecks and Bills & Subscriptions, the ⚙ Columns button sat alone on

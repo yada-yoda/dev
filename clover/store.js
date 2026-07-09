@@ -63,6 +63,28 @@ export const ACCOUNT_TYPES = [
   'Retirement', 'Cash App / Payment', 'Other'
 ];
 
+// One-time additive migration for accounts created before v1.0.50's seed
+// defaults existed: rename "Mortgage / Rent" to "Housing" (unless the user
+// already has a Housing group) and add any missing default subcategories to
+// seed-named expense groups. Never removes or renames anything user-made.
+function migrateExpenseSeeds(cats) {
+  if (!Array.isArray(cats)) return false;
+  let changed = false;
+  const norm = s => (s || '').trim().toLowerCase();
+  const mr = cats.find(c => norm(c.name) === 'mortgage / rent');
+  if (mr && !cats.some(c => norm(c.name) === 'housing')) { mr.name = 'Housing'; changed = true; }
+  SEED_EXPENSE_GROUPS.forEach(it => {
+    if (typeof it === 'string' || !it.subs || !it.subs.length) return;
+    const g = cats.find(c => norm(c.name) === norm(it.name));
+    if (!g) return;
+    if (!Array.isArray(g.subs)) g.subs = [];
+    it.subs.forEach(sn => {
+      if (!g.subs.some(s => norm(s.name) === norm(sn))) { g.subs.push({ id: mkId('sub'), name: sn }); changed = true; }
+    });
+  });
+  return changed;
+}
+
 function seedGroups(items) {
   return items.map((it, i) => {
     const name = typeof it === 'string' ? it : it.name;
@@ -189,6 +211,7 @@ function apply(data) {
   state.persons = s.persons;
   state.incomeCategories = s.incomeCategories;
   state.expenseCategories = s.expenseCategories;
+  if (migrateExpenseSeeds(state.expenseCategories)) scheduleSave();
   state.accounts = s.accounts;
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;

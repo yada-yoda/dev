@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.52';
+const VERSION = '1.0.53';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1681,17 +1681,31 @@ function expenseAmount(e) { return Number(e.amount) || 0; }
 // Normalized monthly cost of active recurring bills in a category, spread across
 // all 12 months — EXCEPT months where a logged payment is linked to that bill
 // (the actual overrides the estimate, so it isn't double-counted).
-function recurringMonthsForCategory(store, catId, payments) {
+// Recurring-bill estimates only make sense from the current year forward —
+// bills have no start/end history, so projecting them into past years would
+// overwrite what those years actually looked like.
+function recurringAppliesTo(year) { return year >= new Date().getFullYear(); }
+// Per-category recurring estimates, split by the bill's assigned subcategory:
+// { total, subs: {subId: months[]}, none: months[] }. validSubIds keeps bills
+// pointing at a deleted subcategory in the "no subcategory" bucket.
+function recurringMonthsBy(store, catId, payments, validSubIds) {
   const bills = store.state.recurring.filter(isSubActive).filter(r => r.categoryId === catId);
-  const m = new Array(12).fill(0);
+  const out = { total: new Array(12).fill(0), subs: {}, none: new Array(12).fill(0) };
   bills.forEach(bill => {
     const me = monthlyEquiv(bill);
+    const subOk = bill.subId && (!validSubIds || validSubIds.has(bill.subId));
     for (let mi = 0; mi < 12; mi++) {
       const overridden = payments.some(p => p.recurringId === bill.id && monthIdx(p.date) === mi);
-      if (!overridden) m[mi] += me;
+      if (overridden) continue;
+      out.total[mi] += me;
+      if (subOk) (out.subs[bill.subId] = out.subs[bill.subId] || new Array(12).fill(0))[mi] += me;
+      else out.none[mi] += me;
     }
   });
-  return m;
+  return out;
+}
+function recurringMonthsForCategory(store, catId, payments) {
+  return recurringMonthsBy(store, catId, payments).total;
 }
 
 function renderExpenses(view) {
@@ -1706,8 +1720,9 @@ function renderExpenses(view) {
   left.appendChild(el('h3', null, 'Expenses · ' + activeYear));
   const total = data.expensePayments.reduce((s, e) => s + expenseAmount(e), 0);
   const n = data.expensePayments.length;
+  const recApplies = recurringAppliesTo(activeYear);
   left.appendChild(el('p', 'muted', money(total) + ' logged · ' + n + ' entr' + (n === 1 ? 'y' : 'ies') +
-    (expenseIncludeRecurring && hasBills ? ' + recurring bills' : '')));
+    (expenseIncludeRecurring && hasBills && recApplies ? ' + recurring bills' : '')));
   head.appendChild(left);
 
   const right = el('div', 'head-actions');
@@ -1718,7 +1733,7 @@ function renderExpenses(view) {
     tabs.appendChild(b);
   });
   right.appendChild(tabs);
-  if (expenseTab === 'grid' && hasBills) {
+  if (expenseTab === 'grid' && hasBills && recApplies) {
     const toggle = checkbox('Include bills', expenseIncludeRecurring, 'Roll active recurring bills (from Bills & Subscriptions) into the grid at their normalized monthly cost. A logged expense linked to a bill overrides its estimate for that month.');
     toggle.__input.addEventListener('change', () => { expenseIncludeRecurring = toggle.__input.checked; renderView(currentRoute); });
     right.appendChild(toggle);
@@ -1730,6 +1745,8 @@ function renderExpenses(view) {
   view.appendChild(head);
 
   const yt = yearTabs(store2, 'expenses'); if (yt) view.appendChild(yt);
+  if (expenseTab === 'grid' && hasBills && !recApplies)
+    view.appendChild(el('p', 'muted', 'Past year — showing logged expenses only. Recurring-bill estimates apply from the current year forward, so switching years changes the numbers.'));
   view.appendChild(expenseTab === 'grid' ? expenseGrid(data) : expenseList(data));
 }
 
@@ -1743,35 +1760,49 @@ function expenseGrid(data) {
   const grand = new Array(12).fill(0);
 
   const monthsFor = list => { const m = new Array(12).fill(0); list.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += expenseAmount(e); }); return m; };
-  const addRow = (cls, label, monthly, onClick, caret) => {
+  // recMask marks the months whose amount includes a recurring-bill estimate —
+  // those cells get a small ↻ next to the amount.
+  const addRow = (cls, label, monthly, onClick, caret, recMask) => {
     const tr = el('tr', cls);
     const c0 = el('td', cls.includes('sub-row') ? 'sub-name' : 'grp-name');
     if (caret != null) { c0.appendChild(el('span', 'caret', caret)); c0.appendChild(document.createTextNode(' ' + label)); }
     else c0.textContent = label;
     if (onClick) { c0.style.cursor = 'pointer'; c0.addEventListener('click', onClick); }
     tr.appendChild(c0);
-    monthly.forEach(v => tr.appendChild(numCell(v)));
-    tr.appendChild(numCell(monthly.reduce((a, b) => a + b, 0), true));
+    const mark = td => { td.appendChild(el('span', 'rec-mark', '↻')); td.title = 'Includes recurring-bill estimate'; return td; };
+    monthly.forEach((v, i) => { const td = numCell(v); if (recMask && recMask[i] && v) mark(td); tr.appendChild(td); });
+    const ytdTd = numCell(monthly.reduce((a, b) => a + b, 0), true);
+    if (recMask && recMask.some(Boolean)) mark(ytdTd);
+    tr.appendChild(ytdTd);
     tr.appendChild(numCell(avgOf(monthly), true));
     return tr;
   };
 
+  const recOn = expenseIncludeRecurring && recurringAppliesTo(activeYear);
   groups.forEach(g => {
     const gEntries = entries.filter(e => e.categoryId === g.id);
     const monthly = monthsFor(gEntries);
-    const rec = expenseIncludeRecurring ? recurringMonthsForCategory(store, g.id, entries) : new Array(12).fill(0);
+    const validSubs = new Set(g.subs.map(s => s.id));
+    const recBy = recOn ? recurringMonthsBy(store, g.id, entries, validSubs) : null;
+    const rec = recBy ? recBy.total : new Array(12).fill(0);
     const hasRec = rec.some(v => v > 0);
     for (let i = 0; i < 12; i++) monthly[i] += rec[i];
     monthly.forEach((v, i) => grand[i] += v);
     const open = expandedExpenseGroups.has(g.id);
     tb.appendChild(addRow('grp-row', g.name, monthly,
       () => { open ? expandedExpenseGroups.delete(g.id) : expandedExpenseGroups.add(g.id); renderView(currentRoute); },
-      open ? '▾' : '▸'));
+      open ? '▾' : '▸', hasRec ? rec.map(v => v > 0) : null));
     if (open) {
-      g.subs.forEach(sub => tb.appendChild(addRow('sub-row', sub.name, monthsFor(gEntries.filter(e => e.subId === sub.id)))));
+      g.subs.forEach(sub => {
+        const subMonths = monthsFor(gEntries.filter(e => e.subId === sub.id));
+        const subRec = recBy && recBy.subs[sub.id];
+        if (subRec) for (let i = 0; i < 12; i++) subMonths[i] += subRec[i];
+        tb.appendChild(addRow('sub-row', sub.name, subMonths, null, null, subRec ? subRec.map(v => v > 0) : null));
+      });
       const noSub = gEntries.filter(e => !e.subId || !g.subs.some(s => s.id === e.subId));
       if (noSub.length) tb.appendChild(addRow('sub-row', '(no subcategory)', monthsFor(noSub)));
-      if (hasRec) tb.appendChild(addRow('sub-row', '↻ Recurring bills', rec));
+      const recNone = recBy ? recBy.none : new Array(12).fill(0);
+      if (recNone.some(v => v > 0)) tb.appendChild(addRow('sub-row', '↻ Recurring bills (no subcategory)', recNone, null, null, recNone.map(v => v > 0)));
     }
   });
 
@@ -3557,7 +3588,7 @@ function monthlyRecurringTotals(store, payments) {
 function monthlyExpenseTotals(store, data, includeRecurring) {
   const m = new Array(12).fill(0);
   data.expensePayments.forEach(e => { const mi = monthIdx(e.date); if (mi >= 0) m[mi] += expenseAmount(e); });
-  if (includeRecurring) { const rec = monthlyRecurringTotals(store, data.expensePayments); for (let i = 0; i < 12; i++) m[i] += rec[i]; }
+  if (includeRecurring && recurringAppliesTo(activeYear)) { const rec = monthlyRecurringTotals(store, data.expensePayments); for (let i = 0; i < 12; i++) m[i] += rec[i]; }
   return m;
 }
 function wageMonthly(data, field) {
@@ -3568,7 +3599,7 @@ function wageMonthly(data, field) {
 function expenseByCategoryFull(store, data) {
   const m = {};
   data.expensePayments.forEach(e => { const g = store.expenseGroupName(e.categoryId); m[g] = (m[g] || 0) + expenseAmount(e); });
-  store.state.expenseCategories.forEach(cat => { const rec = recurringMonthsForCategory(store, cat.id, data.expensePayments).reduce((a, b) => a + b, 0); if (rec > 0) m[cat.name] = (m[cat.name] || 0) + rec; });
+  if (recurringAppliesTo(activeYear)) store.state.expenseCategories.forEach(cat => { const rec = recurringMonthsForCategory(store, cat.id, data.expensePayments).reduce((a, b) => a + b, 0); if (rec > 0) m[cat.name] = (m[cat.name] || 0) + rec; });
   return m;
 }
 function expenseByAccount(store, data) {
