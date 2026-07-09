@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.75 — Cross-basis previous + readable durations
+
+- **Previous bridges bases via annual totals.** A raise whose prior record
+  is on a different basis (e.g. a salary raise following an hourly year)
+  no longer shows an empty Previous — when both sides have an annual
+  figure (the salary itself, or the hourly year's recorded gross annual
+  earned), the comparison runs on those totals: Previous shows the prior
+  year's annual figure (/yr), and Change $/% is computed against your own
+  annual figure, with a hover explaining it.
+- **"At this pay" adds a human breakdown** under the day count —
+  "797 days (2 yrs, 2 mo, 5 days)" — for both finished and still-counting
+  pay levels.
+
 ### v1.0.74 — Flat-year records, orphaned-category rescue, inflation verdicts
 
 - **"No new raise — year record only."** A new checkbox on the raise form

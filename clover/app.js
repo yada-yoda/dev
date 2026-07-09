@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.74';
+const VERSION = '1.0.75';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2781,13 +2781,25 @@ let raiseYoYFilter = null;   // {key:'basis'|'empType', value} from clicking a Y
 // Effective previous amount for a raise: the entered one, else inferred from
 // the prior same-employer raise on the same basis — unless the raise is
 // marked standalone (noPrev, e.g. a job/role change makes them incomparable).
+function raiseAnnualOf(x) { return x.basis === 'annual' ? Number(x.amount) : (x.basis === 'hourly' && x.yearGross != null && x.yearGross !== '') ? Number(x.yearGross) : null; }
 function raisePrev(store, r) {
   if (r.prevAmount != null && r.prevAmount !== '') return { v: Number(r.prevAmount), derived: false };
   if (r.noPrev) return null;
-  const prior = store.state.raises
-    .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') < (r.date || '') && (x.basis || 'check') === (r.basis || 'check') && x.amount != null)
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
-  return prior ? { v: Number(prior.amount), derived: true } : null;
+  const priors = store.state.raises
+    .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') < (r.date || '') && x.amount != null)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (!priors.length) return null;
+  // Immediately prior record: same basis compares directly; a different basis
+  // can still compare when BOTH sides have an annual figure (a salary's
+  // amount, or an hourly year's recorded Year gross) — e.g. a salary raise
+  // following an hourly year uses that year's gross annual earned.
+  const im = priors[0];
+  if ((im.basis || 'check') === (r.basis || 'check')) return { v: Number(im.amount), derived: true };
+  const a = raiseAnnualOf(r), pa = raiseAnnualOf(im);
+  if (a != null && pa != null) return { v: pa, derived: true, annualized: true };
+  // Otherwise fall back to the latest prior raise on the same basis.
+  const same = priors.find(x => (x.basis || 'check') === (r.basis || 'check'));
+  return same ? { v: Number(same.amount), derived: true } : null;
 }
 // How long this pay level lasted: until the employer's NEXT raise, or counting
 // up to today for the latest one.
@@ -2796,7 +2808,21 @@ function raiseDurationDays(store, r) {
   const next = store.state.raises
     .filter(x => x.id !== r.id && !x.noRaise && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') > (r.date || ''))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
-  return { days: daysBetweenISO(next ? next.date : todayISO(), r.date), ongoing: !next };
+  const end = next ? next.date : todayISO();
+  return { days: daysBetweenISO(end, r.date), ongoing: !next, end };
+}
+// Calendar breakdown from one ISO date to a later one: whole years, months, days.
+function ymdBetween(fromIso, toIso) {
+  const a = parseISODate(fromIso), b = parseISODate(toIso);
+  if (!a || !b || b < a) return null;
+  let y = b.getFullYear() - a.getFullYear(), m = b.getMonth() - a.getMonth(), d = b.getDate() - a.getDate();
+  if (d < 0) { m--; d += new Date(b.getFullYear(), b.getMonth(), 0).getDate(); }
+  if (m < 0) { y--; m += 12; }
+  const parts = [];
+  if (y) parts.push(y + ' yr' + (y === 1 ? '' : 's'));
+  if (m) parts.push(m + ' mo');
+  if (d) parts.push(d + ' day' + (d === 1 ? '' : 's'));
+  return parts.length ? parts.join(', ') : 'same day';
 }
 const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', hoursYear: 'Hours (yr)', yearGross: 'Year gross', yearNet: 'Year net', notes: 'Notes' };
 const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'hoursYear', 'yearGross', 'yearNet', 'notes'];
@@ -2823,21 +2849,25 @@ function buildRaiseCol(store, key) {
     case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
     case 'amount': return { label: 'New gross', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => { const td = numCell(Number(r.amount) || 0, true); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
     case 'net': return { label: 'New net', key: 'net', num: true, value: r => r.net != null ? Number(r.net) : 0, cell: r => { if (r.net == null || r.net === '') return el('td', 'num', '—'); const td = numCell(Number(r.net)); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
-    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => { const pv = raisePrev(store, r); return pv ? pv.v : 0; }, cell: r => { const pv = raisePrev(store, r); if (!pv) return el('td', 'num', '—'); const td = numCell(pv.v); td.appendChild(el('span', 'muted', raiseSuf(r))); if (pv.derived) { td.classList.add('muted'); td.title = 'Inferred from this employer’s prior raise (tick “doesn’t follow the prior raise” on the raise to stop this)'; } return td; } };
-    case 'change': return { label: 'Change', key: 'change', num: true, value: r => { const pv = raisePrev(store, r); return (pv && r.amount != null) ? Number(r.amount) - pv.v : 0; }, cell: r => {
+    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => { const pv = raisePrev(store, r); return pv ? pv.v : 0; }, cell: r => { const pv = raisePrev(store, r); if (!pv) return el('td', 'num', '—'); const td = numCell(pv.v); td.appendChild(el('span', 'muted', pv.annualized ? ' /yr' : raiseSuf(r))); if (pv.derived) { td.classList.add('muted'); td.title = pv.annualized ? 'The prior record’s annual figure (its gross annual earned) — bases differ, so the comparison runs on annual totals' : 'Inferred from this employer’s prior raise (tick “doesn’t follow the prior raise” on the raise to stop this)'; } return td; } };
+    case 'change': return { label: 'Change', key: 'change', num: true, value: r => { const pv = raisePrev(store, r); if (!pv || r.amount == null) return 0; const cur = pv.annualized ? raiseAnnualOf(r) : Number(r.amount); return cur != null ? cur - pv.v : 0; }, cell: r => {
         const td = el('td', 'num');
         const pv = raisePrev(store, r);
         if (!pv || r.amount == null) { td.textContent = '—'; return td; }
-        const diff = Number(r.amount) - pv.v;
+        const cur = pv.annualized ? raiseAnnualOf(r) : Number(r.amount);
+        if (cur == null) { td.textContent = '—'; return td; }
+        const diff = cur - pv.v;
         const pct = pv.v > 0 ? (diff / pv.v * 100) : null;
         const span = el('span', diff >= 0 ? 'pos' : 'neg', (diff >= 0 ? '+' : '−') + money(Math.abs(diff)) + (pct != null ? ' (' + (diff >= 0 ? '+' : '−') + Math.abs(pct).toFixed(1) + '%)' : ''));
-        if (pv.derived) span.title = 'Previous inferred from this employer’s prior raise';
+        span.title = pv.annualized ? 'Compared on annual totals — the bases differ' : (pv.derived ? 'Previous inferred from this employer’s prior raise' : '');
         td.appendChild(span); return td; } };
     case 'gap': return { label: 'At this pay', key: 'gap', num: true, value: r => r.noRaise ? -1 : raiseDurationDays(store, r).days, cell: r => {
         const td = el('td', 'num');
         if (r.noRaise) { td.textContent = '—'; td.title = 'Year record, not a raise — the running pay level owns the duration'; return td; }
         const d = raiseDurationDays(store, r);
         td.textContent = d.days + ' days' + (d.ongoing ? ' · counting' : '');
+        const ymd = ymdBetween(r.date, d.end);
+        if (ymd) td.appendChild(el('div', 'acct-sub', '(' + ymd + ')'));
         td.title = d.ongoing ? 'Still at this pay — counting up until the next raise' : 'How long this pay level lasted before the next raise';
         return td; } };
     case 'hoursYear': return { label: 'Hours (yr)', key: 'hoursYear', num: true, value: r => r.hoursYear != null ? Number(r.hoursYear) : -1, cell: r => el('td', 'num', r.hoursYear != null && r.hoursYear !== '' ? Number(r.hoursYear).toLocaleString('en-US') : '—') };
