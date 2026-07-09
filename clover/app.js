@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.79';
+const VERSION = '1.0.80';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1574,12 +1574,17 @@ function renderSubscriptions(view) {
   netCard.appendChild(el('div', 'sum-hint', 'net pay ÷ 12 (annualized)'));
   sum.appendChild(netCard);
   const fHint = narrowed ? 'filtered view — active rows shown below' : undefined;
-  sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense', fHint));
-  sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense', fHint));
+  const barOf = (pct, tone, title) => net > 0 ? { pct, tone, title } : null;
+  sum.appendChild(sumCard('Total monthly', money(totalMonthly), 'expense', fHint,
+    barOf(totalMonthly / net * 100, 'expense', net > 0 ? (totalMonthly / net * 100).toFixed(1) + '% of net monthly income' : '')));
+  sum.appendChild(sumCard('Total annual', money(totalAnnual), 'expense', fHint,
+    barOf(totalAnnual / (net * 12) * 100, 'expense', net > 0 ? (totalAnnual / (net * 12) * 100).toFixed(1) + '% of annual net income' : '')));
   if (net > 0) {
     const unalloc = net - totalMonthly;
-    sum.appendChild(sumCard('Left after subs', money(unalloc), unalloc < 0 ? 'expense' : 'income', fHint));
-    sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral', fHint));
+    sum.appendChild(sumCard('Left after subs', money(unalloc), unalloc < 0 ? 'expense' : 'income', fHint,
+      barOf(unalloc / net * 100, unalloc < 0 ? 'expense' : 'income', (unalloc / net * 100).toFixed(1) + '% of net income left over')));
+    sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral', fHint,
+      barOf(totalMonthly / net * 100, 'neutral', (totalMonthly / net * 100).toFixed(1) + '% of net income goes to bills')));
   }
   view.appendChild(sum);
 
@@ -1649,11 +1654,20 @@ function renderSubscriptions(view) {
   }
 }
 
-function sumCard(label, value, tone, hint) {
+function sumCard(label, value, tone, hint, bar) {
   const c = el('div', 'sum-card');
   c.appendChild(el('div', 'sum-label', label));
   c.appendChild(el('div', 'sum-value ' + (tone || ''), value));
   if (hint) c.appendChild(el('div', 'sum-hint', hint));
+  // Optional progress bar: bar = { pct (0..100+, clamped for width), tone }.
+  if (bar && bar.pct != null && isFinite(bar.pct)) {
+    const track = el('div', 'sum-bar');
+    const fill = el('div', 'sum-bar-fill ' + (bar.pct > 100 ? 'expense' : (bar.tone || 'neutral')));
+    fill.style.width = Math.max(0, Math.min(100, bar.pct)) + '%';
+    track.title = bar.title || (bar.pct.toFixed(1) + '% of net monthly income');
+    track.appendChild(fill);
+    c.appendChild(track);
+  }
   return c;
 }
 function renewCell(r) {
@@ -3081,6 +3095,40 @@ function raiseYoYCard(store, emp) {
   return card;
 }
 
+// The two top raises sections as movable/resizable panels (same engine as
+// the dashboard: drag, snap widths, half height, remove/re-add, packing).
+let raisesUnlocked = false;
+const RAISES_PANEL_DEFS = [
+  { key: 'sinceCards', title: 'Since last raise', span2: true, build: ctx => raisesSinceCards(ctx.store) },
+  { key: 'profiles', title: 'Employer profiles', span2: true, build: ctx => raisesProfilesGrid(ctx.store) }
+];
+function raisesSinceCards(store) {
+  const s = store.state;
+  // Per-employer "days since last raise" — ongoing while still employed (active
+  // schedule or a paycheck in the last 45 days), else counted to the last check.
+  const byEmp = {};
+  s.raises.forEach(r => { if (r.noRaise) return; const k = (r.employer || '').toLowerCase(); if (!byEmp[k] || (r.date || '') > (byEmp[k].date || '')) byEmp[k] = r; });
+  const sum = el('div', 'sub-summary');
+  if (!Object.keys(byEmp).length) { sum.appendChild(el('div', 'muted', 'No raises recorded yet.')); return sum; }
+  Object.values(byEmp).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4).forEach(r => {
+    const emp = r.employer || '—';
+    const lastPay = lastPaycheckDateFor(store, emp);
+    const employed = activeSchedules(store).some(sch => (sch.employer || '').toLowerCase() === emp.toLowerCase())
+      || (lastPay && daysBetweenISO(todayISO(), lastPay) <= 45);
+    const days = employed ? daysBetweenISO(todayISO(), r.date) : (lastPay ? Math.max(0, daysBetweenISO(lastPay, r.date)) : null);
+    sum.appendChild(sumCard(emp, days == null ? '—' : (days + 'd'), 'neutral',
+      'since last raise (' + fmtDate(r.date) + ')' + (employed ? ' · counting' : ' · through last paycheck')));
+  });
+  return sum;
+}
+function raisesProfilesGrid(store) {
+  const s = store.state;
+  const profEmps = [...new Set(s.raises.map(r => (r.employer || '').trim()).filter(Boolean))];
+  const profGrid = el('div', 'dash-cols');
+  if (!profEmps.length) { profGrid.appendChild(el('div', 'muted', 'No employers yet.')); return profGrid; }
+  profEmps.slice(0, 4).forEach(emp => profGrid.appendChild(employerProfileCard(store, emp)));
+  return profGrid;
+}
 function renderRaises(view) {
   const store = window.cloverStore, s = store.state;
   ensureYearsScanned(store);
@@ -3105,6 +3153,19 @@ function renderRaises(view) {
   detect.title = 'Scan your recorded paychecks for gross-amount changes and propose them as raises';
   detect.addEventListener('click', () => detectRaisesModal());
   actions.appendChild(detect);
+  const lockBtn = el('button', 'btn-ghost', raisesUnlocked ? '✓ Done editing' : '✎ Edit layout');
+  lockBtn.title = raisesUnlocked ? 'Keep these changes and lock the layout' : 'Unlock to reorder, resize, remove, or add the top panels';
+  lockBtn.addEventListener('click', () => {
+    if (!raisesUnlocked) panelSnapshots.raises = JSON.parse(JSON.stringify((store.state.settings.pagePanels || {}).raises || null));
+    raisesUnlocked = !raisesUnlocked; renderView(currentRoute);
+  });
+  actions.appendChild(lockBtn);
+  if (raisesUnlocked) {
+    const cancelBtn = el('button', 'btn-ghost', '✕ Cancel changes');
+    cancelBtn.title = 'Put the layout back the way it was when you started editing';
+    cancelBtn.addEventListener('click', () => { raisesUnlocked = false; store.setPagePanels('raises', panelSnapshots.raises); });
+    actions.appendChild(cancelBtn);
+  }
   const add = el('button', 'btn-primary', '+ Add raise'); add.addEventListener('click', () => raiseModal(null));
   actions.appendChild(add);
   head.appendChild(actions);
@@ -3115,27 +3176,31 @@ function renderRaises(view) {
     return;
   }
 
-  // Per-employer "days since last raise" — ongoing while still employed (active
-  // schedule or a paycheck in the last 45 days), else counted to the last check.
-  const byEmp = {};
-  s.raises.forEach(r => { if (r.noRaise) return; const k = (r.employer || '').toLowerCase(); if (!byEmp[k] || (r.date || '') > (byEmp[k].date || '')) byEmp[k] = r; });
-  const sum = el('div', 'sub-summary');
-  Object.values(byEmp).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4).forEach(r => {
-    const emp = r.employer || '—';
-    const lastPay = lastPaycheckDateFor(store, emp);
-    const employed = activeSchedules(store).some(sch => (sch.employer || '').toLowerCase() === emp.toLowerCase())
-      || (lastPay && daysBetweenISO(todayISO(), lastPay) <= 45);
-    const days = employed ? daysBetweenISO(todayISO(), r.date) : (lastPay ? Math.max(0, daysBetweenISO(lastPay, r.date)) : null);
-    sum.appendChild(sumCard(emp, days == null ? '—' : (days + 'd'), 'neutral',
-      'since last raise (' + fmtDate(r.date) + ')' + (employed ? ' · counting' : ' · through last paycheck')));
+  // Top sections as panels: drag / resize / remove like the dashboard.
+  const pState = pagePanelState(store, 'raises', RAISES_PANEL_DEFS);
+  const pOpts = { unlocked: raisesUnlocked, save: arr => store.setPagePanels('raises', arr) };
+  if (raisesUnlocked) {
+    const addRow = el('div', 'dash-add-row');
+    addRow.appendChild(el('span', 'muted', 'Drag panels to reorder · ✕ removes · click a header to collapse.'));
+    RAISES_PANEL_DEFS.filter(d => pState.some(px => px.k === d.key && px.off)).forEach(d => {
+      const b = el('button', 'btn-ghost', '＋ ' + d.title);
+      b.addEventListener('click', () => { const en = pState.find(px => px.k === d.key); en.off = 0; store.setPagePanels('raises', pState); });
+      addRow.appendChild(b);
+    });
+    view.appendChild(addRow);
+  }
+  const pGrid = el('div', 'dash-panels');
+  const pCtx = { store };
+  pState.forEach(entry => {
+    if (entry.off) return;
+    const def = RAISES_PANEL_DEFS.find(d => d.key === entry.k); if (!def) return;
+    pGrid.appendChild(dashPanel(store, def, entry, pState, pCtx, pOpts));
   });
-  view.appendChild(sum);
+  view.appendChild(pGrid);
+  attachPanelPacking(pGrid);
 
-  // Employer profiles (tenure, totals, hours/hourly) + YoY-vs-inflation analysis.
+  // Employer profiles' YoY-vs-inflation analysis stays below the panels.
   const profEmps = [...new Set(s.raises.map(r => (r.employer || '').trim()).filter(Boolean))];
-  const profGrid = el('div', 'dash-cols');
-  profEmps.slice(0, 4).forEach(emp => profGrid.appendChild(employerProfileCard(store, emp)));
-  if (profEmps.length) view.appendChild(profGrid);
   profEmps.forEach(emp => { const yoy = raiseYoYCard(store, emp); if (yoy) view.appendChild(yoy); });
 
   const cols = [
@@ -3711,6 +3776,8 @@ function recentActivityCard(store, data) {
 // ---- Dashboard panels: add/remove, drag-reorder (when unlocked), collapse ----
 let dashUnlocked = false;
 let dashDragKey = null;
+// Layout snapshots taken when entering edit mode, restored by "Cancel".
+let panelSnapshots = {};
 const DASH_PANEL_DEFS = [
   { key: 'kpis', title: 'Key numbers', span2: true, build: ctx => dashKpisBody(ctx) },
   { key: 'warnings', title: '⚠ Attention', span2: true, build: ctx => buildWarnings(ctx.store, ctx.data, ctx.s) || el('div', 'card muted', 'Nothing needs attention right now.') },
@@ -3917,9 +3984,18 @@ function renderDashboard(view) {
   left.appendChild(el('p', 'muted', monthName + ' ' + activeYear + ' snapshot'));
   head.appendChild(left);
   const lockBtn = el('button', 'btn-ghost', dashUnlocked ? '✓ Done editing' : '✎ Edit layout');
-  lockBtn.title = dashUnlocked ? 'Lock the layout' : 'Unlock to reorder, remove, or add panels';
-  lockBtn.addEventListener('click', () => { dashUnlocked = !dashUnlocked; renderView(currentRoute); });
+  lockBtn.title = dashUnlocked ? 'Keep these changes and lock the layout' : 'Unlock to reorder, resize, remove, or add panels';
+  lockBtn.addEventListener('click', () => {
+    if (!dashUnlocked) panelSnapshots.dashboard = JSON.parse(JSON.stringify(store.state.settings.dashPanels || null));
+    dashUnlocked = !dashUnlocked; renderView(currentRoute);
+  });
   head.appendChild(lockBtn);
+  if (dashUnlocked) {
+    const cancelBtn = el('button', 'btn-ghost', '✕ Cancel changes');
+    cancelBtn.title = 'Put the layout back the way it was when you started editing';
+    cancelBtn.addEventListener('click', () => { dashUnlocked = false; store.setDashPanels(panelSnapshots.dashboard); });
+    head.appendChild(cancelBtn);
+  }
   view.appendChild(head);
 
   const state = dashPanelState(store);
@@ -4520,9 +4596,18 @@ function renderReports(view) {
   left.appendChild(el('p', 'muted', 'Charts follow the selected year'));
   head.appendChild(left);
   const lockBtn = el('button', 'btn-ghost', reportsUnlocked ? '✓ Done editing' : '✎ Edit layout');
-  lockBtn.title = reportsUnlocked ? 'Lock the layout' : 'Unlock to reorder, remove, or add report panels';
-  lockBtn.addEventListener('click', () => { reportsUnlocked = !reportsUnlocked; renderView(currentRoute); });
+  lockBtn.title = reportsUnlocked ? 'Keep these changes and lock the layout' : 'Unlock to reorder, resize, remove, or add report panels';
+  lockBtn.addEventListener('click', () => {
+    if (!reportsUnlocked) panelSnapshots.reports = JSON.parse(JSON.stringify((store.state.settings.pagePanels || {}).reports || null));
+    reportsUnlocked = !reportsUnlocked; renderView(currentRoute);
+  });
   head.appendChild(lockBtn);
+  if (reportsUnlocked) {
+    const cancelBtn = el('button', 'btn-ghost', '✕ Cancel changes');
+    cancelBtn.title = 'Put the layout back the way it was when you started editing';
+    cancelBtn.addEventListener('click', () => { reportsUnlocked = false; store.setPagePanels('reports', panelSnapshots.reports); });
+    head.appendChild(cancelBtn);
+  }
   view.appendChild(head);
   const yt = yearTabs(store, 'reports'); if (yt) view.appendChild(yt);
 

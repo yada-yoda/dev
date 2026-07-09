@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.80 — Stat-card progress bars, raises panels, cancelable layout edits
+
+- **Progress bars on the Bills & Subscriptions cards.** Total monthly,
+  Total annual, Left after subs, and % of net income each get a slim bar
+  showing their share of your net income (red for cost, green for what's
+  left; hover for the exact figure). Overspending past 100% fills the bar
+  red.
+- **The raises page's top sections are panels now** — "Since last raise"
+  and "Employer profiles" drag, resize (full/half/quarter, half height),
+  collapse, and remove/re-add exactly like dashboard panels, with the same
+  vertical packing.
+- **"✕ Cancel changes" while editing layouts** — on the Dashboard, Reports,
+  and Raises, entering Edit layout now snapshots the arrangement; Cancel
+  puts everything back the way it was, while "Done editing" keeps it.
+
 ### v1.0.79 — Budget placeholders
 
 New "Budget placeholder" checkbox on bills — for a future cost you know is
