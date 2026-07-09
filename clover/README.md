@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.65 — Employment type on raises
+
+Each raise can now state the employment type as of that pay change —
+Full-time, Part-time, Seasonal, Contract, Temporary, or Per diem. It shows
+as a colored badge column on the Raises table, on the employer profile
+(latest known type), and rides along in the CSV import/export/template.
+
 ### v1.0.64 — Hourly raises
 
 The raise "Amounts are" choice gains **Hourly rate** alongside Per paycheck
