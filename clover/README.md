@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.71 — Hours worked on any raise basis
+
+The "Hours worked that year" field now shows for every raise basis — not
+just Hourly rate. Salaried (and per-paycheck) folks who track their hours
+get the same Hours (yr) and Hours-vs-prior-yr columns, and it shows what a
+salary really earned per hour. The year's total-paid fields stay
+hourly-only, since a salary already implies them.
+
 ### v1.0.70 — Bills search + "Paid for this year"
 
 - **Live search** above the Bills & Subscriptions table — type and the

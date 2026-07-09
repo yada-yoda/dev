@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.70';
+const VERSION = '1.0.71';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3104,10 +3104,11 @@ function raiseModal(existing) {
   body.appendChild(prevRow);
   const amtLbl = amtField.querySelector('span').childNodes[0];
   const netLbl = netField.querySelector('span').childNodes[0];
-  // Hourly pay varies with hours, so the year's totals can't be derived from
-  // the rate (unlike salary) — let them be recorded per year.
+  // Hours worked applies to any basis — salaried people can track hours too
+  // (it shows the true hourly picture). The year's paid totals stay
+  // hourly-only, since a salary already implies them.
+  body.appendChild(field('Hours worked that year (optional)', fHoursYr, 'Actual hours worked during this raise’s year. For hourly pay it drives the year totals (pay varies with hours); on a salary it shows what your time really earned per hour.'));
   const hourlyWrap = el('div');
-  hourlyWrap.appendChild(field('Hours worked that year (optional)', fHoursYr, 'Actual hours worked during this raise’s year — hourly pay varies with hours, so this can’t be derived from the rate like a salary can.'));
   const hyRow = el('div', 'two-col');
   hyRow.appendChild(field('Total paid that year — gross (optional)', fYearGross, 'What this job actually paid you that year before taxes.'));
   hyRow.appendChild(field('Total paid that year — net (optional)', fYearNet, 'What actually hit your account that year.'));
