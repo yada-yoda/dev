@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.75';
+const VERSION = '1.0.77';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2782,6 +2782,12 @@ let raiseYoYFilter = null;   // {key:'basis'|'empType', value} from clicking a Y
 // the prior same-employer raise on the same basis — unless the raise is
 // marked standalone (noPrev, e.g. a job/role change makes them incomparable).
 function raiseAnnualOf(x) { return x.basis === 'annual' ? Number(x.amount) : (x.basis === 'hourly' && x.yearGross != null && x.yearGross !== '') ? Number(x.yearGross) : null; }
+// The year's annual figure, gross or net: an annual salary's own amount/net,
+// otherwise the explicitly recorded Year gross / Year net.
+function raiseYearFig(r, kind) {
+  if (kind === 'gross') return r.basis === 'annual' ? (r.amount != null && r.amount !== '' ? Number(r.amount) : null) : (r.yearGross != null && r.yearGross !== '' ? Number(r.yearGross) : null);
+  return r.basis === 'annual' ? (r.net != null && r.net !== '' ? Number(r.net) : null) : (r.yearNet != null && r.yearNet !== '' ? Number(r.yearNet) : null);
+}
 function raisePrev(store, r) {
   if (r.prevAmount != null && r.prevAmount !== '') return { v: Number(r.prevAmount), derived: false };
   if (r.noPrev) return null;
@@ -2824,9 +2830,9 @@ function ymdBetween(fromIso, toIso) {
   if (d) parts.push(d + ' day' + (d === 1 ? '' : 's'));
   return parts.length ? parts.join(', ') : 'same day';
 }
-const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', hoursYear: 'Hours (yr)', yearGross: 'Year gross', yearNet: 'Year net', notes: 'Notes' };
-const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'hoursYear', 'yearGross', 'yearNet', 'notes'];
-const RAISE_DEFAULT_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'prevAmount', 'change', 'gap'];
+const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', hoursYear: 'Hours (yr)', yearGross: 'Year gross', yearNet: 'Year net', actGross: 'Actual $/hr (gross)', actNet: 'Actual $/hr (net)', notes: 'Notes' };
+const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'hoursYear', 'yearGross', 'yearNet', 'actGross', 'actNet', 'notes'];
+const RAISE_DEFAULT_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'prevAmount', 'change', 'gap', 'actGross', 'actNet'];
 function raiseGapDays(store, r) {
   const prior = store.state.raises
     .filter(x => x.id !== r.id && (x.employer || '').toLowerCase() === (r.employer || '').toLowerCase() && (x.date || '') < (r.date || ''))
@@ -2873,6 +2879,8 @@ function buildRaiseCol(store, key) {
     case 'hoursYear': return { label: 'Hours (yr)', key: 'hoursYear', num: true, value: r => r.hoursYear != null ? Number(r.hoursYear) : -1, cell: r => el('td', 'num', r.hoursYear != null && r.hoursYear !== '' ? Number(r.hoursYear).toLocaleString('en-US') : '—') };
     case 'yearGross': return { label: 'Year gross', key: 'yearGross', num: true, value: r => r.yearGross != null ? Number(r.yearGross) : -1, cell: r => r.yearGross != null && r.yearGross !== '' ? numCell(Number(r.yearGross)) : el('td', 'num', '—') };
     case 'yearNet': return { label: 'Year net', key: 'yearNet', num: true, value: r => r.yearNet != null ? Number(r.yearNet) : -1, cell: r => r.yearNet != null && r.yearNet !== '' ? numCell(Number(r.yearNet)) : el('td', 'num', '—') };
+    case 'actGross': return { label: 'Actual $/hr (gross)', key: 'actGross', num: true, value: r => { const f = raiseYearFig(r, 'gross'), hh = Number(r.hoursYear); return (f != null && hh > 0) ? f / hh : -1; }, cell: r => { const f = raiseYearFig(r, 'gross'), hh = Number(r.hoursYear); if (f == null || !(hh > 0)) return el('td', 'num', '—'); const td = el('td', 'num', '$' + (f / hh).toFixed(2)); td.title = money(f) + ' year gross ÷ ' + hh.toLocaleString('en-US') + ' hours worked'; return td; } };
+    case 'actNet': return { label: 'Actual $/hr (net)', key: 'actNet', num: true, value: r => { const f = raiseYearFig(r, 'net'), hh = Number(r.hoursYear); return (f != null && hh > 0) ? f / hh : -1; }, cell: r => { const f = raiseYearFig(r, 'net'), hh = Number(r.hoursYear); if (f == null || !(hh > 0)) return el('td', 'num', '—'); const td = el('td', 'num', '$' + (f / hh).toFixed(2)); td.title = money(f) + ' year net ÷ ' + hh.toLocaleString('en-US') + ' hours worked'; return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
   return null;
@@ -2936,6 +2944,12 @@ function employerProfileCard(store, emp) {
   if (sch && sch.taxForm && sch.taxForm !== 'none') row('Pay reported on', sch.taxForm, '');
   if (days != null) row('Employed', days + ' days', '(' + (days / 365.25).toFixed(1) + ' yrs' + (hire === (sch && sch.hireDate) ? ', since ' + fmtDate(hire) : ', from first paycheck') + (employed ? ')' : ', through last paycheck)'));
   row('Total paid (gross)', money(gross), 'net ' + money(net) + ' · from ' + allChecks + ' recorded paycheck' + (allChecks === 1 ? '' : 's') + ', all titles — years not entered in Clover aren’t counted');
+  const yrEntries = raises.filter(x => (x.yearGross != null && x.yearGross !== '') || (x.yearNet != null && x.yearNet !== ''));
+  if (yrEntries.length) {
+    const yg = yrEntries.reduce((a, x) => a + (Number(x.yearGross) || 0), 0);
+    const yn = yrEntries.reduce((a, x) => a + (Number(x.yearNet) || 0), 0);
+    row('Reported year totals', money(yg) + ' gross', 'net ' + money(yn) + ' · summed from the Year gross/net figures on ' + yrEntries.length + ' raise/year record' + (yrEntries.length === 1 ? '' : 's'));
+  }
   row('Regular checks', String(regChecks), '');
   if (sch && sch.hoursPerCheck) {
     row('Total hours (est.)', (regChecks * Number(sch.hoursPerCheck)).toLocaleString('en-US'), '@ ' + sch.hoursPerCheck + ' hrs/check');
@@ -3096,7 +3110,7 @@ function renderRaises(view) {
   // Per-employer "days since last raise" — ongoing while still employed (active
   // schedule or a paycheck in the last 45 days), else counted to the last check.
   const byEmp = {};
-  s.raises.forEach(r => { const k = (r.employer || '').toLowerCase(); if (!byEmp[k] || (r.date || '') > (byEmp[k].date || '')) byEmp[k] = r; });
+  s.raises.forEach(r => { if (r.noRaise) return; const k = (r.employer || '').toLowerCase(); if (!byEmp[k] || (r.date || '') > (byEmp[k].date || '')) byEmp[k] = r; });
   const sum = el('div', 'sub-summary');
   Object.values(byEmp).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4).forEach(r => {
     const emp = r.employer || '—';
@@ -3620,11 +3634,6 @@ function incomeByCategory(store, data) {
   (data.sales || []).forEach(x => { m[sellName] = (m[sellName] || 0) + salesEarn(x); });
   return m;
 }
-function expenseByCategory(store, data) {
-  const m = {};
-  data.expensePayments.forEach(e => { const g = store.expenseGroupName(e.categoryId); m[g] = (m[g] || 0) + expenseAmount(e); });
-  return m;
-}
 function donutCard(map) {
   const card = el('div', 'card');
   const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
@@ -3699,7 +3708,10 @@ const DASH_PANEL_DEFS = [
   { key: 'warnings', title: '⚠ Attention', span2: true, build: ctx => buildWarnings(ctx.store, ctx.data, ctx.s) || el('div', 'card muted', 'Nothing needs attention right now.') },
   { key: 'incomeMix', title: 'Income mix (YTD)', span2: true, build: ctx => dashIncomeMixBody(ctx) },
   { key: 'incomeDonut', title: 'Income by category (YTD)', build: ctx => donutCard(incomeByCategory(ctx.store, ctx.data)) },
-  { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategory(ctx.store, ctx.data)) },
+  // Same engine as the expense annual grid's YTD column: logged payments plus
+  // recurring-bill estimates (overrides, one-time, and not-paid-this-year rules
+  // all honored) — so the donut and the grid always agree.
+  { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategoryFull(ctx.store, ctx.data)) },
   { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
   { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) },
   { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) },
@@ -3749,7 +3761,7 @@ function pagePanelState(store, pageKey, defs) {
   const saved = pageKey === 'dashboard' ? (pp.dashboard || store.state.settings.dashPanels) : pp[pageKey];
   if (Array.isArray(saved) && saved.length) {
     const entries = saved.filter(p => defs.some(d => d.key === p.k))
-      .map(p => ({ k: p.k, c: !!p.c, w: (p.w === 1 || p.w === 2) ? p.w : 0, off: p.off ? 1 : 0 }));
+      .map(p => ({ k: p.k, c: !!p.c, w: (p.w === 1 || p.w === 2 || p.w === 3) ? p.w : 0, h: p.h ? 1 : 0, off: p.off ? 1 : 0 }));
     // Panels shipped after this layout was saved won't be in it — surface
     // them at the end instead of hiding them forever. Removing a panel keeps
     // an off-flagged entry, so deliberate removals stay removed.
@@ -3796,8 +3808,8 @@ function dashIncomeMixBody(ctx) {
 function dashPanel(store, def, entry, state, ctx, opts) {
   const unlocked = opts ? opts.unlocked : dashUnlocked;
   const save = opts ? opts.save : (arr => store.setDashPanels(arr));
-  const width = entry.w || (def.span2 ? 2 : 1);   // snap widths: 1 = half, 2 = full
-  const panel = el('div', 'dash-panel' + (width === 2 ? ' span2' : ''));
+  const width = entry.w || (def.span2 ? 2 : 1);   // snap widths: 1 = half, 2 = full, 3 = quarter
+  const panel = el('div', 'dash-panel' + (width === 2 ? ' span2' : width === 3 ? ' span1q' : '') + (entry.h ? ' hhalf' : ''));
   const head = el('div', 'dash-panel-head');
   if (unlocked) {
     panel.draggable = true;
@@ -3817,10 +3829,14 @@ function dashPanel(store, def, entry, state, ctx, opts) {
   head.appendChild(el('h3', 'dph-title', def.title));
   head.appendChild(el('span', 'dph-caret', entry.c ? '▸' : '▾'));
   if (unlocked) {
-    const wBtn = el('button', 'dph-x dph-w', width === 2 ? '⇥ Half' : '⇤ Full');
-    wBtn.title = 'Snap this panel to ' + (width === 2 ? 'half' : 'full') + ' width';
-    wBtn.addEventListener('click', ev => { ev.stopPropagation(); entry.w = width === 2 ? 1 : 2; save(state); });
+    const wBtn = el('button', 'dph-x dph-w', width === 2 ? '⇥ Half' : width === 1 ? '◫ Quarter' : '⇤ Full');
+    wBtn.title = 'Cycle the snap width: full → half → quarter → full';
+    wBtn.addEventListener('click', ev => { ev.stopPropagation(); entry.w = width === 2 ? 1 : width === 1 ? 3 : 2; save(state); });
     head.appendChild(wBtn);
+    const hBtn = el('button', 'dph-x dph-w', entry.h ? '⇕ Auto height' : '⇕ Half height');
+    hBtn.title = entry.h ? 'Let the panel grow to fit its content' : 'Cap the panel at half height — its content scrolls inside';
+    hBtn.addEventListener('click', ev => { ev.stopPropagation(); entry.h = entry.h ? 0 : 1; save(state); });
+    head.appendChild(hBtn);
     const x = el('button', 'dph-x', '✕'); x.title = 'Remove this panel';
     x.addEventListener('click', ev => { ev.stopPropagation(); entry.off = 1; save(state); });
     head.appendChild(x);
@@ -3831,6 +3847,29 @@ function dashPanel(store, def, entry, state, ctx, opts) {
   return panel;
 }
 
+// Masonry-style vertical packing: the panel grid uses small fixed rows and
+// each panel spans only as many as its content needs, so a short panel snaps
+// up under the one above it instead of stretching to its tallest row-mate.
+const DASH_ROW_PX = 8;
+function packPanels(grid) {
+  const gap = parseFloat(getComputedStyle(grid).rowGap) || 18;
+  if (window.innerWidth <= 900) return;   // single column — no packing needed
+  [...grid.children].forEach(pn => {
+    if (!pn.classList.contains('dash-panel')) return;
+    let h = 0;
+    // Fractional heights (offsetHeight rounds down and under-spans, making
+    // neighbors overlap the shortfall) plus a little slack for borders.
+    [...pn.children].forEach(c => { const cs = getComputedStyle(c); h += c.getBoundingClientRect().height + (parseFloat(cs.marginTop) || 0) + (parseFloat(cs.marginBottom) || 0); });
+    h += 4;
+    const want = 'span ' + Math.max(1, Math.ceil((h + gap) / (DASH_ROW_PX + gap)));
+    if (pn.style.gridRowEnd !== want) pn.style.gridRowEnd = want;
+  });
+}
+function attachPanelPacking(grid) {
+  const ro = new ResizeObserver(() => packPanels(grid));
+  [...grid.children].forEach(pn => { if (pn.classList.contains('dash-panel')) [...pn.children].forEach(c => ro.observe(c)); });
+  packPanels(grid);
+}
 function renderDashboard(view) {
   destroyCharts();
   const store = window.cloverStore, s = store.state;
@@ -3893,6 +3932,7 @@ function renderDashboard(view) {
     grid.appendChild(dashPanel(store, def, entry, state, ctx));
   });
   view.appendChild(grid);
+  attachPanelPacking(grid);
 }
 
 // ============================================================
@@ -3929,7 +3969,9 @@ function reportCard(title, builder) {
 function doughnutInto(cv, map) {
   const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   if (!entries.length) { cv.parentElement.appendChild(el('div', 'muted', 'No data yet.')); return; }
-  buildDoughnut(cv, { labels: entries.map(e => e[0]), data: entries.map(e => e[1]) });
+  // Every slice states its share of the whole, like the dashboard donuts.
+  const total = entries.reduce((a, e) => a + e[1], 0);
+  buildDoughnut(cv, { labels: entries.map(e => e[0] + ' · ' + (total > 0 ? (e[1] / total * 100).toFixed(1) : '0.0') + '%'), data: entries.map(e => e[1]) });
 }
 
 function monthlyIncomeTotals(store, data) {
@@ -4499,6 +4541,7 @@ function renderReports(view) {
     grid.appendChild(dashPanel(store, def, entry, state, ctx, opts));
   });
   view.appendChild(grid);
+  attachPanelPacking(grid);
 }
 
 function yearSummary(store, y) {

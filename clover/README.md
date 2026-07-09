@@ -45,6 +45,38 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.77 — Actual $/hr, honest raise cards, and panels that pack tight
+
+- **Actual $/hr columns on All Raises** (default): year gross ÷ hours
+  worked and year net ÷ hours worked — for salary years it uses the salary
+  itself, for hourly years the recorded totals, so you see what your time
+  really earned either way (hover shows the math).
+- **Employer profile adds "Reported year totals"** — gross and net summed
+  from the Year gross/net figures entered on raises and year records.
+- **"Since last raise" cards fixed** — they anchored to the most recent
+  *entry*, so a "no new raise" year record reset the counter. They now use
+  the most recent real raise.
+- **Panels: quarter width, half height, and no more empty space.** The
+  width button now cycles Full → Half → Quarter (half of a half). A new
+  ⇕ height button caps a panel at half height (content scrolls inside).
+  And the panel grid packs vertically — a short panel snaps up under the
+  one above it instead of stretching to its tallest neighbor, killing the
+  blank stretches in the screenshot. Works on Reports panels too; phones
+  keep the single-column layout.
+
+### v1.0.76 — Dashboard expenses donut matches the grid + % on every pie
+
+- **Expenses by category (YTD) on the dashboard now uses the exact same
+  numbers as the expense annual grid** — logged payments plus
+  recurring-bill estimates, with all the grid's rules honored (linked
+  payments overriding estimates, one-time bills in their due month,
+  "not paid this year" exclusions). Previously it counted logged payments
+  only, so it disagreed with the grid whenever bills were involved.
+- **Every pie/doughnut states each slice's share.** The reports doughnuts
+  (income by category, expenses by category, expenses by payment method)
+  now append the percentage to each legend label — "Streaming · 70.6%" —
+  like the dashboard donuts already did.
+
 ### v1.0.75 — Cross-basis previous + readable durations
 
 - **Previous bridges bases via annual totals.** A raise whose prior record
