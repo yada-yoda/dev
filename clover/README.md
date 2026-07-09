@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.63 — Raises: position titles + salary-basis amounts + net
+
+- **Position title on every raise.** Record the title that came with a pay
+  change — promotions show up properly now. It's a default table column,
+  the employer profile shows your current position, and the CSV
+  import/export/template all carry it.
+- **Per-paycheck or annual salary.** A new "Amounts are" choice on each
+  raise: enter amounts per paycheck (as before) or as annual salary
+  figures — the form relabels itself, the table shows /check or /yr next
+  to amounts, and change $ / % work either way. Older rows keep meaning
+  per-check.
+- **New net (optional).** Track your take-home after the raise alongside
+  gross, on whichever basis you picked.
+- Old raise CSVs still import — the previous "New gross per check" header
+  is recognized alongside the new one.
+
 ### v1.0.62 — Source drill-downs on Expenses (and Income's Other) + projected income panel
 
 - **Expense categories now show where the money came from.** Expanding a
