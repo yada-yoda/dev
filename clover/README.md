@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.68 — Raises follow-ups: honest totals, hourly year figures, tidy tables
+
+- **"Total paid (gross)" now says what it counts.** It always summed every
+  recorded paycheck for that employer across all titles — but if older
+  years were never entered into Clover, they aren't in the number. The
+  line now spells that out ("from N recorded paychecks, all titles — years
+  not entered in Clover aren't counted") so a low-looking total is
+  explainable at a glance.
+- **Hourly raises can record the year's reality.** When a raise's basis is
+  Hourly rate, three extra fields appear: hours worked that year, and the
+  year's total gross and net pay — things a salary implies but hourly work
+  doesn't. Optional table columns (Hours (yr) / Year gross / Year net) and
+  CSV columns carry them.
+- **YoY table sorts newest-first** by default, matching the raises table
+  below it — which now has a proper "All raises" title.
+
 ### v1.0.67 — Raises: sortable YoY table, inferred previous, duration that reads right
 
 - **The YoY-vs-inflation table caught up to the table standards** — sortable

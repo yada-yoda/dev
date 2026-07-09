@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.67';
+const VERSION = '1.0.68';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2726,7 +2726,7 @@ function employerMergeModal() {
 // Raises — per-employer raise history + time between raises
 // ============================================================
 let raisesSort = { key: 'date', dir: 'desc' };
-let raiseYoYSort = { key: 'date', dir: 'asc' };
+let raiseYoYSort = { key: 'date', dir: 'desc' };
 // Effective previous amount for a raise: the entered one, else inferred from
 // the prior same-employer raise on the same basis — unless the raise is
 // marked standalone (noPrev, e.g. a job/role change makes them incomparable).
@@ -2746,8 +2746,8 @@ function raiseDurationDays(store, r) {
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''))[0];
   return { days: daysBetweenISO(next ? next.date : todayISO(), r.date), ongoing: !next };
 }
-const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', notes: 'Notes' };
-const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'notes'];
+const RAISE_COL_LABELS = { employer: 'Employer', title: 'Position', empType: 'Employment', date: 'Date', amount: 'New gross', net: 'New net', prevAmount: 'Previous', change: 'Change', gap: 'At this pay', hoursYear: 'Hours (yr)', yearGross: 'Year gross', yearNet: 'Year net', notes: 'Notes' };
+const RAISE_ALL_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'net', 'prevAmount', 'change', 'gap', 'hoursYear', 'yearGross', 'yearNet', 'notes'];
 const RAISE_DEFAULT_COLS = ['employer', 'title', 'empType', 'date', 'amount', 'prevAmount', 'change', 'gap'];
 function raiseGapDays(store, r) {
   const prior = store.state.raises
@@ -2786,20 +2786,23 @@ function buildRaiseCol(store, key) {
         td.textContent = d.days + ' days' + (d.ongoing ? ' · counting' : '');
         td.title = d.ongoing ? 'Still at this pay — counting up until the next raise' : 'How long this pay level lasted before the next raise';
         return td; } };
+    case 'hoursYear': return { label: 'Hours (yr)', key: 'hoursYear', num: true, value: r => r.hoursYear != null ? Number(r.hoursYear) : -1, cell: r => el('td', 'num', r.hoursYear != null && r.hoursYear !== '' ? Number(r.hoursYear).toLocaleString('en-US') : '—') };
+    case 'yearGross': return { label: 'Year gross', key: 'yearGross', num: true, value: r => r.yearGross != null ? Number(r.yearGross) : -1, cell: r => r.yearGross != null && r.yearGross !== '' ? numCell(Number(r.yearGross)) : el('td', 'num', '—') };
+    case 'yearNet': return { label: 'Year net', key: 'yearNet', num: true, value: r => r.yearNet != null ? Number(r.yearNet) : -1, cell: r => r.yearNet != null && r.yearNet !== '' ? numCell(Number(r.yearNet)) : el('td', 'num', '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
   return null;
 }
 // US CPI-U annual average inflation, % (2025 preliminary) — for comparing raises.
 const INFLATION_CPI = { 2010: 1.6, 2011: 3.2, 2012: 2.1, 2013: 1.5, 2014: 1.6, 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2020: 1.2, 2021: 4.7, 2022: 8.0, 2023: 4.1, 2024: 2.9, 2025: 2.7 };
-const RAISES_CSV_HEADERS = ['Employer', 'Position title', 'Employment type', 'Date', 'Amounts are', 'New gross', 'New net', 'Previous gross', 'Standalone', 'Notes'];
+const RAISES_CSV_HEADERS = ['Employer', 'Position title', 'Employment type', 'Date', 'Amounts are', 'New gross', 'New net', 'Previous gross', 'Standalone', 'Hours worked (year)', 'Year gross', 'Year net', 'Notes'];
 const RAISES_TEMPLATE_CSV = RAISES_CSV_HEADERS.join(',') + '\n'
-  + 'Main Job,Support Tech,Full-time,2025-04-04,Per paycheck,2100.00,1650.00,2000.00,Annual review\n'
-  + 'Main Job,Senior Support Tech,Full-time,2026-04-03,Annual salary,62000.00,47000.00,56000.00,Promotion with title change\n'
-  + 'Weekend Gig,Crew Lead,Part-time,2026-05-10,Hourly rate,19.50,16.25,17.00,Hourly bump\n';
+  + 'Main Job,Support Tech,Full-time,2025-04-04,Per paycheck,2100.00,1650.00,2000.00,,,,,Annual review\n'
+  + 'Main Job,Senior Support Tech,Full-time,2026-04-03,Annual salary,62000.00,47000.00,56000.00,,,,,Promotion with title change\n'
+  + 'Weekend Gig,Crew Lead,Part-time,2026-05-10,Hourly rate,19.50,16.25,17.00,,850,16575.00,13800.00,Hourly bump\n';
 function exportRaisesCSV(store) {
   const rows = [RAISES_CSV_HEADERS.join(',')];
-  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.empType, r.date, r.basis === 'annual' ? 'Annual salary' : r.basis === 'hourly' ? 'Hourly rate' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.noPrev ? 'Yes' : '', r.notes].map(csvEsc).join(',')));
+  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.empType, r.date, r.basis === 'annual' ? 'Annual salary' : r.basis === 'hourly' ? 'Hourly rate' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.noPrev ? 'Yes' : '', r.hoursYear, r.yearGross, r.yearNet, r.notes].map(csvEsc).join(',')));
   downloadFile('clover-raises.csv', rows.join('\n'), 'text/csv');
 }
 function importRaisesCSV(store, rows) {
@@ -2818,7 +2821,10 @@ function importRaisesCSV(store, rows) {
     const net = parseImportAmount(g(r, 'New net'));
     const basisRaw = g(r, 'Amounts are');
     const basis = /hour|\bhr\b/i.test(basisRaw) ? 'hourly' : /annual|salary|year/i.test(basisRaw) ? 'annual' : 'check';
-    store.saveRaise({ employer, title: g(r, 'Position title') || g(r, 'Position') || g(r, 'Title'), empType: g(r, 'Employment type') || g(r, 'Employment'), date, basis, amount, net: isNaN(net) ? null : net, prevAmount: isNaN(prev) ? null : prev, noPrev: /^y|^true/i.test(g(r, 'Standalone')), notes: g(r, 'Notes') });
+    const hoursYear = parseImportAmount(g(r, 'Hours worked (year)'));
+    const yearGross = parseImportAmount(g(r, 'Year gross'));
+    const yearNet = parseImportAmount(g(r, 'Year net'));
+    store.saveRaise({ employer, title: g(r, 'Position title') || g(r, 'Position') || g(r, 'Title'), empType: g(r, 'Employment type') || g(r, 'Employment'), date, basis, amount, net: isNaN(net) ? null : net, prevAmount: isNaN(prev) ? null : prev, noPrev: /^y|^true/i.test(g(r, 'Standalone')), hoursYear: isNaN(hoursYear) ? null : hoursYear, yearGross: isNaN(yearGross) ? null : yearGross, yearNet: isNaN(yearNet) ? null : yearNet, notes: g(r, 'Notes') });
     added++;
   });
   toast('Imported ' + added + ' raise' + (added === 1 ? '' : 's') + (skipped ? ' · ' + skipped + ' skipped' : ''));
@@ -2826,10 +2832,10 @@ function importRaisesCSV(store, rows) {
 // Employer profile: tenure, totals paid, hours, hourly, raise history summary.
 function employerProfileCard(store, emp) {
   const sch = store.state.paySchedules.find(x => (x.employer || '').toLowerCase() === emp.toLowerCase());
-  let gross = 0, net = 0, regChecks = 0, firstPay = '', lastPay = '';
+  let gross = 0, net = 0, regChecks = 0, allChecks = 0, firstPay = '', lastPay = '';
   Object.keys(store.state.years).forEach(yk => (store.state.years[yk].paychecks || []).forEach(pc => {
     if ((pc.employer || '').toLowerCase() !== emp.toLowerCase() || !isPaycheckPaid(pc)) return;
-    gross += Number(pc.gross) || 0; net += paycheckNet(pc);
+    gross += Number(pc.gross) || 0; net += paycheckNet(pc); allChecks++;
     if (!pc.checkType || pc.checkType === 'Regular') regChecks++;
     if (!firstPay || pc.payDate < firstPay) firstPay = pc.payDate;
     if (pc.payDate > lastPay) lastPay = pc.payDate;
@@ -2845,7 +2851,7 @@ function employerProfileCard(store, emp) {
   const row = (l, v, sub) => { const rw = el('div', 'mini-row'); rw.appendChild(el('span', null, l)); const right = el('span'); right.appendChild(el('span', 'strong', v)); if (sub) right.appendChild(el('span', 'muted', ' ' + sub)); rw.appendChild(right); list.appendChild(rw); };
   if (sch && sch.taxForm && sch.taxForm !== 'none') row('Pay reported on', sch.taxForm, '');
   if (days != null) row('Employed', days + ' days', '(' + (days / 365.25).toFixed(1) + ' yrs' + (hire === (sch && sch.hireDate) ? ', since ' + fmtDate(hire) : ', from first paycheck') + (employed ? ')' : ', through last paycheck)'));
-  row('Total paid (gross)', money(gross), 'net ' + money(net));
+  row('Total paid (gross)', money(gross), 'net ' + money(net) + ' · from ' + allChecks + ' recorded paycheck' + (allChecks === 1 ? '' : 's') + ', all titles — years not entered in Clover aren’t counted');
   row('Regular checks', String(regChecks), '');
   if (sch && sch.hoursPerCheck) {
     row('Total hours (est.)', (regChecks * Number(sch.hoursPerCheck)).toLocaleString('en-US'), '@ ' + sch.hoursPerCheck + ' hrs/check');
@@ -2903,7 +2909,7 @@ function raiseYoYCard(store, emp) {
   });
   const cols = tableColKeys(store, 'raiseYoY', RYOY_COL_LABELS, RYOY_ALL_COLS).map(k => buildRaiseYoYCol(k)).filter(Boolean);
   const wrap = el('div', 'table-scroll');
-  wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'asc' }; renderView(currentRoute); }, null));
+  wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
   card.appendChild(wrap);
   card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation.'));
   return card;
@@ -2974,6 +2980,7 @@ function renderRaises(view) {
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove((r.employer || 'raise') + ' · ' + fmtDate(r.date), () => store.removeRaise(r.id)));
         td.appendChild(edit); td.appendChild(del); return td; } }
   ];
+  view.appendChild(el('h3', 'strip-title', 'All raises'));
   view.appendChild(tableTools(columnsButton('raises', RAISE_ALL_COLS, RAISE_DEFAULT_COLS, RAISE_COL_LABELS, 'Raise columns')));
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, s.raises, raisesSort, ns => { raisesSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
@@ -2998,6 +3005,9 @@ function raiseModal(existing) {
   const fPrev = input(r.prevAmount != null ? r.prevAmount : '', { type: 'number', placeholder: '0.00' }); fPrev.step = '0.01';
   const cNoPrev = checkbox('Doesn’t follow the prior raise', r.noPrev, 'Normally, when Previous is left blank, Clover infers it from this employer’s prior recorded raise. Tick this when that comparison doesn’t apply — e.g. a different role or pay structure.');
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional — promotion, annual review, etc.';
+  const fHoursYr = input(r.hoursYear != null ? r.hoursYear : '', { type: 'number', placeholder: 'e.g. 1200' }); fHoursYr.step = 'any'; fHoursYr.min = 0;
+  const fYearGross = input(r.yearGross != null ? r.yearGross : '', { type: 'number', placeholder: '0.00' }); fYearGross.step = '0.01';
+  const fYearNet = input(r.yearNet != null ? r.yearNet : '', { type: 'number', placeholder: '0.00' }); fYearNet.step = '0.01';
   body.appendChild(field('Employer', fEmp, 'Which job the raise is from — matches your paycheck employer names.'));
   const tRow = el('div', 'two-col');
   tRow.appendChild(field('Position title', fTitle, 'Your title as of this pay change — record it here when a raise came with a promotion or title change.'));
@@ -3020,10 +3030,20 @@ function raiseModal(existing) {
   body.appendChild(prevRow);
   const amtLbl = amtField.querySelector('span').childNodes[0];
   const netLbl = netField.querySelector('span').childNodes[0];
+  // Hourly pay varies with hours, so the year's totals can't be derived from
+  // the rate (unlike salary) — let them be recorded per year.
+  const hourlyWrap = el('div');
+  hourlyWrap.appendChild(field('Hours worked that year (optional)', fHoursYr, 'Actual hours worked during this raise’s year — hourly pay varies with hours, so this can’t be derived from the rate like a salary can.'));
+  const hyRow = el('div', 'two-col');
+  hyRow.appendChild(field('Total paid that year — gross (optional)', fYearGross, 'What this job actually paid you that year before taxes.'));
+  hyRow.appendChild(field('Total paid that year — net (optional)', fYearNet, 'What actually hit your account that year.'));
+  hourlyWrap.appendChild(hyRow);
+  body.appendChild(hourlyWrap);
   const syncBasis = () => {
     const b = fBasis.value;
     amtLbl.nodeValue = b === 'annual' ? 'New annual gross salary' : b === 'hourly' ? 'New hourly rate (gross)' : 'New gross per check';
     netLbl.nodeValue = b === 'annual' ? 'New annual net (optional)' : b === 'hourly' ? 'New hourly net (optional)' : 'New net per check (optional)';
+    hourlyWrap.style.display = b === 'hourly' ? '' : 'none';
   };
   fBasis.addEventListener('change', syncBasis); syncBasis();
   body.appendChild(field('Notes', fNotes, 'Anything worth remembering — promotion, title change, merit increase.'));
@@ -3036,7 +3056,10 @@ function raiseModal(existing) {
       store.saveRaise(Object.assign(r, {
         employer: fEmp.value.trim(), title: fTitle.value.trim(), empType: fEmpType.value, date: fDate.value || todayISO(),
         basis: fBasis.value, amount, net: fNet.value === '' ? null : parseFloat(fNet.value),
-        prevAmount: fPrev.value === '' ? null : parseFloat(fPrev.value), noPrev: cNoPrev.__input.checked, notes: fNotes.value.trim()
+        prevAmount: fPrev.value === '' ? null : parseFloat(fPrev.value), noPrev: cNoPrev.__input.checked,
+        hoursYear: fHoursYr.value === '' ? null : parseFloat(fHoursYr.value),
+        yearGross: fYearGross.value === '' ? null : parseFloat(fYearGross.value),
+        yearNet: fYearNet.value === '' ? null : parseFloat(fYearNet.value), notes: fNotes.value.trim()
       }));
       toast(existing ? 'Raise updated' : 'Raise added');
     }
