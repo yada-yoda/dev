@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.58';
+const VERSION = '1.0.59';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1314,7 +1314,10 @@ const FREQUENCIES = [
   { key: 'semiannual', label: 'Semiannual', occ: 2 },
   { key: 'annual', label: 'Annual', occ: 1 },
   { key: 'everyNMonths', label: 'Every N months', occ: null },
-  { key: 'everyNYears', label: 'Every N years', occ: null }
+  { key: 'everyNYears', label: 'Every N years', occ: null },
+  // One-time bills: occ 0 keeps them out of monthly/annual recurring totals;
+  // they hit the expense grid + calendar only on their due date.
+  { key: 'once', label: 'One-time (not recurring)', occ: 0 }
 ];
 const PRIORITIES = ['Essential', 'High', 'Medium', 'Low', 'Optional'];
 const SUB_STATUSES = ['Active', 'Trial', 'Paused', 'Canceled', 'Inactive', 'Needs review'];
@@ -1329,6 +1332,7 @@ function occPerYear(item) {
 function monthlyEquiv(item) { return (Number(item.amount) || 0) * occPerYear(item) / 12; }
 function annualCost(item) { return (Number(item.amount) || 0) * occPerYear(item); }
 function freqLabel(item) {
+  if (item.frequency === 'once') return 'One-time';
   const f = FREQUENCIES.find(x => x.key === item.frequency);
   if (!f) return item.frequency || '—';
   if (f.occ != null) return f.label;
@@ -1362,6 +1366,7 @@ function subStepMonths(sub) {
 function nextRenewalDate(sub) {
   const iso = sub && sub.renewalDate;
   if (!iso) return '';
+  if (sub.frequency === 'once') return iso;   // a one-time bill's date never rolls
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso;
   const today = new Date(); today.setHours(0, 0, 0, 0);
   let d = new Date(+m[1], +m[2] - 1, +m[3]);
@@ -1385,6 +1390,7 @@ function nextRenewalDate(sub) {
 function renewalDaysInMonth(sub, year, month) {
   if (!isSubActive(sub) || !sub.renewalDate) return [];
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(sub.renewalDate); if (!m) return [];
+  if (sub.frequency === 'once') return (+m[1] === year && (+m[2] - 1) === month) ? [+m[3]] : [];
   const anchor = new Date(+m[1], +m[2] - 1, +m[3]);
   const monthEnd = new Date(year, month + 1, 0);
   if (monthEnd < anchor) return [];
@@ -1421,8 +1427,8 @@ function trendIcon(sub) {
   const s = el('span', 'trend flat', '–'); s.title = 'No change at the last update'; return s;
 }
 
-const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', flags: 'Flags', notes: 'Notes' };
-const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'flags', 'notes'];
+const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
+const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'apr', 'flags', 'notes'];
 const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
 function buildSubsCol(store, key, net) {
   switch (key) {
@@ -1430,7 +1436,10 @@ function buildSubsCol(store, key, net) {
         const td = el('td'); const nm = el('div', 'acct-name'); nm.appendChild(document.createTextNode(r.name));
         const ti = trendIcon(r); if (ti) { nm.appendChild(document.createTextNode(' ')); nm.appendChild(ti); }
         td.appendChild(nm);
-        if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
+        if (r.vendor) {
+          if (r.url) { const a = el('a', 'acct-sub', r.vendor); a.href = r.url; a.target = '_blank'; a.rel = 'noopener'; a.style.display = 'block'; td.appendChild(a); }
+          else td.appendChild(el('div', 'acct-sub', r.vendor));
+        }
         return td; } };
     case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => { const td = el('td'); const n = store.expenseGroupName(r.categoryId); td.appendChild(valueBadge('subs', 'category', n === '—' ? '' : n)); return td; } };
     case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => numCell(Number(r.amount) || 0) };
@@ -1445,6 +1454,9 @@ function buildSubsCol(store, key, net) {
     case 'backupAccount': return { label: 'Backup account', key: 'backupAccount', value: r => store.accountName(r.backupAccountId) || '', cell: r => el('td', 'muted', store.accountName(r.backupAccountId) || '—') };
     case 'priority': return { label: 'Priority', key: 'priority', value: r => r.priority || '', cell: r => { const td = el('td'); if (!r.priority) { td.textContent = '—'; return td; } td.appendChild(badge(r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : '')); return td; } };
     case 'status': return { label: 'Status', key: 'status', value: r => r.status || 'Active', cell: r => { const td = el('td'); const st = r.status || 'Active'; td.appendChild(badge(st, isSubActive(r) ? (st === 'Trial' ? 'amber' : 'green') : 'red')); return td; } };
+    case 'links': return { label: 'Links', key: 'links', sortable: false, value: () => '', cell: r => { const td = el('td'); const mk = (url, txt) => { const a = el('a', null, txt); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.marginRight = '8px'; td.appendChild(a); }; if (r.url) mk(r.url, 'Site ↗'); if (r.payUrl) mk(r.payUrl, 'Pay ↗'); if (!r.url && !r.payUrl) td.textContent = '—'; return td; } };
+    case 'customerNo': return { label: 'Customer #', key: 'customerNo', value: r => r.customerNo || '', cell: r => { const td = el('td'); if (!r.customerNo) { td.textContent = '—'; return td; } const full = String(r.customerNo); const masked = '•••• ' + full.slice(-4); const span = el('span', null, masked); span.title = 'Click to reveal'; span.style.cursor = 'pointer'; let shown = false; span.addEventListener('click', ev => { ev.stopPropagation(); shown = !shown; span.textContent = shown ? full : masked; span.title = shown ? 'Click to hide' : 'Click to reveal'; }); td.appendChild(span); return td; } };
+    case 'apr': return { label: 'APR %', key: 'apr', num: true, value: r => r.apr != null ? Number(r.apr) : -1, cell: r => el('td', 'num', (r.apr != null && r.apr !== '') ? (Number(r.apr).toFixed(2) + '%') : '—') };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
         const td = el('td'); const flags = el('div', 'flags');
@@ -1616,6 +1628,13 @@ function subscriptionModal(existing) {
   const fStatus = select(SUB_STATUSES, r.status || 'Active');
   const cAuto = checkbox('Auto-pay', r.autoPay, 'Charged automatically — no manual action needed.');
   const fUrl = input(r.url || '', { placeholder: 'https:// (optional)' });
+  const fPayUrl = input(r.payUrl || '', { placeholder: 'https:// (optional)' });
+  // Customer/account number stays masked unless the field is focused.
+  const fCust = input(r.customerNo || '', { placeholder: 'optional' });
+  fCust.type = 'password'; fCust.autocomplete = 'off';
+  fCust.addEventListener('focus', () => { fCust.type = 'text'; });
+  fCust.addEventListener('blur', () => { fCust.type = 'password'; });
+  const fApr = input(r.apr != null ? r.apr : '', { type: 'number', placeholder: 'e.g. 24.99' }); fApr.step = '0.01'; fApr.min = 0;
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   body.appendChild(field('Name', fName, 'What the subscription or bill is called.'));
@@ -1627,7 +1646,8 @@ function subscriptionModal(existing) {
   amtRow.appendChild(field('Frequency', fFreq, 'How often you are charged. Converted to a monthly-equivalent and annual cost.'));
   body.appendChild(amtRow);
   body.appendChild(intervalWrap);
-  body.appendChild(field('Renewal / due date', fRenew, 'The day it recurs — e.g. the 8th. For an active bill this auto-advances each period (monthly → next month’s same day, annual → next year), so you set it once and it never goes overdue or blank. Drives the renewal warnings (7/14/30/60 days).'));
+  const renewField = field('Renewal / due date', fRenew, 'The day it recurs — e.g. the 8th. For an active bill this auto-advances each period (monthly → next month’s same day, annual → next year), so you set it once and it never goes overdue or blank. Drives the renewal warnings (7/14/30/60 days). For a one-time bill this is simply the date it’s due — it never rolls forward.');
+  body.appendChild(renewField);
   const acctRow = el('div', 'two-col');
   acctRow.appendChild(field('Payment account', fAcct, 'Which account or card pays for this.'));
   acctRow.appendChild(field('Backup account', fBackup, 'A fallback payment method on file, if any.'));
@@ -1641,10 +1661,29 @@ function subscriptionModal(existing) {
   const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cAuto);
   pRow.appendChild(field('Flags', flagsWrap));
   body.appendChild(pRow);
-  body.appendChild(field('Vendor URL', fUrl, 'Link to manage or cancel the subscription (optional).'));
+  const custField = field('Account / customer #', fCust, 'Your customer, account, policy, or member number with this vendor. Kept masked except the last 4 digits until you click into the field (or click it in the table).');
+  const aprField = field('Interest rate (APR %)', fApr, 'The interest rate this loan or card charges, for reference.');
+  const custRow = el('div', 'two-col');
+  custRow.appendChild(custField); custRow.appendChild(aprField);
+  body.appendChild(custRow);
+  const urlRow = el('div', 'two-col');
+  urlRow.appendChild(field('Vendor URL', fUrl, 'The vendor’s site — where you manage or cancel this (optional).'));
+  urlRow.appendChild(field('Payment URL', fPayUrl, 'Where you go to actually pay this bill, if different from the vendor site (optional).'));
+  body.appendChild(urlRow);
   body.appendChild(field('Notes', fNotes, 'Anything else — promo pricing, renewal quirks, etc.'));
-  rebuildSubs(); syncInterval();
-  fCat.addEventListener('change', rebuildSubs);
+  // Category-aware labels/fields: the number field renames itself to match the
+  // category, and APR only shows where an interest rate makes sense.
+  const custLblNode = custField.querySelector('span').childNodes[0];
+  const renewLblNode = renewField.querySelector('span').childNodes[0];
+  const syncCatFields = () => {
+    const n = ((s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '');
+    custLblNode.nodeValue = /insurance/i.test(n) ? 'Policy #' : /membership|gym/i.test(n) ? 'Member #' : /loan|credit/i.test(n) ? 'Loan / account #' : 'Account / customer #';
+    aprField.style.display = /loan|credit/i.test(n) ? '' : 'none';
+  };
+  const syncOnce = () => { renewLblNode.nodeValue = fFreq.value === 'once' ? 'Due date' : 'Renewal / due date'; };
+  fFreq.addEventListener('change', syncOnce);
+  rebuildSubs(); syncInterval(); syncCatFields(); syncOnce();
+  fCat.addEventListener('change', () => { rebuildSubs(); syncCatFields(); });
 
   openModal({
     title: existing ? 'Edit subscription' : 'Add subscription', body, confirmLabel: 'Save',
@@ -1673,7 +1712,8 @@ function subscriptionModal(existing) {
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
         renewalDate: fRenew.value || '', accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
         personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked,
-        url: fUrl.value.trim(), notes: fNotes.value.trim(), priceHistory: hist
+        url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(),
+        apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
       });
       store.saveRecurring(item);
       toast(existing ? 'Subscription updated' : 'Subscription added');
@@ -1700,9 +1740,12 @@ function recurringMonthsBy(store, catId, payments, validSubIds) {
   const bills = store.state.recurring.filter(isSubActive).filter(r => r.categoryId === catId);
   const out = { total: new Array(12).fill(0), subs: {}, none: new Array(12).fill(0) };
   bills.forEach(bill => {
-    const me = monthlyEquiv(bill);
+    const once = bill.frequency === 'once';
+    const onceMonth = once ? (String(bill.renewalDate || '').slice(0, 4) === String(activeYear) ? monthIdx(bill.renewalDate) : -1) : -1;
+    const me = once ? (Number(bill.amount) || 0) : monthlyEquiv(bill);
     const subOk = bill.subId && (!validSubIds || validSubIds.has(bill.subId));
     for (let mi = 0; mi < 12; mi++) {
+      if (once && mi !== onceMonth) continue;
       const overridden = payments.some(p => p.recurringId === bill.id && monthIdx(p.date) === mi);
       if (overridden) continue;
       out.total[mi] += me;
@@ -4219,7 +4262,7 @@ function calendarEvents(store, year, month) {
   const events = [];
   const yd = store.yearData(year);
   (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
-  store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + ' renews · ' + money(Number(r.amount) || 0), tone: 'amber' })); });
+  store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + (r.frequency === 'once' ? ' due · ' : ' renews · ') + money(Number(r.amount) || 0), tone: 'amber' })); });
   store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => {
     const name = a.name + (a.last4 ? ' ••' + a.last4 : '');
     const d = dateInMonth(a.cdMaturity, year, month);

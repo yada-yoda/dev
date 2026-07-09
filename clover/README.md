@@ -45,6 +45,28 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.59 — One-time bills, smarter bill fields, links & masked account numbers
+
+- **One-time bills.** The Frequency dropdown gains "One-time (not
+  recurring)" — for a bill that happens once (a repair, a deposit, an
+  annual event you won't repeat). The date field becomes a plain "Due
+  date" that never rolls forward, the bill stays out of the monthly/annual
+  recurring totals, shows on the Calendar as "due" (not "renews"), and
+  lands in the expense grid only in its due month.
+- **Category-aware fields.** The new account-number field renames itself to
+  match the category — Policy # for Insurance, Member # for Memberships,
+  Loan / account # for Loans & Credit Cards — and an "Interest rate
+  (APR %)" field appears only for loan/credit categories (with an optional
+  APR column in the table).
+- **Vendor URL + Payment URL.** Alongside the existing vendor link there's
+  now a Payment URL (where you actually go to pay). A new optional Links
+  column shows "Site ↗ / Pay ↗", and a bill's vendor name under its title
+  is now a clickable link.
+- **Masked customer/account number.** The new Account / customer # field
+  shows only •••• and the last 4 digits — in the table, click it to
+  reveal/hide; in the edit form it unmasks only while you're clicked into
+  the field.
+
 ### v1.0.58 — Money Market & Cash / Sweep account types + editable tax-forms list
 
 - **Two new account types**: Money Market and Cash / Sweep — for things
