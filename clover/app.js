@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.71';
+const VERSION = '1.0.72';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2985,7 +2985,7 @@ function raiseYoYCard(store, emp) {
   const wrap = el('div', 'table-scroll');
   wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
   card.appendChild(wrap);
-  card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation. Year gross for an hourly year is the recorded total paid; for a salary year it’s the salary itself — those annual figures are what let an hourly year compare against a salary.'));
+  card.appendChild(el('div', 'sum-hint', 'Inflation is itself a year-over-year figure — the % change in US consumer prices (CPI-U annual average) vs the prior year (2025 preliminary) — so it’s on the same YoY basis as your raise %. “Real” = raise % minus inflation. Year gross for an hourly year is the recorded total paid; for a salary year it’s the salary itself — those annual figures are what let an hourly year compare against a salary.'));
   return card;
 }
 

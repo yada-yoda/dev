@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.72 — Clarify that inflation is already YoY
+
+The YoY-raises footnote now says explicitly that the inflation column is
+itself a year-over-year figure (CPI-U annual average % change vs the prior
+year) — the same basis as your raise %, which is what makes the "Real"
+column a fair comparison. The header stays as-is since inflation rates are
+always quoted YoY; only the explanation needed to say so.
+
 ### v1.0.71 — Hours worked on any raise basis
 
 The "Hours worked that year" field now shows for every raise basis — not
