@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.68';
+const VERSION = '1.0.69';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2727,6 +2727,7 @@ function employerMergeModal() {
 // ============================================================
 let raisesSort = { key: 'date', dir: 'desc' };
 let raiseYoYSort = { key: 'date', dir: 'desc' };
+let raiseYoYFilter = null;   // {key:'basis'|'empType', value} from clicking a YoY tag
 // Effective previous amount for a raise: the entered one, else inferred from
 // the prior same-employer raise on the same basis — unless the raise is
 // marked standalone (noPrev, e.g. a job/role change makes them incomparable).
@@ -2876,42 +2877,88 @@ function employerProfileCard(store, emp) {
   return card;
 }
 // YoY raise analysis vs inflation (shown once an employer has 3+ raises).
-const RYOY_COL_LABELS = { date: 'Date', amount: 'New gross', pct: 'Raise %', inflation: 'Inflation that year', real: 'Real (vs inflation)' };
-const RYOY_ALL_COLS = ['date', 'amount', 'pct', 'inflation', 'real'];
+const RYOY_COL_LABELS = { date: 'Date', basis: 'Amounts are', empType: 'Employment', amount: 'New gross', yearGross: 'Year gross', yearNet: 'Year net', hours: 'Hours (yr)', hoursDelta: 'Hours vs prior yr', pct: 'Raise %', inflation: 'Inflation that year', real: 'Real (vs inflation)' };
+const RYOY_ALL_COLS = ['date', 'basis', 'empType', 'amount', 'yearGross', 'yearNet', 'hours', 'hoursDelta', 'pct', 'inflation', 'real'];
+const RYOY_DEFAULT_COLS = ['date', 'basis', 'empType', 'amount', 'yearGross', 'hours', 'hoursDelta', 'pct', 'inflation', 'real'];
+function basisLabel(b) { return b === 'annual' ? 'Annual salary' : b === 'hourly' ? 'Hourly rate' : 'Per paycheck'; }
+// A clickable tag in the YoY table — filters all YoY cards to that basis or
+// employment type, and the raise-% chain recomputes over the displayed rows.
+function yoyFilterBadge(key, value, label, tone) {
+  const b = badge(label, tone || '');
+  b.style.cursor = 'pointer';
+  b.title = 'Click to show only “' + label + '” — the raise % chain recomputes over what’s shown';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const cur = raiseYoYFilter;
+    raiseYoYFilter = (cur && cur.key === key && cur.value === value) ? null : { key, value };
+    renderView(currentRoute);
+  });
+  return b;
+}
 function buildRaiseYoYCol(key) {
   const pctCell = (v, titles) => { const td = el('td', 'num'); if (v == null) { td.textContent = '—'; return td; } const sp = el('span', v >= 0 ? 'pos' : 'neg', (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1) + '%'); if (titles) td.title = v >= 0 ? titles[0] : titles[1]; td.appendChild(sp); return td; };
   switch (key) {
     case 'date': return { label: 'Date', key: 'date', value: x => x.date || '', cell: x => el('td', null, fmtDate(x.date)) };
+    case 'basis': return { label: 'Amounts are', key: 'basis', value: x => basisLabel(x.basis), cell: x => { const td = el('td'); td.appendChild(yoyFilterBadge('basis', x.basis || 'check', basisLabel(x.basis), x.basis === 'hourly' ? 'amber' : x.basis === 'annual' ? 'green' : '')); return td; } };
+    case 'empType': return { label: 'Employment', key: 'empType', value: x => x.empType || '', cell: x => { const td = el('td'); if (!x.empType) { td.textContent = '—'; return td; } td.appendChild(yoyFilterBadge('empType', x.empType, x.empType, x.empType === 'Full-time' ? 'green' : x.empType === 'Part-time' ? 'amber' : '')); return td; } };
     case 'amount': return { label: 'New gross', key: 'amount', num: true, value: x => Number(x.amount) || 0, cell: x => { const td = numCell(Number(x.amount) || 0, true); td.appendChild(el('span', 'muted', raiseSuf(x))); return td; } };
-    case 'pct': return { label: 'Raise %', key: 'pct', num: true, value: x => x.pct == null ? -1e9 : x.pct, cell: x => pctCell(x.pct) };
+    case 'yearGross': return { label: 'Year gross', key: 'yearGross', num: true, value: x => x.annualG != null ? x.annualG : -1, cell: x => { if (x.annualG == null) return el('td', 'num', '—'); const td = numCell(x.annualG); if (x.annualDerived) { td.classList.add('muted'); td.title = 'The annual salary itself'; } return td; } };
+    case 'yearNet': return { label: 'Year net', key: 'yearNet', num: true, value: x => x.yearNet != null ? Number(x.yearNet) : -1, cell: x => x.yearNet != null && x.yearNet !== '' ? numCell(Number(x.yearNet)) : el('td', 'num', '—') };
+    case 'hours': return { label: 'Hours (yr)', key: 'hours', num: true, value: x => x.hours != null ? Number(x.hours) : -1, cell: x => el('td', 'num', x.hours != null && x.hours !== '' ? Number(x.hours).toLocaleString('en-US') : '—') };
+    case 'hoursDelta': return { label: 'Hours vs prior yr', key: 'hoursDelta', num: true, value: x => x.hoursDelta == null ? -1e9 : x.hoursDelta, cell: x => { const td = pctCell(x.hoursDelta, ['Worked more hours than the prior recorded year', 'Worked fewer hours than the prior recorded year']); return td; } };
+    case 'pct': return { label: 'Raise %', key: 'pct', num: true, value: x => x.pct == null ? -1e9 : x.pct, cell: x => { const td = pctCell(x.pct); if (x.pct != null && x.pctAnnualized) td.title = 'Compared on annual totals (hourly year vs salary)'; return td; } };
     case 'inflation': return { label: 'Inflation that year', key: 'inflation', num: true, value: x => x.infl == null ? -1e9 : x.infl, cell: x => el('td', 'num', x.infl != null ? x.infl.toFixed(1) + '%' : '—') };
     case 'real': return { label: 'Real (vs inflation)', key: 'real', num: true, value: x => x.real == null ? -1e9 : x.real, cell: x => pctCell(x.real, ['Beat inflation', 'Behind inflation']) };
   }
   return null;
 }
 function raiseYoYCard(store, emp) {
-  const raises = store.state.raises.filter(r => (r.employer || '').toLowerCase() === emp.toLowerCase() && r.amount != null).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  if (raises.length < 3) return null;
+  const all = store.state.raises.filter(r => (r.employer || '').toLowerCase() === emp.toLowerCase() && r.amount != null).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  if (all.length < 3) return null;
   const card = el('div', 'card');
   const yh = el('div', 'view-head');
   yh.appendChild(el('h3', 'strip-title', 'YoY raises vs inflation · ' + emp));
-  yh.appendChild(columnsButton('raiseYoY', RYOY_ALL_COLS, RYOY_ALL_COLS, RYOY_COL_LABELS, 'YoY raise columns'));
+  yh.appendChild(columnsButton('raiseYoY', RYOY_ALL_COLS, RYOY_DEFAULT_COLS, RYOY_COL_LABELS, 'YoY raise columns'));
   card.appendChild(yh);
-  // Precompute the chain: each raise's % over the prior one (same basis, and
-  // not across a raise marked standalone), inflation for its calendar year,
-  // and the real (inflation-adjusted) %.
+  // Tag filter: the chain below recomputes over the DISPLAYED rows only.
+  let raises = all;
+  if (raiseYoYFilter) {
+    const f = raiseYoYFilter;
+    raises = all.filter(r => f.key === 'basis' ? (r.basis || 'check') === f.value : (r.empType || '') === f.value);
+    const fb = el('div', 'filter-bar');
+    fb.appendChild(el('span', 'muted', 'Showing ' + raises.length + ' of ' + all.length + ' where ' + (f.key === 'basis' ? 'amounts are' : 'employment') + ' = “' + (f.key === 'basis' ? basisLabel(f.value) : f.value) + '” — raise % recomputed over what’s shown'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { raiseYoYFilter = null; renderView(currentRoute); });
+    fb.appendChild(clear);
+    card.appendChild(fb);
+  }
+  // Chain: each raise's % over the prior DISPLAYED one. Same basis compares
+  // directly; an hourly year with a recorded Year gross compares against an
+  // annual salary on annual totals — that's what makes hourly-vs-salary math
+  // possible. An explicit Previous always wins; noPrev breaks the chain.
+  const annualOf = x => (x.basis === 'annual') ? Number(x.amount) : (x.basis === 'hourly' && x.yearGross != null && x.yearGross !== '') ? Number(x.yearGross) : null;
   const rows = raises.map((r, i) => {
-    const prior = i > 0 && !r.noPrev && (raises[i - 1].basis || 'check') === (r.basis || 'check') ? Number(raises[i - 1].amount) : null;
-    const prev = (r.prevAmount != null && r.prevAmount !== '') ? Number(r.prevAmount) : prior;
-    const pct = (prev && prev > 0) ? (Number(r.amount) - prev) / prev * 100 : null;
+    const prevR = i > 0 ? raises[i - 1] : null;
+    let prev = (r.prevAmount != null && r.prevAmount !== '') ? Number(r.prevAmount) : null;
+    let cur = Number(r.amount), pctAnnualized = false;
+    if (prev == null && prevR && !r.noPrev) {
+      if ((prevR.basis || 'check') === (r.basis || 'check')) prev = Number(prevR.amount);
+      else if (annualOf(r) != null && annualOf(prevR) != null) { prev = annualOf(prevR); cur = annualOf(r); pctAnnualized = true; }
+    }
+    const pct = (prev && prev > 0) ? (cur - prev) / prev * 100 : null;
+    let hoursDelta = null;
+    if (r.hoursYear != null && r.hoursYear !== '' && prevR && prevR.hoursYear != null && prevR.hoursYear !== '' && Number(prevR.hoursYear) > 0)
+      hoursDelta = (Number(r.hoursYear) - Number(prevR.hoursYear)) / Number(prevR.hoursYear) * 100;
     const infl = INFLATION_CPI[+String(r.date || '').slice(0, 4)];
-    return { date: r.date, amount: r.amount, basis: r.basis, pct, infl: infl != null ? infl : null, real: (pct != null && infl != null) ? pct - infl : null };
+    return { date: r.date, amount: r.amount, basis: r.basis, empType: r.empType,
+      annualG: annualOf(r), annualDerived: r.basis === 'annual', yearNet: r.basis === 'annual' ? r.net : r.yearNet, hours: r.hoursYear, hoursDelta,
+      pct, pctAnnualized, infl: infl != null ? infl : null, real: (pct != null && infl != null) ? pct - infl : null };
   });
-  const cols = tableColKeys(store, 'raiseYoY', RYOY_COL_LABELS, RYOY_ALL_COLS).map(k => buildRaiseYoYCol(k)).filter(Boolean);
+  const cols = tableColKeys(store, 'raiseYoY', RYOY_COL_LABELS, RYOY_DEFAULT_COLS).map(k => buildRaiseYoYCol(k)).filter(Boolean);
   const wrap = el('div', 'table-scroll');
   wrap.appendChild(sortableTable(cols, rows, raiseYoYSort, ns => { raiseYoYSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
   card.appendChild(wrap);
-  card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation.'));
+  card.appendChild(el('div', 'sum-hint', 'Inflation = US CPI-U annual average for the raise’s calendar year (2025 preliminary). “Real” = raise % minus inflation. Year gross for an hourly year is the recorded total paid; for a salary year it’s the salary itself — those annual figures are what let an hourly year compare against a salary.'));
   return card;
 }
 

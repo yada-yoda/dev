@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.69 — YoY raises: basis & employment tags, hourly-vs-salary math, hours trend
+
+- **New YoY columns**: "Amounts are" (Per paycheck / Annual salary / Hourly
+  rate) and Employment (Full-time / Part-time / …) — both clickable tags.
+  Click one to filter the YoY table to just those raises, and the raise-%
+  chain **recomputes over what's shown** (a chip explains, ✕ clears).
+- **Hourly years compare against salaries properly.** Year gross and Year
+  net columns show each year's annual figure — the recorded total for an
+  hourly year, the salary itself for a salary year — and when the chain
+  crosses from hourly to salary (or back), the raise % is computed on
+  those annual totals instead of comparing a $17/hr rate to a $52,000
+  salary. The % gets a hover note when it's an annualized comparison.
+- **Hours trend**: Hours (yr) shows in the table, with a "Hours vs prior
+  yr" % column (+20.0% = worked a fifth more hours than the prior recorded
+  year).
+
 ### v1.0.68 — Raises follow-ups: honest totals, hourly year figures, tidy tables
 
 - **"Total paid (gross)" now says what it counts.** It always summed every
