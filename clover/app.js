@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.56';
+const VERSION = '1.0.57';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4714,6 +4714,33 @@ const BROKER_PARSERS = [
       });
       return { divs, buys, fees };
     }
+  },
+  {
+    // Ameriprise portfolio-activity export (ameriprise.com -> Portfolio ->
+    // Activity -> All transactions + date range -> download). The real header
+    // sits below a few preamble lines — analyzeDividendFileRaw handles that.
+    // Money-market ("Insured Money Market") interest rows are collected
+    // separately so they can import as Interest income; JOURNAL rows are
+    // transfers between accounts and never import.
+    key: 'ameriprise', name: 'Ameriprise',
+    detect: h => h.includes('Transaction Date') && h.includes('Description') && h.includes('Symbol') && h.includes('Amount'),
+    dateNote: 'Dates use the “Transaction Date” column.',
+    parse: rows => {
+      const divs = [], buys = [], fees = [], interest = [];
+      rows.forEach((r, i) => {
+        const row = i + 2;   // spreadsheet row number (header = row 1)
+        const desc = String(r['Description'] || '').trim();
+        const date = parseImportDate(r['Transaction Date']);
+        const symbol = String(r['Symbol'] || '').trim().toUpperCase();
+        const amt = parseImportAmount(r['Amount']);
+        if (!date || !desc) return;
+        if (/^JOURNAL/i.test(desc)) return;
+        if (/^INTEREST PAYMENT/i.test(desc) && !isNaN(amt) && amt > 0) { interest.push({ date, amount: amt, desc, row }); return; }
+        if (/^DIVIDEND PAYMENT/i.test(desc) && !isNaN(amt) && amt > 0) { divs.push({ date, symbol: /^\d+$/.test(symbol) ? '' : symbol, amount: amt, action: '', desc, row }); return; }
+        if (/^CHARGE/i.test(desc) && !isNaN(amt) && amt < 0) fees.push({ date, symbol: '', amount: Math.abs(amt), desc, row });
+      });
+      return { divs, buys, fees, interest };
+    }
   }
 ];
 // Sample files (fake data) showing the exact export shape each broker produces —
@@ -4728,6 +4755,12 @@ const SCHWAB_TEMPLATE_CSV = '"Date","Action","Symbol","Description","Quantity","
   + '"01/15/2026","Reinvest Shares","KO","THE COCA-COLA CO","0.09","$60.00","","-$5.40"\n'
   + '"01/20/2026","Non-Qualified Div","XYZ","EXAMPLE FUND","","","","$2.10"\n'
   + '"01/22/2026","ADR Mgmt Fee","BP","BP P L C","","","","-$0.20"\n';
+const AMERIPRISE_TEMPLATE_CSV = '"AMERIPRISE BROKERAGE","0000 1111 2222 3 444"\n'
+  + '"Filter Criteria","Start Date: 2026-01-01 End Date: 2026-12-31 "\n,\n\n,\n"Completed Transactions"\n'
+  + '"Transaction Date","Account","Description","Amount","Quantity","Price","Symbol"\n'
+  + '"02/13/2026","AMERIPRISE BROKERAGE (**** 2222 3 444) ","DIVIDEND PAYMENT - EXAMPLE COMPANY INC 021326 100","$25.00","100.000","","XYZ"\n'
+  + '"01/30/2026","AMERIPRISE BROKERAGE (**** 2222 3 444) ","INTEREST PAYMENT - AMERIPRISE INSURED MONEY MARKET ACCOUNT 013026 10,000 - APYE .03%","$0.25","10,000.000","","9999840"\n'
+  + '"01/20/2026","AMERIPRISE BROKERAGE (**** 2222 3 444) ","CHARGE - QTRLY MAINT FEE","-$25.00","","",""\n';
 function divKey(d) { return d.date + '|' + (d.symbol || '') + '|' + (Number(d.amount) || 0).toFixed(2); }
 // Existing dividend keys across every loaded year (manual entries included, when
 // they carry a symbol) — this is what makes re-imports and overlapping M1 exports safe.
@@ -4747,6 +4780,39 @@ function existingDividendAccountsByKey(store) {
     });
   });
   return map;
+}
+// Existing money-market/sweep interest income (entries in an Interest-named
+// category) keyed date|amount -> set of accountIds, for re-import safety.
+function existingInterestAccountsByKey(store) {
+  const intCatIds = new Set(store.state.incomeCategories.filter(c => /interest/i.test(c.name)).map(c => c.id));
+  const map = new Map();
+  Object.keys(store.state.years).forEach(yk => {
+    const d = store.state.years[yk]; if (!d || !d.income) return;
+    d.income.forEach(e => {
+      if (!intCatIds.has(e.categoryId)) return;
+      const k = e.date + '|' + (Number(e.gross) || 0).toFixed(2);
+      if (!map.has(k)) map.set(k, new Set());
+      map.get(k).add(e.accountId || '');
+    });
+  });
+  return map;
+}
+// Some broker exports (Ameriprise) put preamble lines above the real header —
+// find the header row in a header:false re-parse and analyze from there.
+function analyzeDividendFileRaw(store, rawRows, filename) {
+  const hi = rawRows.findIndex(r => Array.isArray(r) && r.map(x => String(x || '').trim()).includes('Transaction Date') && r.map(x => String(x || '').trim()).includes('Symbol'));
+  if (hi < 0) return null;
+  const headers = rawRows[hi].map(x => String(x || '').trim());
+  const objRows = [];
+  for (let i = hi + 1; i < rawRows.length; i++) {
+    const r = rawRows[i]; if (!Array.isArray(r)) continue;
+    if (!r.some(x => String(x || '').trim() !== '')) continue;
+    const o = {}; headers.forEach((h, j) => { o[h] = r[j] != null ? r[j] : ''; });
+    objRows.push(o);
+  }
+  const analyzed = analyzeDividendFile(store, objRows, headers, filename);
+  if (analyzed) [analyzed.divs, analyzed.fees, analyzed.interest].forEach(list => (list || []).forEach(x => { if (x.row) x.row += hi; }));
+  return analyzed;
 }
 function analyzeDividendFile(store, rows, headers, filename) {
   const parser = BROKER_PARSERS.find(p => p.detect(headers));
@@ -4776,17 +4842,22 @@ function analyzeDividendFile(store, rows, headers, filename) {
     if (firstRowByKey.has(kf)) { d.dupFile = true; d.dupRow = firstRowByKey.get(kf); }
     else firstRowByKey.set(kf, d.row);
   });
-  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, choices: {}, includeFees: false, feeCat: '', accountId: '' };
+  const intMap = existingInterestAccountsByKey(store);
+  (parsed.interest || []).forEach(t => {
+    const k = t.date + '|' + (Number(t.amount) || 0).toFixed(2);
+    t.dbAccts = intMap.has(k) ? [...intMap.get(k)] : null;
+  });
+  return { filename, broker: parser.name, dateNote: parser.dateNote || '', divs: parsed.divs, buys: parsed.buys, fees: parsed.fees, interest: parsed.interest || [], choices: {}, includeFees: false, includeInterest: true, feeCat: '', accountId: '' };
 }
 function dividendReviewCard(store) {
   const st = divImportState, s = store.state;
   ensureYearsScanned(store);
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'Import dividends — ' + st.broker));
-  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.divs.length + ' dividend' + (st.divs.length === 1 ? '' : 's') + ' found · ' + st.buys.length + ' purchases ignored (only used to tag reinvestment) · ' + st.fees.length + ' related fee' + (st.fees.length === 1 ? '' : 's') + '.' + (st.dateNote ? ' ' + st.dateNote : '')));
+  card.appendChild(el('p', 'muted', '“' + st.filename + '” · ' + st.divs.length + ' dividend' + (st.divs.length === 1 ? '' : 's') + ' found · ' + st.buys.length + ' purchases ignored (only used to tag reinvestment) · ' + st.fees.length + ' related fee' + (st.fees.length === 1 ? '' : 's') + ((st.interest || []).length ? ' · ' + st.interest.length + ' money-market interest payment' + (st.interest.length === 1 ? '' : 's') : '') + '.' + (st.dateNote ? ' ' + st.dateNote : '')));
 
   const divCat = s.incomeCategories.find(c => /dividend/i.test(c.name));
-  if (!divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
+  if (st.divs.length && !divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
 
   const optRow = el('div', 'io-actions');
   const acctSel = select(accountOptions(s, '— no account —'), st.accountId);
@@ -4848,6 +4919,31 @@ function dividendReviewCard(store) {
     card.appendChild(feeRow);
   }
 
+  // Money-market / sweep-account interest — imports as Interest income.
+  const intCat = s.incomeCategories.find(c => /interest/i.test(c.name));
+  const importableInt = (st.interest || []).filter(t => !(t.dbAccts || []).includes(st.accountId || ''));
+  if ((st.interest || []).length) {
+    card.appendChild(el('h3', 'strip-title', 'Money-market interest (' + st.interest.length + ')'));
+    const skippedInt = st.interest.length - importableInt.length;
+    card.appendChild(el('p', 'muted', 'Interest paid by the broker’s cash / sweep account (e.g. the insured money market). These import as Interest income under the account picked above.' + (skippedInt ? ' ' + skippedInt + ' already recorded for that account will be skipped automatically.' : '')));
+    const il = el('div', 'mini-list');
+    st.interest.slice(0, 8).forEach(t => {
+      const rw = el('div', 'mini-row');
+      rw.appendChild(el('span', null, fmtDate(t.date) + ' · ' + money(t.amount) + ' — CSV row ' + t.row + ((t.dbAccts || []).includes(st.accountId || '') ? ' · already recorded' : '')));
+      rw.appendChild(el('span', 'muted', (t.desc || '').slice(0, 60)));
+      il.appendChild(rw);
+    });
+    card.appendChild(il);
+    if (st.interest.length > 8) card.appendChild(el('div', 'muted', '+ ' + (st.interest.length - 8) + ' more'));
+    const iRow = el('div', 'io-actions');
+    const icb = checkbox('Import ' + importableInt.length + ' interest payment' + (importableInt.length === 1 ? '' : 's') + ' as Interest income', st.includeInterest, 'They join the same undoable import batch as the dividends.');
+    icb.__input.addEventListener('change', () => { st.includeInterest = icb.__input.checked; renderView(currentRoute); });
+    iRow.appendChild(icb);
+    card.appendChild(iRow);
+    if (st.includeInterest && !intCat) card.appendChild(el('p', 'muted', 'No “Interest” income category exists — add one in Settings to import these.'));
+  }
+  const intGo = (st.includeInterest && intCat) ? importableInt : [];
+
   const importable = st.divs.filter(d => (!isDbDup(d) && !d.dupFile) || st.choices[d.uid] === 'add');
   const prevWrap = el('div', 'table-scroll');
   const pt = el('table', 'data-table');
@@ -4867,14 +4963,15 @@ function dividendReviewCard(store) {
   card.appendChild(el('div', 'muted', 'These go into your Dividends income. Preview of the first ' + Math.min(12, importable.length) + ':'));
   card.appendChild(prevWrap);
   const skippedN = st.divs.length - importable.length;
-  card.appendChild(el('p', 'muted', importable.length + ' will import as Dividends income · ' + skippedN + ' merged/skipped as duplicates' + (st.includeFees ? ' · ' + st.fees.length + ' fees as expenses' : '') + '. Reinvested payouts are tagged; the purchases themselves are never imported.'));
+  card.appendChild(el('p', 'muted', importable.length + ' will import as Dividends income · ' + skippedN + ' merged/skipped as duplicates' + (intGo.length ? ' · ' + intGo.length + ' interest payments as Interest income' : '') + (st.includeFees ? ' · ' + st.fees.length + ' fees as expenses' : '') + '. Reinvested payouts are tagged; the purchases themselves are never imported.'));
 
   const actions = el('div', 'io-actions');
-  const impBtn = el('button', 'btn-primary', 'Import ' + importable.length + ' dividend' + (importable.length === 1 ? '' : 's'));
-  impBtn.disabled = !importable.length && !(st.includeFees && st.fees.length);
+  const impTotal = importable.length + intGo.length;
+  const impBtn = el('button', 'btn-primary', 'Import ' + impTotal + ' entr' + (impTotal === 1 ? 'y' : 'ies'));
+  impBtn.disabled = !impTotal && !(st.includeFees && st.fees.length);
   impBtn.addEventListener('click', async () => {
     const me = s.persons[0] && s.persons[0].id;
-    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: 'income', source: st.filename + ' (dividends · ' + st.broker + ')', count: importable.length + (st.includeFees ? st.fees.length : 0) };
+    const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target: 'income', source: st.filename + ' (dividends · ' + st.broker + ')', count: importable.length + intGo.length + (st.includeFees ? st.fees.length : 0) };
     const byYear = {}, feeByYear = {};
     importable.forEach(d => {
       const yr = +d.date.slice(0, 4);
@@ -4885,6 +4982,14 @@ function dividendReviewCard(store) {
         receivedVia: st.broker, notes: ''
       });
     });
+    intGo.forEach(t => {
+      const yr = +t.date.slice(0, 4);
+      (byYear[yr] = byYear[yr] || []).push({
+        date: t.date, gross: t.amount, net: t.amount, categoryId: intCat.id, subId: '',
+        accountId: st.accountId || '', personId: me, status: 'received', taxable: 'yes',
+        receivedVia: st.broker, notes: (t.desc || '').slice(0, 120)
+      });
+    });
     if (st.includeFees && st.feeCat) st.fees.forEach(f => {
       const yr = +f.date.slice(0, 4);
       (feeByYear[yr] = feeByYear[yr] || []).push({ date: f.date, amount: f.amount, categoryId: st.feeCat, subId: '', accountId: st.accountId || '', personId: me, notes: ((f.symbol ? f.symbol + ' — ' : '') + f.desc).trim() });
@@ -4893,7 +4998,7 @@ function dividendReviewCard(store) {
     await Promise.all(years.map(y => store.loadYear(y)));
     Object.keys(byYear).forEach(y => store.importEntries(+y, 'income', byYear[y], batch));
     Object.keys(feeByYear).forEach(y => store.importEntries(+y, 'expenses', feeByYear[y], batch));
-    toast('Imported ' + importable.length + ' dividends' + (st.includeFees && st.fees.length ? ' + ' + st.fees.length + ' fees' : ''));
+    toast('Imported ' + importable.length + ' dividends' + (intGo.length ? ' + ' + intGo.length + ' interest' : '') + (st.includeFees && st.fees.length ? ' + ' + st.fees.length + ' fees' : ''));
     divImportState = null;
     importState = { target: 'dividends', rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
     renderView(currentRoute);
@@ -5158,7 +5263,7 @@ function importSection() {
 
   if (!importState.rows) {
     card.appendChild(el('p', 'muted', importState.target === 'dividends'
-      ? 'Upload your broker’s activity export (M1 Finance or Schwab). Clover keeps only the dividends — purchases are ignored (but used to tag reinvestment), duplicates are caught for review, and related fees can come along as expenses.'
+      ? 'Upload your broker’s activity export (M1 Finance, Schwab, or Ameriprise). For Ameriprise: ameriprise.com → Portfolio → Activity → All transactions, set the date range, download the CSV. Clover keeps the dividends and money-market interest — purchases are ignored (but used to tag reinvestment), duplicates are caught for review, and fees can come along as investment-fee expenses.'
       : importState.target === 'selling'
       ? 'Upload your Poshmark “My Sales Report” CSV (on Poshmark: your avatar → My Sales → My Sales Report → email the report to yourself). Duplicates are skipped automatically and earnings roll into your Selling income.'
       : 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
@@ -5187,10 +5292,25 @@ function importSection() {
           if (!headers.length || !res.data.length) { toast('No rows found in that CSV', 'warn'); return; }
           if (importState.target === 'dividends') {
             const analyzed = analyzeDividendFile(store, res.data, headers, file.name);
-            if (!analyzed) { toast('Couldn’t recognize this broker file — expected an M1 Finance or Schwab activity export', 'warn'); return; }
-            if (!analyzed.divs.length) { toast('No dividend rows found in that file', 'warn'); return; }
-            divImportState = analyzed;
-            renderView(currentRoute);
+            if (analyzed) {
+              if (!analyzed.divs.length && !analyzed.interest.length) { toast('No dividend rows found in that file', 'warn'); return; }
+              divImportState = analyzed;
+              renderView(currentRoute);
+              return;
+            }
+            // Preamble-style exports (Ameriprise) hide the real header a few
+            // rows down — retry with a raw parse that locates it.
+            Papa.parse(file, {
+              header: false, skipEmptyLines: true,
+              complete: res2 => {
+                const a2 = analyzeDividendFileRaw(store, res2.data, file.name);
+                if (!a2) { toast('Couldn’t recognize this broker file — expected an M1 Finance, Schwab, or Ameriprise activity export', 'warn'); return; }
+                if (!a2.divs.length && !a2.interest.length) { toast('No dividend or interest rows found in that file', 'warn'); return; }
+                divImportState = a2;
+                renderView(currentRoute);
+              },
+              error: () => toast('Couldn’t read that CSV', 'warn')
+            });
             return;
           }
           const mapping = {}; IMPORT_FIELDS[importState.target].forEach(f => { mapping[f.key] = guessColumn(headers, f.kw); });
@@ -5211,6 +5331,9 @@ function importSection() {
       const schT = el('button', 'btn-ghost', '⬇ Schwab template');
       schT.addEventListener('click', () => downloadFile('schwab-transactions-template.csv', SCHWAB_TEMPLATE_CSV, 'text/csv'));
       tRow.appendChild(schT);
+      const ampT = el('button', 'btn-ghost', '⬇ Ameriprise template');
+      ampT.addEventListener('click', () => downloadFile('ameriprise-activity-template.csv', AMERIPRISE_TEMPLATE_CSV, 'text/csv'));
+      tRow.appendChild(ampT);
       card.appendChild(tRow);
     }
     if (importState.target === 'selling') {

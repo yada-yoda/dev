@@ -45,6 +45,27 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.57 — Ameriprise activity import (dividends, money-market interest, fees)
+
+The broker import now recognizes Ameriprise portfolio-activity CSVs
+alongside M1 Finance and Schwab. To get the file: ameriprise.com →
+Portfolio → Activity → All transactions, set your date range, download —
+the import screen says this too, and has an Ameriprise template download.
+What it does with the rows:
+
+- **Dividend payments** import as Dividends income with their ticker, with
+  the same duplicate review as other brokers.
+- **Money-market interest** (the insured money market / cash sweep) gets
+  its own section and imports as Interest income — payments already
+  recorded under the chosen account are skipped automatically.
+- **Charges** (e.g. quarterly maintenance fees) can come along as expenses,
+  defaulting to your investment-fee category.
+- **Journals** (transfers between accounts) are never imported.
+
+PDF statements aren't supported — reliably reading numbers out of PDF
+layouts isn't something a client-side app can do safely, and the activity
+CSV covers the same data for any date range, including past years.
+
 ### v1.0.56 — CD maturity reminders a week ahead
 
 CD maturity dates were already on the Calendar; now each CD also gets an
