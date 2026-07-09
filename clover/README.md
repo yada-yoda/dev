@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.70 — Bills search + "Paid for this year"
+
+- **Live search** above the Bills & Subscriptions table — type and the
+  table filters as you go (name, vendor, category, subcategory, account,
+  frequency, priority, status, notes), with the stat cards following what's
+  shown.
+- **"Paid for this year" checkbox** next to the renewal date, on by
+  default. The Total monthly / annual cards are normalized figures — an
+  annual bill renewing next year still counts, assuming this year's charge
+  happened. When it didn't (nothing due this calendar year), untick the
+  box: the bill drops out of the stat cards and the expense grid until
+  January, when the flag resets automatically. Skipped bills show an amber
+  "Not paid this year" flag (clickable, like the others).
+
 ### v1.0.69 — YoY raises: basis & employment tags, hourly-vs-salary math, hours trend
 
 - **New YoY columns**: "Amounts are" (Per paycheck / Annual salary / Hourly

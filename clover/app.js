@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.69';
+const VERSION = '1.0.70';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -48,6 +48,7 @@ let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
+let subsSearch = '';               // live search over the bills table
 let subsBadgeFilter = null;        // { key, value } from clicking a subs value badge
 let taxesSort = { key: 'taxYear', dir: 'desc' };
 let salesSort = { key: 'orderDate', dir: 'desc' };
@@ -1446,6 +1447,7 @@ function subFlags(r) {
   else if (r.status === 'Trial') out.push('Trial');
   if (r.autoPay) out.push('Auto-pay');
   if (r.priority && r.priority !== 'Medium') out.push(r.priority);
+  if (r.notPaidYear === new Date().getFullYear()) out.push('Not paid this year');
   return out;
 }
 // A tone badge (Essential red, Trial amber, …) that filters the subs table
@@ -1499,6 +1501,7 @@ function buildSubsCol(store, key, net) {
         else if (r.status === 'Trial') flags.appendChild(subsFilterBadge('flags', 'Trial', 'amber'));
         if (r.autoPay) flags.appendChild(subsFilterBadge('flags', 'Auto-pay', 'amber'));
         if (r.priority && r.priority !== 'Medium') flags.appendChild(subsFilterBadge('flags', r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
+        if (r.notPaidYear === new Date().getFullYear()) { const b = subsFilterBadge('flags', 'Not paid this year', 'amber'); b.title = 'Excluded from the totals until January — nothing is due this calendar year. ' + b.title; flags.appendChild(b); }
         td.appendChild(flags); return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
@@ -1514,6 +1517,11 @@ function renderSubscriptions(view) {
   let rows = all.slice();
   if (subsStatusFilter === 'active') rows = rows.filter(isSubActive);
   if (subsCatFilter !== 'all') rows = rows.filter(r => r.categoryId === subsCatFilter);
+  if (subsSearch.trim()) {
+    const q = subsSearch.trim().toLowerCase();
+    rows = rows.filter(r => [r.name, r.vendor, store.expenseGroupName(r.categoryId), store.subName('expense', r.categoryId, r.subId), store.accountName(r.accountId), r.notes, freqLabel(r), r.priority, r.status]
+      .some(v => (v || '').toLowerCase().includes(q)));
+  }
   let chipBar = null;
   if (subsBadgeFilter) {
     const f = subsBadgeFilter;
@@ -1530,8 +1538,11 @@ function renderSubscriptions(view) {
     clear.addEventListener('click', () => { subsBadgeFilter = null; renderView(currentRoute); });
     chipBar.appendChild(clear);
   }
-  const narrowed = !!(subsBadgeFilter || subsCatFilter !== 'all');
-  const shownActive = rows.filter(isSubActive);
+  const narrowed = !!(subsBadgeFilter || subsCatFilter !== 'all' || subsSearch.trim());
+  // Bills marked "not paid for this year" cost nothing THIS year — they stay
+  // in the table but drop out of the normalized totals until next January.
+  const curYearNow = new Date().getFullYear();
+  const shownActive = rows.filter(isSubActive).filter(r => r.notPaidYear !== curYearNow);
   const totalMonthly = shownActive.reduce((sum, r) => sum + monthlyEquiv(r), 0);
   const totalAnnual = shownActive.reduce((sum, r) => sum + annualCost(r), 0);
   const autoNet = avgNetMonthlyIncome(store);   // null while a year doc loads
@@ -1572,6 +1583,16 @@ function renderSubscriptions(view) {
   const catSel = select([{ value: 'all', label: 'All categories' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), subsCatFilter);
   catSel.addEventListener('change', () => { subsCatFilter = catSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Category', catSel));
+  const searchIn = input(subsSearch, { placeholder: 'Search bills…' });
+  searchIn.id = 'subs-search'; searchIn.type = 'search';
+  searchIn.addEventListener('input', () => {
+    subsSearch = searchIn.value;
+    renderView(currentRoute);
+    // renderView rebuilt the DOM — put the cursor back where the user was typing
+    const n2 = document.getElementById('subs-search');
+    if (n2) { n2.focus(); const L = n2.value.length; try { n2.setSelectionRange(L, L); } catch (e) {} }
+  });
+  bar.appendChild(labelWrap('Search', searchIn));
   view.appendChild(bar);
   if (chipBar) view.appendChild(chipBar);
 
@@ -1688,7 +1709,12 @@ function subscriptionModal(existing) {
   body.appendChild(amtRow);
   body.appendChild(intervalWrap);
   const renewField = field('Renewal / due date', fRenew, 'The day it recurs — e.g. the 8th. For an active bill this auto-advances each period (monthly → next month’s same day, annual → next year), so you set it once and it never goes overdue or blank. Drives the renewal warnings (7/14/30/60 days). For a one-time bill this is simply the date it’s due — it never rolls forward.');
-  body.appendChild(renewField);
+  const cPaidYr = checkbox('Paid for this year', r.notPaidYear !== new Date().getFullYear(), 'Whether this year’s charge happened (or will happen) — on by default. Untick when nothing is due this calendar year (e.g. the next renewal isn’t until next year and this year was never paid): the bill then drops out of the Total monthly / annual cards and the expense grid until January, when this resets automatically.');
+  const renewRow = el('div', 'two-col');
+  renewRow.appendChild(renewField);
+  const pyWrap = el('div', 'check-row'); pyWrap.appendChild(cPaidYr);
+  renewRow.appendChild(field('This calendar year', pyWrap));
+  body.appendChild(renewRow);
   const acctRow = el('div', 'two-col');
   acctRow.appendChild(field('Payment account', fAcct, 'Which account or card pays for this.'));
   acctRow.appendChild(field('Backup account', fBackup, 'A fallback payment method on file, if any.'));
@@ -1751,7 +1777,7 @@ function subscriptionModal(existing) {
       const item = Object.assign(r, {
         name, vendor: fVendor.value.trim(), categoryId: fCat.value, subId: fSub.value || '',
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
-        renewalDate: fRenew.value || '', accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
+        renewalDate: fRenew.value || '', notPaidYear: cPaidYr.__input.checked ? null : new Date().getFullYear(), accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
         personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked,
         url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(),
         apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
@@ -1781,6 +1807,7 @@ function recurringMonthsBy(store, catId, payments, validSubIds) {
   const bills = store.state.recurring.filter(isSubActive).filter(r => r.categoryId === catId);
   const out = { total: new Array(12).fill(0), subs: {}, none: new Array(12).fill(0) };
   bills.forEach(bill => {
+    if (bill.notPaidYear === activeYear) return;   // nothing due this calendar year
     const once = bill.frequency === 'once';
     const onceMonth = once ? (String(bill.renewalDate || '').slice(0, 4) === String(activeYear) ? monthIdx(bill.renewalDate) : -1) : -1;
     const me = once ? (Number(bill.amount) || 0) : monthlyEquiv(bill);
