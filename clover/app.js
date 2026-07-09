@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.63';
+const VERSION = '1.0.64';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2713,14 +2713,15 @@ function lastPaycheckDateFor(store, employer) {
   }));
   return last;
 }
+function raiseSuf(r) { return r.basis === 'annual' ? ' /yr' : r.basis === 'hourly' ? ' /hr' : ' /check'; }
 function buildRaiseCol(store, key) {
   switch (key) {
     case 'employer': return { label: 'Employer', key: 'employer', value: r => r.employer || '', cell: r => el('td', 'strong', r.employer || '—') };
     case 'title': return { label: 'Position', key: 'title', value: r => r.title || '', cell: r => el('td', 'muted', r.title || '—') };
     case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
-    case 'amount': return { label: 'New gross', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => { const td = numCell(Number(r.amount) || 0, true); td.appendChild(el('span', 'muted', r.basis === 'annual' ? ' /yr' : ' /check')); return td; } };
-    case 'net': return { label: 'New net', key: 'net', num: true, value: r => r.net != null ? Number(r.net) : 0, cell: r => { if (r.net == null || r.net === '') return el('td', 'num', '—'); const td = numCell(Number(r.net)); td.appendChild(el('span', 'muted', r.basis === 'annual' ? ' /yr' : ' /check')); return td; } };
-    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => Number(r.prevAmount) || 0, cell: r => { const td = numCell(Number(r.prevAmount) || 0); if (r.prevAmount != null && r.prevAmount !== '') td.appendChild(el('span', 'muted', r.basis === 'annual' ? ' /yr' : ' /check')); return td; } };
+    case 'amount': return { label: 'New gross', key: 'amount', num: true, value: r => Number(r.amount) || 0, cell: r => { const td = numCell(Number(r.amount) || 0, true); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
+    case 'net': return { label: 'New net', key: 'net', num: true, value: r => r.net != null ? Number(r.net) : 0, cell: r => { if (r.net == null || r.net === '') return el('td', 'num', '—'); const td = numCell(Number(r.net)); td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
+    case 'prevAmount': return { label: 'Previous', key: 'prevAmount', num: true, value: r => Number(r.prevAmount) || 0, cell: r => { const td = numCell(Number(r.prevAmount) || 0); if (r.prevAmount != null && r.prevAmount !== '') td.appendChild(el('span', 'muted', raiseSuf(r))); return td; } };
     case 'change': return { label: 'Change', key: 'change', num: true, value: r => (r.prevAmount != null && r.amount != null) ? Number(r.amount) - Number(r.prevAmount) : 0, cell: r => {
         const td = el('td', 'num');
         if (r.prevAmount == null || r.prevAmount === '' || r.amount == null) { td.textContent = '—'; return td; }
@@ -2741,10 +2742,11 @@ const INFLATION_CPI = { 2015: 0.1, 2016: 1.3, 2017: 2.1, 2018: 2.4, 2019: 1.8, 2
 const RAISES_CSV_HEADERS = ['Employer', 'Position title', 'Date', 'Amounts are', 'New gross', 'New net', 'Previous gross', 'Notes'];
 const RAISES_TEMPLATE_CSV = RAISES_CSV_HEADERS.join(',') + '\n'
   + 'Main Job,Support Tech,2025-04-04,Per paycheck,2100.00,1650.00,2000.00,Annual review\n'
-  + 'Main Job,Senior Support Tech,2026-04-03,Annual salary,62000.00,47000.00,56000.00,Promotion with title change\n';
+  + 'Main Job,Senior Support Tech,2026-04-03,Annual salary,62000.00,47000.00,56000.00,Promotion with title change\n'
+  + 'Weekend Gig,Crew Lead,2026-05-10,Hourly rate,19.50,16.25,17.00,Hourly bump\n';
 function exportRaisesCSV(store) {
   const rows = [RAISES_CSV_HEADERS.join(',')];
-  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.date, r.basis === 'annual' ? 'Annual salary' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.notes].map(csvEsc).join(',')));
+  store.state.raises.forEach(r => rows.push([r.employer, r.title, r.date, r.basis === 'annual' ? 'Annual salary' : r.basis === 'hourly' ? 'Hourly rate' : 'Per paycheck', r.amount, r.net, r.prevAmount, r.notes].map(csvEsc).join(',')));
   downloadFile('clover-raises.csv', rows.join('\n'), 'text/csv');
 }
 function importRaisesCSV(store, rows) {
@@ -2761,7 +2763,8 @@ function importRaisesCSV(store, rows) {
     existing.add(key);
     const prev = parseImportAmount(g(r, 'Previous gross'));
     const net = parseImportAmount(g(r, 'New net'));
-    const basis = /annual|salary|year/i.test(g(r, 'Amounts are')) ? 'annual' : 'check';
+    const basisRaw = g(r, 'Amounts are');
+    const basis = /hour|\bhr\b/i.test(basisRaw) ? 'hourly' : /annual|salary|year/i.test(basisRaw) ? 'annual' : 'check';
     store.saveRaise({ employer, title: g(r, 'Position title') || g(r, 'Position') || g(r, 'Title'), date, basis, amount, net: isNaN(net) ? null : net, prevAmount: isNaN(prev) ? null : prev, notes: g(r, 'Notes') });
     added++;
   });
@@ -2803,7 +2806,7 @@ function employerProfileCard(store, emp) {
     // Salary difference between years (first vs latest recorded amount) —
     // only comparable when both raises use the same per-check/annual basis.
     if (raises.length >= 2 && raises[0].amount != null && last.amount != null && (raises[0].basis || 'check') === (last.basis || 'check')) {
-      const suf = last.basis === 'annual' ? '/yr' : '/check';
+      const suf = last.basis === 'annual' ? '/yr' : last.basis === 'hourly' ? '/hr' : '/check';
       const diff = Number(last.amount) - Number(raises[0].amount);
       row('Since first recorded raise', (diff >= 0 ? '+' : '−') + money(Math.abs(diff)) + suf, money(raises[0].amount) + ' → ' + money(last.amount));
     }
@@ -2923,7 +2926,7 @@ function raiseModal(existing) {
   const fEmp = input(r.employer || '', { placeholder: 'Employer', list: 'raise-emp-list' });
   const fTitle = input(r.title || '', { placeholder: 'e.g. Senior Tech II (optional)' });
   const fDate = input(r.date || todayISO(), { type: 'date' });
-  const fBasis = select([{ value: 'check', label: 'Per paycheck' }, { value: 'annual', label: 'Annual salary' }], r.basis || 'check');
+  const fBasis = select([{ value: 'check', label: 'Per paycheck' }, { value: 'annual', label: 'Annual salary' }, { value: 'hourly', label: 'Hourly rate' }], r.basis || 'check');
   const fAmt = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
   const fNet = input(r.net != null ? r.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
   const fPrev = input(r.prevAmount != null ? r.prevAmount : '', { type: 'number', placeholder: '0.00' }); fPrev.step = '0.01';
@@ -2932,7 +2935,7 @@ function raiseModal(existing) {
   body.appendChild(field('Position title', fTitle, 'Your title as of this pay change — record it here when a raise came with a promotion or title change.'));
   const dRow = el('div', 'two-col');
   dRow.appendChild(field('Effective date', fDate, 'The first pay date at the new amount (or the date the raise took effect).'));
-  dRow.appendChild(field('Amounts are', fBasis, 'Whether the amounts below are per paycheck or annual salary figures. Change $ and % work either way — just use the same basis for new and previous.'));
+  dRow.appendChild(field('Amounts are', fBasis, 'Whether the amounts below are per paycheck, annual salary figures, or an hourly rate. Change $ and % work on any basis — just use the same one for new and previous.'));
   body.appendChild(dRow);
   const amtRow = el('div', 'two-col');
   const amtField = field('New gross per check', fAmt, 'Your gross after the raise, on the basis picked above.');
@@ -2944,9 +2947,9 @@ function raiseModal(existing) {
   const amtLbl = amtField.querySelector('span').childNodes[0];
   const netLbl = netField.querySelector('span').childNodes[0];
   const syncBasis = () => {
-    const a = fBasis.value === 'annual';
-    amtLbl.nodeValue = a ? 'New annual gross salary' : 'New gross per check';
-    netLbl.nodeValue = a ? 'New annual net (optional)' : 'New net per check (optional)';
+    const b = fBasis.value;
+    amtLbl.nodeValue = b === 'annual' ? 'New annual gross salary' : b === 'hourly' ? 'New hourly rate (gross)' : 'New gross per check';
+    netLbl.nodeValue = b === 'annual' ? 'New annual net (optional)' : b === 'hourly' ? 'New hourly net (optional)' : 'New net per check (optional)';
   };
   fBasis.addEventListener('change', syncBasis); syncBasis();
   body.appendChild(field('Notes', fNotes, 'Anything worth remembering — promotion, title change, merit increase.'));

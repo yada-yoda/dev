@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.64 — Hourly raises
+
+The raise "Amounts are" choice gains **Hourly rate** alongside Per paycheck
+and Annual salary — for hourly jobs, enter the new (and previous) rate
+directly. Amounts show /hr in the table, change $ and % work the same, and
+the CSV import/export/template carry it.
+
 ### v1.0.63 — Raises: position titles + salary-basis amounts + net
 
 - **Position title on every raise.** Record the title that came with a pay
