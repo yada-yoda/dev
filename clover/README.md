@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.54 — Deduction amounts obviously auto-subtract + Year overview wage deductions
+
+- **Deduction amounts are entered as positive numbers** — Clover subtracts
+  them from gross automatically. That was always true but nothing said so;
+  now each deduction amount field has a − sign in front of it, an
+  "e.g. 150.00" placeholder, and a tooltip spelling it out. If a minus was
+  typed (or imported) anyway, it's normalized to positive so the math never
+  doubles up.
+- **Year overview gains a "Wage deductions" column** — what your paycheck
+  jobs withheld each year (taxes, 401(k), insurance…), computed as gross −
+  net across recorded paychecks where both amounts are known.
+
 ### v1.0.53 — Expense grid: subcategories, honest past years, and Housing for everyone
 
 - **Recurring bills now land on their subcategory rows.** In the expense

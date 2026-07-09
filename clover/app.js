@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.53';
+const VERSION = '1.0.54';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2549,11 +2549,15 @@ function payScheduleModal(existing) {
       const row = el('div', 'io-actions');
       const fName2 = input(d0.name, { placeholder: 'e.g. Federal Withholding', list: 'deduct-list' });
       fName2.addEventListener('input', () => { d0.name = fName2.value; });
-      const fAmt2 = input(d0.amount != null ? d0.amount : '', { type: 'number', placeholder: '0.00' }); fAmt2.step = '0.01';
-      fAmt2.addEventListener('input', () => { d0.amount = fAmt2.value === '' ? null : parseFloat(fAmt2.value); });
+      const fAmt2 = input(d0.amount != null ? Math.abs(d0.amount) : '', { type: 'number', placeholder: 'e.g. 150.00' }); fAmt2.step = '0.01'; fAmt2.min = 0;
+      fAmt2.title = 'Enter as a positive amount — it\u2019s subtracted from gross automatically (that\u2019s what the \u2212 means).';
+      fAmt2.addEventListener('input', () => { d0.amount = fAmt2.value === '' ? null : Math.abs(parseFloat(fAmt2.value)); });
       const x = el('button', 'icon-btn danger', '✕'); x.title = 'Remove this line item';
       x.addEventListener('click', () => { deductions.splice(i, 1); renderDed(); });
-      row.appendChild(fName2); row.appendChild(fAmt2); row.appendChild(x);
+      const amtWrap = el('span', 'ded-amt');
+      const minus = el('span', 'ded-minus', '−'); minus.title = fAmt2.title;
+      amtWrap.appendChild(minus); amtWrap.appendChild(fAmt2);
+      row.appendChild(fName2); row.appendChild(amtWrap); row.appendChild(x);
       dedWrap.appendChild(row);
     });
     const addDed = el('button', 'btn-ghost', '＋ Add line item');
@@ -2579,7 +2583,7 @@ function payScheduleModal(existing) {
         anchorDate: fAnchor.value, yearFirstPay: fYearFirst.value || '', hireDate: fHire.value || '', hoursPerCheck: fHours.value === '' ? null : parseFloat(fHours.value), day2: fDay2.value === '' ? null : parseInt(fDay2.value, 10),
         gross: fGross.value === '' ? null : parseFloat(fGross.value),
         net: fNet.value === '' ? null : parseFloat(fNet.value), active: cActive.__input.checked, taxForm: fTaxForm.value,
-        deductions: deductions.filter(x => (x.name || '').trim()).map(x => ({ name: x.name.trim(), amount: x.amount != null && !isNaN(x.amount) ? x.amount : null }))
+        deductions: deductions.filter(x => (x.name || '').trim()).map(x => ({ name: x.name.trim(), amount: x.amount != null && !isNaN(x.amount) ? Math.abs(x.amount) : null }))
       });
       store.savePaySchedule(entry);
       toast(existing ? 'Schedule updated' : 'Schedule added');
@@ -4146,11 +4150,15 @@ function yearSummary(store, y) {
     year: y, income, expenses, net: income - expenses,
     dividends: incomeByNamedCategory(store, d, /dividend/i),
     interest: incomeByNamedCategory(store, d, /interest/i),
-    rewards: incomeByNamedCategory(store, d, /reward/i)
+    rewards: incomeByNamedCategory(store, d, /reward/i),
+    // What paycheck jobs withheld that year: gross − net across recorded
+    // checks where both amounts are known (taxes, 401k, insurance, …).
+    wageDeductions: d.paychecks.filter(p => isPaycheckPaid(p) && p.gross != null && p.net != null)
+      .reduce((a, p) => a + Math.max(0, (Number(p.gross) || 0) - (Number(p.net) || 0)), 0)
   };
 }
-const YOY_COL_LABELS = { income: 'Income', expenses: 'Expenses', net: 'Net', dividends: 'Dividends', interest: 'Interest', rewards: 'Rewards' };
-const YOY_ALL_COLS = ['income', 'expenses', 'net', 'dividends', 'interest', 'rewards'];
+const YOY_COL_LABELS = { income: 'Income', expenses: 'Expenses', net: 'Net', wageDeductions: 'Wage deductions', dividends: 'Dividends', interest: 'Interest', rewards: 'Rewards' };
+const YOY_ALL_COLS = ['income', 'expenses', 'net', 'wageDeductions', 'dividends', 'interest', 'rewards'];
 function yoyCell(r, key) {
   if (key === 'net') { const td = numCell(r.net, true); td.classList.add(r.net >= 0 ? 'pos' : 'neg'); return td; }
   return numCell(r[key], key === 'income');
