@@ -26,10 +26,20 @@ Each monitor watches one of:
 
 The first check of a monitor just records a baseline; you only get emailed on later *changes*.
 
-### Phase 1 limitations
-- Pages that render their content **only via JavaScript** can look empty to the server-side fetch.
-  Visual screenshot monitoring (Phase 2) handles those with a real headless browser.
-- Sites behind strong anti-bot protection may block the fetch; those monitors show an `Error` state.
+### Phase 1 limitations & the rendered-page trick
+- Pages that render their content **only via JavaScript** look empty to the server-side fetch, and
+  some sites (banks especially) block datacenter IPs outright. The **Test it now** button in the
+  monitor form shows you exactly what Spyglass can see before you save.
+- **Workaround that usually fixes both:** prefix the URL with `https://r.jina.ai/` — a free public
+  reader that loads the page in a real browser and returns its rendered text. Pair it with a
+  *keyword* monitor on the exact value you care about (e.g. keyword `3.00%` on a bank's rates page:
+  the alert fires the moment that rate changes). Visual screenshot monitoring (Phase 2) will handle
+  these natively.
+
+### Worker endpoints
+- `POST /trigger` — run a sweep immediately (`x-trigger-key` header).
+- `POST /preview` — powers *Test it now*: `{url, type, selector?, keyword?}` returns
+  `{matched, length, preview}`. Auth: Firebase ID token (Bearer) or `x-trigger-key`.
 
 ## One-time setup
 
@@ -69,6 +79,14 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.2.0
+"Test it now" button in the monitor form — the worker's new `/preview` endpoint fetches the page
+and returns exactly what the selector/keyword would extract, so you know a monitor works before
+saving it. DevTools class lists pasted as selectors are auto-converted to real CSS selectors
+(`a b c` → `.a.b.c`). Empty or blocked fetches now explain themselves and suggest the
+`r.jina.ai` rendered-page prefix for JavaScript-built pages. Worker fetches send fuller
+browser-like headers and allow slower renders (25s timeout).
 
 ### v0.1.0
 First release. Dashboard front end (Google sign-in, create/edit/pause/delete monitors, status

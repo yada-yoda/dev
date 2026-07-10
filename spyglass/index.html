@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.1.0 — watch any web page for changes</title>
+<title>Spyglass v0.2.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -267,6 +267,11 @@
         <input id="mKeyword" type="text" placeholder="In stock" />
       </label>
       <label class="toggle"><input type="checkbox" id="mEnabled" checked style="width:auto"> Active</label>
+      <div style="margin-top:1rem">
+        <button class="btn" id="btnTest" type="button">&#128269; Test it now</button>
+        <span class="hint" style="font-size:.74rem;color:var(--muted)"> — fetch the page and show exactly what this monitor would watch</span>
+        <div id="testResult" class="hidden" style="margin-top:.6rem"></div>
+      </div>
     </div>
     <div class="foot">
       <button class="btn" data-close>Cancel</button>
@@ -289,6 +294,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.2.0</strong> — New <em>Test it now</em> button in the monitor form: fetches the page and shows exactly what your selector or keyword would watch, before you save. Pasted DevTools class lists are auto-converted to real CSS selectors, and when a page hides its content behind JavaScript, the tester now tells you and suggests the <code>r.jina.ai</code> rendered-page trick.</li>
         <li><strong>v0.1.0</strong> — First release: create page monitors, Google sign-in, and a dashboard. Server-side checking + email alerts arrive with the worker.</li>
       </ul>
     </div>
@@ -309,7 +315,10 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.1.0";
+  const APP_VERSION = "0.2.0";
+  // The Cloudflare Worker that does server-side checking; also serves the
+  // "Test it now" preview endpoint (CORS-enabled for this app's origins).
+  const WORKER_URL = "https://spyglass-worker.sevendwarfs.workers.dev";
 </script>
 
 <!-- Firebase SDK (compat) -->
@@ -490,6 +499,7 @@ function openEdit(id){
   $("#mSelector").value = m ? (m.selector||"") : "";
   $("#mKeyword").value = m ? (m.keyword||"") : "";
   $("#mEnabled").checked = m ? !!m.enabled : true;
+  $("#testResult").classList.add("hidden"); $("#testResult").innerHTML = "";
   syncTypeFields();
   openOverlay("#editOverlay");
 }
@@ -498,6 +508,19 @@ function syncTypeFields(){
   $("#selField").classList.toggle("hidden", t!=="element");
   $("#kwField").classList.toggle("hidden", t!=="keyword");
 }
+/* DevTools copies class attributes as "a b c" — not a CSS selector. If the
+   selector looks like a bare class list (no CSS syntax chars), convert it
+   to ".a.b.c" and show the user what happened. */
+function autofixSelector(sel){
+  if(!sel || /[.#\[\]>:+~*]/.test(sel)) return sel;
+  const tokens = sel.trim().split(/\s+/);
+  if(!tokens.every(t => /^-?[A-Za-z_][A-Za-z0-9_-]*$/.test(t))) return sel;
+  const fixed = "." + tokens.join(".");
+  $("#mSelector").value = fixed;
+  toast("Converted class list to CSS selector");
+  return fixed;
+}
+
 function collectForm(){
   const url = $("#mUrl").value.trim();
   if(!/^https?:\/\//i.test(url)){ toast("Enter a valid http(s) URL","err"); return null; }
@@ -506,12 +529,54 @@ function collectForm(){
     url, name: $("#mName").value.trim() || domainOf(url),
     type, frequencyMinutes: parseInt($("#mFreq").value,10),
     enabled: $("#mEnabled").checked,
-    selector: type==="element" ? $("#mSelector").value.trim() : null,
+    selector: type==="element" ? autofixSelector($("#mSelector").value.trim()) : null,
     keyword: type==="keyword" ? $("#mKeyword").value.trim() : null,
   };
   if(type==="element" && !data.selector){ toast("Enter a CSS selector","err"); return null; }
   if(type==="keyword" && !data.keyword){ toast("Enter a keyword","err"); return null; }
   return data;
+}
+
+/* "Test it now" — ask the worker to fetch the page and extract with the
+   current form values, then show exactly what the monitor would watch. */
+async function testMonitor(){
+  const box = $("#testResult");
+  const show = (html) => { box.classList.remove("hidden"); box.innerHTML = html; };
+  if(DEMO){ toast("Demo mode — sign in to test monitors"); return; }
+  const d = collectForm();
+  if(!d) return;
+  const btn = $("#btnTest");
+  btn.disabled = true; btn.textContent = "Testing…";
+  show(`<div class="muted" style="font-size:.85rem">Fetching ${escapeHtml(domainOf(d.url))}… (JS-heavy pages can take ~20s)</div>`);
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const resp = await fetch(WORKER_URL + "/preview", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ url: d.url, type: d.type, selector: d.selector, keyword: d.keyword }),
+    });
+    const r = await resp.json();
+    if(!r.ok){
+      show(`<div style="border:1px solid var(--red);border-radius:10px;padding:.7rem .85rem;background:var(--red-bg);color:var(--red);font-size:.85rem">
+        <strong>Couldn't fetch the page:</strong> ${escapeHtml(r.error||"unknown error")}<br>
+        <span style="font-size:.78rem">Some sites block server-side checks. Try prefixing the URL with
+        <code>https://r.jina.ai/</code> — it renders the page in a real browser (works for JavaScript-built pages too).</span></div>`);
+    }else if(!r.matched){
+      show(`<div style="border:1px solid var(--amber);border-radius:10px;padding:.7rem .85rem;background:var(--amber-bg);color:var(--amber);font-size:.85rem">
+        <strong>Fetched the page, but extracted nothing.</strong><br>
+        <span style="font-size:.78rem">The selector matched no server-rendered content — many sites inject values
+        (prices, rates) with JavaScript, which a plain fetch can't see. Try prefixing the URL with
+        <code>https://r.jina.ai/</code> and switching to a keyword monitor on the value you care about.</span></div>`);
+    }else{
+      show(`<div style="border:1px solid var(--green);border-radius:10px;padding:.7rem .85rem;background:var(--green-bg);font-size:.85rem">
+        <strong style="color:var(--green)">Matched — this is what Spyglass will watch (${r.length} chars):</strong>
+        <div class="diff" style="margin-top:.5rem;max-height:180px">${escapeHtml(r.preview)}${r.length>1200?" …":""}</div></div>`);
+    }
+  }catch(e){
+    show(`<div style="border:1px solid var(--red);border-radius:10px;padding:.7rem .85rem;background:var(--red-bg);color:var(--red);font-size:.85rem">Test failed: ${escapeHtml(e.message)}</div>`);
+  }finally{
+    btn.disabled = false; btn.innerHTML = "&#128269; Test it now";
+  }
 }
 
 /* ---- detail modal ---- */
@@ -580,6 +645,7 @@ function wireUi(){
   $("#btnSignInBig").onclick = signIn;
   $("#mType").onchange = syncTypeFields;
   $("#btnSave").onclick = () => { const d = collectForm(); if(d) saveMonitor(d, $("#mId").value || null); };
+  $("#btnTest").onclick = testMonitor;
   $$("[data-close]").forEach(b => b.onclick = e => e.target.closest(".overlay").classList.remove("open"));
   $$(".overlay").forEach(o => o.onclick = e => { if(e.target===o) o.classList.remove("open"); });
   $("#filters").onclick = e => {
