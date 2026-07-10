@@ -22,7 +22,12 @@ Browser (dev.rizzo.cc)  ──auth/data──▶  Firebase (Auth + Firestore)  �
 Each monitor watches one of:
 - **Whole page text** — all visible text on the page.
 - **A specific element** — the text inside a CSS selector (e.g. `#price`, `.status`).
-- **A keyword** — alerts when a word/phrase appears or disappears.
+- **A keyword** — alerts when a word/phrase appears or disappears. One-shot by nature: after it
+  fires you usually update the keyword to the new value.
+- **A pattern (regex)** — extracts whatever the pattern matches (capture group 1 if present, up to
+  10 matches) and tracks *that*. The self-maintaining choice for values that change — a rate or
+  price monitor alerts with old → new and keeps working without edits.
+  E.g. `(\d+\.\d{2}%)\s*APY` on a bank page.
 
 The first check of a monitor just records a baseline; you only get emailed on later *changes*.
 
@@ -38,8 +43,11 @@ The first check of a monitor just records a baseline; you only get emailed on la
 
 ### Worker endpoints
 - `POST /trigger` — run a sweep immediately (`x-trigger-key` header).
-- `POST /preview` — powers *Test it now*: `{url, type, selector?, keyword?}` returns
+- `POST /preview` — powers *Test it now*: `{url, type, selector?, keyword?, pattern?}` returns
   `{matched, length, preview}`. Auth: Firebase ID token (Bearer) or `x-trigger-key`.
+- `POST /check` — powers the per-monitor ↻ button: `{monitorId}` runs that monitor's check right
+  now (baselines, snapshots, and emails exactly like the cron). Auth: the owner's Firebase ID
+  token — monitors are looked up under the caller's own user subtree only.
 
 ## One-time setup
 
@@ -79,6 +87,13 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.3.0
+Pattern (regex) monitors: extract a value (rate, price) with a regex and Spyglass tracks whatever
+it matches — when the value changes you get an old → new diff email and the monitor keeps working,
+unlike keyword monitors which need re-arming after each change. Every monitor card gains a
+↻ Check-now button (new worker `POST /check` endpoint), and alert emails include a Recent-changes
+history of the last few snapshots.
 
 ### v0.2.0
 "Test it now" button in the monitor form — the worker's new `/preview` endpoint fetches the page

@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.2.0 — watch any web page for changes</title>
+<title>Spyglass v0.3.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -243,6 +243,7 @@
             <option value="text">Whole page text</option>
             <option value="element">A specific element (CSS selector)</option>
             <option value="keyword">Keyword present / absent</option>
+            <option value="pattern">Pattern (regex) — extract a value</option>
           </select>
         </label>
         <label class="field">
@@ -265,6 +266,10 @@
       <label class="field hidden" id="kwField">
         <span class="lab">Keyword <span class="hint">— alert when this text appears or disappears</span></span>
         <input id="mKeyword" type="text" placeholder="In stock" />
+      </label>
+      <label class="field hidden" id="patField">
+        <span class="lab">Regex pattern <span class="hint">— watches whatever it matches, so it keeps working when the value changes (best for rates/prices). Capture group 1 is used if present. E.g. <code>(\d+\.\d{2}%)\s*APY</code></span></span>
+        <input id="mPattern" type="text" placeholder="(\d+\.\d{2}%)\s*APY" />
       </label>
       <label class="toggle"><input type="checkbox" id="mEnabled" checked style="width:auto"> Active</label>
       <div style="margin-top:1rem">
@@ -294,6 +299,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.3.0</strong> — New <em>Pattern (regex)</em> monitor type that extracts a value (a rate, a price) and keeps tracking it as it changes — no re-arming needed, and the alert email shows old &rarr; new. Every monitor card gets a &#8635; <em>Check now</em> button. Alert emails now include a <em>Recent changes</em> history.</li>
         <li><strong>v0.2.0</strong> — New <em>Test it now</em> button in the monitor form: fetches the page and shows exactly what your selector or keyword would watch, before you save. Pasted DevTools class lists are auto-converted to real CSS selectors, and when a page hides its content behind JavaScript, the tester now tells you and suggests the <code>r.jina.ai</code> rendered-page trick.</li>
         <li><strong>v0.1.0</strong> — First release: create page monitors, Google sign-in, and a dashboard. Server-side checking + email alerts arrive with the worker.</li>
       </ul>
@@ -315,7 +321,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.2.0";
+  const APP_VERSION = "0.3.0";
   // The Cloudflare Worker that does server-side checking; also serves the
   // "Test it now" preview endpoint (CORS-enabled for this app's origins).
   const WORKER_URL = "https://spyglass-worker.sevendwarfs.workers.dev";
@@ -438,6 +444,38 @@ async function toggleMonitor(m){
   await db.collection("users").doc(uid).collection("monitors").doc(m.id)
     .update({enabled: !m.enabled, nextCheckAt: Date.now()});
 }
+/* Check-now (per-card refresh) — asks the worker to run this monitor's
+   check immediately. The Firestore onSnapshot listener repaints the card
+   with the fresh status on its own; we just toast the outcome. */
+async function checkNow(id){
+  if(DEMO){ toast("Demo mode — sign in to run checks"); return; }
+  const btn = $("#chk-"+id);
+  if(btn){ btn.disabled = true; btn.style.opacity = ".4"; }
+  toast("Checking…");
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const resp = await fetch(WORKER_URL + "/check", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ monitorId: id }),
+    });
+    const r = await resp.json();
+    if(r.ok === false || r.status === "error"){
+      toast("Check failed: " + (r.error || "unknown error"), "err");
+    }else if(r.changed){
+      toast("Change detected!" + (r.emailed ? " Alert email sent." : ""), "ok");
+    }else if(r.baseline){
+      toast("Baseline recorded — future checks compare against it", "ok");
+    }else{
+      toast("Checked — no change", "ok");
+    }
+  }catch(e){
+    toast("Check failed: " + e.message, "err");
+  }finally{
+    if(btn){ btn.disabled = false; btn.style.opacity = ""; }
+  }
+}
+
 async function loadSnaps(id){
   if(DEMO) return DEMO_SNAPS[id] || [];
   const snap = await db.collection("users").doc(uid).collection("monitors").doc(id)
@@ -479,6 +517,7 @@ function renderList(){
       </div>
       ${statusPill(m)}
       <div class="actions">
+        <button class="btn sm ghost" id="chk-${m.id}" title="Check now" onclick="checkNow('${m.id}')">&#8635;</button>
         <button class="btn sm ghost" title="${m.enabled?'Pause':'Resume'}" onclick="toggleMonitor(monitorById('${m.id}'))">${m.enabled?'&#10073;&#10073;':'&#9658;'}</button>
         <button class="btn sm ghost" title="Edit" onclick="openEdit('${m.id}')">&#9998;</button>
         <button class="btn sm ghost" title="Delete" onclick="deleteMonitor('${m.id}')">&#128465;</button>
@@ -498,6 +537,7 @@ function openEdit(id){
   $("#mFreq").value = m ? String(m.frequencyMinutes) : "60";
   $("#mSelector").value = m ? (m.selector||"") : "";
   $("#mKeyword").value = m ? (m.keyword||"") : "";
+  $("#mPattern").value = m ? (m.pattern||"") : "";
   $("#mEnabled").checked = m ? !!m.enabled : true;
   $("#testResult").classList.add("hidden"); $("#testResult").innerHTML = "";
   syncTypeFields();
@@ -507,6 +547,7 @@ function syncTypeFields(){
   const t = $("#mType").value;
   $("#selField").classList.toggle("hidden", t!=="element");
   $("#kwField").classList.toggle("hidden", t!=="keyword");
+  $("#patField").classList.toggle("hidden", t!=="pattern");
 }
 /* DevTools copies class attributes as "a b c" — not a CSS selector. If the
    selector looks like a bare class list (no CSS syntax chars), convert it
@@ -531,9 +572,14 @@ function collectForm(){
     enabled: $("#mEnabled").checked,
     selector: type==="element" ? autofixSelector($("#mSelector").value.trim()) : null,
     keyword: type==="keyword" ? $("#mKeyword").value.trim() : null,
+    pattern: type==="pattern" ? $("#mPattern").value.trim() : null,
   };
   if(type==="element" && !data.selector){ toast("Enter a CSS selector","err"); return null; }
   if(type==="keyword" && !data.keyword){ toast("Enter a keyword","err"); return null; }
+  if(type==="pattern"){
+    if(!data.pattern){ toast("Enter a regex pattern","err"); return null; }
+    try{ new RegExp(data.pattern); }catch(e){ toast("Invalid regex: "+e.message,"err"); return null; }
+  }
   return data;
 }
 
@@ -553,7 +599,7 @@ async function testMonitor(){
     const resp = await fetch(WORKER_URL + "/preview", {
       method: "POST",
       headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ url: d.url, type: d.type, selector: d.selector, keyword: d.keyword }),
+      body: JSON.stringify({ url: d.url, type: d.type, selector: d.selector, keyword: d.keyword, pattern: d.pattern }),
     });
     const r = await resp.json();
     if(!r.ok){
@@ -589,7 +635,7 @@ async function openDetail(id){
   let html = `
     <p style="margin-top:0"><a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.url)}</a></p>
     <p class="muted" style="font-size:.85rem">
-      ${statusPill(m)} &middot; watching ${m.type==='element'?'element <code>'+escapeHtml(m.selector||'')+'</code>':m.type==='keyword'?'keyword &ldquo;'+escapeHtml(m.keyword||'')+'&rdquo;':'whole page'} &middot;
+      ${statusPill(m)} &middot; watching ${m.type==='element'?'element <code>'+escapeHtml(m.selector||'')+'</code>':m.type==='keyword'?'keyword &ldquo;'+escapeHtml(m.keyword||'')+'&rdquo;':m.type==='pattern'?'pattern <code>'+escapeHtml(m.pattern||'')+'</code>':'whole page'} &middot;
       every ${freqLabel(m.frequencyMinutes)} &middot; last checked ${fmtAgo(m.lastCheckedAt)}
     </p>`;
   if(snaps.length===0){
