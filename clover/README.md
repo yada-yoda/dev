@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.88 — Name your Google calendar
+
+The first Connect now asks what to call the Google calendar Clover pushes
+to (default "Clover"), and once connected a ✎ button renames it any time —
+both in your Google account and in Clover's settings.
+
 ### v1.0.87 — Google Calendar sync (one-way push)
 
 The Calendar page gains **Connect Google Calendar**. One Google sign-in

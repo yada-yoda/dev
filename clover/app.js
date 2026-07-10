@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.87';
+const VERSION = '1.0.88';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4894,14 +4894,21 @@ function gfetch(path, opts) {
 }
 async function gcalEnsureCalendar(store) {
   const g = store.state.settings.gcal || {};
+  const wantName = (g.calendarName || 'Clover').trim() || 'Clover';
   if (g.calendarId) {
     try { await gfetch('/calendars/' + encodeURIComponent(g.calendarId)); return g.calendarId; } catch (e) { /* deleted — recreate */ }
   }
   const list = await gfetch('/users/me/calendarList?minAccessRole=owner&maxResults=250');
-  const found = (list.items || []).find(c => c.summary === 'Clover');
-  const id = found ? found.id : (await gfetch('/calendars', { method: 'POST', body: JSON.stringify({ summary: 'Clover', description: 'Pushed from Clover — paychecks, expected pay dates, bills, and CD maturities. Safe to delete; the next sync recreates it.' }) })).id;
+  const found = (list.items || []).find(c => c.summary === wantName);
+  const id = found ? found.id : (await gfetch('/calendars', { method: 'POST', body: JSON.stringify({ summary: wantName, description: 'Pushed from Clover — paychecks, expected pay dates, bills, and CD maturities. Safe to delete; the next sync recreates it.' }) })).id;
   store.setGcal({ calendarId: id });
   return id;
+}
+// Rename the target calendar (both in Google and in settings).
+async function gcalRename(store, name) {
+  store.setGcal({ calendarName: name });
+  const g = store.state.settings.gcal || {};
+  if (g.calendarId) await gfetch('/calendars/' + encodeURIComponent(g.calendarId), { method: 'PATCH', body: JSON.stringify({ summary: name }) });
 }
 function isoOfDay(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
 function isoNextDay(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); const d = addDays(new Date(+m[1], +m[2] - 1, +m[3]), 1); return isoOfDay(d.getFullYear(), d.getMonth(), d.getDate()); }
@@ -4971,15 +4978,28 @@ function renderCalendar(view) {
   gBtn.title = g.calendarId
     ? 'Push this month + the next two to your dedicated “Clover” Google calendar (adds, updates, and removes — never duplicates).' + (g.lastSyncAt ? ' Last synced ' + fmtDate(g.lastSyncAt.slice(0, 10)) + ' · ' + (g.lastCount || 0) + ' events.' : '')
     : 'One-time Google sign-in, then Clover pushes paychecks, expected pay dates, bills, and CD maturities to a dedicated “Clover” calendar in your Google account. One-way: Clover never reads your calendar.';
-  gBtn.addEventListener('click', async () => {
+  const runSync = async () => {
     gBtn.disabled = true; gBtn.textContent = 'Syncing…';
     try {
       const r = await gcalSyncNow(store);
       toast('Google Calendar synced — ' + r.added + ' added · ' + r.updated + ' updated · ' + r.removed + ' removed');
     } catch (e) { toast(String(e.message || e), 'warn'); }
     renderView(currentRoute);
+  };
+  gBtn.addEventListener('click', () => {
+    // First connect: pick the Google calendar's name (default Clover).
+    if (!g.calendarId) promptText('Name the Google calendar Clover will push to', g.calendarName || 'Clover', name => { store.setGcal({ calendarName: name }); runSync(); });
+    else runSync();
   });
   nav.appendChild(gBtn);
+  if (g.calendarId) {
+    const rn = el('button', 'btn-ghost', '✎');
+    rn.title = 'Rename the Google calendar Clover pushes to (currently “' + (g.calendarName || 'Clover') + '”)';
+    rn.addEventListener('click', () => promptText('Rename the Google calendar', g.calendarName || 'Clover', async name => {
+      try { await gcalRename(store, name); toast('Google calendar renamed to “' + name + '”'); } catch (e) { toast(String(e.message || e), 'warn'); }
+    }));
+    nav.appendChild(rn);
+  }
   head.appendChild(nav);
   view.appendChild(head);
 
