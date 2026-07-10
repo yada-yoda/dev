@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.84';
+const VERSION = '1.0.85';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2427,8 +2427,9 @@ function renderPaychecks(view) {
   const schedActive = activeSchedules(store).length > 0;
   if (!allMode && schedActive) {
     const pvTabs = el('div', 'tabs pv-tabs');
-    [['current', 'Paychecks'], ['upcoming', 'Upcoming']].forEach(([v, label]) => {
+    [['current', 'Paychecks'], ['upcoming', 'Upcoming'], ['missing', 'Missing']].forEach(([v, label]) => {
       const b = el('button', 'tab' + (paycheckView === v ? ' active' : ''), label);
+      if (v === 'missing') b.title = 'Expected paychecks never entered, plus recorded ones still unreceived 3+ days past their pay date';
       b.addEventListener('click', () => { paycheckView = v; renderView(currentRoute); });
       pvTabs.appendChild(b);
     });
@@ -2439,16 +2440,18 @@ function renderPaychecks(view) {
     view.appendChild(pvTabs);
   }
   const upcomingView = !allMode && schedActive && paycheckView === 'upcoming';
+  const missingView = !allMode && schedActive && paycheckView === 'missing';
 
   const bar = el('div', 'filter-bar');
   const statusSel = select([{ value: 'all', label: 'All statuses' }].concat(PAYCHECK_STATUSES.map(s => ({ value: s, label: s }))), paycheckStatusFilter);
   statusSel.addEventListener('change', () => { paycheckStatusFilter = statusSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Status', statusSel));
-  if (!upcomingView && !allMode && schedActive) bar.appendChild(el('div', 'muted', 'Greyed rows are expected paychecks not recorded yet — they don’t count toward totals.'));
+  if (missingView) bar.appendChild(el('div', 'muted', 'Expected paychecks never entered, plus recorded ones still unreceived 3+ days past their pay date. None of these count toward totals.'));
+  else if (!upcomingView && !allMode && schedActive) bar.appendChild(el('div', 'muted', 'Greyed rows are expected paychecks not recorded yet — they don’t count toward totals.'));
   view.appendChild(bar);
 
   // Bulk selection applies only to real recorded paychecks in the single-year current view.
-  const showSel = !allMode && paycheckView === 'current';
+  const showSel = !allMode && paycheckView === 'current';   // no bulk-select on Upcoming/Missing (mixed synthetic rows)
   if (!showSel) { paycheckSel = new Set(); paycheckSelYear = null; }
   else {
     if (paycheckSelYear !== activeYear) { paycheckSel = new Set(); paycheckSelYear = activeYear; }
@@ -2456,15 +2459,23 @@ function renderPaychecks(view) {
     [...paycheckSel].forEach(id => { if (!validIds.has(id)) paycheckSel.delete(id); });
   }
 
-  // Rows: recorded (+ past-missing) for the current view; future expected for upcoming.
+  // Rows: recorded (+ past-missing) for the current view; future expected for
+  // upcoming; the Missing tab collects never-entered expected checks plus
+  // recorded-but-unreceived ones 3+ days past their pay date.
   let rows;
   if (upcomingView) rows = expectedRows(store, activeYear, pays, 'upcoming');
+  else if (missingView) {
+    const synth = expectedRows(store, activeYear, pays, 'missing').filter(p => daysUntil(p.payDate) <= -3);
+    const overdue = pays.filter(p => !isPaycheckPaid(p) && p.status !== 'Bounced/Returned' && p.payDate && daysUntil(p.payDate) <= -3);
+    rows = overdue.concat(synth).sort((a, b) => (b.payDate || '').localeCompare(a.payDate || ''));
+  }
   else if (!allMode && schedActive) rows = pays.concat(expectedRows(store, activeYear, pays, 'missing'));
   else rows = pays.slice();
-  if (paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
+  if (!missingView && paycheckStatusFilter !== 'all') rows = rows.filter(p => (p.status || 'Received') === paycheckStatusFilter);
 
   if (!rows.length) {
     if (upcomingView) view.appendChild(el('div', 'card muted pad', 'No upcoming paychecks scheduled.'));
+    else if (missingView) view.appendChild(el('div', 'card muted pad', 'Nothing missing — every expected paycheck is recorded and received (3-day grace).'));
     else view.appendChild(emptyState('No paychecks yet', 'Add your paychecks — main job and any acting/side gigs — to track expected vs. received, days early/late, and wage totals. Wages roll into the Income view automatically.', '+ Add paycheck', () => paycheckModal(null)));
     return;
   }
@@ -3888,12 +3899,19 @@ const DASH_PANEL_DEFS = [
   { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) },
   { key: 'bestCard', title: '💳 Best card to use today', build: ctx => bestCardCallout(ctx.store) || el('div', 'card muted', 'Add credit cards with statement close + due days (on the Accounts page) to see which card gives a purchase the longest float.') },
   { key: 'projIncome', title: '📈 Projected annual income', build: ctx => {
+      const box = el('div');
       const wrap = el('div', 'sub-summary');
       const me = ctx.monthsElapsed > 0 ? ctx.monthsElapsed : 1;
       const avgG = ctx.incYTD / me, avgN = ctx.netYTD / me;
       wrap.appendChild(kpiCard('Projected gross / yr', money(avgG * 12), 'income', 'avg ' + money(avgG) + ' / mo so far × 12'));
       wrap.appendChild(kpiCard('Projected net / yr', money(avgN * 12), 'income', 'avg ' + money(avgN) + ' / mo take-home × 12'));
-      return wrap;
+      box.appendChild(wrap);
+      // Say exactly which income streams feed the projection.
+      const srcs = Object.entries(incomeByCategory(ctx.store, ctx.data)).filter(x => x[1] > 0).sort((a, b) => b[1] - a[1]).map(x => x[0]);
+      box.appendChild(el('div', 'sum-hint', srcs.length
+        ? 'Both projections count all recorded income this year: ' + srcs.join(', ') + '. Net uses each entry’s recorded net (take-home for paychecks); entries without a net use their gross.'
+        : 'No income recorded yet this year.'));
+      return box;
     } }
 ];
 // Last filed year's net outcome + lifetime refund/paid totals from Tax history.

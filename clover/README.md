@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.85 — Missing paychecks tab + projection sources named
+
+- **New "Missing" tab on Paychecks** (next to Paychecks and Upcoming): one
+  place listing every paycheck that's gone missing — expected pay dates
+  from your schedule that were never entered, plus recorded paychecks
+  still unreceived once their pay date is 3+ days past. Bounced checks are
+  excluded (that's a known event, not a missing one), and nothing here
+  counts toward totals.
+- **The Projected annual income panel says what it counts.** A line under
+  the gross/net cards lists the income streams feeding the projection
+  ("Wages, Dividends, Interest…"), and explains that net uses each entry's
+  recorded net — take-home for paychecks — falling back to gross where no
+  net was recorded.
+
 ### v1.0.84 — Customizable paycheck Method and Check type lists
 
 Settings gains two new managed lists: **Paycheck methods** (Direct deposit,
