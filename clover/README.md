@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.87 — Google Calendar sync (one-way push)
+
+The Calendar page gains **Connect Google Calendar**. One Google sign-in
+(client-side Google Identity Services — no server, no secrets; the OAuth
+client id is public by design), and Clover creates a dedicated **"Clover"**
+calendar in your Google account and pushes this month plus the next two:
+paychecks, expected pay dates, bill renewals/due dates, and CD maturities
+with their 7-day reminders. Strictly one-way — Clover never reads your
+calendar. Every event carries a hidden id, so re-syncing updates and
+removes instead of duplicating, and deleting the Clover calendar is always
+safe (the next sync recreates it). After connecting, the button becomes
+"↻ Sync to Google" with the last-synced time in its tooltip.
+
+First connect shows Google's "unverified app" notice — expected for a
+personal app in Testing; click Advanced → continue once.
+
 ### v1.0.86 — Expected pay dates on the Calendar
 
 The Calendar now shows your pay schedule's expected pay dates ("TestCo

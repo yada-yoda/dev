@@ -300,6 +300,7 @@ window.cloverStore = {
     state.settings.pagePanels[pageKey] = (Array.isArray(arr) && arr.length) ? arr.map(p => ({ k: p.k, c: p.c ? 1 : 0, w: (p.w === 1 || p.w === 2 || p.w === 3) ? p.w : 0, h: p.h ? 1 : 0, off: p.off ? 1 : 0 })) : null;
     scheduleSave(); notify();
   },
+  setGcal(patch) { state.settings.gcal = Object.assign({}, state.settings.gcal, patch); scheduleSave(); notify(); },
   addExtraYear(y) {
     y = Math.floor(+y);
     if (!y || y < 1980 || y > 2100) return false;

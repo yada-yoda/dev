@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.86';
+const VERSION = '1.0.87';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4820,7 +4820,7 @@ function dateInMonth(iso, year, month) {
 function calendarEvents(store, year, month) {
   const events = [];
   const yd = store.yearData(year);
-  (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
+  (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green', gid: 'pc-' + (p.id || (p.payDate + '-' + (p.employer || ''))) }); });
   // Expected pay dates from active schedules — shown until a real paycheck
   // gets recorded within 4 days of them (then the recorded one takes over).
   activeSchedules(store).forEach(sch => {
@@ -4828,26 +4828,118 @@ function calendarEvents(store, year, month) {
       const d = dateInMonth(per.payDate, year, month); if (!d) return;
       const recorded = (yd.paychecks || []).some(pc => (pc.employer || '').toLowerCase() === (sch.employer || '').toLowerCase() && Math.abs(daysBetweenISO(per.payDate, pc.payDate)) <= 4);
       if (recorded) return;
-      events.push({ day: d, type: 'Expected paycheck', label: (sch.employer || 'Paycheck') + ' expected' + (sch.gross ? ' · ~' + money(Number(sch.gross)) : ''), tone: 'green' });
+      events.push({ day: d, type: 'Expected paycheck', label: (sch.employer || 'Paycheck') + ' expected' + (sch.gross ? ' · ~' + money(Number(sch.gross)) : ''), tone: 'green', gid: 'exp-' + sch.id + '-' + per.payDate });
     });
   });
-  store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + (r.frequency === 'once' ? ' due · ' : ' renews · ') + money(Number(r.amount) || 0), tone: 'amber' })); });
+  store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + (r.frequency === 'once' ? ' due · ' : ' renews · ') + money(Number(r.amount) || 0), tone: 'amber', gid: 'bill-' + r.id + '-' + year + '-' + (month + 1) + '-' + d })); });
   store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => {
     const name = a.name + (a.last4 ? ' ••' + a.last4 : '');
     const d = dateInMonth(a.cdMaturity, year, month);
-    if (d) events.push({ day: d, type: 'CD matures', label: name + ' matures', tone: 'blue' });
+    if (d) events.push({ day: d, type: 'CD matures', label: name + ' matures', tone: 'blue', gid: 'cdm-' + a.id });
     // Heads-up a week ahead — time to decide on rollover vs. withdrawal
     // before the bank's auto-renew window closes.
     const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(a.cdMaturity);
     if (m) {
       const r = addDays(new Date(+m[1], +m[2] - 1, +m[3]), -7);
       if (r.getFullYear() === year && r.getMonth() === month)
-        events.push({ day: r.getDate(), type: 'CD reminder', label: name + ' matures in 7 days (' + fmtDate(a.cdMaturity) + ')', tone: 'amber' });
+        events.push({ day: r.getDate(), type: 'CD reminder', label: name + ' matures in 7 days (' + fmtDate(a.cdMaturity) + ')', tone: 'amber', gid: 'cdr-' + a.id });
     }
   });
   return events;
 }
 
+// ============================================================
+// Google Calendar one-way push — client-side Google Identity Services.
+// No server, no secret: the client id below is public by design. Events go
+// to a dedicated "Clover" calendar; each carries a stable cloverId so
+// re-syncs update/remove instead of duplicating.
+// ============================================================
+const GCAL_CLIENT_ID = '102155680656-8gg1s4ms8blhs04pm47jqr48auufdvv8.apps.googleusercontent.com';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar';
+const GCAL_MONTHS_AHEAD = 3;   // sync horizon: this month + the next two
+let _gisLoading = null, _gcalToken = null, _gcalTokenExp = 0;
+function ensureGIS() {
+  if (window.google && window.google.accounts && window.google.accounts.oauth2) return Promise.resolve();
+  if (_gisLoading) return _gisLoading;
+  _gisLoading = new Promise((resolve, reject) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true;
+    sc.onload = () => resolve();
+    sc.onerror = () => { _gisLoading = null; reject(new Error('Couldn’t load Google sign-in')); };
+    document.head.appendChild(sc);
+  });
+  return _gisLoading;
+}
+function gcalToken() {
+  if (_gcalToken && Date.now() < _gcalTokenExp - 60000) return Promise.resolve(_gcalToken);
+  return ensureGIS().then(() => new Promise((resolve, reject) => {
+    const tc = google.accounts.oauth2.initTokenClient({
+      client_id: GCAL_CLIENT_ID, scope: GCAL_SCOPE,
+      callback: resp => {
+        if (resp && resp.access_token) { _gcalToken = resp.access_token; _gcalTokenExp = Date.now() + (Number(resp.expires_in) || 3600) * 1000; resolve(_gcalToken); }
+        else reject(new Error((resp && resp.error) || 'No token'));
+      },
+      error_callback: e => reject(new Error((e && e.type) === 'popup_closed' ? 'Sign-in popup closed' : ((e && e.type) || 'Sign-in failed')))
+    });
+    tc.requestAccessToken({ prompt: '' });
+  }));
+}
+function gfetch(path, opts) {
+  return gcalToken().then(tok => fetch('https://www.googleapis.com/calendar/v3' + path, Object.assign({}, opts, {
+    headers: Object.assign({ Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' }, (opts || {}).headers)
+  }))).then(async r => {
+    if (!r.ok) throw new Error('Google Calendar ' + r.status + ' — ' + (await r.text()).slice(0, 160));
+    return r.status === 204 ? null : r.json();
+  });
+}
+async function gcalEnsureCalendar(store) {
+  const g = store.state.settings.gcal || {};
+  if (g.calendarId) {
+    try { await gfetch('/calendars/' + encodeURIComponent(g.calendarId)); return g.calendarId; } catch (e) { /* deleted — recreate */ }
+  }
+  const list = await gfetch('/users/me/calendarList?minAccessRole=owner&maxResults=250');
+  const found = (list.items || []).find(c => c.summary === 'Clover');
+  const id = found ? found.id : (await gfetch('/calendars', { method: 'POST', body: JSON.stringify({ summary: 'Clover', description: 'Pushed from Clover — paychecks, expected pay dates, bills, and CD maturities. Safe to delete; the next sync recreates it.' }) })).id;
+  store.setGcal({ calendarId: id });
+  return id;
+}
+function isoOfDay(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
+function isoNextDay(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); const d = addDays(new Date(+m[1], +m[2] - 1, +m[3]), 1); return isoOfDay(d.getFullYear(), d.getMonth(), d.getDate()); }
+function gcalWindowEvents(store) {
+  const out = []; const now = new Date();
+  for (let i = 0; i < GCAL_MONTHS_AHEAD; i++) {
+    const y = now.getFullYear() + Math.floor((now.getMonth() + i) / 12);
+    const m = (now.getMonth() + i) % 12;
+    if (!store.isYearLoaded(y)) continue;
+    calendarEvents(store, y, m).forEach(ev => { if (ev.gid) out.push({ gid: ev.gid, iso: isoOfDay(y, m, ev.day), summary: ev.label }); });
+  }
+  return out;
+}
+async function gcalSyncNow(store) {
+  const now = new Date();
+  const years = [...new Set(Array.from({ length: GCAL_MONTHS_AHEAD }, (x, i) => now.getFullYear() + Math.floor((now.getMonth() + i) / 12)))];
+  await Promise.all(years.map(y => store.loadYear(y)));
+  const calId = await gcalEnsureCalendar(store);
+  const want = gcalWindowEvents(store);
+  const tmin = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const tmax = new Date(now.getFullYear(), now.getMonth() + GCAL_MONTHS_AHEAD, 1).toISOString();
+  const existing = await gfetch('/calendars/' + encodeURIComponent(calId) + '/events?maxResults=2500&privateExtendedProperty=' + encodeURIComponent('cloverApp=1') + '&timeMin=' + encodeURIComponent(tmin) + '&timeMax=' + encodeURIComponent(tmax));
+  const byId = new Map();
+  (existing.items || []).forEach(ev => { const k = ev.extendedProperties && ev.extendedProperties.private && ev.extendedProperties.private.cloverId; if (k && !byId.has(k)) byId.set(k, ev); });
+  let added = 0, updated = 0, removed = 0;
+  for (const w of want) {
+    const body = { summary: w.summary, start: { date: w.iso }, end: { date: isoNextDay(w.iso) }, transparency: 'transparent', extendedProperties: { private: { cloverApp: '1', cloverId: w.gid } } };
+    const ex = byId.get(w.gid);
+    if (!ex) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events', { method: 'POST', body: JSON.stringify(body) }); added++; }
+    else {
+      byId.delete(w.gid);
+      if ((ex.start && ex.start.date) !== w.iso || ex.summary !== w.summary) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'PATCH', body: JSON.stringify(body) }); updated++; }
+    }
+  }
+  for (const ex of byId.values()) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'DELETE' }); removed++; }
+  store.setGcal({ lastSyncAt: new Date().toISOString(), lastCount: want.length });
+  return { added, updated, removed, total: want.length };
+}
 function calShift(delta) {
   let { year, month } = calCursor;
   month += delta;
@@ -4874,6 +4966,20 @@ function renderCalendar(view) {
   const next = el('button', 'btn-ghost', '›'); next.addEventListener('click', () => calShift(1));
   const today = el('button', 'btn-ghost', 'Today'); today.addEventListener('click', () => { const t = new Date(); calCursor = { year: t.getFullYear(), month: t.getMonth() }; renderView(currentRoute); });
   nav.appendChild(prev); nav.appendChild(lbl); nav.appendChild(next); nav.appendChild(today);
+  const g = store.state.settings.gcal || {};
+  const gBtn = el('button', 'btn-ghost', g.calendarId ? '↻ Sync to Google' : 'Connect Google Calendar');
+  gBtn.title = g.calendarId
+    ? 'Push this month + the next two to your dedicated “Clover” Google calendar (adds, updates, and removes — never duplicates).' + (g.lastSyncAt ? ' Last synced ' + fmtDate(g.lastSyncAt.slice(0, 10)) + ' · ' + (g.lastCount || 0) + ' events.' : '')
+    : 'One-time Google sign-in, then Clover pushes paychecks, expected pay dates, bills, and CD maturities to a dedicated “Clover” calendar in your Google account. One-way: Clover never reads your calendar.';
+  gBtn.addEventListener('click', async () => {
+    gBtn.disabled = true; gBtn.textContent = 'Syncing…';
+    try {
+      const r = await gcalSyncNow(store);
+      toast('Google Calendar synced — ' + r.added + ' added · ' + r.updated + ' updated · ' + r.removed + ' removed');
+    } catch (e) { toast(String(e.message || e), 'warn'); }
+    renderView(currentRoute);
+  });
+  nav.appendChild(gBtn);
   head.appendChild(nav);
   view.appendChild(head);
 
