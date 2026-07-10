@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.81';
+const VERSION = '1.0.82';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3539,10 +3539,70 @@ function rateInstitution(store, r) {
   return '';
 }
 
+// ---- Live APY sources ----
+// Banks whose public sites expose an open-CORS rates JSON — fetched straight
+// from the browser, no server needed. Add banks here as feeds are found.
+const RATE_SOURCES = [
+  {
+    key: 'syf', name: 'Synchrony Bank', match: /synchrony/i, product: 'High Yield Savings',
+    url: 'https://api.syf.com/v1/retailBank/products',
+    // Synchrony's retail-bank products feed; HYS = High Yield Savings.
+    parse: j => { const pr = (((j || {}).productTypes || {}).products || []).find(x => x.displayCode === 'HYS'); const v = pr && parseFloat(String(pr.maxAPY || '').replace('%', '')); return isFinite(v) ? v : null; }
+  }
+];
+// The institution name the user actually uses for this bank (from past rate
+// entries or accounts), else the source's default name.
+function rateSourceInstName(store, src) {
+  const s = store.state;
+  const fromRates = s.rateHistory.map(r => rateInstitution(store, r)).find(n => src.match.test(n || ''));
+  if (fromRates) return fromRates;
+  const fromAcct = (s.accounts.find(a => src.match.test(a.institution || '')) || {}).institution;
+  return fromAcct || src.name;
+}
+function userHasRateSource(store, src) {
+  const s = store.state;
+  return s.rateHistory.some(r => src.match.test(rateInstitution(store, r) || '')) || s.accounts.some(a => src.match.test(a.institution || ''));
+}
+async function syncRateSource(store, src, opts) {
+  const quiet = opts && opts.quiet;
+  try {
+    const res = await fetch(src.url, { headers: { Accept: 'application/json' } });
+    const apy = src.parse(await res.json());
+    if (apy == null) { if (!quiet) toast('Couldn’t read the APY from ' + src.name + '’s feed', 'warn'); return; }
+    const inst = rateSourceInstName(store, src);
+    const latest = store.state.rateHistory
+      .filter(r => (rateInstitution(store, r) || '').toLowerCase() === inst.toLowerCase())
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
+    if (latest && Number(latest.apy) === apy) { if (!quiet) toast(inst + ' ' + src.product + ' APY is already current at ' + apy.toFixed(2) + '%'); return; }
+    store.saveRate({ date: todayISO(), institution: inst, apy });
+    toast(inst + ' savings APY ' + (latest ? 'changed ' + Number(latest.apy).toFixed(2) + '% → ' : 'recorded: ') + apy.toFixed(2) + '% (auto)');
+  } catch (e) { if (!quiet) toast('Couldn’t reach ' + src.name + '’s rates feed', 'warn'); }
+}
+// Once-a-day auto check when the Rates tab opens — only for banks the user
+// actually has, so nobody gets rates logged for banks they don't use.
+function autoSyncRates(store) {
+  let last = 0; try { last = +localStorage.getItem('cloverRateSyncAt') || 0; } catch (e) {}
+  if (Date.now() - last < 20 * 3600 * 1000) return;
+  try { localStorage.setItem('cloverRateSyncAt', String(Date.now())); } catch (e) {}
+  RATE_SOURCES.filter(srx => userHasRateSource(store, srx)).forEach(srx => syncRateSource(store, srx, { quiet: true }));
+}
+function rateSyncButtons(store) {
+  return RATE_SOURCES.map(srx => {
+    const b = el('button', 'btn-ghost', '↻ Sync ' + srx.name.replace(/ Bank$/, '') + ' APY');
+    b.title = 'Fetch ' + srx.name + '’s current ' + srx.product + ' APY from its public rates feed and log it here if it changed. Also checked automatically once a day.';
+    b.addEventListener('click', () => syncRateSource(store, srx));
+    return b;
+  });
+}
 function renderRatesTab(view) {
   const store = window.cloverStore, s = store.state;
+  autoSyncRates(store);
   const allRows = s.rateHistory.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  if (!allRows.length) { view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null))); return; }
+  if (!allRows.length) {
+    view.appendChild(tableTools.apply(null, rateSyncButtons(store)));
+    view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null)));
+    return;
+  }
 
   normalizeChartRange(allRows);
   view.appendChild(chartRangeControls(allRows, () => renderView(currentRoute)));
@@ -3567,7 +3627,7 @@ function renderRatesTab(view) {
     ...tableColKeys(store, 'rates', RATES_COL_LABELS, RATES_ALL_COLS).map(k => buildRatesCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
   ];
-  view.appendChild(tableTools(columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns')));
+  view.appendChild(tableTools.apply(null, rateSyncButtons(store).concat([columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns')])));
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null)); view.appendChild(card);
 }
 

@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.82 — Synchrony savings APY updates itself
+
+Synchrony's website exposes a public rates feed (api.syf.com) that allows
+browser access, so Clover now reads it directly — no server involved. When
+you open Credit & Rates → Rates, it checks once a day whether Synchrony's
+High Yield Savings APY changed and logs a new dated entry automatically
+(tagged "(auto)" in the toast); there's also a "↻ Sync Synchrony APY"
+button to check on demand. It only runs if you actually have Synchrony
+(an account or past rate entries), and it logs under whatever institution
+name you already use. Built as a registry, so other banks with similar
+public feeds can be added the same way.
+
 ### v1.0.81 — Zero stat cards say $0.00
 
 "Spending · Jul" showing just a line was the app's grid convention for
