@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.89 — Click a calendar day for details
+
+Clicking any day with events on the Calendar grid opens a detail popup —
+the full date, an event count, and every event with its complete label and
+a type tag (Paycheck / Expected paycheck / Bill / CD). No more squinting at
+chips that truncate long bill names; the whole cell is clickable, chips
+included.
+
 ### v1.0.88 — Name your Google calendar
 
 The first Connect now asks what to call the Google calendar Clover pushes

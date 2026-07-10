@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.88';
+const VERSION = '1.0.89';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -5008,6 +5008,22 @@ function renderCalendar(view) {
   view.appendChild(calendarAgenda(events, month));
 }
 
+// Day-detail popup: full labels for every event on a day — grid chips get
+// truncated, so clicking anything in a cell opens this, like a real calendar.
+function calendarDayModal(year, month, day, dayEvents) {
+  const body = el('div');
+  const list = el('div', 'mini-list');
+  dayEvents.forEach(e => {
+    const row = el('div', 'mini-row');
+    const left = el('span');
+    left.appendChild(badge(e.type, e.tone === 'green' ? 'green' : e.tone === 'amber' ? 'amber' : ''));
+    left.appendChild(document.createTextNode(' ' + e.label));
+    row.appendChild(left);
+    list.appendChild(row);
+  });
+  body.appendChild(list);
+  openModal({ title: fmtDate(isoOfDay(year, month, day)) + ' · ' + dayEvents.length + ' event' + (dayEvents.length === 1 ? '' : 's'), body, confirmLabel: 'Close', onConfirm: () => {} });
+}
 function calendarGrid(year, month, events) {
   const card = el('div', 'card cal-card');
   const grid = el('div', 'cal-grid');
@@ -5026,8 +5042,12 @@ function calendarGrid(year, month, events) {
       const dots = el('div', 'cal-dots');
       dayEvents.slice(0, 4).forEach(e => dots.appendChild(el('span', 'cal-dot ' + e.tone)));
       cell.appendChild(dots);
-      dayEvents.slice(0, 3).forEach(e => { const chip = el('div', 'cal-event ' + e.tone, e.label); chip.title = e.label; cell.appendChild(chip); });
+      dayEvents.slice(0, 3).forEach(e => { const chip = el('div', 'cal-event ' + e.tone, e.label); chip.title = e.label + ' — click for details'; cell.appendChild(chip); });
       if (dayEvents.length > 3) cell.appendChild(el('div', 'cal-more', '+' + (dayEvents.length - 3) + ' more'));
+      // The whole cell opens the day view — chips truncate and dots are tiny,
+      // so any click on the day shows the full labels.
+      cell.classList.add('cal-clickable');
+      cell.addEventListener('click', () => calendarDayModal(year, month, day, dayEvents));
     }
     grid.appendChild(cell);
   }

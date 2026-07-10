@@ -457,6 +457,9 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
+/* Calendar day cells with events open a detail popup on click. */
+.cal-cell.cal-clickable { cursor: pointer; }
+.cal-cell.cal-clickable:hover { background: var(--surface-2, rgba(0, 0, 0, 0.03)); }
 /* "No new raise" year records: lighter — data points, not raises. */
 .data-table tr.no-raise-row td { color: var(--text-faint); }
 /* Source drill-down rows: a shade lighter — already counted in the rows above. */
