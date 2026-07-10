@@ -34,6 +34,8 @@ const SEED_REWARD_PROGRAMS = [
 const SEED_GIFT_CARD_TYPES = [
   'Amazon', 'Target', 'Walmart', 'Cash Back', 'Statement Credit', 'PayPal', 'Visa'
 ];
+const SEED_PAY_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
+const SEED_CHECK_TYPES = ['Regular', 'Bonus', 'Reimbursement', 'Adjustment', 'Other one-time'];
 const SEED_INCOME_GROUPS = [
   'Wages', 'Acting', 'Side Jobs', 'Dividends', 'Investments', 'Interest',
   'Passive / Affiliate', 'Rewards', 'Selling', 'Other'
@@ -132,7 +134,10 @@ function defaults() {
       giftCardTypes: seedList(SEED_GIFT_CARD_TYPES),
       // Federal forms offered in tax-history pickers — editable in Settings
       // so the list can keep up if the IRS changes things.
-      taxForms: seedList(SEED_TAX_FORMS)
+      taxForms: seedList(SEED_TAX_FORMS),
+      // Paycheck method + check-type dropdowns — user-extensible in Settings.
+      payMethods: seedList(SEED_PAY_METHODS),
+      checkTypes: seedList(SEED_CHECK_TYPES)
     },
     creditScores: [],   // {id, date, score, provider}
     rateHistory: [],    // {id, date, accountId, apy}

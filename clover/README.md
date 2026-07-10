@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.84 — Customizable paycheck Method and Check type lists
+
+Settings gains two new managed lists: **Paycheck methods** (Direct deposit,
+Check, Office pickup… plus whatever yours are) and **Paycheck check types**
+(Regular, Bonus, Reimbursement…). Add, rename, or remove entries and the
+paycheck form's Method and Check type dropdowns — and the bulk-edit bar —
+follow along. One caution baked into the card's description: keep
+"Regular", since any other check type is treated as a one-time check and
+excluded from salary math and raise detection. Existing paychecks keep
+whatever value they have even if it's later removed from the list.
+
 ### v1.0.83 — Check numbers
 
 Paper checks are traceable now:

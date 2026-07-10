@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.83';
+const VERSION = '1.0.84';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -538,6 +538,10 @@ function renderSettings(view) {
     { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
   grid.appendChild(simpleListCard('Tax forms', 'Form names offered in the tax-history pickers — update here if the IRS changes things (see irs.gov/forms-instructions-and-publications)', s.catalog.taxForms || [],
     { addLabel: 'Add tax form', onAdd: v => store.addCatalog('taxForms', v), onRemove: id => store.removeCatalog('taxForms', id), onRename: (id, v) => store.renameCatalog('taxForms', id, v) }));
+  grid.appendChild(simpleListCard('Paycheck methods', 'How paychecks arrive — the Method dropdown on paychecks', s.catalog.payMethods || [],
+    { addLabel: 'Add method', onAdd: v => store.addCatalog('payMethods', v), onRemove: id => store.removeCatalog('payMethods', id), onRename: (id, v) => store.renameCatalog('payMethods', id, v) }));
+  grid.appendChild(simpleListCard('Paycheck check types', 'The Check type dropdown — keep “Regular”: anything else is treated as a one-time check and left out of salary math and raise detection', s.catalog.checkTypes || [],
+    { addLabel: 'Add check type', onAdd: v => store.addCatalog('checkTypes', v), onRemove: id => store.removeCatalog('checkTypes', id), onRename: (id, v) => store.renameCatalog('checkTypes', id, v) }));
   grid.appendChild(paySchedulesCard());
   grid.appendChild(accountDefaultsCard());
   grid.appendChild(yearsCard());
@@ -2100,6 +2104,15 @@ function expenseModal(existing) {
 const PAYCHECK_STATUSES = ['Received', 'Expected', 'Late', 'Missing', 'Bounced/Returned', 'Manual deposit'];
 const PAYCHECK_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
 const PAYCHECK_KINDS = ['Regular', 'Bonus', 'Reimbursement', 'Adjustment', 'Other one-time'];
+// Dropdown options from a Settings-managed catalog list (falls back to the
+// built-ins for pre-migration data); `current` is kept selectable even if it
+// was removed from the list.
+function catalogOptions(s, kind, fallback, current) {
+  let names = ((s.catalog && s.catalog[kind]) || []).map(x => x.name).filter(Boolean);
+  if (!names.length) names = fallback.slice();
+  if (current && !names.includes(current)) names.push(current);
+  return names;
+}
 // Common gross-to-net line items for the pay-stub sample (generic names — state
 // withholding varies by state, so it's just "State Withholding").
 const DEDUCTION_SUGGESTIONS = ['Federal Withholding', 'Social Security Employee', 'Medicare Employee', 'Medicare Employee Addl Tax', 'State Withholding', '401(k)', 'Roth 401(k)', 'Health Insurance', 'Dental Insurance', 'Vision Insurance', 'HSA', 'FSA', 'Life Insurance', 'Garnishment'];
@@ -2546,7 +2559,7 @@ function updatePaycheckSelectionUI() {
 function paycheckBulkBar(store) {
   const bar = el('div', 'bulk-bar');
   bar.appendChild(el('span', 'bulk-count', paycheckSel.size + ' selected'));
-  const mSel = select([{ value: '', label: 'Method: no change' }].concat(PAYCHECK_METHODS.map(m => ({ value: m, label: m }))), '');
+  const mSel = select([{ value: '', label: 'Method: no change' }].concat(catalogOptions(s, 'payMethods', PAYCHECK_METHODS).map(m => ({ value: m, label: m }))), '');
   const sSel = select([{ value: '', label: 'Status: no change' }].concat(PAYCHECK_STATUSES.map(s => ({ value: s, label: s }))), '');
   bar.appendChild(mSel); bar.appendChild(sSel);
   const apply = el('button', 'btn-primary', 'Apply');
@@ -2588,9 +2601,9 @@ function paycheckModal(existing) {
   const fPeriodStart = input(p.periodStart || '', { type: 'date' });
   const fPeriodEnd = input(p.periodEnd || '', { type: 'date' });
   const fStatus = select(PAYCHECK_STATUSES, p.status || 'Received');
-  const fMethod = select(PAYCHECK_METHODS, p.method || 'Direct deposit');
+  const fMethod = select(catalogOptions(s, 'payMethods', PAYCHECK_METHODS, p.method), p.method || 'Direct deposit');
   const fCheckNo = input(p.checkNo || '', { placeholder: 'optional' });
-  const fKind = select(PAYCHECK_KINDS, p.checkType || 'Regular');
+  const fKind = select(catalogOptions(s, 'checkTypes', PAYCHECK_KINDS, p.checkType), p.checkType || 'Regular');
   const fNotes = document.createElement('textarea'); fNotes.value = p.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   const dateRow = el('div', 'two-col');
