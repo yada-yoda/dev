@@ -28,6 +28,10 @@ Each monitor watches one of:
   10 matches) and tracks *that*. The self-maintaining choice for values that change — a rate or
   price monitor alerts with old → new and keeps working without edits.
   E.g. `(\d+\.\d{2}%)\s*APY` on a bank page.
+  Don't know regex? The **✨ Build it for me** helper asks for the value currently on the page
+  (e.g. `3.10%`) and an optional nearby word (e.g. `APY`), then generates candidate patterns,
+  tests them against the live page via `/preview`, and fills in the first one that captures your
+  value — trying the `r.jina.ai` rendered version automatically when the plain fetch can't see it.
 
 The first check of a monitor just records a baseline; you only get emailed on later *changes*.
 
@@ -87,6 +91,13 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.5.0
+"✨ Build it for me" pattern assistant: type the value currently shown on the page and an optional
+nearby word, and Spyglass generates the regex for you — generalizing numbers so the pattern
+survives value changes, testing candidates against the live page, and auto-switching the URL to
+the r.jina.ai rendered version when the site builds its content with JavaScript. No regex
+knowledge needed for rate/price monitors anymore.
 
 ### v0.4.0
 Change history became a real look-back log. The first check of a monitor now records a baseline

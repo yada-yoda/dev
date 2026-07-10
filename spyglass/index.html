@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.4.0 — watch any web page for changes</title>
+<title>Spyglass v0.5.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -271,6 +271,20 @@
         <span class="lab">Regex pattern <span class="hint">— watches whatever it matches, so it keeps working when the value changes (best for rates/prices). Capture group 1 is used if present. E.g. <code>(\d+\.\d{2}%)\s*APY</code></span></span>
         <input id="mPattern" type="text" placeholder="(\d+\.\d{2}%)\s*APY" />
       </label>
+      <div class="hidden" id="patHelper" style="margin:-.5rem 0 1rem">
+        <button class="btn sm" id="btnBuildPat" type="button">&#10024; Don't know regex? Build it for me</button>
+        <div id="patBuilder" class="hidden" style="margin-top:.6rem;border:1px solid var(--border);border-radius:10px;padding:.8rem;background:var(--surface-2)">
+          <label class="field" style="margin-bottom:.6rem">
+            <span class="lab">What value is on the page right now? <span class="hint">— copy it exactly, e.g. <code>3.10%</code> or <code>$1,299.99</code></span></span>
+            <input id="pbValue" type="text" placeholder="3.10%" />
+          </label>
+          <label class="field" style="margin-bottom:.6rem">
+            <span class="lab">A word near it <span class="hint">— optional but helps pick the right one, e.g. <code>APY</code> or <code>Savings</code></span></span>
+            <input id="pbNear" type="text" placeholder="APY" />
+          </label>
+          <button class="btn primary sm" id="pbGo" type="button">Build &amp; test pattern</button>
+        </div>
+      </div>
       <label class="toggle"><input type="checkbox" id="mEnabled" checked style="width:auto"> Active</label>
       <div style="margin-top:1rem">
         <button class="btn" id="btnTest" type="button">&#128269; Test it now</button>
@@ -299,6 +313,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.5.0</strong> — <em>&#10024; Build it for me</em>: no more writing regex by hand. Pick the Pattern type, type the value you currently see on the page (and optionally a word near it, like &ldquo;APY&rdquo;), and Spyglass generates the pattern, tests it against the live page, and fills it in — automatically switching to the rendered-page version when the site needs JavaScript.</li>
         <li><strong>v0.4.0</strong> — The change history is now a real look-back log: the first check records a <em>baseline</em> snapshot (&ldquo;started watching — value was X&rdquo;), and timeline rows show the captured value with its date &amp; time instead of just +N/-N counts. Click any row for the full before/after diff.</li>
         <li><strong>v0.3.0</strong> — New <em>Pattern (regex)</em> monitor type that extracts a value (a rate, a price) and keeps tracking it as it changes — no re-arming needed, and the alert email shows old &rarr; new. Every monitor card gets a &#8635; <em>Check now</em> button. Alert emails now include a <em>Recent changes</em> history.</li>
         <li><strong>v0.2.0</strong> — New <em>Test it now</em> button in the monitor form: fetches the page and shows exactly what your selector or keyword would watch, before you save. Pasted DevTools class lists are auto-converted to real CSS selectors, and when a page hides its content behind JavaScript, the tester now tells you and suggests the <code>r.jina.ai</code> rendered-page trick.</li>
@@ -322,7 +337,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.4.0";
+  const APP_VERSION = "0.5.0";
   // The Cloudflare Worker that does server-side checking; also serves the
   // "Test it now" preview endpoint (CORS-enabled for this app's origins).
   const WORKER_URL = "https://spyglass-worker.sevendwarfs.workers.dev";
@@ -541,6 +556,7 @@ function openEdit(id){
   $("#mPattern").value = m ? (m.pattern||"") : "";
   $("#mEnabled").checked = m ? !!m.enabled : true;
   $("#testResult").classList.add("hidden"); $("#testResult").innerHTML = "";
+  $("#patBuilder").classList.add("hidden"); $("#pbValue").value = ""; $("#pbNear").value = "";
   syncTypeFields();
   openOverlay("#editOverlay");
 }
@@ -549,6 +565,89 @@ function syncTypeFields(){
   $("#selField").classList.toggle("hidden", t!=="element");
   $("#kwField").classList.toggle("hidden", t!=="keyword");
   $("#patField").classList.toggle("hidden", t!=="pattern");
+  $("#patHelper").classList.toggle("hidden", t!=="pattern");
+}
+
+/* ---- pattern builder ("Build it for me") ---- */
+
+/* Turn a literal value into a generalized regex: digit runs become \d+ so
+   the pattern still matches after the value changes. "3.10%" -> \d+\.\d+%
+   and "$1,299.99" -> \$\d+,\d+\.\d+  (commas/periods/symbols kept literal). */
+function valueToRegex(value){
+  return value.trim()
+    .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")   // escape regex metachars
+    .replace(/\d+/g, "\\d+");                  // generalize every number
+}
+
+/* Candidate patterns, most-specific first. `near` anchors the match to the
+   right part of the page; both orders are tried since the anchor can sit
+   before or after the value. */
+function buildCandidates(value, near){
+  const v = valueToRegex(value);
+  const out = [];
+  if(near){
+    const n = near.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    out.push(`${n}[\\s\\S]{0,300}?(${v})`);
+    out.push(`(${v})[\\s\\S]{0,120}?${n}`);
+  }
+  out.push(`(${v})`);
+  return out;
+}
+
+async function buildPattern(){
+  if(DEMO){ toast("Demo mode — sign in to build patterns"); return; }
+  const url = $("#mUrl").value.trim();
+  if(!/^https?:\/\//i.test(url)){ toast("Enter the page URL first","err"); return; }
+  const value = $("#pbValue").value.trim();
+  if(!value){ toast("Enter the value you see on the page","err"); return; }
+  const near = $("#pbNear").value.trim();
+  const box = $("#testResult");
+  const show = (html) => { box.classList.remove("hidden"); box.innerHTML = html; };
+  const btn = $("#pbGo");
+  btn.disabled = true; btn.textContent = "Testing patterns…";
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const tryOne = async (u, pattern) => {
+      const resp = await fetch(WORKER_URL + "/preview", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ url: u, type: "pattern", pattern }),
+      });
+      return resp.json();
+    };
+    const candidates = buildCandidates(value, near);
+    // Round 1: the URL as entered. Round 2: through r.jina.ai (renders
+    // JavaScript pages in a real browser) if nothing matched directly.
+    const rounds = [url];
+    if(!url.includes("r.jina.ai")) rounds.push("https://r.jina.ai/" + url);
+    for(const u of rounds){
+      for(const pattern of candidates){
+        const r = await tryOne(u, pattern);
+        // require the literal value in the result so we know we captured the right thing
+        if(r.ok && r.matched && r.preview.includes(value)){
+          $("#mPattern").value = pattern;
+          if(u !== url){
+            $("#mUrl").value = u;
+            toast("Page needed JavaScript — URL switched to the r.jina.ai rendered version");
+          }
+          show(`<div style="border:1px solid var(--green);border-radius:10px;padding:.7rem .85rem;background:var(--green-bg);font-size:.85rem">
+            <strong style="color:var(--green)">Pattern built &amp; working.</strong>
+            <div style="font-size:.78rem;margin:.3rem 0">Pattern: <code>${escapeHtml(pattern)}</code></div>
+            <div class="diff" style="max-height:120px">${escapeHtml(r.preview)}</div>
+            <div style="font-size:.78rem;margin-top:.3rem;color:var(--muted)">When this value changes on the page, you'll get an alert showing old &rarr; new — no need to update anything.</div></div>`);
+          $("#patBuilder").classList.add("hidden");
+          return;
+        }
+      }
+    }
+    show(`<div style="border:1px solid var(--amber);border-radius:10px;padding:.7rem .85rem;background:var(--amber-bg);color:var(--amber);font-size:.85rem">
+      <strong>Couldn't find "${escapeHtml(value)}" on the page</strong> (tried the rendered version too).<br>
+      <span style="font-size:.78rem">Double-check the value is visible on that exact URL, or try without the nearby word.</span></div>`);
+  }catch(e){
+    show(`<div style="border:1px solid var(--red);border-radius:10px;padding:.7rem .85rem;background:var(--red-bg);color:var(--red);font-size:.85rem">Builder failed: ${escapeHtml(e.message)}</div>`);
+  }finally{
+    btn.disabled = false; btn.textContent = "Build & test pattern";
+  }
 }
 /* DevTools copies class attributes as "a b c" — not a CSS selector. If the
    selector looks like a bare class list (no CSS syntax chars), convert it
@@ -701,6 +800,8 @@ function wireUi(){
   $("#mType").onchange = syncTypeFields;
   $("#btnSave").onclick = () => { const d = collectForm(); if(d) saveMonitor(d, $("#mId").value || null); };
   $("#btnTest").onclick = testMonitor;
+  $("#btnBuildPat").onclick = () => $("#patBuilder").classList.toggle("hidden");
+  $("#pbGo").onclick = buildPattern;
   $$("[data-close]").forEach(b => b.onclick = e => e.target.closest(".overlay").classList.remove("open"));
   $$(".overlay").forEach(o => o.onclick = e => { if(e.target===o) o.classList.remove("open"); });
   $("#filters").onclick = e => {
