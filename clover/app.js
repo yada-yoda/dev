@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.82';
+const VERSION = '1.0.83';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1470,8 +1470,8 @@ function subsFilterBadge(colKey, text, tone) {
   });
   return b;
 }
-const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
-const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'apr', 'flags', 'notes'];
+const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', checkNo: 'Check #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
+const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'checkNo', 'apr', 'flags', 'notes'];
 const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
 function buildSubsCol(store, key, net) {
   switch (key) {
@@ -1499,6 +1499,7 @@ function buildSubsCol(store, key, net) {
     case 'status': return { label: 'Status', key: 'status', value: r => r.status || 'Active', cell: r => { const td = el('td'); const st = r.status || 'Active'; td.appendChild(subsFilterBadge('status', st, isSubActive(r) ? (st === 'Trial' ? 'amber' : 'green') : 'red')); return td; } };
     case 'links': return { label: 'Links', key: 'links', sortable: false, value: () => '', cell: r => { const td = el('td'); const mk = (url, txt) => { const a = el('a', null, txt); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.marginRight = '8px'; td.appendChild(a); }; if (r.url) mk(r.url, 'Site ↗'); if (r.payUrl) mk(r.payUrl, 'Pay ↗'); if (!r.url && !r.payUrl) td.textContent = '—'; return td; } };
     case 'customerNo': return { label: 'Customer #', key: 'customerNo', value: r => r.customerNo || '', cell: r => { const td = el('td'); if (!r.customerNo) { td.textContent = '—'; return td; } const full = String(r.customerNo); const masked = '•••• ' + full.slice(-4); const span = el('span', null, masked); span.title = 'Click to reveal'; span.style.cursor = 'pointer'; let shown = false; span.addEventListener('click', ev => { ev.stopPropagation(); shown = !shown; span.textContent = shown ? full : masked; span.title = shown ? 'Click to hide' : 'Click to reveal'; }); td.appendChild(span); return td; } };
+    case 'checkNo': return { label: 'Check #', key: 'checkNo', value: r => r.checkNo || '', cell: r => el('td', 'muted', r.checkNo || '—') };
     case 'apr': return { label: 'APR %', key: 'apr', num: true, value: r => r.apr != null ? Number(r.apr) : -1, cell: r => el('td', 'num', (r.apr != null && r.apr !== '') ? (Number(r.apr).toFixed(2) + '%') : '—') };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
@@ -1719,6 +1720,7 @@ function subscriptionModal(existing) {
   fCust.addEventListener('focus', () => { fCust.type = 'text'; });
   fCust.addEventListener('blur', () => { fCust.type = 'password'; });
   const fApr = input(r.apr != null ? r.apr : '', { type: 'number', placeholder: 'e.g. 24.99' }); fApr.step = '0.01'; fApr.min = 0;
+  const fSubCheckNo = input(r.checkNo || '', { placeholder: 'optional' });
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   body.appendChild(field('Name', fName, 'What the subscription or bill is called.'));
@@ -1737,6 +1739,8 @@ function subscriptionModal(existing) {
   const pyWrap = el('div', 'check-row'); pyWrap.appendChild(cPaidYr);
   renewRow.appendChild(field('This calendar year', pyWrap));
   body.appendChild(renewRow);
+  const subCheckNoField = field('Check # (optional)', fSubCheckNo, 'If this one-time bill is paid by paper check, the check number — for tracing it later.');
+  body.appendChild(subCheckNoField);
   const acctRow = el('div', 'two-col');
   acctRow.appendChild(field('Payment account', fAcct, 'Which account or card pays for this.'));
   acctRow.appendChild(field('Backup account', fBackup, 'A fallback payment method on file, if any.'));
@@ -1769,7 +1773,12 @@ function subscriptionModal(existing) {
     custLblNode.nodeValue = /insurance/i.test(n) ? 'Policy #' : /membership|gym/i.test(n) ? 'Member #' : /loan|credit/i.test(n) ? 'Loan / account #' : 'Account / customer #';
     aprField.style.display = /loan|credit/i.test(n) ? '' : 'none';
   };
-  const syncOnce = () => { renewLblNode.nodeValue = fFreq.value === 'once' ? 'Due date' : 'Renewal / due date'; };
+  const syncOnce = () => {
+    renewLblNode.nodeValue = fFreq.value === 'once' ? 'Due date' : 'Renewal / due date';
+    // A recurring bill has a different check every cycle — the single check
+    // number only makes sense for one-time bills.
+    subCheckNoField.style.display = fFreq.value === 'once' ? '' : 'none';
+  };
   fFreq.addEventListener('change', syncOnce);
   rebuildSubs(); syncInterval(); syncCatFields(); syncOnce();
   fCat.addEventListener('change', () => { rebuildSubs(); syncCatFields(); });
@@ -1801,7 +1810,7 @@ function subscriptionModal(existing) {
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
         renewalDate: fRenew.value || '', notPaidYear: cPaidYr.__input.checked ? null : new Date().getFullYear(), accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
         personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked, budgetEst: cBudget.__input.checked,
-        url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(),
+        url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(), checkNo: fSubCheckNo.value.trim(),
         apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
       });
       store.saveRecurring(item);
@@ -2020,7 +2029,9 @@ function expenseList(data) {
     tr.appendChild(el('td', null, fmtDate(e.date)));
     tr.appendChild(el('td', null, store.expenseGroupName(e.categoryId)));
     tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
-    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
+    const accTd = el('td', null, store.accountName(e.accountId) || '—');
+    if (e.checkNo) accTd.appendChild(el('div', 'acct-sub', 'Check #' + e.checkNo));
+    tr.appendChild(accTd);
     tr.appendChild(numCell(expenseAmount(e), true));
     tr.appendChild(el('td', null, store.personName(e.personId)));
     const act = el('td', 'row-actions');
@@ -2060,6 +2071,8 @@ function expenseModal(existing) {
   body.appendChild(field('Account', fAcct, 'Which account or card this was paid from.'));
   body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
   body.appendChild(field('Amount', fAmount, 'How much you paid.'));
+  const fExpCheckNo = input(e.checkNo || '', { placeholder: 'optional' });
+  body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — handy for tracing it later.'));
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this expense.'));
   rebuildSubs();
   fCat.addEventListener('change', rebuildSubs);
@@ -2072,7 +2085,7 @@ function expenseModal(existing) {
       if (isNaN(amount)) { toast('Amount is required', 'warn'); fAmount.focus(); return false; }
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
-        accountId: fAcct.value || '', personId: fPerson.value, amount, notes: fNotes.value.trim(),
+        accountId: fAcct.value || '', personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
         recurringId: fBill.value || ''
       });
       store.saveExpense(activeYear, entry);
@@ -2206,9 +2219,9 @@ function expectedRows(store, year, recorded, kind) {
 const PAYCHECK_COL_LABELS = {
   payDate: 'Pay date', received: 'Received', timing: 'Timing', period: 'Period #',
   periodStart: 'Period start', periodEnd: 'Period end', gross: 'Gross', net: 'Net',
-  employer: 'Employer', person: 'Person', status: 'Status', method: 'Method', notes: 'Notes'
+  employer: 'Employer', person: 'Person', status: 'Status', method: 'Method', checkNo: 'Check #', notes: 'Notes'
 };
-const PAYCHECK_ALL_COLS = ['payDate', 'received', 'timing', 'period', 'periodStart', 'periodEnd', 'gross', 'net', 'employer', 'person', 'status', 'method', 'notes'];
+const PAYCHECK_ALL_COLS = ['payDate', 'received', 'timing', 'period', 'periodStart', 'periodEnd', 'gross', 'net', 'employer', 'person', 'status', 'method', 'checkNo', 'notes'];
 const PAYCHECK_DEFAULT_COLS = ['payDate', 'received', 'timing', 'gross', 'net', 'employer', 'person', 'period', 'status', 'method'];
 // ---- Generic table-column customization (show/hide/reorder), saved per table ----
 function tableColKeys(store, tableKey, labels, defaults) {
@@ -2298,6 +2311,7 @@ function buildPaycheckCol(store, key) {
         if (p.checkType && p.checkType !== 'Regular') { td.appendChild(document.createTextNode(' ')); td.appendChild(badge(p.checkType, 'type')); }
         return td; } };
     case 'method': return { label: 'Method', key: 'method', value: p => p.method || '', cell: p => el('td', 'muted', p.method || '—') };
+    case 'checkNo': return { label: 'Check #', key: 'checkNo', value: p => p.checkNo || '', cell: p => el('td', 'muted', p.checkNo || '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: p => p.notes || '', cell: p => { const td = el('td', 'muted'); td.textContent = p.notes || '—'; return td; } };
   }
   return null;
@@ -2575,6 +2589,7 @@ function paycheckModal(existing) {
   const fPeriodEnd = input(p.periodEnd || '', { type: 'date' });
   const fStatus = select(PAYCHECK_STATUSES, p.status || 'Received');
   const fMethod = select(PAYCHECK_METHODS, p.method || 'Direct deposit');
+  const fCheckNo = input(p.checkNo || '', { placeholder: 'optional' });
   const fKind = select(PAYCHECK_KINDS, p.checkType || 'Regular');
   const fNotes = document.createElement('textarea'); fNotes.value = p.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
@@ -2598,7 +2613,15 @@ function paycheckModal(existing) {
   stRow.appendChild(field('Status', fStatus, 'Received/Manual deposit count toward wage totals; Expected/Late/Missing/Bounced do not.'));
   stRow.appendChild(field('Method', fMethod, 'How you got paid — direct deposit, check, office pickup, etc.'));
   body.appendChild(stRow);
-  body.appendChild(field('Check type', fKind, 'Most checks are Regular — on a salary, every regular check is about the same. Mark bonuses, reimbursements, or other one-time checks so they don’t skew the deductions breakdown or raise detection.'));
+  const ktRow = el('div', 'two-col');
+  ktRow.appendChild(field('Check type', fKind, 'Most checks are Regular — on a salary, every regular check is about the same. Mark bonuses, reimbursements, or other one-time checks so they don’t skew the deductions breakdown or raise detection.'));
+  const checkNoField = field('Check # (optional)', fCheckNo, 'The number printed on the paper check — for tracing a bounced or lost check later.');
+  ktRow.appendChild(checkNoField);
+  body.appendChild(ktRow);
+  // The check-number field only applies to paper checks — hide it for
+  // direct deposit.
+  const syncCheckNo = () => { checkNoField.style.display = /check|office|other/i.test(fMethod.value) ? '' : 'none'; };
+  fMethod.addEventListener('change', syncCheckNo); syncCheckNo();
   body.appendChild(field('Notes', fNotes, 'Anything unusual — bounced check, wrong amount, deposit delay, etc.'));
 
   const isEdit = !!(existing && existing.id);
@@ -2613,7 +2636,7 @@ function paycheckModal(existing) {
         employer: fEmp.value.trim(), incomeCategoryId: fCat.value, personId: fPerson.value,
         periodNum: fPeriodNum.value === '' ? null : parseInt(fPeriodNum.value, 10),
         periodStart: fPeriodStart.value || '', periodEnd: fPeriodEnd.value || '',
-        status: fStatus.value, method: fMethod.value, checkType: fKind.value, notes: fNotes.value.trim()
+        status: fStatus.value, method: fMethod.value, checkNo: fCheckNo.value.trim(), checkType: fKind.value, notes: fNotes.value.trim()
       });
       // A paycheck belongs to the year of its pay date, not whatever year is
       // being viewed — this keeps All-view edits and cross-year adds correct.
@@ -5038,6 +5061,7 @@ const IMPORT_FIELDS = {
     { key: 'periodEnd', label: 'Period end', kw: ['period end', 'pay date end', 'period pay date end', 'end'] },
     { key: 'status', label: 'Status', kw: ['status'] },
     { key: 'method', label: 'Method', kw: ['method'] },
+    { key: 'checkNo', label: 'Check #', kw: ['check #', 'check no', 'check number'] },
     { key: 'notes', label: 'Notes', kw: ['note', 'memo'] }
   ],
   subscriptions: [
@@ -5194,7 +5218,7 @@ function buildImportEntries(store) {
         incomeCategoryId: fallbackCat, personId: matchPerson(store, g('person')),
         periodNum: g('periodNum') ? (parseInt(String(g('periodNum')).replace(/[^\d]/g, ''), 10) || null) : null,
         periodStart: parseImportDate(g('periodStart')), periodEnd: parseImportDate(g('periodEnd')),
-        status: normalizePaycheckStatus(g('status')), method: normalizePayMethod(g('method')), notes: g('notes')
+        status: normalizePaycheckStatus(g('status')), method: normalizePayMethod(g('method')), checkNo: String(g('checkNo')).trim(), notes: g('notes')
       };
     }
     if (existing.has(dupKey(target, e))) { dupes++; return; }

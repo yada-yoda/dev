@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.83 — Check numbers
+
+Paper checks are traceable now:
+
+- **Paychecks** get a "Check #" field that appears when the method is
+  Check, Office pickup, or Other (hidden for direct deposit), plus an
+  optional Check # table column and CSV import mapping.
+- **Expenses** get an always-available "Check #" field; the list shows it
+  under the paying account.
+- **One-time bills** get a "Check #" field too (recurring bills don't — a
+  new check every cycle wouldn't fit one field), with an optional column
+  in Bills & Subscriptions.
+
 ### v1.0.82 — Synchrony savings APY updates itself
 
 Synchrony's website exposes a public rates feed (api.syf.com) that allows
