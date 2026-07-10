@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.3.0 — watch any web page for changes</title>
+<title>Spyglass v0.4.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -299,6 +299,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.4.0</strong> — The change history is now a real look-back log: the first check records a <em>baseline</em> snapshot (&ldquo;started watching — value was X&rdquo;), and timeline rows show the captured value with its date &amp; time instead of just +N/-N counts. Click any row for the full before/after diff.</li>
         <li><strong>v0.3.0</strong> — New <em>Pattern (regex)</em> monitor type that extracts a value (a rate, a price) and keeps tracking it as it changes — no re-arming needed, and the alert email shows old &rarr; new. Every monitor card gets a &#8635; <em>Check now</em> button. Alert emails now include a <em>Recent changes</em> history.</li>
         <li><strong>v0.2.0</strong> — New <em>Test it now</em> button in the monitor form: fetches the page and shows exactly what your selector or keyword would watch, before you save. Pasted DevTools class lists are auto-converted to real CSS selectors, and when a page hides its content behind JavaScript, the tester now tells you and suggests the <code>r.jina.ai</code> rendered-page trick.</li>
         <li><strong>v0.1.0</strong> — First release: create page monitors, Google sign-in, and a dashboard. Server-side checking + email alerts arrive with the worker.</li>
@@ -321,7 +322,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.3.0";
+  const APP_VERSION = "0.4.0";
   // The Cloudflare Worker that does server-side checking; also serves the
   // "Test it now" preview endpoint (CORS-enabled for this app's origins).
   const WORKER_URL = "https://spyglass-worker.sevendwarfs.workers.dev";
@@ -644,9 +645,17 @@ async function openDetail(id){
     html += `<h4 style="margin:.5rem 0">Change history</h4><div class="timeline">`;
     snaps.forEach((s,i) => {
       const prev = snaps[i+1];
+      // Row label: for short extracts (rates, prices, keyword state) show the
+      // captured value itself — that turns the timeline into a value history.
+      const c = (s.content||"").trim();
+      const isBaseline = (s.diffSummary||"").startsWith("baseline");
+      const label = c && c.length <= 120
+        ? escapeHtml(c) + (isBaseline ? ' <span style="opacity:.7">· started watching</span>'
+                                       : ' <span style="opacity:.7">· ' + escapeHtml(s.diffSummary||"changed") + '</span>')
+        : escapeHtml(s.diffSummary||'change detected');
       html += `<div class="snap" onclick="this.querySelector('.diffbox').classList.toggle('hidden')">
         <div class="when">${new Date(s.takenAt && s.takenAt.toMillis ? s.takenAt.toMillis() : s.takenAt).toLocaleString()}</div>
-        <div class="sum">${escapeHtml(s.diffSummary||'change detected')}</div>
+        <div class="sum">${label}</div>
         <div class="diffbox hidden" style="margin-top:.5rem">
           <div class="diff">${prev ? wordDiff(prev.content, s.content) : escapeHtml(s.content||'(first snapshot)')}</div>
         </div>

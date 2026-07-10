@@ -88,6 +88,14 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.4.0
+Change history became a real look-back log. The first check of a monitor now records a baseline
+snapshot ("started watching — value was X"), so every monitor's timeline has a dated starting
+point, and the first real change diffs against it properly. Timeline rows in the detail view show
+the captured value with date & time (e.g. "Jul 10, 6:20 AM — 3.30%") instead of just +N/-N counts;
+click a row for the full before/after diff. Alert emails inherit the same benefit via their
+Recent-changes section.
+
 ### v0.3.0
 Pattern (regex) monitors: extract a value (rate, price) with a regex and Spyglass tracks whatever
 it matches — when the value changes you get an old → new diff email and the monitor keeps working,
