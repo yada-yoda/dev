@@ -35,6 +35,25 @@ Each monitor watches one of:
 
 The first check of a monitor just records a baseline; you only get emailed on later *changes*.
 
+### Screenshots
+When a change is detected (and on each monitor's first baseline), the worker photographs the real
+rendered page with Cloudflare Browser Rendering (free tier: 10 browser-minutes/day account-wide —
+plenty, since captures happen only on actual changes) and stores a viewport JPEG inside the
+snapshot document. Screenshots appear in the change-history timeline and are attached to alert
+emails. Per-user toggle in ⚙ Settings (`prefs.screenshotsEnabled`, default on). For
+`r.jina.ai/…`-proxied monitors the *underlying* page is photographed.
+
+### Sign-up gating
+Sign-ups are invite-only by default. Google sign-in itself can't be blocked, so the gate lives in
+Firestore rules: all data access requires an `/allowedUsers/{uid}` doc. When the admin flips
+"Allow new sign-ups" in ⚙ Settings (`/config/app.signupsOpen`), first-time users self-register
+automatically; when closed, they see a "sign-ups are closed" screen and are signed back out.
+Existing accounts are never affected.
+
+### 404
+`404.html` in this folder is the Spyglass-branded not-found page; the dev.rizzo.cc root
+`404.html` bounces `/spyglass/*` misses here (GitHub Pages only supports one site-wide 404).
+
 ### Phase 1 limitations & the rendered-page trick
 - Pages that render their content **only via JavaScript** look empty to the server-side fetch, and
   some sites (banks especially) block datacenter IPs outright. The **Test it now** button in the
@@ -91,6 +110,14 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.6.0
+Page screenshots (Phase 2, and it turned out free): on every change and first baseline the worker
+photographs the real rendered page via Cloudflare Browser Rendering and stores it in the snapshot —
+visible in the change history and attached to alert emails, with a per-user toggle in the new
+⚙ Settings panel. Sign-ups became invite-only, enforced by Firestore rules (an admin switch in
+Settings reopens them; new users then self-register on first sign-in). Added a Spyglass-branded
+404 page, and the add/edit form no longer closes on a stray backdrop click.
 
 ### v0.5.0
 "✨ Build it for me" pattern assistant: type the value currently shown on the page and an optional
