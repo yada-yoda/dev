@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.85';
+const VERSION = '1.0.86';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4821,6 +4821,16 @@ function calendarEvents(store, year, month) {
   const events = [];
   const yd = store.yearData(year);
   (yd.paychecks || []).forEach(p => { const d = dateInMonth(p.payDate, year, month); if (d) events.push({ day: d, type: 'Paycheck', label: (p.employer || 'Paycheck') + ' · ' + money(Number(p.gross) || 0), tone: 'green' }); });
+  // Expected pay dates from active schedules — shown until a real paycheck
+  // gets recorded within 4 days of them (then the recorded one takes over).
+  activeSchedules(store).forEach(sch => {
+    expectedPayPeriods(sch, year).forEach(per => {
+      const d = dateInMonth(per.payDate, year, month); if (!d) return;
+      const recorded = (yd.paychecks || []).some(pc => (pc.employer || '').toLowerCase() === (sch.employer || '').toLowerCase() && Math.abs(daysBetweenISO(per.payDate, pc.payDate)) <= 4);
+      if (recorded) return;
+      events.push({ day: d, type: 'Expected paycheck', label: (sch.employer || 'Paycheck') + ' expected' + (sch.gross ? ' · ~' + money(Number(sch.gross)) : ''), tone: 'green' });
+    });
+  });
   store.state.recurring.filter(isSubActive).forEach(r => { renewalDaysInMonth(r, year, month).forEach(d => events.push({ day: d, type: 'Bill', label: r.name + (r.frequency === 'once' ? ' due · ' : ' renews · ') + money(Number(r.amount) || 0), tone: 'amber' })); });
   store.state.accounts.filter(a => a.type === 'CD' && a.cdMaturity).forEach(a => {
     const name = a.name + (a.last4 ? ' ••' + a.last4 : '');

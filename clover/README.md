@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.86 — Expected pay dates on the Calendar
+
+The Calendar now shows your pay schedule's expected pay dates ("TestCo
+expected · ~$2,000.00") alongside recorded paychecks, bills, and CD
+maturities. An expected marker disappears as soon as a real paycheck is
+recorded within 4 days of it — so past dates you've entered show the
+actual check, and future ones show what's coming.
+
 ### v1.0.85 — Missing paychecks tab + projection sources named
 
 - **New "Missing" tab on Paychecks** (next to Paychecks and Upcoming): one
