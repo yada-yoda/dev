@@ -232,7 +232,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.52.1';
+const APP_VERSION = 'v0.52.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -293,6 +293,7 @@ let logSubtab = 'feed';
 let careSubtab = 'vet';
 let trendMetric = 'feeding', trendStyle = 'auto', trendRange = 7, trendsChart = null;
 let recordSortAsc = false; // Records tab: false = newest first, true = oldest first
+let vetSortAsc = false, groomSortAsc = false, illnessSortAsc = false; // Care lists: same date-sort toggle
 let suppliesCat = 'all';
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
@@ -916,11 +917,16 @@ function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id=
 
 // ── Medical records (vaccinations, surgeries, tests, etc.) ─────────
 function toggleRecordSort(){ recordSortAsc = !recordSortAsc; render(); }
+function toggleVetSort(){ vetSortAsc = !vetSortAsc; render(); }
+function toggleGroomSort(){ groomSortAsc = !groomSortAsc; render(); }
+function toggleIllnessSort(){ illnessSortAsc = !illnessSortAsc; render(); }
+// Shared right-aligned "Date ↑/↓" toggle button for the dated Care lists.
+function dateSortBtn(fn, asc){ return '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-sm" onclick="'+fn+'()" title="Toggle sort order by date">Date '+(asc?'↑ oldest first':'↓ newest first')+'</button></div>'; }
 function renderRecordsTab(){
   const recs = petArr('records').slice().sort((a,b)=> recordSortAsc ? (a.date||'').localeCompare(b.date||'') : (b.date||'').localeCompare(a.date||''));
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:320px" onclick="recordModal()">+ Add medical record</button></div>':'';
   if(recs.length){
-    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button class="btn btn-sm" onclick="toggleRecordSort()" title="Toggle sort order by date">Date '+(recordSortAsc?'↑ oldest first':'↓ newest first')+'</button></div>';
+    html += dateSortBtn('toggleRecordSort', recordSortAsc);
     html += '<div class="card">'+recs.map(r=>{
       const nd = r.nextDue ? untilStr(r.nextDue) : null;
       const due = nd ? (nd.past ? '<span style="color:var(--danger);font-weight:600">due again '+nd.text+'</span>' : '<span style="color:'+(nd.days<=30?'var(--warning)':'var(--text-secondary)')+'">due again '+nd.text+'</span>') : '';
@@ -3083,7 +3089,7 @@ function vetPanel(){
   return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="section-title" style="margin:0">'+svgIcon('care',18)+' '+esc(p.name)+'’s vet'+(hasTwo?'s':'')+'</h3><button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">Edit</button></div>'+primary+secondary+'</div>';
 }
 function renderVetTab(){
-  const visits = petArr('vetVisits').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
+  const visits = petArr('vetVisits').slice().sort((a,b)=> vetSortAsc ? (new Date(dateSafe(a.date))-new Date(dateSafe(b.date))) : (new Date(dateSafe(b.date))-new Date(dateSafe(a.date))));
   const now = todayISO();
   const upcoming = visits.filter(v=>v.date > now), past = visits.filter(v=>v.date <= now);
   const followups = visits.filter(v=>v.followUpDate && v.followUpDate >= now);
@@ -3092,17 +3098,21 @@ function renderVetTab(){
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
   const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):'',(v.lineItems&&v.lineItems.length?' · '+v.lineItems.length+' item'+(v.lineItems.length===1?'':'s'):''),(v.payMethod?' · '+esc(v.payMethod)+(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?' '+(v.ccBrand?esc(v.ccBrand)+' ':'')+'••'+esc(v.ccLast4):''):'')].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
+  if(visits.length) html += dateSortBtn('toggleVetSort', vetSortAsc);
   if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
   if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
   if(!visits.length) html += '<div class="card empty"><div class="ico">'+svgIcon('vet',46)+'</div><p style="color:var(--text-secondary)">No vet visits logged yet.</p></div>';
   return html;
 }
 function renderGroomTab(){
-  const items = petArr('grooming').slice().sort((a,b)=>new Date(dateSafe(b.date))-new Date(dateSafe(a.date)));
+  const all = petArr('grooming');
+  const items = all.slice().sort((a,b)=> groomSortAsc ? (new Date(dateSafe(a.date))-new Date(dateSafe(b.date))) : (new Date(dateSafe(b.date))-new Date(dateSafe(a.date))));
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="groomModal()">+ Add grooming</button></div>':'';
   if(items.length){
     const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
-    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(items[0].date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
+    const lastGroomed = all.reduce((m,g)=> (!m || (g.date||'') > (m.date||'')) ? g : m, null); // newest, independent of display sort
+    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(lastGroomed.date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
+    html += dateSortBtn('toggleGroomSort', groomSortAsc);
     html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
@@ -3136,9 +3146,10 @@ function renderMedsTab(){
   return html;
 }
 function renderIllnessTab(){
-  const items = petArr('illnesses').slice().sort((a,b)=>new Date(dateSafe(b.start))-new Date(dateSafe(a.start)));
+  const items = petArr('illnesses').slice().sort((a,b)=> illnessSortAsc ? (new Date(dateSafe(a.start))-new Date(dateSafe(b.start))) : (new Date(dateSafe(b.start))-new Date(dateSafe(a.start))));
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>':'';
   if(items.length){
+    html += dateSortBtn('toggleIllnessSort', illnessSortAsc);
     html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('illness',46)+'</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
   return html;

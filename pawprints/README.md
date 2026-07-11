@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.52.1**
+**Current Version: v0.52.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.52.2** — **Date-sort toggle on all Care lists** — Vet visits, Grooming, and Illness now have the
+  same "Date ↑/↓" sort toggle the medical Records list already had, so you can flip any of them between
+  newest-first and oldest-first. (Meds still sorts by soonest-due, and Grooming's "Last groomed" stat
+  always shows the true most-recent date regardless of the chosen order.)
 - **v0.52.1** — **Non-identifying contact wording** — the Privacy and Terms pages no longer link a
   personal GitHub profile for contact; they now simply state it's a personal, non-commercial project
   with no dedicated support channel (policy changes are signalled by the "last updated" date).
