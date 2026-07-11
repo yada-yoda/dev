@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.51.1**
+**Current Version: v0.52.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -18,6 +18,8 @@ covers both.
 | `site.webmanifest` | PWA manifest — installable to home screen |
 | `favicon.ico` / `favicon-16.png` / `favicon-32.png` / `apple-touch-icon.png` / `icon-192.png` / `icon-512.png` / `icon-maskable.png` | Favicon + PWA + Android adaptive icon set |
 | `.scripts/build-icons.py` | Regenerates the icon set + OG image from the brand gradient + 🐾 |
+| `privacy.html` | Privacy Policy |
+| `terms.html` | Terms of Use + a "not veterinary advice" disclaimer |
 | `README.md` | This file |
 
 ## Features
@@ -83,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.52.0** — **Terms of Use + disclaimer page** — added `terms.html`, linked in the footer next to
+  Privacy. It leads with a prominent **"not veterinary advice"** disclaimer (PawPrints is a care log,
+  not a substitute for a vet — see your vet for medical decisions and emergencies), followed by plain-
+  language terms: as-is with no warranty, your data/backups are your responsibility, acceptable use, and
+  a liability limit. (The Privacy Policy already existed at `privacy.html`.)
 - **v0.51.1** — **Fixed Trends "Lifetime" start date** — Lifetime now spans from the first entry of
   the metric you're charting (e.g. the walk trend starts at your first walk), instead of the
   earliest of *any* activity — so it no longer began weeks early on an unrelated weigh-in or feeding.
