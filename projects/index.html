@@ -134,8 +134,12 @@ h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
 /* Per-card accent overrides (subtle differentiation) */
 .card.c-inventory{--accent-card:#14b8a6}
 .card.c-usage    {--accent-card:#00bcd4}
+.card.c-clover   {--accent-card:#16a34a}
+.card.c-pawprints{--accent-card:#fb923c}
 .card.c-sick     {--accent-card:#f87171}
+.card.c-planmath {--accent-card:#60a5fa}
 .card.c-sceneseed{--accent-card:#a78bfa}
+.card.c-spyglass {--accent-card:#818cf8}
 .card.c-scan2pdf {--accent-card:#fbbf24}
 .card.c-scancard {--accent-card:#34d399}
 
@@ -189,6 +193,30 @@ h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
       <div class="meta"><span>Static SPA &middot; Firebase + Worker</span><span class="open">Open</span></div>
     </a>
 
+    <a class="card c-clover" href="/clover/">
+      <div class="top">
+        <div class="glyph">C</div>
+        <div>
+          <h2>Clover</h2>
+          <span class="slug"><b>/clover/</b></span>
+        </div>
+      </div>
+      <p>Private personal-finance dashboard: accounts, income, expenses, recurring bills, paychecks, dividends, credit scores and APY rates. Charts, CSV import, Google Calendar push. Light theme, One&nbsp;Tap sign-in.</p>
+      <div class="meta"><span>Multi-file SPA &middot; Firebase</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-pawprints" href="/pawprints/">
+      <div class="top">
+        <div class="glyph">P</div>
+        <div>
+          <h2>PawPrints</h2>
+          <span class="slug"><b>/pawprints/</b></span>
+        </div>
+      </div>
+      <p>Dog-care tracker: feeding, walks, potty, weight, vet &amp; grooming visits, meds, supplies and insights. Shares the Illness Tracker login, connect-once Google Calendar sync, walk-badge milestones.</p>
+      <div class="meta"><span>Single-file SPA &middot; Firebase</span><span class="open">Open</span></div>
+    </a>
+
     <a class="card c-sick" href="/sick/">
       <div class="top">
         <div class="glyph">+</div>
@@ -201,6 +229,18 @@ h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
       <div class="meta"><span>Single-file SPA &middot; PWA</span><span class="open">Open</span></div>
     </a>
 
+    <a class="card c-planmath" href="/planmath/">
+      <div class="top">
+        <div class="glyph">PM</div>
+        <div>
+          <h2>PlanMath</h2>
+          <span class="slug"><b>/planmath/</b></span>
+        </div>
+      </div>
+      <p>Health-plan cost estimator: compare plans against your real usage, simulate the deductible, and see the break-even with a what-if slider. Dental &amp; vision, print / PDF export. Runs entirely on-device.</p>
+      <div class="meta"><span>Single-file SPA &middot; localStorage</span><span class="open">Open</span></div>
+    </a>
+
     <a class="card c-sceneseed" href="/sceneseed/">
       <div class="top">
         <div class="glyph">S</div>
@@ -211,6 +251,18 @@ h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
       </div>
       <p>Improv suggestion generator for live shows: relationships, locations, objects, emotions. P5e line-art logo, color-coded suggestion types, public share codes.</p>
       <div class="meta"><span>Vanilla JS &middot; Firebase</span><span class="open">Open</span></div>
+    </a>
+
+    <a class="card c-spyglass" href="/spyglass/">
+      <div class="top">
+        <div class="glyph">SG</div>
+        <div>
+          <h2>Spyglass</h2>
+          <span class="slug"><b>/spyglass/</b></span>
+        </div>
+      </div>
+      <p>Watch any web page for changes and get an email the moment it updates. Region picker, keyword filters, Discord &amp; webhook channels, schedule windows, and screenshot diffs via a Cloudflare Worker.</p>
+      <div class="meta"><span>Static SPA &middot; Firebase + Worker</span><span class="open">Open</span></div>
     </a>
 
     <a class="card c-scan2pdf" href="/scan2pdf/">
@@ -242,8 +294,8 @@ h1,h2,h3{font-family:'Montserrat',sans-serif;color:#fff}
   <!-- Bump this version chip whenever you ship a meaningful change to
        this hub (new project added, card design refreshed, etc.). -->
   <footer class="foot">
-    <span class="pin"><b>Hub:</b> dev.rizzo.cc/projects/</span>
-    <span>&copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.1.0</span></span>
+    <span class="pin"><b>Hub:</b> dev.rizzo.cc/projects/ &middot; <a href="/">&larr; DASH</a></span>
+    <span>&copy; <span id="yr"></span> Rizzo.cc <span class="ver">v0.2.0</span></span>
   </footer>
 </div>
 

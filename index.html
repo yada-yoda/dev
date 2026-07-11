@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>DASH · dev.rizzo.cc</title>
-<meta name="version" content="0.2.1">
+<meta name="version" content="0.2.2">
 <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
 <meta property="og:type" content="website">
 <meta property="og:title" content="DASH">
@@ -172,7 +172,7 @@ h1 .cursor{
   <main class="grid" id="grid"></main>
 
   <footer class="foot">
-    <span>DASH v<span id="dashver">0.2.1</span></span>
+    <span>DASH v<span id="dashver">0.2.2</span></span>
     <span class="clock" id="clock">--:--:--</span>
     <span><a href="/projects/">full project index</a></span>
   </footer>
@@ -187,16 +187,18 @@ h1 .cursor{
 var PROGRAMS = [
   { name: 'USAGE TRACKER', href: '/usage/', ver: '0.27.4', src: '/usage/index.html',
     desc: 'Household product usage and reorder tracking, with a UPC barcode scanner.' },
-  { name: 'PAWPRINTS', href: '/pawprints/', ver: '0.49.2', src: '/pawprints/index.html',
+  { name: 'PAWPRINTS', href: '/pawprints/', ver: '0.51.1', src: '/pawprints/index.html',
     desc: 'Dog care tracker: feeding, walks, potty, supplies, vet visits, and insights.' },
-  { name: 'CLOVER', href: '/clover/', ver: '1.0.15', src: '/clover/app.js',
+  { name: 'CLOVER', href: '/clover/', ver: '1.0.87', src: '/clover/app.js',
     desc: 'Personal finance dashboard. Accounts, spending, and recurring bills in one place.' },
   { name: 'SCENESEED', href: '/sceneseed/', ver: '1.3.1', src: '/sceneseed/index.html',
     desc: 'Audience suggestions for live improv shows, straight from their phones.' },
   { name: 'ILLNESS TRACKER', href: '/sick/', ver: '0.50', src: '/sick/index.html',
     desc: 'Symptom and illness logging with analysis and Google Calendar sync.' },
-  { name: 'PLANMATH', href: '/planmath/', ver: '0.6.2', src: '/planmath/index.html',
-    desc: 'Health plan cost estimator: compare plans against your real usage history.' }
+  { name: 'PLANMATH', href: '/planmath/', ver: '0.6.5', src: '/planmath/index.html',
+    desc: 'Health plan cost estimator: compare plans against your real usage history.' },
+  { name: 'SPYGLASS', href: '/spyglass/', ver: '0.7.0', src: '/spyglass/index.html',
+    desc: 'Watch any web page for changes and get an email the moment it updates.' }
 ];
 
 /* ---- render cards ---- */
