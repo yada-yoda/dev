@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="color-scheme" content="light dark">
+
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
+    });
+  }
+</script>
+
+<!-- Perf: warm up TCP/TLS to the third-parties we hit before JS runs. -->
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.googletagmanager.com">
+<link rel="dns-prefetch" href="https://firestore.googleapis.com">
+<link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com">
+
+<title>Terms of Service — SceneSeed</title>
+<meta name="description" content="The rules for using SceneSeed. Written in plain English, kept short.">
+<meta name="version" content="1.4.0">
+<meta name="theme-color" content="#0f172a">
+<meta name="robots" content="index, follow">
+
+<link rel="canonical" href="https://dev.rizzo.cc/sceneseed/terms.html">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SceneSeed">
+<meta property="og:title" content="Terms of Service — SceneSeed">
+<meta property="og:description" content="The rules for using SceneSeed. Plain English, short.">
+<meta property="og:url" content="https://dev.rizzo.cc/sceneseed/terms.html">
+<meta property="og:image" content="https://dev.rizzo.cc/sceneseed/og-image.png">
+
+<link rel="stylesheet" href="styles.css">
+
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-D04TM51CVE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-D04TM51CVE');
+</script>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="container">
+    <a class="brand" href="/sceneseed/" aria-label="SceneSeed home">
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <path d="M 25 55 Q 35 30 60 25 Q 82 23 90 38 Q 88 56 70 60 Q 45 64 25 55 Z" fill="none" stroke-width="6"/>
+        <circle cx="50" cy="46" r="5"/>
+        <circle cx="62" cy="44" r="5"/>
+        <circle cx="74" cy="42" r="5"/>
+        <path d="M 25 55 Q 15 70 7 88" stroke-width="6" fill="none" stroke-linecap="round"/>
+      </svg>
+      SceneSeed
+    </a>
+    <nav class="nav">
+      <a href="/sceneseed/">Home</a>
+    </nav>
+  </div>
+</header>
+
+<main class="prose">
+  <h1>Terms of Service</h1>
+  <p class="updated">Last updated: 2026-05-15</p>
+
+  <p>SceneSeed is a free tool for improv teams to collect audience suggestions during a show. By using it — as a host or as an audience member — you agree to these terms. If you don't agree, don't use the service.</p>
+
+  <h2>What SceneSeed is</h2>
+  <p>SceneSeed is provided as a free web app. It's not affiliated with any specific improv theater, troupe, or venue. It's a hobby project, not a commercial product, and comes with no promise of uptime, feature stability, or long-term availability.</p>
+
+  <h2>Using the app</h2>
+  <p>You agree to use SceneSeed in ways that are lawful and that don't harm other users or the service itself. Don't:</p>
+  <ul>
+    <li>Submit content that is illegal, hateful, or targeted harassment of a specific person.</li>
+    <li>Attempt to bypass the profanity filter, the submission window, or any other security control.</li>
+    <li>Try to overload, scrape, or otherwise abuse the service.</li>
+    <li>Impersonate someone else when signing up or submitting.</li>
+  </ul>
+  <p>Automated filters catch some of this. The rest is up to you.</p>
+
+  <h2>Your submissions</h2>
+  <p>Audience suggestions and any content you submit are your own responsibility. You keep whatever rights you have in what you submit. By submitting, you grant the show's host permission to display, use, and act on your suggestion during their show and to export it as part of a post-show recap. SceneSeed itself doesn't claim ownership of your text.</p>
+
+  <h2>Host accounts</h2>
+  <p>If you sign in to host a show, you're responsible for keeping your account secure and for the shows, groups, and suggestions created under your account. You can delete your groups, shows, or suggestions at any time from the dashboard.</p>
+  <p>SceneSeed reserves the right to suspend or terminate accounts that abuse the service — for example, by hosting shows that solicit harassment or illegal content. In practice this hasn't happened; it's here as a safety net.</p>
+
+  <h2>Availability</h2>
+  <p>SceneSeed runs on Google Cloud infrastructure. When that infrastructure has an outage, SceneSeed has an outage. When it's fine, SceneSeed is usually fine. There is no service-level guarantee. Don't build a paid show around SceneSeed as your only backup — always have a fallback plan (a piece of paper works).</p>
+
+  <h2>Disclaimer</h2>
+  <p>SceneSeed is provided <strong>"as is"</strong> and <strong>"as available"</strong>, without warranties of any kind, express or implied. To the maximum extent allowed by law, the maintainer is not liable for indirect, incidental, or consequential damages arising from your use of the service — including but not limited to lost data, missed shows, or content displayed on stage.</p>
+  <p>Audience-submitted suggestions are user-generated content. SceneSeed does not endorse, review, or moderate individual suggestions beyond the automated filter. The host running the show is responsible for what they choose to read out loud.</p>
+
+  <h2>Third-party services</h2>
+  <p>SceneSeed uses Google Cloud (including Firebase) for hosting and data. When you use SceneSeed, you are also indirectly using those services and their terms and privacy policies apply.</p>
+
+  <h2>Changes to these terms</h2>
+  <p>If these terms change meaningfully, the date at the top of this page will be updated and the new version will appear at the same URL. Continued use of the service after a change means you accept the updated terms.</p>
+
+  <h2>Related</h2>
+  <p>See also: <a href="privacy.html">Privacy Policy</a>.</p>
+</main>
+
+<footer class="site-footer">
+  <div class="container">
+    <div>
+      <a href="/sceneseed/">Home</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </div>
+    <div>SceneSeed v1.4.0 · MIT</div>
+  </div>
+</footer>
+
+</body>
+</html>
