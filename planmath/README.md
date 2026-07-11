@@ -47,6 +47,8 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   comparison (plans, usage, winner, tables, chart) via the browser's print
   dialog; choose "Save as PDF" there to get a shareable file
 - Demo mode (`?demo=1`) with a PPO-vs-HDHP sample — changes aren't saved
+- Privacy page, Terms &amp; Disclaimer page (estimates only — not insurance or
+  financial advice), and a branded 404 page
 
 ## Model notes
 
@@ -62,6 +64,16 @@ No accounts, no server, no analytics. Health and cost data never leaves your
 browser unless you export it yourself.
 
 ## Changelog
+
+### v0.7.0 - 2026-07-07
+
+The paperwork release: a privacy page (short version: there is nothing to
+collect — your data stays in your browser), a combined Terms of Use &
+Disclaimer page (PlanMath is a calculator, not an advisor; verify against
+official plan documents), and a branded 404 page wired into the site-wide
+not-found dispatcher. Footer links to both legal pages, and the printed
+report now carries an "estimates only" note so shared PDFs keep the
+disclaimer attached.
 
 ### v0.6.5 - 2026-07-07
 
