@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.7.0 — watch any web page for changes</title>
+<title>Spyglass v0.7.1 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -407,6 +407,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.7.1</strong> — Screenshots are much faster (a few seconds instead of ~25) and no longer come back blank on script-heavy sites — the capture now waits for the page's text to actually render instead of for network traffic to go quiet, which banking sites never do.</li>
         <li><strong>v0.7.0</strong> — Four VisualPing-inspired upgrades: <em>&#128207; screenshot region picker</em> (drag a box over a live screenshot; that monitor's screenshots crop to just that area), <em>keyword direction</em> (alert only when a phrase is <em>added</em> or only when it's <em>removed</em> — perfect for restock watching), <em>Discord &amp; custom webhook alert channels</em> (set in &#9881; Settings), and <em>schedule windows</em> (limit checks to certain days/hours). Keyword monitors are now clearly labeled &ldquo;Keyword / exact phrase&rdquo;.</li>
         <li><strong>v0.6.1</strong> — Added a <a href="legal.html">Privacy, Terms &amp; Disclaimer</a> page explaining exactly what Spyglass stores, where it lives, and what it will never do (no analytics, no ads, no data sale) — linked from the new footer.</li>
         <li><strong>v0.6.0</strong> — <em>&#128247; Page screenshots</em>: when a monitor changes (or takes its first baseline), Spyglass photographs the real rendered page — see it in the change history and attached to alert emails; toggle it in the new &#9881; <em>Settings</em>. Sign-ups are now invite-only with an admin switch to reopen them, and Spyglass got its own 404 page.</li>
@@ -434,7 +435,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.7.0";
+  const APP_VERSION = "0.7.1";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -729,7 +730,7 @@ async function openRegionPicker(){
   const url = $("#mUrl").value.trim();
   if(!/^https?:\/\//i.test(url)){ toast("Enter the page URL first","err"); return; }
   const btn = $("#btnRegion");
-  btn.disabled = true; btn.textContent = "Loading screenshot… (~10s)";
+  btn.disabled = true; btn.textContent = "Loading screenshot…";
   try{
     const idToken = await auth.currentUser.getIdToken();
     const r = await fetch(WORKER_URL + "/screenshot", {
@@ -930,7 +931,7 @@ async function testMonitor(){
   if(!d) return;
   const btn = $("#btnTest");
   btn.disabled = true; btn.textContent = "Testing…";
-  show(`<div class="muted" style="font-size:.85rem">Fetching ${escapeHtml(domainOf(d.url))}… (JS-heavy pages can take ~20s)</div>`);
+  show(`<div class="muted" style="font-size:.85rem">Fetching ${escapeHtml(domainOf(d.url))}…</div>`);
   try{
     const idToken = await auth.currentUser.getIdToken();
     const resp = await fetch(WORKER_URL + "/preview", {

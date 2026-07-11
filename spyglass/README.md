@@ -127,6 +127,13 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.7.1 (worker v0.6.1)
+Faster, reliable screenshots. The capture waited on `networkidle2`, which never settles on
+tracker-heavy sites (banks) — so it stalled the full 25s timeout and then shot a blank pre-paint
+page. Now it loads on `domcontentloaded`, waits (capped) for real text to render, sets a desktop
+UA, and nudges lazy content: ~3-6s instead of ~25s, and no more white screenshots. Verified
+against the live Synchrony/M1/Ally pages.
+
 ### v0.7.0 (worker v0.6.0)
 Four VisualPing-inspired upgrades. Screenshot region picker: drag/resize a box over a live
 screenshot in the monitor form and that monitor's screenshots crop to just that area (worker
