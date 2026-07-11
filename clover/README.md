@@ -45,6 +45,37 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.92 — Account dropdowns grouped by type
+
+Every account dropdown now separates accounts by type — Checking, then
+Savings, then Credit Card, and so on (in the account-type order), with
+each group alphabetical inside. No more hunting for a card among savings
+accounts.
+
+### v1.0.91 — Expenses grew up
+
+- **Templates for every CSV import.** Income, Expenses, Paychecks, and
+  Bills & Subscriptions each get a ⬇ Template download in the import
+  chooser (the broker/Poshmark imports already had theirs).
+- **Expenses can finally say what they were.** New Description and Vendor
+  fields ("Parking — Main St Garage" via "SpotHero"), shown as their own
+  column in the List view. The account field is now labeled **"Paid
+  from"** and its help text says exactly what it means — the account or
+  card the money came out of.
+- **Parking day / Toll issued day.** Pick a parking- or toll-flavored
+  category or subcategory and a date field appears for the day the charge
+  was actually *for* — pay today for the 25th's parking, and the list
+  shows "for Jul 25" under the paid date. The field name follows the
+  category.
+- **Duplicate button** in the expense list — starts a new expense
+  prefilled from an existing one, dated today.
+- **Stat cards on the Expenses page**: Net monthly income, logged expenses
+  for the month, recurring bills for the month (with logged payments
+  replacing their estimates), and **Left after everything** — your net
+  income minus both — each with a share-of-income bar.
+- The CSV importer maps all the new fields (Description, Vendor, Applies
+  to day, Check #).
+
 ### v1.0.90 — Collapsible Settings + privacy/terms/disclaimer page
 
 - **Settings is navigable now.** All nine customizable lists (People,

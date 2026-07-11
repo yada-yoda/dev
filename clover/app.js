@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.90';
+const VERSION = '1.0.92';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1000,10 +1000,26 @@ function attnWhenEmpty(sel) {
   return sel;
 }
 // Account <option>s for modals — always alphabetical, however accounts were added.
-function accountOptions(s, noneLabel) {
-  return [{ value: '', label: noneLabel || '—' }].concat(
-    s.accounts.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-      .map(a => ({ value: a.id, label: a.name + (a.last4 ? ' ••' + a.last4 : '') })));
+// Account dropdown grouped by type: an <optgroup> per account type (in the
+// ACCOUNT_TYPES order), alphabetical within each group.
+function accountSelect(s, value, noneLabel) {
+  const sel = document.createElement('select');
+  const o0 = el('option'); o0.value = ''; o0.textContent = noneLabel || '—'; sel.appendChild(o0);
+  const groups = new Map();
+  s.accounts.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+    .forEach(a => { const t = a.type || 'Other'; if (!groups.has(t)) groups.set(t, []); groups.get(t).push(a); });
+  const typeOrder = (window.cloverStore.ACCOUNT_TYPES || []).filter(t => groups.has(t))
+    .concat([...groups.keys()].filter(t => !(window.cloverStore.ACCOUNT_TYPES || []).includes(t)));
+  typeOrder.forEach(t => {
+    const og = document.createElement('optgroup'); og.label = t;
+    groups.get(t).forEach(a => {
+      const op = el('option'); op.value = a.id; op.textContent = a.name + (a.last4 ? ' ••' + a.last4 : '');
+      if (a.id === value) op.selected = true;
+      og.appendChild(op);
+    });
+    sel.appendChild(og);
+  });
+  return sel;
 }
 
 function renderIncome(view) {
@@ -1232,7 +1248,7 @@ function incomeModal(existing) {
     fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); });
     if (e.subId) fSub.value = e.subId;
   };
-  const fAcct = select(accountOptions(s), e.accountId || '');
+  const fAcct = accountSelect(s, e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fGross = input(e.gross != null ? e.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
   const fNet = input(e.net != null ? e.net : '', { type: 'number', placeholder: 'optional' }); fNet.step = '0.01';
@@ -1747,8 +1763,8 @@ function subscriptionModal(existing) {
   const syncInterval = () => { intervalWrap.style.display = (fFreq.value === 'everyNMonths' || fFreq.value === 'everyNYears') ? '' : 'none'; };
   fFreq.addEventListener('change', syncInterval);
   const fRenew = input(r.renewalDate || '', { type: 'date' });
-  const fAcct = select(accountOptions(s), r.accountId || '');
-  const fBackup = select(accountOptions(s, '— None —'), r.backupAccountId || '');
+  const fAcct = accountSelect(s, r.accountId || '');
+  const fBackup = accountSelect(s, r.backupAccountId || '', '— None —');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
   const fPriority = select(PRIORITIES, r.priority || 'Medium');
   const fStatus = select(SUB_STATUSES, r.status || 'Active');
@@ -1936,6 +1952,24 @@ function renderExpenses(view) {
   head.appendChild(right);
   view.appendChild(head);
 
+  // What the month really costs — logged expenses AND bills — against
+  // take-home income, with what's left after everything.
+  const nowE = new Date();
+  const focusM = activeMonth > 0 ? activeMonth - 1 : (activeYear === nowE.getFullYear() ? nowE.getMonth() : 11);
+  const spendMonth = data.expensePayments.filter(e2 => monthIdx(e2.date) === focusM).reduce((a2, e2) => a2 + expenseAmount(e2), 0);
+  let recMonth = 0;
+  if (recApplies) store2.state.expenseCategories.forEach(cat => { recMonth += recurringMonthsForCategory(store2, cat.id, data.expensePayments)[focusM]; });
+  const autoNetE = avgNetMonthlyIncome(store2);
+  const netE = autoNetE || 0;
+  const leftE = netE - spendMonth - recMonth;
+  const sumE = el('div', 'sub-summary');
+  const barE = (pct, tone, title) => netE > 0 ? { pct, tone, title } : null;
+  sumE.appendChild(sumCard('Net monthly income', autoNetE == null ? '…' : (netE > 0 ? money(netE) : '–'), 'income', 'net pay ÷ 12 (annualized)'));
+  sumE.appendChild(sumCard('Logged · ' + MONTHS[focusM], money(spendMonth), 'expense', 'one-off expenses this month', barE(netE ? spendMonth / netE * 100 : 0, 'expense', netE ? (spendMonth / netE * 100).toFixed(1) + '% of net income' : '')));
+  sumE.appendChild(sumCard('Bills / mo', money(recMonth), 'expense', 'recurring estimates for ' + MONTHS[focusM] + ' (logged payments replace their estimates)', barE(netE ? recMonth / netE * 100 : 0, 'expense', netE ? (recMonth / netE * 100).toFixed(1) + '% of net income' : '')));
+  if (netE > 0) sumE.appendChild(sumCard('Left after everything', money(leftE), leftE < 0 ? 'expense' : 'income', 'net income − logged − bills', barE(leftE / netE * 100, leftE < 0 ? 'expense' : 'income', (leftE / netE * 100).toFixed(1) + '% of net income left')));
+  view.appendChild(sumE);
+
   const yt = yearTabs(store2, 'expenses'); if (yt) view.appendChild(yt);
   if (expenseTab === 'grid' && hasBills && !recApplies)
     view.appendChild(el('p', 'muted', 'Past year — showing logged expenses only. Recurring-bill estimates apply from the current year forward, so switching years changes the numbers.'));
@@ -2064,11 +2098,16 @@ function expenseList(data) {
 
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th class="num">Amount</th><th>Person</th><th></th></tr></thead>';
+  table.innerHTML = '<thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Source</th><th>Paid from</th><th class="num">Amount</th><th>Person</th><th></th></tr></thead>';
   const tb = el('tbody');
   rows.forEach(e => {
     const tr = el('tr');
-    tr.appendChild(el('td', null, fmtDate(e.date)));
+    const dateTd = el('td', null, fmtDate(e.date));
+    if (e.forDate) dateTd.appendChild(el('div', 'acct-sub', 'for ' + fmtDate(e.forDate)));
+    tr.appendChild(dateTd);
+    const descTd = el('td', null, e.title || '—');
+    if (e.vendor) descTd.appendChild(el('div', 'acct-sub', e.vendor));
+    tr.appendChild(descTd);
     tr.appendChild(el('td', null, store.expenseGroupName(e.categoryId)));
     tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
     const accTd = el('td', null, store.accountName(e.accountId) || '—');
@@ -2078,8 +2117,11 @@ function expenseList(data) {
     tr.appendChild(el('td', null, store.personName(e.personId)));
     const act = el('td', 'row-actions');
     const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => expenseModal(e));
+    const dup = el('button', 'icon-btn', 'Duplicate');
+    dup.title = 'Start a new expense prefilled from this one (date set to today)';
+    dup.addEventListener('click', () => { const pre = Object.assign({}, e); delete pre.id; pre.date = todayISO(); expenseModal(pre); });
     const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.expenseGroupName(e.categoryId), () => store.removeExpense(activeYear, e.id)));
-    act.appendChild(edit); act.appendChild(del); tr.appendChild(act);
+    act.appendChild(edit); act.appendChild(dup); act.appendChild(del); tr.appendChild(act);
     tb.appendChild(tr);
   });
   table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
@@ -2101,37 +2143,58 @@ function expenseModal(existing) {
     const bill = s.recurring.find(r => r.id === fBill.value);
     if (bill) { fCat.value = bill.categoryId || ''; rebuildSubs(); if (bill.subId) fSub.value = bill.subId; }
   });
-  const fAcct = select(accountOptions(s), e.accountId || '');
+  const fAcct = accountSelect(s, e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
+  const fTitle = input(e.title || '', { placeholder: 'e.g. Parking — Main St Garage' });
+  const fVendor = input(e.vendor || '', { placeholder: 'e.g. SpotHero' });
+  const fForDate = input(e.forDate || '', { type: 'date' });
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
-  body.appendChild(field('Date', fDate, 'When you paid this.'));
+  body.appendChild(field('Date paid', fDate, 'The day the money left — the expense counts in this month.'));
   if (recActive.length) body.appendChild(field('For which bill?', fBill, 'Link this to a recurring bill (e.g. the actual ComEd amount this month). It replaces that bill’s estimate for the month so it isn’t double-counted. Leave as “one-off” for regular expenses.'));
+  const dvRow = el('div', 'two-col');
+  dvRow.appendChild(field('Description', fTitle, 'What this expense was — e.g. which garage, which trip, which purchase.'));
+  dvRow.appendChild(field('Vendor', fVendor, 'Who you paid — the merchant or service (SpotHero, the tollway, the store).'));
+  body.appendChild(dvRow);
   body.appendChild(field('Category', fCat, 'The type of expense. Manage the list in Settings.'));
   body.appendChild(field('Source (subcategory)', fSub, 'A more specific grouping within the category (optional).'));
-  body.appendChild(field('Account', fAcct, 'Which account or card this was paid from.'));
+  // Parking/toll expenses are often paid on a different day than they apply
+  // to — the field label follows the picked category/subcategory.
+  const forField = field('Applies to (day)', fForDate, 'The day this charge was actually FOR — e.g. paid today for next week’s parking, or a toll issued last month. Date paid stays the day the money left.');
+  body.appendChild(forField);
+  const forLbl = forField.querySelector('span').childNodes[0];
+  const syncForDate = () => {
+    const names = ((s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '') + ' ' + (store.subName('expense', fCat.value, fSub.value) || '');
+    const park = /park/i.test(names), toll = /toll/i.test(names);
+    forField.style.display = (park || toll || e.forDate) ? '' : 'none';
+    forLbl.nodeValue = toll && !park ? 'Toll issued day' : park ? 'Parking day' : 'Applies to (day)';
+  };
+  fSub.addEventListener('change', syncForDate);
+  body.appendChild(field('Paid from', fAcct, 'The account or card the money came OUT of — your checking, a credit card, etc.'));
   body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
   body.appendChild(field('Amount', fAmount, 'How much you paid.'));
   const fExpCheckNo = input(e.checkNo || '', { placeholder: 'optional' });
   body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — handy for tracing it later.'));
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this expense.'));
-  rebuildSubs();
-  fCat.addEventListener('change', rebuildSubs);
+  rebuildSubs(); syncForDate();
+  fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); });
 
+  const isEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit expense' : 'Add expense', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit expense' : 'Add expense', body, confirmLabel: 'Save',
     onConfirm: () => {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const amount = parseFloat(fAmount.value);
       if (isNaN(amount)) { toast('Amount is required', 'warn'); fAmount.focus(); return false; }
       const entry = Object.assign(e, {
-        date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
+        date: fDate.value || todayISO(), title: fTitle.value.trim(), vendor: fVendor.value.trim(),
+        forDate: fForDate.value || '', categoryId: fCat.value, subId: fSub.value || '',
         accountId: fAcct.value || '', personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
         recurringId: fBill.value || ''
       });
       store.saveExpense(activeYear, entry);
-      toast(existing ? 'Expense updated' : 'Expense added');
+      toast(isEdit ? 'Expense updated' : 'Expense added');
     }
   });
 }
@@ -5251,6 +5314,19 @@ function ensurePapa() {
   return _papaLoading;
 }
 
+// Sample files (fake data) for the generic import targets.
+const INCOME_TEMPLATE_CSV = 'Date,Gross,Net,Category,Reward source,Reward type,Other type,Description,Received via,Account,Person,Notes\n'
+  + '2026-01-15,25.00,25.00,Rewards,Chase,Cash back,,,Statement credit,Chase ••1111,Me,\n'
+  + '2026-02-03,150.00,150.00,Interest,,,,,Deposit,Ally Savings ••2222,Me,Monthly interest\n';
+const EXPENSES_TEMPLATE_CSV = 'Date,Amount,Description,Vendor,Category,Applies to day,Account,Person,Check #,Notes\n'
+  + '2026-07-10,14.50,Parking — Main St Garage,SpotHero,Auto,2026-07-25,Chase ••1111,Me,,Paid ahead for the 25th\n'
+  + '2026-07-02,42.80,Groceries,Local Market,Food,,Checking ••2222,Me,,\n';
+const PAYCHECKS_TEMPLATE_CSV = 'Pay date,Gross,Net,Received date,Employer,Person,Period #,Period start,Period end,Status,Method,Check #,Notes\n'
+  + '2026-01-02,2000.00,1500.00,2026-01-02,Main Job,Me,1,2025-12-14,2025-12-27,Received,Direct deposit,,\n'
+  + '2026-01-16,2000.00,1500.00,2026-01-16,Main Job,Me,2,2025-12-28,2026-01-10,Received,Check,1042,\n';
+const SUBS_TEMPLATE_CSV = 'Name,Amount,Frequency,Category,Renewal date,Account,Priority,Status,Auto-pay,Vendor,Notes\n'
+  + 'Netflix,15.49,monthly,Streaming,2026-08-08,Chase ••1111,Low,Active,Yes,Netflix,\n'
+  + 'Example Insurance,600.00,semiannual,Insurance,2026-11-01,Checking ••2222,Essential,Active,No,Example Mutual,\n';
 const IMPORT_FIELDS = {
   income: [
     { key: 'date', label: 'Date', req: true, kw: ['date'] },
@@ -5267,12 +5343,16 @@ const IMPORT_FIELDS = {
     { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'symbol'] }
   ],
   expenses: [
-    { key: 'date', label: 'Date', req: true, kw: ['date'] },
+    { key: 'date', label: 'Date paid', req: true, kw: ['date'] },
     { key: 'amount', label: 'Amount', req: true, num: true, kw: ['amount', 'paid', 'cost', 'total'] },
-    { key: 'category', label: 'Category', kw: ['category', 'reason', 'type', 'description'] },
-    { key: 'account', label: 'Account', kw: ['account', 'card', 'method'] },
+    { key: 'title', label: 'Description', kw: ['description', 'title', 'what'] },
+    { key: 'vendor', label: 'Vendor', kw: ['vendor', 'merchant', 'payee'] },
+    { key: 'category', label: 'Category', kw: ['category', 'reason', 'type'] },
+    { key: 'forDate', label: 'Applies to day', kw: ['applies to', 'parking day', 'toll issued', 'service date', 'for date'] },
+    { key: 'account', label: 'Paid from', kw: ['account', 'card', 'paid from'] },
     { key: 'person', label: 'Person', kw: ['person', 'owner'] },
-    { key: 'notes', label: 'Notes', kw: ['note', 'memo', 'description'] }
+    { key: 'checkNo', label: 'Check #', kw: ['check #', 'check no', 'check number'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'memo'] }
   ],
   paychecks: [
     { key: 'payDate', label: 'Pay date', req: true, kw: ['pay date', 'date'] },
@@ -5436,7 +5516,7 @@ function buildImportEntries(store) {
         if ((net == null || isNaN(net)) && /reward/i.test(store.incomeGroupName(catId) || '')) net = amt;
         e = { date, gross: amt, net, categoryId: catId, subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), otherType: String(g('otherType')).trim(), description: String(g('description')).trim(), receivedVia: String(g('receivedVia')).trim(), notes: g('notes') };
       }
-      else if (target === 'expenses') e = { date, amount: amt, categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), notes: g('notes') };
+      else if (target === 'expenses') e = { date, amount: amt, title: String(g('title')).trim(), vendor: String(g('vendor')).trim(), forDate: parseImportDate(g('forDate')) || '', categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), checkNo: String(g('checkNo')).trim(), notes: g('notes') };
       else e = {
         payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,
         receivedDate: parseImportDate(g('receivedDate')), employer: String(g('employer')).trim(),
@@ -5661,7 +5741,7 @@ function dividendReviewCard(store) {
   if (st.divs.length && !divCat) { card.appendChild(el('div', 'muted', 'No “Dividends” income category exists — add one in Settings first.')); return card; }
 
   const optRow = el('div', 'io-actions');
-  const acctSel = attnWhenEmpty(select(accountOptions(s, '— no account —'), st.accountId));
+  const acctSel = attnWhenEmpty(accountSelect(s, st.accountId, '— no account —'));
   acctSel.addEventListener('change', () => { st.accountId = acctSel.value; renderView(currentRoute); });
   optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
@@ -5735,7 +5815,7 @@ function dividendReviewCard(store) {
     const skippedInt = st.interest.length - importableInt.length;
     card.appendChild(el('p', 'muted', 'Interest paid by the broker’s cash / sweep account (e.g. the insured money market). These import as Interest income.' + (skippedInt ? ' ' + skippedInt + ' already recorded for the account picked below will be skipped automatically.' : '')));
     const iAcctRow = el('div', 'io-actions');
-    const iAcctSel = attnWhenEmpty(select(accountOptions(s, '— no account —'), st.intAccountId || ''));
+    const iAcctSel = attnWhenEmpty(accountSelect(s, st.intAccountId || '', '— no account —'));
     iAcctSel.addEventListener('change', () => { st.intAccountId = iAcctSel.value; renderView(currentRoute); });
     iAcctRow.appendChild(labelWrap('Record interest under', iAcctSel));
     card.appendChild(iAcctRow);
@@ -6156,6 +6236,21 @@ function importSection() {
       const pmT = el('button', 'btn-ghost', '⬇ Poshmark template');
       pmT.addEventListener('click', () => downloadFile('poshmark-sales-template.csv', POSHMARK_TEMPLATE_CSV, 'text/csv'));
       tRow.appendChild(pmT);
+      card.appendChild(tRow);
+    }
+    // Every import target has a downloadable sample — never guess a format.
+    const GEN_TEMPLATES = {
+      income: ['clover-income-template.csv', INCOME_TEMPLATE_CSV],
+      expenses: ['clover-expenses-template.csv', EXPENSES_TEMPLATE_CSV],
+      paychecks: ['clover-paychecks-template.csv', PAYCHECKS_TEMPLATE_CSV],
+      subscriptions: ['clover-bills-template.csv', SUBS_TEMPLATE_CSV]
+    };
+    if (GEN_TEMPLATES[importState.target]) {
+      const tRow = el('div', 'io-actions');
+      tRow.appendChild(el('span', 'muted', 'Not sure of the format? Download a sample:'));
+      const gt = el('button', 'btn-ghost', '⬇ Template');
+      gt.addEventListener('click', () => downloadFile(GEN_TEMPLATES[importState.target][0], GEN_TEMPLATES[importState.target][1], 'text/csv'));
+      tRow.appendChild(gt);
       card.appendChild(tRow);
     }
     return card;
