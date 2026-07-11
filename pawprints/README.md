@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.52.0**
+**Current Version: v0.52.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,9 @@ covers both.
 
 ## Version History
 
+- **v0.52.1** — **Non-identifying contact wording** — the Privacy and Terms pages no longer link a
+  personal GitHub profile for contact; they now simply state it's a personal, non-commercial project
+  with no dedicated support channel (policy changes are signalled by the "last updated" date).
 - **v0.52.0** — **Terms of Use + disclaimer page** — added `terms.html`, linked in the footer next to
   Privacy. It leads with a prominent **"not veterinary advice"** disclaimer (PawPrints is a care log,
   not a substitute for a vet — see your vet for medical decisions and emergencies), followed by plain-
