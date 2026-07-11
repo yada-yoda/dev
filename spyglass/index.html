@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.6.0 — watch any web page for changes</title>
+<title>Spyglass v0.6.1 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -231,6 +231,13 @@
   </div>
 </main>
 
+<footer style="text-align:center;padding:1.2rem 1rem 2rem;font-size:.78rem;color:var(--muted)">
+  Spyglass ·
+  <a href="legal.html#privacy" style="color:var(--muted)">Privacy</a> ·
+  <a href="legal.html#terms" style="color:var(--muted)">Terms</a> ·
+  <a href="legal.html#disclaimer" style="color:var(--muted)">Disclaimer</a>
+</footer>
+
 <!-- Add/Edit modal -->
 <div class="overlay" id="editOverlay">
   <div class="modal">
@@ -350,6 +357,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.6.1</strong> — Added a <a href="legal.html">Privacy, Terms &amp; Disclaimer</a> page explaining exactly what Spyglass stores, where it lives, and what it will never do (no analytics, no ads, no data sale) — linked from the new footer.</li>
         <li><strong>v0.6.0</strong> — <em>&#128247; Page screenshots</em>: when a monitor changes (or takes its first baseline), Spyglass photographs the real rendered page — see it in the change history and attached to alert emails; toggle it in the new &#9881; <em>Settings</em>. Sign-ups are now invite-only with an admin switch to reopen them, and Spyglass got its own 404 page.</li>
         <li><strong>v0.5.0</strong> — <em>&#10024; Build it for me</em>: no more writing regex by hand. Pick the Pattern type, type the value you currently see on the page (and optionally a word near it, like &ldquo;APY&rdquo;), and Spyglass generates the pattern, tests it against the live page, and fills it in — automatically switching to the rendered-page version when the site needs JavaScript.</li>
         <li><strong>v0.4.0</strong> — The change history is now a real look-back log: the first check records a <em>baseline</em> snapshot (&ldquo;started watching — value was X&rdquo;), and timeline rows show the captured value with its date &amp; time instead of just +N/-N counts. Click any row for the full before/after diff.</li>
@@ -375,7 +383,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.6.0";
+  const APP_VERSION = "0.6.1";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";

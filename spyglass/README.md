@@ -111,6 +111,12 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.6.1
+Added `legal.html` — Privacy Policy, Terms of Use, and Disclaimer on one page, linked from a new
+site footer. The privacy section documents the real data flow (Firebase, Cloudflare Workers,
+Resend, r.jina.ai for rendered pages) and commits to no analytics, ads, tracking, or data sale;
+the disclaimer covers best-effort monitoring and the not-financial-advice caveat for rate monitors.
+
 ### v0.6.0
 Page screenshots (Phase 2, and it turned out free): on every change and first baseline the worker
 photographs the real rendered page via Cloudflare Browser Rendering and stores it in the snapshot —
