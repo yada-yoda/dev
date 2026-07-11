@@ -7,6 +7,7 @@ the active projects — it reads each project's live version at load,
 so its cards stay current without manual edits. It lived at `/dash`
 in v0.1.0; that path now redirects to the root.
 
-`/projects/` (v0.2.0) is the fuller, modern-dark project index —
-now including Clover, PawPrints, PlanMath, and Spyglass. DASH and
-the projects index link to each other.
+`/projects/` (v0.2.1) is the fuller, modern-dark project index —
+now including Clover, PawPrints, PlanMath, and Spyglass. It lists
+only visitable dev-hub apps; DASH itself and the public /acting
+site are intentionally excluded.
