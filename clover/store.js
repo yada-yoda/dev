@@ -320,6 +320,18 @@ window.cloverStore = {
     scheduleSave(); notify(); return item;
   },
   removeRecurring(id) { state.recurring = state.recurring.filter(x => x.id !== id); scheduleSave(); notify(); },
+  // Budget-placeholder reconciliation: mark a given 'YYYY-MM' as "didn't happen"
+  // (skip) or clear that mark. A logged actual (recurringId link) covers the
+  // "did happen" case, so this only tracks the not-used decision.
+  setBudgetSkip(id, ym, skip) {
+    const b = state.recurring.find(x => x.id === id); if (!b) return;
+    const arr = Array.isArray(b.budgetSkips) ? b.budgetSkips.slice() : [];
+    const i = arr.indexOf(ym);
+    if (skip && i < 0) arr.push(ym);
+    else if (!skip && i >= 0) arr.splice(i, 1);
+    else return;
+    b.budgetSkips = arr; scheduleSave(); notify();
+  },
   expenseGroup(id) { return state.expenseCategories.find(c => c.id === id) || null; },
   expenseGroupName(id) { const g = this.expenseGroup(id); return g ? g.name : '—'; },
 

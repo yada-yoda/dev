@@ -45,6 +45,25 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.94 — Budget page for placeholders + monthly reconciliation
+
+- **New Budget page** (in the nav under Bills & Subscriptions) gathers every
+  bill you’ve flagged as a **budget placeholder** — the expected/future costs
+  you want reflected before they’re real bills. Stat cards up top show the
+  count of placeholders, your net monthly income, their estimated monthly and
+  annual cost (with share-of-income bars), and how many are reconciled for the
+  chosen month.
+- **Monthly check-in.** Each placeholder gets a per-month row: **Log actual**
+  (opens a pre-filled expense linked to the bill, so its estimate is replaced
+  by the real amount for that month) or **Not used** (marks it reconciled
+  without an expense — undoable). A month picker lets you reconcile any month
+  of the year.
+- **New-month reminder.** A few days into a new month, a banner on the Budget
+  page — and an item on the dashboard’s ⚠ Attention strip — prompts you to
+  enter last month’s actuals for any placeholder you haven’t confirmed yet.
+- Placeholders are fully **editable from this page** (Edit/Remove), and a
+  **+ Add budget placeholder** button creates one with the flag already set.
+
 ### v1.0.93 — Paychecks in the Income list + a leaner rewards form
 
 - **Wages finally show in Income → List.** The list only ever showed

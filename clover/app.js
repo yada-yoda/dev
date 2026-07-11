@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.93';
+const VERSION = '1.0.94';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -22,6 +22,7 @@ const ROUTES = [
   { id: 'selling',       label: 'Selling',        ico: '▧', phase: 9 },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
   { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
+  { id: 'budget',        label: 'Budget',         ico: '◐', phase: 10 },
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
   { sep: true },
   { id: 'credit',        label: 'Credit & Rates', ico: '％', phase: 5 },
@@ -50,6 +51,7 @@ let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
 let subsSearch = '';               // live search over the bills table
 let subsBadgeFilter = null;        // { key, value } from clicking a subs value badge
+let budgetReconMonth = null;       // Budget check-in target month (0-based, within activeYear); null = auto (prev month)
 let taxesSort = { key: 'taxYear', dir: 'desc' };
 let salesSort = { key: 'orderDate', dir: 'desc' };
 let salesImportState = null;   // parsed Poshmark sales awaiting review
@@ -142,7 +144,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -1773,6 +1775,190 @@ function renderSubscriptions(view) {
   }
 }
 
+// ============================================================
+// Budget — the home for "budget placeholder" bills (expected/future costs).
+// Lists every placeholder, rolls their estimated cost into stat cards, and
+// each month asks you to confirm whether the estimate actually happened.
+// ============================================================
+function ymOf(year, mIdx) { return year + '-' + String(mIdx + 1).padStart(2, '0'); }
+function budgetMonthSkipped(bill, ym) { return Array.isArray(bill.budgetSkips) && bill.budgetSkips.includes(ym); }
+
+function renderBudget(view) {
+  destroyCharts();
+  const store = window.cloverStore, s = store.state;
+  const year = activeYear;
+  const data = store.yearData(year);
+  const placeholders = s.recurring.filter(r => r.budgetEst);
+  const active = placeholders.filter(isSubActive);
+  const net = avgNetMonthlyIncome(store) || 0;
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Budget'));
+  left.appendChild(el('p', 'muted', 'Expected & placeholder costs you’re budgeting for — ' + placeholders.length + ' placeholder' + (placeholders.length === 1 ? '' : 's') + (active.length !== placeholders.length ? ' · ' + active.length + ' active' : '')));
+  head.appendChild(left);
+  const acts = el('div', 'head-actions');
+  const add = el('button', 'btn-primary', '+ Add budget placeholder');
+  add.addEventListener('click', () => subscriptionModal({ budgetEst: true, frequency: 'monthly', status: 'Active', priority: 'Medium', personId: s.persons[0] && s.persons[0].id }));
+  acts.appendChild(add);
+  head.appendChild(acts);
+  view.appendChild(head);
+
+  if (!placeholders.length) {
+    view.appendChild(emptyState('No budget placeholders yet',
+      'A budget placeholder is an expected or future cost you want reflected in your budget before it’s a real bill — e.g. a utility you know will jump once you move in, or a subscription you’re about to start. It counts toward your monthly/annual totals and is tagged “Budget est.” everywhere. Mark any bill as a placeholder from its Edit form, or add one here.',
+      '+ Add budget placeholder', () => subscriptionModal({ budgetEst: true, frequency: 'monthly', status: 'Active', priority: 'Medium', personId: s.persons[0] && s.persons[0].id })));
+    return;
+  }
+
+  // --- reconciliation target month (within the active year) ---
+  const now = new Date();
+  const thisY = now.getFullYear(), thisM = now.getMonth();   // 0-based
+  const maxM = year === thisY ? thisM : (year < thisY ? 11 : 0);
+  let targetM = budgetReconMonth;
+  if (targetM == null) targetM = year === thisY ? Math.max(0, thisM - 1) : (year < thisY ? 11 : 0);
+  targetM = Math.min(Math.max(0, targetM), maxM);
+  const targetYM = ymOf(year, targetM);
+  const checkins = active.filter(b => b.notPaidYear !== year);   // placeholders expected this year
+  const reconOf = (bill) => {
+    const used = data.expensePayments.filter(p => p.recurringId === bill.id && monthIdx(p.date) === targetM);
+    if (used.length) return { state: 'used', amount: used.reduce((a, p) => a + expenseAmount(p), 0), payments: used };
+    if (budgetMonthSkipped(bill, targetYM)) return { state: 'skipped' };
+    return { state: 'pending' };
+  };
+  const recons = checkins.map(b => ({ b, r: reconOf(b) }));
+  const doneCount = recons.filter(x => x.r.state !== 'pending').length;
+
+  // --- new-month reminder banner (a few days into a new month) ---
+  if (year === thisY && thisM >= 1 && now.getDate() >= 3) {
+    const pm = thisM - 1, pym = ymOf(thisY, pm);
+    const pend = active.filter(b => b.notPaidYear !== thisY).filter(b => {
+      const used = data.expensePayments.some(p => p.recurringId === b.id && monthIdx(p.date) === pm);
+      return !used && !budgetMonthSkipped(b, pym);
+    });
+    if (pend.length) {
+      const banner = el('div', 'card warn-strip budget-reminder');
+      const row = el('div', 'warn-item');
+      row.appendChild(badge('New month', 'amber'));
+      row.appendChild(el('span', null, 'It’s ' + MONTHS[thisM] + ' — ' + pend.length + ' budget placeholder' + (pend.length === 1 ? ' still needs ' : 's still need ') + MONTHS[pm] + '’s actuals. Mark each as used (log the real amount) or not used below.'));
+      if (targetM !== pm) {
+        const go = el('button', 'btn-ghost', 'Review ' + MONTHS[pm]);
+        go.addEventListener('click', () => { budgetReconMonth = pm; renderView(currentRoute); });
+        row.appendChild(go);
+      }
+      banner.appendChild(row);
+      view.appendChild(banner);
+    }
+  }
+
+  // --- stat cards (bills-style, scoped to placeholders, + counts) ---
+  const expected = checkins;   // active & expected this year
+  const totalMonthly = expected.reduce((a, b) => a + monthlyEquiv(b), 0);
+  const totalAnnual = expected.reduce((a, b) => a + annualCost(b), 0);
+  const barOf = (pct, tone, title) => net > 0 ? { pct, tone, title } : null;
+  const sum = el('div', 'sub-summary');
+  const pcCard = el('div', 'sum-card');
+  pcCard.appendChild(el('div', 'sum-label', 'Budget placeholders'));
+  pcCard.appendChild(el('div', 'sum-value', String(placeholders.length)));
+  pcCard.appendChild(el('div', 'sum-hint', active.length + ' active' + (expected.length !== active.length ? ' · ' + expected.length + ' expected this year' : '')));
+  sum.appendChild(pcCard);
+  const netCard = el('div', 'sum-card');
+  netCard.appendChild(el('div', 'sum-label', 'Net monthly income'));
+  netCard.appendChild(el('div', 'sum-value income', net > 0 ? money(net) : '–'));
+  netCard.appendChild(el('div', 'sum-hint', 'net pay ÷ 12 (annualized)'));
+  sum.appendChild(netCard);
+  sum.appendChild(sumCard('Est. monthly', money(totalMonthly), 'expense', 'placeholders, monthly-equivalent',
+    barOf(totalMonthly / net * 100, 'expense', net > 0 ? (totalMonthly / net * 100).toFixed(1) + '% of net monthly income' : '')));
+  sum.appendChild(sumCard('Est. annual', money(totalAnnual), 'expense', 'placeholders × 12',
+    barOf(totalAnnual / (net * 12) * 100, 'expense', net > 0 ? (totalAnnual / (net * 12) * 100).toFixed(1) + '% of annual net income' : '')));
+  if (net > 0) sum.appendChild(sumCard('% of net income', (totalMonthly / net * 100).toFixed(1) + '%', 'neutral', 'share of income budgeted to placeholders',
+    barOf(totalMonthly / net * 100, 'neutral', (totalMonthly / net * 100).toFixed(1) + '% of net income')));
+  const rcCard = el('div', 'sum-card');
+  rcCard.appendChild(el('div', 'sum-label', 'Reconciled · ' + MONTHS[targetM]));
+  const allDone = checkins.length && doneCount === checkins.length;
+  rcCard.appendChild(el('div', 'sum-value ' + (allDone ? 'income' : doneCount ? '' : 'expense'), doneCount + ' / ' + checkins.length));
+  rcCard.appendChild(el('div', 'sum-hint', 'confirmed for ' + MONTHS[targetM] + ' ' + year));
+  sum.appendChild(rcCard);
+  view.appendChild(sum);
+
+  // --- monthly check-in ---
+  const chk = el('div', 'card');
+  const chkHead = el('div', 'view-head');
+  const chkLeft = el('div');
+  chkLeft.appendChild(el('h3', 'strip-title', 'Monthly check-in'));
+  chkLeft.appendChild(el('p', 'muted', 'Confirm whether each placeholder actually happened — log the real amount, or mark it not used.'));
+  chkHead.appendChild(chkLeft);
+  const monSel = select(MONTHS.slice(0, maxM + 1).map((m, i) => ({ value: String(i), label: m + ' ' + year })), String(targetM));
+  monSel.addEventListener('change', () => { budgetReconMonth = parseInt(monSel.value, 10); renderView(currentRoute); });
+  chkHead.appendChild(labelWrap('Month', monSel));
+  chk.appendChild(chkHead);
+  if (!checkins.length) {
+    chk.appendChild(el('div', 'muted', 'No active placeholders expected this year to reconcile.'));
+  } else {
+    const list = el('div', 'mini-list');
+    recons.forEach(({ b, r }) => {
+      const row = el('div', 'mini-row');
+      const lft = el('div');
+      lft.appendChild(el('span', null, b.name));
+      lft.appendChild(el('div', 'acct-sub', '~' + money(monthlyEquiv(b)) + ' est. · ' + store.expenseGroupName(b.categoryId)));
+      row.appendChild(lft);
+      const right = el('div', 'brow-actions');
+      if (r.state === 'used') {
+        right.appendChild(badge('Used ' + money(r.amount), 'green'));
+        const viewBtn = el('button', 'icon-btn', 'View');
+        viewBtn.addEventListener('click', () => expenseModal(r.payments[0]));
+        right.appendChild(viewBtn);
+      } else if (r.state === 'skipped') {
+        right.appendChild(badge('Not used', ''));
+        const undo = el('button', 'icon-btn', 'Undo');
+        undo.addEventListener('click', () => { store.setBudgetSkip(b.id, targetYM, false); });
+        right.appendChild(undo);
+      } else {
+        right.appendChild(badge('Pending', 'amber'));
+        const logBtn = el('button', 'icon-btn', 'Log actual');
+        logBtn.addEventListener('click', () => expenseModal({
+          recurringId: b.id, categoryId: b.categoryId, subId: b.subId || '', personId: b.personId,
+          amount: (b.amount != null && b.amount !== '') ? Number(b.amount) : '', title: b.name, vendor: b.vendor || '',
+          date: (year === thisY && targetM === thisM) ? todayISO() : (targetYM + '-01')
+        }));
+        const skip = el('button', 'icon-btn', 'Not used');
+        skip.title = 'This placeholder didn’t cost anything in ' + MONTHS[targetM] + ' — mark it reconciled without logging an expense.';
+        skip.addEventListener('click', () => { store.setBudgetSkip(b.id, targetYM, true); });
+        right.appendChild(logBtn); right.appendChild(skip);
+      }
+      row.appendChild(right);
+      list.appendChild(row);
+    });
+    chk.appendChild(list);
+  }
+  view.appendChild(chk);
+
+  // --- all placeholders (editable) ---
+  const rows = placeholders.slice().sort((a, b) => monthlyEquiv(b) - monthlyEquiv(a));
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Name</th><th>Category</th><th class="num">Amount</th><th class="num">Monthly</th><th class="num">Annual</th><th>Renewal / due</th><th>Status</th><th></th></tr></thead>';
+  const tb = el('tbody');
+  rows.forEach(b => {
+    const tr = el('tr'); if (!isSubActive(b)) tr.className = 'inactive-row';
+    const nameTd = el('td', null, b.name);
+    if (b.vendor) nameTd.appendChild(el('div', 'acct-sub', b.vendor));
+    tr.appendChild(nameTd);
+    tr.appendChild(el('td', null, store.expenseGroupName(b.categoryId)));
+    const amtTd = numCell(Number(b.amount) || 0); amtTd.appendChild(el('div', 'acct-sub', freqLabel(b))); tr.appendChild(amtTd);
+    tr.appendChild(numCell(monthlyEquiv(b), true));
+    tr.appendChild(numCell(annualCost(b)));
+    tr.appendChild(el('td', 'muted', isSubActive(b) ? fmtDate(nextRenewalDate(b)) : (b.renewalDate ? fmtDate(b.renewalDate) : '—')));
+    const stTd = el('td'); stTd.appendChild(badge(b.status || 'Active', isSubActive(b) ? 'green' : '')); tr.appendChild(stTd);
+    const actTd = el('td', 'row-actions');
+    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => subscriptionModal(b));
+    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(b.name, () => store.removeRecurring(b.id)));
+    actTd.appendChild(edit); actTd.appendChild(del); tr.appendChild(actTd);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb); card.appendChild(table); view.appendChild(card);
+}
+
 function sumCard(label, value, tone, hint, bar) {
   const c = el('div', 'sum-card');
   c.appendChild(el('div', 'sum-label', label));
@@ -1901,8 +2087,11 @@ function subscriptionModal(existing) {
   rebuildSubs(); syncInterval(); syncCatFields(); syncOnce();
   fCat.addEventListener('change', () => { rebuildSubs(); syncCatFields(); });
 
+  // A prefill without an id (e.g. "+ Add budget placeholder" passing {budgetEst:true})
+  // is still a NEW bill — key the wording off a real id, not merely a truthy arg.
+  const isEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit subscription' : 'Add subscription', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit subscription' : 'Add subscription', body, confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
@@ -1932,7 +2121,7 @@ function subscriptionModal(existing) {
         apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
       });
       store.saveRecurring(item);
-      toast(existing ? 'Subscription updated' : 'Subscription added');
+      toast(isEdit ? 'Subscription updated' : 'Subscription added');
     }
   });
 }
@@ -3989,9 +4178,29 @@ function buildWarnings(store, data, s) {
   const maxW = Math.max.apply(null, warn);
   const renewSoon = s.recurring.filter(isSubActive).map(r => ({ r, d: daysUntil(nextRenewalDate(r)) })).filter(x => x.d != null && x.d >= 0 && x.d <= maxW).sort((a, b) => a.d - b.d);
   const overdue = data.paychecks.filter(p => !isPaycheckPaid(p) && p.status !== 'Bounced/Returned' && (p.status === 'Late' || p.status === 'Missing' || (p.payDate && daysUntil(p.payDate) < 0)));
-  if (!renewSoon.length && !overdue.length) return null;
+  // Budget placeholders awaiting last month's actuals (a few days into a new month).
+  let budgetDue = [];
+  const bNow = new Date();
+  if (bNow.getDate() >= 3 && bNow.getMonth() >= 1) {
+    const by = bNow.getFullYear(), pm = bNow.getMonth() - 1, pym = ymOf(by, pm);
+    const yd = store.isYearLoaded(by) ? store.yearData(by) : null;
+    budgetDue = s.recurring.filter(r => r.budgetEst).filter(isSubActive).filter(r => r.notPaidYear !== by).filter(b => {
+      const used = yd && yd.expensePayments.some(p => p.recurringId === b.id && monthIdx(p.date) === pm);
+      return !used && !budgetMonthSkipped(b, pym);
+    });
+  }
+  if (!renewSoon.length && !overdue.length && !budgetDue.length) return null;
   const strip = el('div', 'card warn-strip');
   const list = el('div', 'warn-list');
+  if (budgetDue.length) {
+    const w = el('div', 'warn-item');
+    w.appendChild(badge('Budget', 'amber'));
+    w.appendChild(el('span', null, budgetDue.length + ' placeholder' + (budgetDue.length === 1 ? ' needs' : 's need') + ' last month’s actuals'));
+    const go = el('button', 'btn-ghost', 'Review →');
+    go.addEventListener('click', () => { location.hash = 'budget'; });
+    w.appendChild(go);
+    list.appendChild(w);
+  }
   renewSoon.slice(0, 6).forEach(x => {
     const w = el('div', 'warn-item');
     w.appendChild(badge('in ' + x.d + 'd', x.d <= 7 ? 'red' : 'amber'));
