@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.89';
+const VERSION = '1.0.90';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -515,36 +515,74 @@ function helpCard() {
     'Log one-off spending and other income as it happens under <strong>Expenses</strong> and <strong>Income</strong>.',
     'The <strong>Dashboard</strong> and <strong>Reports</strong> summarize everything; the <strong>Calendar</strong> shows upcoming paychecks, renewals, and CD maturities.',
     'Back up anytime under <strong>Import / Export → Download backup</strong>. You can restore or import spreadsheets there too.',
-    'Your data is private to your Google account — nothing here is public.'
+    'Your data is private to your Google account — nothing here is public.',
+    'Read the <a href="privacy.html" target="_blank" rel="noopener">privacy policy, terms &amp; disclaimer</a>.'
   ].forEach(t => { const li = el('li'); li.innerHTML = t; ul.appendChild(li); });
   card.appendChild(ul);
   card.appendChild(el('div', 'muted', 'Clover v' + VERSION));
   return card;
 }
 
+// Click a card's header to collapse it — remembered per card (localStorage;
+// pure UI preference, so it doesn't need to live in Firestore).
+let _setCollapse = null;
+function setCollapseState() {
+  if (!_setCollapse) { try { _setCollapse = JSON.parse(localStorage.getItem('cloverSetCollapse') || '{}'); } catch (e) { _setCollapse = {}; } }
+  return _setCollapse;
+}
+function collapsibleCard(card, key) {
+  const st = setCollapseState();
+  const head = card.querySelector(':scope > .section-head');
+  if (!head) return card;
+  const h3 = head.querySelector('h3');
+  const caret = el('span', 'caret', st[key] ? '▸ ' : '▾ ');
+  if (h3) h3.insertBefore(caret, h3.firstChild);
+  if (st[key]) card.classList.add('set-collapsed');
+  head.classList.add('collapsible');
+  head.addEventListener('click', ev => {
+    if (ev.target.closest('button')) return;   // the + Add button still adds
+    st[key] = !st[key];
+    try { localStorage.setItem('cloverSetCollapse', JSON.stringify(st)); } catch (e) {}
+    card.classList.toggle('set-collapsed', !!st[key]);
+    caret.textContent = st[key] ? '▸ ' : '▾ ';
+  });
+  return card;
+}
 function renderSettings(view) {
   const store = window.cloverStore, s = store.state;
   view.appendChild(helpCard());
+
+  // Every customizable list lives in one collapsible section, and each card
+  // inside collapses too — Settings got long enough to need navigation.
+  const listCards = [
+    ['people', simpleListCard('People', 'Who money belongs to — you, joint, or others. Click a name to rename.', s.persons,
+      { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id), onRename: (id, v) => store.renamePerson(id, v) })],
+    ['incomeCats', categoryCard('income', s.incomeCategories)],
+    ['expenseCats', categoryCard('expense', s.expenseCategories)],
+    ['institutions', simpleListCard('Institutions', 'Banks, brokers & card issuers used by accounts', s.catalog.institutions,
+      { addLabel: 'Add institution', onAdd: v => store.addCatalog('institutions', v), onRemove: id => store.removeCatalog('institutions', id), onRename: (id, v) => store.renameCatalog('institutions', id, v) })],
+    ['rewardPrograms', simpleListCard('Reward programs', 'Cashback & rewards sources', s.catalog.rewardPrograms,
+      { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id), onRename: (id, v) => store.renameCatalog('rewardPrograms', id, v) })],
+    ['giftCardTypes', simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
+      { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) })],
+    ['taxForms', simpleListCard('Tax forms', 'Form names offered in the tax-history pickers — update here if the IRS changes things (see irs.gov/forms-instructions-and-publications)', s.catalog.taxForms || [],
+      { addLabel: 'Add tax form', onAdd: v => store.addCatalog('taxForms', v), onRemove: id => store.removeCatalog('taxForms', id), onRename: (id, v) => store.renameCatalog('taxForms', id, v) })],
+    ['payMethods', simpleListCard('Paycheck methods', 'How paychecks arrive — the Method dropdown on paychecks', s.catalog.payMethods || [],
+      { addLabel: 'Add method', onAdd: v => store.addCatalog('payMethods', v), onRemove: id => store.removeCatalog('payMethods', id), onRename: (id, v) => store.renameCatalog('payMethods', id, v) })],
+    ['checkTypes', simpleListCard('Paycheck check types', 'The Check type dropdown — keep “Regular”: anything else is treated as a one-time check and left out of salary math and raise detection', s.catalog.checkTypes || [],
+      { addLabel: 'Add check type', onAdd: v => store.addCatalog('checkTypes', v), onRemove: id => store.removeCatalog('checkTypes', id), onRename: (id, v) => store.renameCatalog('checkTypes', id, v) })]
+  ];
+  const section = el('div', 'card lists-section');
+  section.appendChild(sectionHead('Lists & categories', 'Every customizable dropdown in one place — click any header (including this one) to collapse it'));
+  const inner = el('div', 'settings-grid');
+  listCards.forEach(pair => inner.appendChild(collapsibleCard(pair[1], 'set-' + pair[0])));
+  section.appendChild(inner);
+  view.appendChild(collapsibleCard(section, 'set-listsSection'));
+
   const grid = el('div', 'settings-grid');
-  grid.appendChild(simpleListCard('People', 'Who money belongs to — you, joint, or others. Click a name to rename.', s.persons,
-    { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id), onRename: (id, v) => store.renamePerson(id, v) }));
-  grid.appendChild(categoryCard('income', s.incomeCategories));
-  grid.appendChild(categoryCard('expense', s.expenseCategories));
-  grid.appendChild(simpleListCard('Institutions', 'Banks, brokers & card issuers used by accounts', s.catalog.institutions,
-    { addLabel: 'Add institution', onAdd: v => store.addCatalog('institutions', v), onRemove: id => store.removeCatalog('institutions', id), onRename: (id, v) => store.renameCatalog('institutions', id, v) }));
-  grid.appendChild(simpleListCard('Reward programs', 'Cashback & rewards sources', s.catalog.rewardPrograms,
-    { addLabel: 'Add reward program', onAdd: v => store.addCatalog('rewardPrograms', v), onRemove: id => store.removeCatalog('rewardPrograms', id), onRename: (id, v) => store.renameCatalog('rewardPrograms', id, v) }));
-  grid.appendChild(simpleListCard('Gift card types', 'Redemption types for rewards', s.catalog.giftCardTypes,
-    { addLabel: 'Add gift card type', onAdd: v => store.addCatalog('giftCardTypes', v), onRemove: id => store.removeCatalog('giftCardTypes', id), onRename: (id, v) => store.renameCatalog('giftCardTypes', id, v) }));
-  grid.appendChild(simpleListCard('Tax forms', 'Form names offered in the tax-history pickers — update here if the IRS changes things (see irs.gov/forms-instructions-and-publications)', s.catalog.taxForms || [],
-    { addLabel: 'Add tax form', onAdd: v => store.addCatalog('taxForms', v), onRemove: id => store.removeCatalog('taxForms', id), onRename: (id, v) => store.renameCatalog('taxForms', id, v) }));
-  grid.appendChild(simpleListCard('Paycheck methods', 'How paychecks arrive — the Method dropdown on paychecks', s.catalog.payMethods || [],
-    { addLabel: 'Add method', onAdd: v => store.addCatalog('payMethods', v), onRemove: id => store.removeCatalog('payMethods', id), onRename: (id, v) => store.renameCatalog('payMethods', id, v) }));
-  grid.appendChild(simpleListCard('Paycheck check types', 'The Check type dropdown — keep “Regular”: anything else is treated as a one-time check and left out of salary math and raise detection', s.catalog.checkTypes || [],
-    { addLabel: 'Add check type', onAdd: v => store.addCatalog('checkTypes', v), onRemove: id => store.removeCatalog('checkTypes', id), onRename: (id, v) => store.renameCatalog('checkTypes', id, v) }));
-  grid.appendChild(paySchedulesCard());
-  grid.appendChild(accountDefaultsCard());
-  grid.appendChild(yearsCard());
+  grid.appendChild(collapsibleCard(paySchedulesCard(), 'set-schedules'));
+  grid.appendChild(collapsibleCard(accountDefaultsCard(), 'set-acctDefaults'));
+  grid.appendChild(collapsibleCard(yearsCard(), 'set-years'));
   view.appendChild(grid);
 }
 

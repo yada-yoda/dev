@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.90 — Collapsible Settings + privacy/terms/disclaimer page
+
+- **Settings is navigable now.** All nine customizable lists (People,
+  Income/Expense categories, Institutions, Reward programs, Gift card
+  types, Tax forms, Paycheck methods, Check types) live inside one
+  "Lists & categories" section — click its header to collapse the whole
+  thing, or any inner card's header to collapse just that list. Pay
+  schedules, New account defaults, and Years collapse too. What's
+  collapsed is remembered per browser.
+- **New [privacy page](privacy.html)** covering the privacy policy, terms
+  of use, and a disclaimer (Clover is record-keeping, not financial/tax
+  advice; verify important figures with a professional). Linked from the
+  sign-in screen and the Settings help card — and it satisfies Google's
+  privacy-policy requirement if the OAuth app is ever verified.
+
 ### v1.0.89 — Click a calendar day for details
 
 Clicking any day with events on the Calendar grid opens a detail popup —

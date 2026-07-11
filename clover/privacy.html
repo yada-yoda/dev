@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Clover — Privacy, Terms &amp; Disclaimer</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+  :root { --text:#17241d; --muted:#5f6f66; --border:#e3e9e5; --accent:#16a34a; --bg:#f7faf8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.65 "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 36px 0 8px; padding-top: 20px; border-top: 1px solid var(--border); }
+  h3 { font-size: 15px; margin: 20px 0 6px; }
+  p, li { color: var(--text); }
+  .muted { color: var(--muted); }
+  a { color: var(--accent); }
+  .top { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .top a { text-decoration: none; font-weight: 600; }
+  ul { padding-left: 22px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="top"><a href="./">🍀 Clover</a><span class="muted">/ Privacy, Terms &amp; Disclaimer</span></div>
+  <h1>Privacy Policy, Terms of Use &amp; Disclaimer</h1>
+  <p class="muted">Effective July 10, 2026. Clover is a private, single-user personal-finance tracker. This page explains what data it touches, how it's stored, and the terms under which it's provided.</p>
+
+  <h2>Privacy Policy</h2>
+  <h3>What data Clover stores, and where</h3>
+  <ul>
+    <li>The financial information you enter (income, expenses, bills, paychecks, accounts, and similar records) is stored in a <strong>Google Firebase (Cloud Firestore) database belonging to the app's owner</strong>. Access is restricted by security rules to the single authorized account — the data is never public and never listed anywhere.</li>
+    <li>Some display preferences (column layouts, collapsed panels, analytics opt-out) are stored locally in your browser's storage and never leave your device.</li>
+  </ul>
+  <h3>Sign-in</h3>
+  <p>Clover uses <strong>Google Sign-In</strong> for authentication. Clover never sees or stores your password; it receives only your Google account's basic profile (name, email, photo) to identify you. Only the pre-authorized account can read or write data.</p>
+  <h3>Google Calendar (optional)</h3>
+  <p>If you choose to connect Google Calendar, Clover requests calendar access to <strong>create and maintain one dedicated calendar</strong> and push events to it (paychecks, bills, CD maturities). The sync is strictly one-way: <strong>Clover never reads your existing calendars or events</strong>. The access token stays in your browser session and is not stored on any server. You can revoke access anytime at <a href="https://myaccount.google.com/permissions" rel="noopener">myaccount.google.com/permissions</a> and delete the created calendar freely.</p>
+  <h3>Third-party requests</h3>
+  <ul>
+    <li><strong>Public bank rate feeds</strong> (e.g. a bank's published products endpoint) may be fetched read-only to record advertised savings rates. No personal data is sent with these requests.</li>
+    <li><strong>Google Analytics</strong> measures anonymous page usage (no financial data is ever sent to it). You can opt out on any visit by adding <code>?ga=off</code> to the address.</li>
+    <li>Charting and CSV libraries load from public CDNs; they receive no personal data.</li>
+  </ul>
+  <h3>What Clover never does</h3>
+  <ul>
+    <li>Never sells, shares, or transmits your financial data to anyone.</li>
+    <li>Never connects to your bank accounts or moves money — every record is entered or imported by you.</li>
+    <li>Never stores credentials, card numbers, or government identifiers.</li>
+  </ul>
+  <h3>Deletion</h3>
+  <p>You can export a full backup at any time (Import / Export → Download backup) and delete any or all records in the app. Deleting data removes it from the Firestore database.</p>
+
+  <h2>Terms of Use</h2>
+  <ul>
+    <li>Clover is provided as a personal tool, free of charge, for the authorized user only. Access by anyone else is not permitted.</li>
+    <li>The software is provided <strong>"as is", without warranty of any kind</strong>, express or implied — including fitness for a particular purpose or freedom from errors. Use it at your own risk.</li>
+    <li>You are responsible for the accuracy of the data you enter and for keeping backups of anything important.</li>
+    <li>These terms and this policy may be updated from time to time; the effective date above changes when they do.</li>
+  </ul>
+
+  <h2>Disclaimer</h2>
+  <ul>
+    <li><strong>Clover is not financial, investment, tax, or legal advice.</strong> It is a record-keeping and visualization tool for information you supply.</li>
+    <li>Figures shown — projections, estimates, monthly equivalents, inflation comparisons, expected tax forms, and similar — are <strong>informational calculations that can be wrong or incomplete</strong>. Verify anything important against your own statements and consult a qualified professional (CPA, financial advisor) before making financial or tax decisions.</li>
+    <li>Bank rates fetched from public feeds reflect what the institution publishes and may lag or differ from what your account actually earns.</li>
+  </ul>
+
+  <p class="muted" style="margin-top:36px">Questions about this page can be directed to the app's owner.</p>
+</main>
+</body>
+</html>

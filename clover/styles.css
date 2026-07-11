@@ -457,6 +457,11 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
+/* Collapsible settings cards: header click hides everything below it. */
+.card.set-collapsed > :not(.section-head) { display: none !important; }
+.section-head.collapsible { cursor: pointer; user-select: none; }
+.section-head .caret { color: var(--text-muted); }
+.lists-section > .settings-grid { margin-top: 6px; }
 /* Calendar day cells with events open a detail popup on click. */
 .cal-cell.cal-clickable { cursor: pointer; }
 .cal-cell.cal-clickable:hover { background: var(--surface-2, rgba(0, 0, 0, 0.03)); }
