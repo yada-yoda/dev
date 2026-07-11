@@ -45,6 +45,27 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.93 — Paychecks in the Income list + a leaner rewards form
+
+- **Wages finally show in Income → List.** The list only ever showed
+  manually-entered income, so paychecks (the source of truth for wages)
+  were invisible there. Now they appear as their own rows — with a
+  Paycheck/Income "Kind" badge, pay period, employer, method, gross and
+  net — and Edit opens the real paycheck editor. The category filter and
+  month picker cover them too.
+- **The Income list gets the standard table treatment** it was owed:
+  sortable headers (asc → desc → reset) and a ⚙ Columns manager with a
+  per-user saved layout (Date, Kind, Category, Source, Account, Received
+  via, Gross, Net, Person, Status, Notes).
+- **Rewards entries only ask what matters.** Picking the Rewards category
+  hides "Received via" and the Reinvested/Paid-out flags (they don't
+  apply), the program dropdown lists **your** Reward programs from
+  Settings (plus Other to type a one-off — the built-in issuer list is
+  gone), and Reward type is a real dropdown (Cash back, Statement credit,
+  Deposit, Gift card, Points, Miles, Crypto, Referral bonus, Other).
+  Choosing **Deposit** reveals a "Deposited to" account picker so you can
+  say which account the money landed in.
+
 ### v1.0.92 — Account dropdowns grouped by type
 
 Every account dropdown now separates accounts by type — Checking, then

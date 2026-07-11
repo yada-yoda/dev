@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.92';
+const VERSION = '1.0.93';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1180,53 +1180,87 @@ function incomeGrid(data) {
   return card;
 }
 
+// Income List: one unified table of income ENTRIES + PAYCHECKS (wages were
+// invisible here before — they only rolled into the grid), with the standard
+// column registry, 3-click sorting, and a per-user ⚙ Columns layout.
+const INCOME_LIST_COL_LABELS = { date: 'Date', kind: 'Kind', category: 'Category', source: 'Source', account: 'Account', via: 'Received via', gross: 'Gross', net: 'Net', person: 'Person', status: 'Status', notes: 'Notes' };
+const INCOME_LIST_ALL_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status', 'notes'];
+const INCOME_LIST_DEFAULT_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status'];
+let incomeListSort = { key: 'date', dir: 'desc' };
+function buildIncomeListCol(store, key) {
+  switch (key) {
+    case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
+    case 'kind': return { label: 'Kind', key: 'kind', value: r => r.kind, cell: r => { const td = el('td'); td.appendChild(badge(r.kind === 'paycheck' ? 'Paycheck' : 'Income', r.kind === 'paycheck' ? 'green' : '')); return td; } };
+    case 'category': return { label: 'Category', key: 'category', value: r => r.catName, cell: r => el('td', null, r.catName) };
+    case 'source': return { label: 'Source', key: 'source', value: r => r.source || '', cell: r => {
+        const td = el('td');
+        td.appendChild(document.createTextNode(r.source || '—'));
+        if (r.reinvested) { td.appendChild(document.createTextNode(' ')); td.appendChild(badge('↻ Reinvested', 'type')); }
+        if (r.srcSub) td.appendChild(el('div', 'acct-sub', r.srcSub));
+        return td; } };
+    case 'account': return { label: 'Account', key: 'account', value: r => r.account || '', cell: r => el('td', null, r.account || '—') };
+    case 'via': return { label: 'Received via', key: 'via', value: r => r.via || '', cell: r => el('td', 'muted', r.via || '—') };
+    case 'gross': return { label: 'Gross', key: 'gross', num: true, value: r => r.gross, cell: r => numCell(r.gross, true) };
+    case 'net': return { label: 'Net', key: 'net', num: true, value: r => r.net, cell: r => numCell(r.net) };
+    case 'person': return { label: 'Person', key: 'person', value: r => r.person, cell: r => el('td', null, r.person) };
+    case 'status': return { label: 'Status', key: 'status', value: r => r.status, cell: r => { const td = el('td'); const st = r.status || 'Received'; td.appendChild(badge(st, /pend|expect|late|missing/i.test(st) ? 'amber' : /bounce/i.test(st) ? 'red' : 'green')); return td; } };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
+  }
+  return null;
+}
 function incomeList(data) {
   const store = window.cloverStore;
-  let rows = data.income.slice();
-  if (activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
-  if (incomeCatFilter !== 'all') rows = rows.filter(e => e.categoryId === incomeCatFilter);
-  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const rows = [];
+  data.income.forEach(e => rows.push({
+    kind: 'income', raw: e, date: e.date, catName: store.incomeGroupName(e.categoryId),
+    source: e.rewardSource || e.otherType || e.symbol || store.subName('income', e.categoryId, e.subId) || '',
+    srcSub: e.rewardType || e.description || (e.symbol && e.action ? e.action : ''), reinvested: !!e.reinvested,
+    account: store.accountName(e.accountId) || '', via: e.receivedVia || '', gross: amountOf(e), net: Number(e.net) || 0,
+    person: store.personName(e.personId), status: e.status === 'pending' ? 'Pending' : 'Received', notes: e.notes || '',
+    categoryId: e.categoryId
+  }));
+  data.paychecks.forEach(pc => rows.push({
+    kind: 'paycheck', raw: pc, date: pc.payDate, catName: store.incomeGroupName(pc.incomeCategoryId) || 'Wages',
+    source: pc.employer || '', srcSub: (n => n ? 'Period #' + n : '')(paycheckPeriodNum(store, pc)), reinvested: false,
+    account: '', via: pc.method || '', gross: Number(pc.gross) || 0, net: paycheckNet(pc),
+    person: store.personName(pc.personId), status: pc.status || 'Received', notes: pc.notes || '',
+    categoryId: pc.incomeCategoryId
+  }));
+  let shown = rows;
+  if (activeMonth > 0) shown = shown.filter(r => monthIdx(r.date) === activeMonth - 1);
+  if (incomeCatFilter !== 'all') shown = shown.filter(r => r.categoryId === incomeCatFilter);
 
   const wrap = el('div');
   const bar = el('div', 'filter-bar');
   const catSel = select([{ value: 'all', label: 'All categories' }].concat(store.state.incomeCategories.map(c => ({ value: c.id, label: c.name }))), incomeCatFilter);
   catSel.addEventListener('change', () => { incomeCatFilter = catSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Category', catSel));
-  bar.appendChild(el('div', 'muted', rows.length + ' shown' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  bar.appendChild(el('div', 'muted', shown.length + ' shown (incl. paychecks)' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  const colsBtn = columnsButton('incomeList', INCOME_LIST_ALL_COLS, INCOME_LIST_DEFAULT_COLS, INCOME_LIST_COL_LABELS, 'Income list columns');
+  colsBtn.style.marginLeft = 'auto';
+  bar.appendChild(colsBtn);
   wrap.appendChild(bar);
 
-  if (!rows.length) {
+  if (!shown.length) {
     wrap.appendChild(emptyState('No income entries', 'Add income for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '.', '+ Add income', () => incomeModal(null)));
     return wrap;
   }
 
+  const cols = [
+    ...tableColKeys(store, 'incomeList', INCOME_LIST_COL_LABELS, INCOME_LIST_DEFAULT_COLS).map(k => buildIncomeListCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: r => {
+        const act = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit');
+        edit.addEventListener('click', () => r.kind === 'paycheck' ? paycheckModal(r.raw) : incomeModal(r.raw));
+        act.appendChild(edit);
+        const del = el('button', 'icon-btn danger', 'Remove');
+        del.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + r.catName, () => r.kind === 'paycheck' ? store.removePaycheck(yearOfPaycheck(r.raw), r.raw.id) : store.removeIncome(activeYear, r.raw.id)));
+        act.appendChild(del);
+        return act; } }
+  ];
   const card = el('div', 'card table-card');
-  const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Date</th><th>Category</th><th>Source</th><th>Account</th><th>Received via</th><th class="num">Gross</th><th class="num">Net</th><th>Person</th><th>Status</th><th></th></tr></thead>';
-  const tb = el('tbody');
-  rows.forEach(e => {
-    const tr = el('tr');
-    tr.appendChild(el('td', null, fmtDate(e.date)));
-    tr.appendChild(el('td', null, store.incomeGroupName(e.categoryId)));
-    const srcTd = el('td');
-    srcTd.appendChild(document.createTextNode(e.rewardSource || e.otherType || e.symbol || store.subName('income', e.categoryId, e.subId) || '—'));
-    if (e.reinvested) { srcTd.appendChild(document.createTextNode(' ')); srcTd.appendChild(badge('↻ Reinvested', 'type')); }
-    const srcSub = e.rewardType || e.description || (e.symbol && e.action ? e.action : '');
-    if (srcSub) srcTd.appendChild(el('div', 'acct-sub', srcSub));
-    tr.appendChild(srcTd);
-    tr.appendChild(el('td', null, store.accountName(e.accountId) || '—'));
-    tr.appendChild(el('td', 'muted', e.receivedVia || '—'));
-    tr.appendChild(numCell(amountOf(e), true));
-    tr.appendChild(numCell(Number(e.net) || 0));
-    tr.appendChild(el('td', null, store.personName(e.personId)));
-    const stTd = el('td'); stTd.appendChild(e.status === 'pending' ? badge('Pending', 'amber') : badge('Received', 'green')); tr.appendChild(stTd);
-    const act = el('td', 'row-actions');
-    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => incomeModal(e));
-    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.incomeGroupName(e.categoryId), () => store.removeIncome(activeYear, e.id)));
-    act.appendChild(edit); act.appendChild(del); tr.appendChild(act);
-    tb.appendChild(tr);
-  });
-  table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
+  card.appendChild(sortableTable(cols, shown, incomeListSort, ns => { incomeListSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
+  wrap.appendChild(card);
   return wrap;
 }
 
@@ -1274,12 +1308,10 @@ function incomeModal(existing) {
   // Program is a real dropdown so your Settings → Reward programs list is
   // visible up front (a type-ahead suggestion box hid it too well).
   const rwPrograms = [...new Set(((s.catalog && s.catalog.rewardPrograms) || []).map(pr => pr.name).filter(Boolean))];
-  const rwCommon = ['Chase', 'Amex', 'Apple Card', 'Discover', 'Citi', 'Capital One', 'Coinbase', 'Fetch Rewards', 'Rakuten / Ebates', 'ReceiptPal', 'Microsoft Rewards', 'PayPal'].filter(v => !rwPrograms.includes(v));
   const curRwSrc = e.rewardSource || '';
-  const rwKnownSrc = !curRwSrc || rwPrograms.includes(curRwSrc) || rwCommon.includes(curRwSrc);
+  const rwKnownSrc = !curRwSrc || rwPrograms.includes(curRwSrc);
   const fRwSel = select([{ value: '', label: '— Select program —' }]
     .concat(rwPrograms.map(n => ({ value: n, label: n })))
-    .concat(rwCommon.map(n => ({ value: n, label: n })))
     .concat([{ value: '__other', label: 'Other / type manually…' }]), rwKnownSrc ? curRwSrc : '__other');
   const fRwOther = input(rwKnownSrc ? '' : curRwSrc, { placeholder: 'Program name' });
   const rwOtherWrap = el('div'); rwOtherWrap.style.marginTop = '6px';
@@ -1287,14 +1319,22 @@ function incomeModal(existing) {
   rwOtherWrap.style.display = rwKnownSrc ? 'none' : '';
   fRwSel.addEventListener('change', () => { rwOtherWrap.style.display = fRwSel.value === '__other' ? '' : 'none'; if (fRwSel.value === '__other') fRwOther.focus(); });
   const rwSrcNode = el('div'); rwSrcNode.appendChild(fRwSel); rwSrcNode.appendChild(rwOtherWrap);
-  const rwTypeList = el('datalist'); rwTypeList.id = 'rw-type-list';
-  ['Cash back', 'Statement credit', 'Gift card', 'Crypto', 'Points', 'Miles', 'Referral bonus'].forEach(v => { const o = el('option'); o.value = v; rwTypeList.appendChild(o); });
-  body.appendChild(rwTypeList);
-  const fRwType = input(e.rewardType || '', { placeholder: 'e.g. Cash back, Gift card', list: 'rw-type-list' });
+  const REWARD_TYPES = ['Cash back', 'Statement credit', 'Deposit', 'Gift card', 'Points', 'Miles', 'Crypto', 'Referral bonus'];
+  const curRwType = e.rewardType || '';
+  const rwTypeKnown = !curRwType || REWARD_TYPES.includes(curRwType);
+  const fRwTypeSel = select([{ value: '', label: '— Select type —' }]
+    .concat(REWARD_TYPES.map(n => ({ value: n, label: n })))
+    .concat([{ value: '__other', label: 'Other / type manually…' }]), rwTypeKnown ? curRwType : '__other');
+  const fRwTypeOther = input(rwTypeKnown ? '' : curRwType, { placeholder: 'Type' });
+  const rwTypeOtherWrap = el('div'); rwTypeOtherWrap.style.marginTop = '6px';
+  rwTypeOtherWrap.appendChild(fRwTypeOther);
+  rwTypeOtherWrap.style.display = rwTypeKnown ? 'none' : '';
+  const rwTypeNode = el('div'); rwTypeNode.appendChild(fRwTypeSel); rwTypeNode.appendChild(rwTypeOtherWrap);
+  const rwTypeVal = () => (fRwTypeSel.value === '__other' ? fRwTypeOther.value : fRwTypeSel.value).trim();
   const fOrderConf = input(e.orderConf || '', { placeholder: 'optional' });
   const rwWrap = el('div', 'div-fields');
-  rwWrap.appendChild(field('Reward program', rwSrcNode, 'Which program or card the reward came from — your reward programs from Settings are listed first, then common issuers. Pick Other to type a new one.'));
-  rwWrap.appendChild(field('Reward type', fRwType, 'What kind of reward it is — e.g. Cash back, Statement credit, Gift card, Crypto.'));
+  rwWrap.appendChild(field('Reward program', rwSrcNode, 'Which program or card the reward came from — the list is your Reward programs from Settings. Pick Other to type a one-off.'));
+  rwWrap.appendChild(field('Reward type', rwTypeNode, 'What kind of reward it is. Pick Deposit for money paid into one of your accounts — a field appears to say which account it landed in.'));
   rwWrap.appendChild(field('Order confirmation #', fOrderConf, 'If the reward came with an order or confirmation number (gift-card redemptions often do), keep it here for reference.'));
 
   // Other-income fields (shown when the category looks like Other) — e.g. lawsuit
@@ -1314,6 +1354,11 @@ function incomeModal(existing) {
     divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none';
     rwWrap.style.display = isRw ? '' : 'none';
     otWrap.style.display = (g && /other/i.test(g.name)) ? '' : 'none';
+    // Rewards don't need the generic plumbing: Received via is replaced by the
+    // reward type, and the reinvested/paid-out flags don't apply.
+    viaField.style.display = isRw ? 'none' : '';
+    flagsField.style.display = isRw ? 'none' : '';
+    syncRwAcct();
     // Rewards are take-home by definition: you enter the NET, and Gross is greyed
     // out and mirrors it (they're always equal for rewards).
     fGross.readOnly = isRw;
@@ -1322,12 +1367,12 @@ function incomeModal(existing) {
   };
   fNet.addEventListener('input', () => { if (fGross.readOnly) fGross.value = fNet.value; });
   fCat.addEventListener('change', () => { rebuildSubs(); syncCat(); });
-  rebuildSubs(); syncCat();
 
   body.appendChild(field('Date', fDate, 'When you received this money. For pending items, the date you expect it.'));
   body.appendChild(field('Category', fCat, 'The type of income — e.g. Wages, Dividends, Interest, Rewards. Manage the list in Settings.'));
   body.appendChild(field('Source (subcategory)', fSub, 'A more specific source within the category — e.g. a particular broker or bank. Add these under the category in Settings.'));
-  body.appendChild(field('Account', fAcct, 'Which of your accounts the money went INTO — e.g. the bank or broker that received it. Optional, but lets you see income by account (like dividends per broker, or interest per bank).'));
+  const acctField = field('Account', fAcct, 'Which of your accounts the money went INTO — e.g. the bank or broker that received it. Optional, but lets you see income by account (like dividends per broker, or interest per bank).');
+  body.appendChild(acctField);
   body.appendChild(field('Person', fPerson, 'Who this income belongs to — you, joint, or another person you track.'));
   const amtRow = el('div', 'two-col');
   amtRow.appendChild(field('Gross amount', fGross, 'The full amount before any taxes or withholding.'));
@@ -1337,16 +1382,31 @@ function incomeModal(existing) {
   stRow.appendChild(field('Status', fStatus, 'Received = money is in hand and counts toward totals. Pending = expected but not yet received (tracked, but left out of grid totals).'));
   stRow.appendChild(field('Expected date', fExpected, 'For pending income, when you expect it to arrive.'));
   body.appendChild(stRow);
-  body.appendChild(field('Received via', fVia, 'How the money arrived — e.g. Direct Deposit, PayPal, Venmo, check.'));
+  const viaField = field('Received via', fVia, 'How the money arrived — e.g. Direct Deposit, PayPal, Venmo, check.');
+  body.appendChild(viaField);
   const tRow = el('div', 'two-col');
   tRow.appendChild(field('Taxable', fTax, 'Whether this income is taxable, if you know. Use Unknown if unsure.'));
   const flagsWrap = el('div', 'check-row'); flagsWrap.appendChild(cReinv); flagsWrap.appendChild(cPaid);
-  tRow.appendChild(field('Flags', flagsWrap));
+  const flagsField = field('Flags', flagsWrap);
+  tRow.appendChild(flagsField);
   body.appendChild(tRow);
   body.appendChild(divWrap);
   body.appendChild(rwWrap);
   body.appendChild(otWrap);
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this entry.'));
+  // For rewards, the account field only matters when the reward was DEPOSITED
+  // somewhere — the label flips to "Deposited to" and hides otherwise.
+  const acctLbl = acctField.querySelector('span').childNodes[0];
+  const syncRwAcct = () => {
+    const g = s.incomeCategories.find(c => c.id === fCat.value);
+    const isRw = !!(g && /reward/i.test(g.name));
+    const dep = /deposit/i.test(rwTypeVal());
+    acctField.style.display = (!isRw || dep) ? '' : 'none';
+    acctLbl.nodeValue = (isRw && dep) ? 'Deposited to' : 'Account';
+  };
+  fRwTypeSel.addEventListener('change', () => { rwTypeOtherWrap.style.display = fRwTypeSel.value === '__other' ? '' : 'none'; if (fRwTypeSel.value === '__other') fRwTypeOther.focus(); syncRwAcct(); });
+  fRwTypeOther.addEventListener('input', syncRwAcct);
+  rebuildSubs(); syncCat();
 
   openModal({
     title: existing ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
@@ -1365,7 +1425,7 @@ function incomeModal(existing) {
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
         symbol: fSym.value.trim(), action: fAction.value.trim(),
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
-        rewardSource: (fRwSel.value === '__other' ? fRwOther.value : fRwSel.value).trim(), rewardType: fRwType.value.trim(), orderConf: fOrderConf.value.trim(),
+        rewardSource: (fRwSel.value === '__other' ? fRwOther.value : fRwSel.value).trim(), rewardType: rwTypeVal(), orderConf: fOrderConf.value.trim(),
         otherType: fOtType.value.trim(), description: fDesc.value.trim()
       });
       store.saveIncome(activeYear, entry);
