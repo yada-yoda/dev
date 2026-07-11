@@ -25,7 +25,8 @@ Each monitor watches one of:
 - **A keyword** — alerts when a word/phrase appears or disappears. One-shot by nature: after it
   fires you usually update the keyword to the new value.
 - **A pattern (regex)** — extracts whatever the pattern matches (capture group 1 if present, up to
-  10 matches) and tracks *that*. The self-maintaining choice for values that change — a rate or
+  10 **distinct** matches — duplicates are collapsed, so a rate a page repeats in four places shows
+  once) and tracks *that*. The self-maintaining choice for values that change — a rate or
   price monitor alerts with old → new and keeps working without edits.
   E.g. `(\d+\.\d{2}%)\s*APY` on a bank page.
   Don't know regex? The **✨ Build it for me** helper asks for the value currently on the page
@@ -110,6 +111,14 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.6.2 (worker v0.5.1)
+Pattern monitors now collapse duplicate matches: pages that display the same value in several
+places (Ally shows its savings rate 4×) read as one clean value instead of "3.00% | 3.00% |
+3.00% | 3.00%" — in the dashboard, history, and alert emails. The Synchrony monitor's pattern was
+re-anchored to Synchrony's own rate so the "National Average" comparison stat (0.33%) no longer
+tags along or triggers alerts. All monitors were rebased in place — no false alerts from the
+transition.
 
 ### v0.6.1
 Added `legal.html` — Privacy Policy, Terms of Use, and Disclaimer on one page, linked from a new
