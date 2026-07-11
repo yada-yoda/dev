@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.6.1 — watch any web page for changes</title>
+<title>Spyglass v0.7.0 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -280,9 +280,17 @@
         <input id="mSelector" type="text" placeholder="#price" />
       </label>
       <label class="field hidden" id="kwField">
-        <span class="lab">Keyword <span class="hint">— alert when this text appears or disappears</span></span>
+        <span class="lab">Keyword / exact phrase <span class="hint">— any exact text: a word, or a whole sentence like <code>So popular we're restocking!</code></span></span>
         <input id="mKeyword" type="text" placeholder="In stock" />
       </label>
+      <div class="field hidden" id="kwModeRow" style="margin-top:-.4rem">
+        <span class="lab">Alert when the phrase is</span>
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.88rem">
+          <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer"><input type="radio" name="kwMode" value="any" checked style="width:auto"> added or removed</label>
+          <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer"><input type="radio" name="kwMode" value="added" style="width:auto"> added only</label>
+          <label style="display:flex;align-items:center;gap:.35rem;cursor:pointer"><input type="radio" name="kwMode" value="removed" style="width:auto"> removed only</label>
+        </div>
+      </div>
       <label class="field hidden" id="patField">
         <span class="lab">Regex pattern <span class="hint">— watches whatever it matches, so it keeps working when the value changes (best for rates/prices). Capture group 1 is used if present. E.g. <code>(\d+\.\d{2}%)\s*APY</code></span></span>
         <input id="mPattern" type="text" placeholder="(\d+\.\d{2}%)\s*APY" />
@@ -301,6 +309,37 @@
           <button class="btn primary sm" id="pbGo" type="button">Build &amp; test pattern</button>
         </div>
       </div>
+      <details class="field" id="schedField" style="border:1px solid var(--border);border-radius:10px;padding:.6rem .9rem">
+        <summary style="cursor:pointer;font-size:.85rem;font-weight:600">Schedule window <span class="hint">— optional: only check on certain days / hours</span></summary>
+        <div style="margin-top:.8rem">
+          <span class="lab">Days <span class="hint">— all selected = no restriction</span></span>
+          <div id="dayChips" style="display:flex;gap:.35rem;flex-wrap:wrap"></div>
+          <div class="row2" style="margin-top:.8rem">
+            <label class="field" style="margin-bottom:.3rem"><span class="lab">From</span><select id="mHourStart"></select></label>
+            <label class="field" style="margin-bottom:.3rem"><span class="lab">Until</span><select id="mHourEnd"></select></label>
+          </div>
+          <p class="hint" style="font-size:.74rem;color:var(--muted);margin:.2rem 0 0">Your local timezone. Outside the window, due checks simply wait; the &#8635; button always checks immediately.</p>
+        </div>
+      </details>
+
+      <div class="field" id="regionField">
+        <span class="lab">Screenshot region <span class="hint">— optional: crop this monitor's screenshots to just the part of the page you care about</span></span>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          <button type="button" class="btn sm" id="btnRegion">&#128207; Select region</button>
+          <button type="button" class="btn sm ghost hidden" id="btnRegionClear">Clear</button>
+          <span id="regionInfo" style="font-size:.78rem;color:var(--muted)"></span>
+        </div>
+        <div id="regionWrap" class="hidden" style="position:relative;margin-top:.6rem;touch-action:none">
+          <img id="regionImg" style="width:100%;display:block;border:1px solid var(--border);border-radius:8px" alt="Page screenshot" draggable="false">
+          <div id="regionBox" style="position:absolute;border:2px solid var(--primary);background:rgba(79,70,229,.18);cursor:move;box-sizing:border-box">
+            <div class="rh" data-c="nw" style="position:absolute;width:14px;height:14px;background:var(--primary);border-radius:50%;top:-8px;left:-8px;cursor:nwse-resize"></div>
+            <div class="rh" data-c="ne" style="position:absolute;width:14px;height:14px;background:var(--primary);border-radius:50%;top:-8px;right:-8px;cursor:nesw-resize"></div>
+            <div class="rh" data-c="sw" style="position:absolute;width:14px;height:14px;background:var(--primary);border-radius:50%;bottom:-8px;left:-8px;cursor:nesw-resize"></div>
+            <div class="rh" data-c="se" style="position:absolute;width:14px;height:14px;background:var(--primary);border-radius:50%;bottom:-8px;right:-8px;cursor:nwse-resize"></div>
+          </div>
+        </div>
+      </div>
+
       <label class="toggle"><input type="checkbox" id="mEnabled" checked style="width:auto"> Active</label>
       <div style="margin-top:1rem">
         <button class="btn" id="btnTest" type="button">&#128269; Test it now</button>
@@ -336,6 +375,17 @@
         photographs the real rendered page and saves it with the snapshot — you'll see it in the
         change history and attached to alert emails. Turn off to keep checks text-only.
       </p>
+      <div style="border-top:1px solid var(--border);padding-top:1rem;margin-bottom:1rem">
+        <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:.5rem">Extra alert channels</div>
+        <label class="field">
+          <span class="lab">Discord webhook URL <span class="hint">— Server Settings &rarr; Integrations &rarr; Webhooks; changes post there as embeds. Leave empty to disable.</span></span>
+          <input id="setDiscord" type="url" placeholder="https://discord.com/api/webhooks/…" />
+        </label>
+        <label class="field" style="margin-bottom:.4rem">
+          <span class="lab">Custom webhook URL <span class="hint">— receives a JSON POST (<code>{event, monitor, summary, before, after}</code>) on every change. Leave empty to disable.</span></span>
+          <input id="setWebhook" type="url" placeholder="https://example.com/hook" />
+        </label>
+      </div>
       <div id="adminBox" class="hidden" style="border-top:1px solid var(--border);padding-top:1rem">
         <div style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:.5rem">Admin</div>
         <label class="toggle" style="margin-bottom:.3rem">
@@ -357,6 +407,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.7.0</strong> — Four VisualPing-inspired upgrades: <em>&#128207; screenshot region picker</em> (drag a box over a live screenshot; that monitor's screenshots crop to just that area), <em>keyword direction</em> (alert only when a phrase is <em>added</em> or only when it's <em>removed</em> — perfect for restock watching), <em>Discord &amp; custom webhook alert channels</em> (set in &#9881; Settings), and <em>schedule windows</em> (limit checks to certain days/hours). Keyword monitors are now clearly labeled &ldquo;Keyword / exact phrase&rdquo;.</li>
         <li><strong>v0.6.1</strong> — Added a <a href="legal.html">Privacy, Terms &amp; Disclaimer</a> page explaining exactly what Spyglass stores, where it lives, and what it will never do (no analytics, no ads, no data sale) — linked from the new footer.</li>
         <li><strong>v0.6.0</strong> — <em>&#128247; Page screenshots</em>: when a monitor changes (or takes its first baseline), Spyglass photographs the real rendered page — see it in the change history and attached to alert emails; toggle it in the new &#9881; <em>Settings</em>. Sign-ups are now invite-only with an admin switch to reopen them, and Spyglass got its own 404 page.</li>
         <li><strong>v0.5.0</strong> — <em>&#10024; Build it for me</em>: no more writing regex by hand. Pick the Pattern type, type the value you currently see on the page (and optionally a word near it, like &ldquo;APY&rdquo;), and Spyglass generates the pattern, tests it against the live page, and fills it in — automatically switching to the rendered-page version when the site needs JavaScript.</li>
@@ -383,7 +434,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.6.1";
+  const APP_VERSION = "0.7.0";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -606,6 +657,14 @@ function openEdit(id){
   $("#mEnabled").checked = m ? !!m.enabled : true;
   $("#testResult").classList.add("hidden"); $("#testResult").innerHTML = "";
   $("#patBuilder").classList.add("hidden"); $("#pbValue").value = ""; $("#pbNear").value = "";
+  // keyword direction, schedule, region
+  const mode = (m && m.keywordMode) || "any";
+  const radio = document.querySelector(`input[name="kwMode"][value="${mode}"]`);
+  if(radio) radio.checked = true;
+  setScheduleUi(m);
+  currentRegion = (m && m.region) ? { ...m.region } : null;
+  $("#regionWrap").classList.add("hidden");
+  updateRegionInfo();
   syncTypeFields();
   openOverlay("#editOverlay");
 }
@@ -613,8 +672,124 @@ function syncTypeFields(){
   const t = $("#mType").value;
   $("#selField").classList.toggle("hidden", t!=="element");
   $("#kwField").classList.toggle("hidden", t!=="keyword");
+  $("#kwModeRow").classList.toggle("hidden", t!=="keyword");
   $("#patField").classList.toggle("hidden", t!=="pattern");
   $("#patHelper").classList.toggle("hidden", t!=="pattern");
+}
+
+/* ---- schedule window controls ---- */
+const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+function initScheduleControls(){
+  $("#dayChips").innerHTML = DAY_NAMES.map((n,i) =>
+    `<button type="button" class="btn sm" data-d="${i}">${n}</button>`).join("");
+  $("#dayChips").onclick = e => {
+    if(e.target.tagName!=="BUTTON") return;
+    e.target.classList.toggle("primary");
+  };
+  const hourOpts = ['<option value="">any time</option>'];
+  for(let h=0; h<24; h++){
+    const label = h===0?"12 am":h<12?h+" am":h===12?"12 pm":(h-12)+" pm";
+    hourOpts.push(`<option value="${h}">${label}</option>`);
+  }
+  $("#mHourStart").innerHTML = hourOpts.join("");
+  $("#mHourEnd").innerHTML = hourOpts.join("");
+}
+function setScheduleUi(m){
+  const days = (m && Array.isArray(m.checkDays) && m.checkDays.length) ? m.checkDays : [0,1,2,3,4,5,6];
+  $$("#dayChips button").forEach(b => b.classList.toggle("primary", days.includes(parseInt(b.dataset.d,10))));
+  $("#mHourStart").value = (m && m.checkStartHour != null) ? String(m.checkStartHour) : "";
+  $("#mHourEnd").value = (m && m.checkEndHour != null) ? String(m.checkEndHour) : "";
+  const restricted = m && ((m.checkDays && m.checkDays.length && m.checkDays.length < 7) || m.checkStartHour != null);
+  $("#schedField").open = !!restricted;
+}
+
+/* ---- screenshot region picker ---- */
+let currentRegion = null;   // {x,y,w,h} in the worker's 1280×800 viewport coords
+let regionDrag = null;
+
+function regionScale(){ return 1280 / ($("#regionImg").clientWidth || 1280); }
+function updateRegionInfo(){
+  $("#regionInfo").textContent = currentRegion
+    ? `cropping to ${currentRegion.w}×${currentRegion.h} at (${currentRegion.x}, ${currentRegion.y})`
+    : "full page";
+  $("#btnRegionClear").classList.toggle("hidden", !currentRegion);
+}
+function setBoxFromRegion(r){
+  const s = regionScale(), b = $("#regionBox");
+  b.style.left = (r.x/s)+"px"; b.style.top = (r.y/s)+"px";
+  b.style.width = (r.w/s)+"px"; b.style.height = (r.h/s)+"px";
+}
+function regionFromBox(){
+  const s = regionScale(), b = $("#regionBox");
+  return { x: Math.round(b.offsetLeft*s), y: Math.round(b.offsetTop*s),
+           w: Math.round(b.offsetWidth*s), h: Math.round(b.offsetHeight*s) };
+}
+async function openRegionPicker(){
+  if(DEMO){ toast("Demo mode — sign in to use the region picker"); return; }
+  const url = $("#mUrl").value.trim();
+  if(!/^https?:\/\//i.test(url)){ toast("Enter the page URL first","err"); return; }
+  const btn = $("#btnRegion");
+  btn.disabled = true; btn.textContent = "Loading screenshot… (~10s)";
+  try{
+    const idToken = await auth.currentUser.getIdToken();
+    const r = await fetch(WORKER_URL + "/screenshot", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
+      body: JSON.stringify({ url }),
+    }).then(x => x.json());
+    if(!r.ok){ toast("Screenshot failed: " + (r.error||"unknown"), "err"); return; }
+    const img = $("#regionImg");
+    img.onload = () => {
+      if(!currentRegion) currentRegion = { x: 160, y: 100, w: 960, h: 400 };
+      setBoxFromRegion(currentRegion);
+      updateRegionInfo();
+    };
+    img.src = "data:image/jpeg;base64," + r.imageB64;
+    $("#regionWrap").classList.remove("hidden");
+  }catch(e){ toast("Screenshot failed: " + e.message, "err"); }
+  finally{ btn.disabled = false; btn.innerHTML = "&#128207; Select region"; }
+}
+function wireRegionBox(){
+  const box = $("#regionBox");
+  box.addEventListener("pointerdown", e => {
+    e.preventDefault();
+    regionDrag = {
+      c: e.target.dataset.c || "move", sx: e.clientX, sy: e.clientY,
+      left: box.offsetLeft, top: box.offsetTop, w: box.offsetWidth, h: box.offsetHeight,
+    };
+    box.setPointerCapture(e.pointerId);
+  });
+  box.addEventListener("pointermove", e => {
+    if(!regionDrag) return;
+    const dx = e.clientX - regionDrag.sx, dy = e.clientY - regionDrag.sy;
+    const maxW = $("#regionImg").clientWidth, maxH = $("#regionImg").clientHeight;
+    let { left, top, w, h } = regionDrag;
+    const c = regionDrag.c;
+    if(c === "move"){ left += dx; top += dy; }
+    else{
+      if(c.includes("w")){ left += dx; w -= dx; }
+      if(c.includes("e")){ w += dx; }
+      if(c.includes("n")){ top += dy; h -= dy; }
+      if(c.includes("s")){ h += dy; }
+    }
+    w = Math.max(24, w); h = Math.max(24, h);
+    left = Math.max(0, Math.min(left, maxW - w));
+    top = Math.max(0, Math.min(top, maxH - h));
+    w = Math.min(w, maxW - left); h = Math.min(h, maxH - top);
+    box.style.left = left+"px"; box.style.top = top+"px";
+    box.style.width = w+"px"; box.style.height = h+"px";
+    currentRegion = regionFromBox();
+    updateRegionInfo();
+  });
+  const end = () => { regionDrag = null; };
+  box.addEventListener("pointerup", end);
+  box.addEventListener("pointercancel", end);
+  $("#btnRegion").onclick = openRegionPicker;
+  $("#btnRegionClear").onclick = () => {
+    currentRegion = null;
+    $("#regionWrap").classList.add("hidden");
+    updateRegionInfo();
+  };
 }
 
 /* ---- pattern builder ("Build it for me") ---- */
@@ -729,6 +904,19 @@ function collectForm(){
     if(!data.pattern){ toast("Enter a regex pattern","err"); return null; }
     try{ new RegExp(data.pattern); }catch(e){ toast("Invalid regex: "+e.message,"err"); return null; }
   }
+  // keyword direction
+  data.keywordMode = type==="keyword" ? (document.querySelector('input[name="kwMode"]:checked')||{}).value || "any" : null;
+  // schedule window (all/no days selected = no restriction)
+  const days = $$("#dayChips button.primary").map(b => parseInt(b.dataset.d,10));
+  data.checkDays = (days.length === 0 || days.length === 7) ? null : days;
+  const hs = $("#mHourStart").value, he = $("#mHourEnd").value;
+  if((hs==="") !== (he==="")){ toast("Set both From and Until hours (or neither)","err"); return null; }
+  data.checkStartHour = hs==="" ? null : parseInt(hs,10);
+  data.checkEndHour = he==="" ? null : parseInt(he,10);
+  if(data.checkStartHour != null && data.checkEndHour < data.checkStartHour){ toast("Until must be at or after From","err"); return null; }
+  data.tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || null;
+  // screenshot crop region
+  data.region = currentRegion || null;
   return data;
 }
 
@@ -784,7 +972,7 @@ async function openDetail(id){
   let html = `
     <p style="margin-top:0"><a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.url)}</a></p>
     <p class="muted" style="font-size:.85rem">
-      ${statusPill(m)} &middot; watching ${m.type==='element'?'element <code>'+escapeHtml(m.selector||'')+'</code>':m.type==='keyword'?'keyword &ldquo;'+escapeHtml(m.keyword||'')+'&rdquo;':m.type==='pattern'?'pattern <code>'+escapeHtml(m.pattern||'')+'</code>':'whole page'} &middot;
+      ${statusPill(m)} &middot; watching ${m.type==='element'?'element <code>'+escapeHtml(m.selector||'')+'</code>':m.type==='keyword'?'phrase &ldquo;'+escapeHtml(m.keyword||'')+'&rdquo;'+(m.keywordMode==='added'?' (added only)':m.keywordMode==='removed'?' (removed only)':''):m.type==='pattern'?'pattern <code>'+escapeHtml(m.pattern||'')+'</code>':'whole page'}${m.region?' &middot; cropped screenshots':''} &middot;
       every ${freqLabel(m.frequencyMinutes)} &middot; last checked ${fmtAgo(m.lastCheckedAt)}
     </p>`;
   if(snaps.length===0){
@@ -878,7 +1066,10 @@ async function openSettings(){
   // load current values
   try{
     const p = await db.collection("users").doc(uid).collection("meta").doc("prefs").get();
-    $("#setShots").checked = !(p.exists && p.data().screenshotsEnabled === false);
+    const d = p.exists ? p.data() : {};
+    $("#setShots").checked = !(d.screenshotsEnabled === false);
+    $("#setDiscord").value = d.discordWebhookUrl || "";
+    $("#setWebhook").value = d.webhookUrl || "";
   }catch(e){ $("#setShots").checked = true; }
   if(uid === ADMIN_UID){
     try{
@@ -896,6 +1087,19 @@ function wireSettings(){
       toast(e.target.checked ? "Screenshots on" : "Screenshots off", "ok");
     }catch(err){ toast("Couldn't save: " + err.message, "err"); }
   };
+  const saveWebhook = (field, validate, label) => async (e) => {
+    const v = e.target.value.trim();
+    if(v && !validate(v)){ toast(label + " URL doesn't look right","err"); return; }
+    try{
+      await db.collection("users").doc(uid).collection("meta").doc("prefs")
+        .set({ [field]: v || null }, { merge: true });
+      toast(v ? label + " alerts on" : label + " alerts off", "ok");
+    }catch(err){ toast("Couldn't save: " + err.message, "err"); }
+  };
+  $("#setDiscord").onchange = saveWebhook("discordWebhookUrl",
+    (v) => /^https:\/\/(discord\.com|discordapp\.com)\/api\/webhooks\//.test(v), "Discord");
+  $("#setWebhook").onchange = saveWebhook("webhookUrl",
+    (v) => /^https:\/\//i.test(v), "Webhook");
   $("#setSignups").onchange = async (e) => {
     try{
       await db.collection("config").doc("app")
@@ -914,6 +1118,8 @@ function wireUi(){
   $("#btnTest").onclick = testMonitor;
   $("#btnBuildPat").onclick = () => $("#patBuilder").classList.toggle("hidden");
   $("#pbGo").onclick = buildPattern;
+  initScheduleControls();
+  wireRegionBox();
   $$("[data-close]").forEach(b => b.onclick = e => e.target.closest(".overlay").classList.remove("open"));
   // Backdrop-click closes read-only overlays; the add/edit FORM only closes
   // via its ✕ / Cancel buttons so a stray click can't eat half-typed input.

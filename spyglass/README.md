@@ -22,8 +22,10 @@ Browser (dev.rizzo.cc)  ──auth/data──▶  Firebase (Auth + Firestore)  �
 Each monitor watches one of:
 - **Whole page text** — all visible text on the page.
 - **A specific element** — the text inside a CSS selector (e.g. `#price`, `.status`).
-- **A keyword** — alerts when a word/phrase appears or disappears. One-shot by nature: after it
-  fires you usually update the keyword to the new value.
+- **A keyword / exact phrase** — alerts when any exact text (a word or a whole sentence) appears
+  or disappears. A direction filter can restrict alerts to *added only* or *removed only* (e.g.
+  alert when "Back soon!" disappears — a restock — but not when it shows up). One-shot by nature
+  for value-tracking: after it fires you usually update the phrase; use a pattern for values.
 - **A pattern (regex)** — extracts whatever the pattern matches (capture group 1 if present, up to
   10 **distinct** matches — duplicates are collapsed, so a rate a page repeats in four places shows
   once) and tracks *that*. The self-maintaining choice for values that change — a rate or
@@ -35,6 +37,16 @@ Each monitor watches one of:
   value — trying the `r.jina.ai` rendered version automatically when the plain fetch can't see it.
 
 The first check of a monitor just records a baseline; you only get emailed on later *changes*.
+
+### Region cropping, schedule windows & extra channels
+- **Region picker**: in the monitor form, load a live screenshot and drag/resize a box over the
+  part of the page you care about — that monitor's screenshots (history + email) crop to it.
+  Coordinates are stored in the worker's 1280×800 viewport space (`region: {x,y,w,h}`).
+- **Schedule windows**: optionally limit a monitor's checks to certain weekdays and/or hours
+  (`checkDays`, `checkStartHour/End`, evaluated in the monitor's own `tz`). Outside the window a
+  due check waits ~30 min and retries; the manual ↻ check always runs.
+- **Extra alert channels** (⚙ Settings): a Discord webhook URL (changes post as embeds) and/or a
+  custom webhook URL (JSON POST with `{event, monitor, summary, before, after}`), alongside email.
 
 ### Screenshots
 When a change is detected (and on each monitor's first baseline), the worker photographs the real
@@ -70,8 +82,11 @@ Existing accounts are never affected.
 - `POST /preview` — powers *Test it now*: `{url, type, selector?, keyword?, pattern?}` returns
   `{matched, length, preview}`. Auth: Firebase ID token (Bearer) or `x-trigger-key`.
 - `POST /check` — powers the per-monitor ↻ button: `{monitorId}` runs that monitor's check right
-  now (baselines, snapshots, and emails exactly like the cron). Auth: the owner's Firebase ID
-  token — monitors are looked up under the caller's own user subtree only.
+  now (baselines, snapshots, and emails exactly like the cron; ignores schedule windows). Auth:
+  the owner's Firebase ID token — monitors are looked up under the caller's own user subtree only.
+- `POST /screenshot` — powers the region picker: `{url, region?}` returns
+  `{imageB64, width, height}`. Same auth as `/preview`. Browser sessions are reused across
+  captures (free tier rate-limits *new* browser launches per minute).
 
 ## One-time setup
 
@@ -111,6 +126,17 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.7.0 (worker v0.6.0)
+Four VisualPing-inspired upgrades. Screenshot region picker: drag/resize a box over a live
+screenshot in the monitor form and that monitor's screenshots crop to just that area (worker
+`/screenshot` endpoint + puppeteer clip; browser sessions now reused across captures to respect
+the free tier's launch rate limit). Keyword direction: alert only on *added* or only on *removed*
+transitions — the other direction re-baselines silently. Discord + custom webhook alert channels
+configured in Settings, firing alongside email with per-channel status in check results. Schedule
+windows: restrict a monitor's checks to chosen weekdays/hours in your own timezone (manual ↻
+bypasses). All verified live: direction suppression, webhook 200 via echo service, schedule skip,
+and full-vs-cropped screenshot captures.
 
 ### v0.6.2 (worker v0.5.1)
 Pattern monitors now collapse duplicate matches: pages that display the same value in several
