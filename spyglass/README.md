@@ -111,6 +111,7 @@ under Firebase Auth → Settings → Authorized domains so Google sign-in works 
    wrangler secret put FIREBASE_SERVICE_ACCOUNT_JSON   # service-account JSON for this project
    wrangler secret put RESEND_API_KEY                  # your Resend API key
    wrangler secret put MANUAL_TRIGGER_KEY              # optional: random string for POST /trigger
+   wrangler secret put JINA_API_KEY                    # optional: free r.jina.ai key — lifts the anonymous rate/IP block so sites whose rate API blocks Cloudflare IPs (e.g. Synchrony) can be read
    ```
 3. Give the service account Firestore access (IAM role **Cloud Datastore User**).
 4. `cf sevendwarfs` then `wrangler deploy`.
@@ -125,6 +126,17 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.8.4 (worker v0.8.4)
+Some sites (Synchrony's HYS/CD pages) inject their rate from an API (`api.syf.com`) that **blocks
+Cloudflare's IPs** — so both a plain fetch (403) and our own headless browser (the API call fails
+inside the page) come up blank; only r.jina.ai, which renders from its own IPs, can read the real
+value. But anonymous jina now 429s Cloudflare's shared egress. Fix: an optional **`JINA_API_KEY`**
+worker secret (free key from jina.ai) — authenticated jina requests bypass the anonymous
+rate/IP-reputation block. When set, r.jina.ai URLs (and the jina fallback) send it. jina URLs are
+plain-fetched (not routed to our browser) so they actually use jina. Synchrony's monitor was
+corrected back to jina + its real **3.30%** rate (an earlier build had mis-read a calculator
+example as 2.85%).
 
 ### v0.8.2 (worker v0.8.2)
 Monitor cards show the current extracted value at a glance (short values only — rates, prices,

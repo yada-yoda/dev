@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.8.2 — watch any web page for changes</title>
+<title>Spyglass v0.8.4 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -413,6 +413,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.8.4</strong> — Some banks (e.g. Synchrony) load their rate from an API that blocks datacenter IPs, so neither a plain fetch nor our own browser can see it — only the r.jina.ai reader can. Spyglass now supports an optional free jina API key to make those pages reliable, and correctly reads Synchrony's rate again.</li>
         <li><strong>v0.8.2</strong> — Each monitor card now shows its <em>current value</em> at a glance (the rate, price, or keyword state) and a <em>thumbnail</em> of the page — the &#8635; refresh button updates both. Two reliability fixes: an empty read (page didn't finish loading) is now treated as a temporary error and retried, never a false &ldquo;it changed&rdquo; alert; and if a browser render fails, Spyglass falls back to the r.jina.ai reader.</li>
         <li><strong>v0.7.2</strong> — Spyglass now renders JavaScript pages with its own browser, replacing the outside r.jina.ai service (which started rate-limiting). New <em>Render in a browser</em> toggle for JS-built pages — and <em>Test it now</em> / the pattern builder switch it on automatically when a value only appears after scripts run. Your bank-rate monitors were moved onto it.</li>
         <li><strong>v0.7.1</strong> — Screenshots are much faster (a few seconds instead of ~25) and no longer come back blank on script-heavy sites — the capture now waits for the page's text to actually render instead of for network traffic to go quiet, which banking sites never do.</li>
@@ -443,7 +444,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.8.2";
+  const APP_VERSION = "0.8.4";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
