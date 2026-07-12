@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.52.2**
+**Current Version: v0.53.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,17 @@ covers both.
 
 ## Version History
 
+- **v0.53.0** — **Insights PNG export, badge-toast fix, PDF refresh:**
+  - **Save any Insights panel as a PNG** — each panel (Walking milestones, Weight trend, Trends,
+    Spending, Potty breakdown) now has a **camera button** that downloads a crisp image of just that
+    panel (html2canvas, loaded on first use).
+  - **Fixed badge notifications for real this time** — the "🎉 Badge unlocked" / "🌟 Prestige" toast
+    was being **instantly overwritten** by the "🦮 Walk logged" confirmation (toasts don't stack), so
+    you never saw it. The walk-logged confirmation now steps aside whenever a badge or prestige is
+    crossed, so the celebration actually shows.
+  - **PDF report brought up to date** — the exported PDF now includes **who paid / payment method /
+    card** on vet visits, grooming, and supplies; a supply's **status** (in-use / finished / low);
+    package **size**; and a **walking-milestones** line (miles walked, badges earned, prestige).
 - **v0.52.2** — **Date-sort toggle on all Care lists** — Vet visits, Grooming, and Illness now have the
   same "Date ↑/↓" sort toggle the medical Records list already had, so you can flip any of them between
   newest-first and oldest-first. (Meds still sorts by soonest-due, and Grooming's "Last groomed" stat

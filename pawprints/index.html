@@ -93,6 +93,9 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .range-seg button{padding:4px 10px;border-radius:8px;font-size:12px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer}
 .range-seg button.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
 .range-span{font-size:11px;color:var(--text-secondary);margin:-4px 0 12px;font-variant-numeric:tabular-nums}
+.panel-cam{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
+.panel-cam:hover{color:var(--accent);border-color:var(--accent)}
+.panel-cam svg{width:16px;height:16px}
 .label{display:block;font-size:12px;font-weight:600;color:var(--text-secondary);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em}
 .input,.select,.textarea{width:100%;padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;margin-bottom:14px}
 .input:focus,.select:focus,.textarea:focus{border-color:var(--accent)}
@@ -232,7 +235,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.52.2';
+const APP_VERSION = 'v0.53.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -248,6 +251,7 @@ const ICONS = {
   calendar: { vb:'0 -960 960 960', d:'M180-80q-24 0-42-18t-18-42v-620q0-24 18-42t42-18h65v-60h65v60h340v-60h65v60h65q24 0 42 18t18 42v620q0 24-18 42t-42 18H180Zm0-60h600v-430H180v430Zm0-490h600v-130H180v130Zm0 0v-130 130Zm300 230q-17 0-28.5-11.5T440-440q0-17 11.5-28.5T480-480q17 0 28.5 11.5T520-440q0 17-11.5 28.5T480-400Zm-188.5-11.5Q280-423 280-440t11.5-28.5Q303-480 320-480t28.5 11.5Q360-457 360-440t-11.5 28.5Q337-400 320-400t-28.5-11.5ZM640-400q-17 0-28.5-11.5T600-440q0-17 11.5-28.5T640-480q17 0 28.5 11.5T680-440q0 17-11.5 28.5T640-400ZM480-240q-17 0-28.5-11.5T440-280q0-17 11.5-28.5T480-320q17 0 28.5 11.5T520-280q0 17-11.5 28.5T480-240Zm-188.5-11.5Q280-263 280-280t11.5-28.5Q303-320 320-320t28.5 11.5Q360-297 360-280t-11.5 28.5Q337-240 320-240t-28.5-11.5ZM640-240q-17 0-28.5-11.5T600-280q0-17 11.5-28.5T640-320q17 0 28.5 11.5T680-280q0 17-11.5 28.5T640-240Z' },
   supplies: { vb:'0 -960 960 960', d:'M180-80q-24.75 0-42.37-17.63Q120-115.25 120-140v-483q-17-6-28.5-21.39T80-680v-140q0-24.75 17.63-42.38Q115.25-880 140-880h680q24.75 0 42.38 17.62Q880-844.75 880-820v140q0 20.22-11.5 35.61T840-623v483q0 24.75-17.62 42.37Q804.75-80 780-80H180Zm0-540v480h600v-480H180Zm-40-60h680v-140H140v140Zm220 260h240v-60H360v60Zm120 40Z' },
   insights: { vb:'0 0 24 24', d:'M3 20q-.825 0-1.412-.587Q1 18.825 1 18q0-.825.588-1.413Q2.175 16 3 16h.263q.112 0 .237.05l4.55-4.55Q8 11.375 8 11.262V11q0-.825.588-1.413Q9.175 9 10 9t1.413.587Q12 10.175 12 11q0 .05-.05.5l2.55 2.55q.125-.05.238-.05h.524q.113 0 .238.05l3.55-3.55q-.05-.125-.05-.238V10q0-.825.587-1.413Q20.175 8 21 8q.825 0 1.413.587Q23 9.175 23 10q0 .825-.587 1.412Q21.825 12 21 12h-.262q-.113 0-.238-.05l-3.55 3.55q.05.125.05.238V16q0 .825-.587 1.413Q15.825 18 15 18q-.825 0-1.412-.587Q13 16.825 13 16v-.262q0-.113.05-.238l-2.55-2.55q-.125.05-.238.05H10q-.05 0-.5-.05L4.95 17.5q.05.125.05.238V18q0 .825-.588 1.413Q3.825 20 3 20ZM4 9.975l-.625-1.35L2.025 8l1.35-.625L4 6.025l.625 1.35L5.975 8l-1.35.625ZM15 9l-.95-2.05L12 6l2.05-.95L15 3l.95 2.05L18 6l-2.05.95Z' },
+  camera:   { vb:'0 -960 960 960', d:'M480-260q75 0 127.5-52.5T660-440q0-75-52.5-127.5T480-620q-75 0-127.5 52.5T300-440q0 75 52.5 127.5T480-260Zm0-60q-50 0-85-35t-35-85q0-50 35-85t85-35q50 0 85 35t35 85q0 50-35 85t-85 35ZM160-120q-33 0-56.5-23.5T80-200v-480q0-33 23.5-56.5T160-760h126l74-80h240l74 80h126q33 0 56.5 23.5T880-680v480q0 33-23.5 56.5T800-120H160Zm0-80h640v-480H638l-73-80H395l-73 80H160v480Zm320-240Z' },
   fed:      { vb:'0 -960 960 960', d:'M285-80v-368q-52-11-88.5-52.5T160-600v-280h60v280h65v-280h60v280h65v-280h60v280q0 58-36.5 99.5T345-448v368h-60Zm415 0v-320H585v-305q0-79 48-127t127-48v800h-60Z' },
   water:    { vb:'0 -960 960 960', d:'M479-208q16 0 24.5-5.5T512-230q0-11-8.5-17t-25.5-6q-42 0-85.5-26.5T337-373q-2-9-9-14.5t-15-5.5q-11 0-17 8.5t-4 17.5q15 84 71 121.5T479-208Zm-227.5 34Q160-268 160-408q0-100 79.5-217.5T480-880q161 137 240.5 254.5T800-408q0 140-91.5 234T480-80q-137 0-228.5-94ZM666-216.5Q740-293 740-408q0-79-66.5-179.5T480-800Q353-688 286.5-587.5T220-408q0 115 74 191.5T480-140q112 0 186-76.5ZM480-480Z' },
   potty:    { vb:'0 -960 960 960', d:'M538-80H423v-149H120l189-274h-95l266-377 266 377h-94l188 274H538v149ZM236-289h189-90 290-89 189-489Zm0 0h489L536-563h89L480-769 335-563h90L236-289Z' },
@@ -377,7 +381,9 @@ const PRESTIGE_COLORS = ['#b5793f','#9fb0c0','#f4a261','#2dd4bf','#a371f7'];
 function prestigeLevel(mi){ return Math.floor((mi||0) / 1000); }
 function prestigeColor(P){ return PRESTIGE_COLORS[((P-1) % PRESTIGE_COLORS.length + PRESTIGE_COLORS.length) % PRESTIGE_COLORS.length]; }
 function prestigeFx(P){ if(P<1) return null; return { col:prestigeColor(P), glow:Math.min(6+P*4, 26), pulse:P>=3, aura:P>=5 }; }
+let badgeToastFired = false; // set by checkWalkBadges so log-confirmation toasts don't clobber a badge/prestige toast
 function checkWalkBadges(announce){
+  badgeToastFired = false;
   const p = activePet(); if(!p) return;
   const mi = totalWalkMiles(), P = prestigeLevel(mi);
   if(!p.badgesSeen){ p.badgesSeen = walkBadgesEarned(mi).map(b=>b.mi); p.prestige = P; save(false); return; }
@@ -389,7 +395,7 @@ function checkWalkBadges(announce){
   if(newly.length) newly.forEach(b=> p.badgesSeen.push(b.mi));
   if(P > prevP) p.prestige = P;
   if(newly.length || P > prevP) save(false);
-  if(announce && msg) showToast(msg);
+  if(announce && msg){ showToast(msg); badgeToastFired = true; }
 }
 // Seed each pet's badgesSeen once (silently) at load, so the FIRST logged walk isn't swallowed
 // by the lazy seeding above. Existing miles are marked already-seen; only crossings from here
@@ -1218,6 +1224,8 @@ async function exportPDF(onlyPetId){
   const heading = (text,y) => { y = need(y,40); doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(...ACCENT); doc.text(text, M, y); doc.setDrawColor(...ACCENT); doc.setLineWidth(1); doc.line(M, y+5, pageW-M, y+5); doc.setFont('helvetica','normal'); doc.setTextColor(...DARK); return y+20; };
   const table = (head, body, y) => { if(!body.length) return y; doc.autoTable({ startY:y, head:[head], body, theme:'striped', margin:{left:M,right:M}, headStyles:{fillColor:ACCENT,textColor:255,fontSize:9,fontStyle:'bold'}, bodyStyles:{fontSize:8.5,textColor:DARK}, alternateRowStyles:{fillColor:STRIPE}, styles:{cellPadding:4,overflow:'linebreak',lineColor:[224,228,232],lineWidth:.5} }); return doc.lastAutoTable.finalY + 18; };
   const dash = '—';
+  // Payment summary cell (method + card ••last4 + who paid) — mirrors the vet/grooming/supply lists.
+  const payStr = x => { const m=x.payMethod||''; if(!m && !x.paidBy) return ''; const card=((m==='Credit card'||m==='Debit card')&&x.ccLast4)?(' '+(x.ccBrand?x.ccBrand+' ':'')+'••'+x.ccLast4):''; return [m+card, x.paidBy?('by '+x.paidBy):''].filter(Boolean).join('  ·  '); };
 
   pets.forEach((p, idx) => {
     if(idx > 0) doc.addPage();
@@ -1250,6 +1258,8 @@ async function exportPDF(onlyPetId){
     if(p.originContact) facts.push(['Source contact', String(p.originContact)]);
     if(p.vetName || p.vetDoctor) facts.push(['Vet', [p.vetDoctor, p.vetName, p.vetPhone, p.vetEmail].filter(Boolean).join('  ·  ')]);
     if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor, p.vet2Name, p.vet2Phone, p.vet2Email].filter(Boolean).join('  ·  ')]);
+    const wmi = data.logs.filter(l=>l.type==='walk' && l.petId===p.id).reduce((s,x)=>s+(num(x.distance)||0),0);
+    if(wmi>0){ const eb=walkBadgesEarned(wmi).length, pr=prestigeLevel(wmi); facts.push(['Walking milestones', fmtMi(wmi)+' mi walked  ·  '+eb+' of '+WALK_BADGES.length+' badges'+(pr>0?'  ·  Prestige '+pr:'')]); }
     if(p.notes) facts.push(['Notes', String(p.notes)]);
     if(facts.length){ y = heading('Profile', y); y = table(['Field','Detail'], facts, y); }
 
@@ -1257,7 +1267,7 @@ async function exportPDF(onlyPetId){
     if(W.length){ y = heading('Weight history', y); y = table(['Date','Weight','Recorded'], W.map(l=>[fmtDate(l.dateTime), l.value+' '+(l.unit||'lb'), (l.source && l.source!=='manual')?'At vet visit':'Manual']), y); }
 
     const vets = recordsFor('vetVisits', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date)+(v.time?' '+fmtClock(v.time):''), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, v.followUpDate?(fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):'')):dash, v.notes||'']), y); }
+    if(vets.length){ y = heading('Vet visits', y); y = table(['Date','Reason','Vet','Weight','Cost','Paid','Follow-up','Notes'], vets.map(v=>[fmtDate(v.date)+(v.time?' '+fmtClock(v.time):''), v.reason||dash, v.vet||dash, v.weight?(v.weight+(p.weightUnit||'lb')):dash, v.cost?money(v.cost):dash, payStr(v)||dash, v.followUpDate?(fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):'')):dash, v.notes||'']), y); }
 
     const recs = recordsFor('records', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     if(recs.length){ y = heading('Medical records', y); y = table(['Date','Type','Name','Detail','Provider','Cost','Next due'], recs.map(r=>{
@@ -1266,7 +1276,7 @@ async function exportPDF(onlyPetId){
     }), y); }
 
     const grm = recordsFor('grooming', p.id).slice().sort((a,b)=>(b.date||'').localeCompare(a.date||''));
-    if(grm.length){ y = heading('Grooming', y); y = table(['Date','Services','Groomer','Cost','Next due'], grm.map(g=>[fmtDate(g.date), (g.services||[]).join(', ')||dash, g.groomer||dash, g.cost?money(g.cost):dash, g.nextDueDate?fmtDate(g.nextDueDate):dash]), y); }
+    if(grm.length){ y = heading('Grooming', y); y = table(['Date','Services','Groomer','Cost','Paid','Next due'], grm.map(g=>[fmtDate(g.date), (g.services||[]).join(', ')||dash, g.groomer||dash, g.cost?money(g.cost):dash, payStr(g)||dash, g.nextDueDate?fmtDate(g.nextDueDate):dash]), y); }
 
     const meds = recordsFor('meds', p.id);
     if(meds.length){ y = heading('Medications & preventatives', y); y = table(['Name','Type','Last given','Every','Next due'], meds.map(m=>[m.name||dash, m.kind||dash, m.lastGiven?fmtDate(m.lastGiven):dash, m.intervalDays?(m.intervalDays+'d'):dash, medNextDue(m)?fmtDate(medNextDue(m)):dash]), y); }
@@ -1275,7 +1285,7 @@ async function exportPDF(onlyPetId){
     if(ill.length){ y = heading('Illness history', y); y = table(['Started','Recovered','Symptoms','Severity','Diagnosis','Notes'], ill.map(e=>[fmtDate(e.start), e.recovery?fmtDate(e.recovery):'ongoing', (e.symptoms||[]).join(', ')||dash, e.severity||dash, e.diagnosis||dash, e.notes||'']), y); }
 
     const inv = recordsFor('inventory', p.id).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
-    if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Low?'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), (i.qty||'')+' '+(i.unit||''), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, i.runningLow?'Yes':'']), y); }
+    if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Paid','Status'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), [(i.qty||''),(i.unit||''),(i.size?'· '+i.size:'')].filter(Boolean).join(' '), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, payStr(i)||dash, invStatus(i)+(i.runningLow?'  ·  low':'')]), y); }
 
     const allLogs = data.logs.filter(l=>l.petId===p.id && l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
     const acts = allLogs.filter(l=>l.type!=='weight').slice(0,40);
@@ -1567,7 +1577,9 @@ function saveWalk(){
   const saveFav = document.getElementById('q-fav') && document.getElementById('q-fav').checked && (entry.from || entry.to);
   if(saveFav) addWalkFavorite(entry.from, entry.to);
   const id = addLog(entry);
-  closeModal(); showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
+  closeModal();
+  // addLog → checkWalkBadges may have just shown a badge/prestige toast — don't clobber it.
+  if(!badgeToastFired) showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
   if(id && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
 }
 // ── Weather for walks (zip → Open-Meteo, no API key) ──
@@ -3298,7 +3310,7 @@ function renderBadgesCard(){
       + '<div style="font-size:12px;font-weight:600;line-height:1.2'+(on?'':';color:var(--text-secondary)')+'">'+esc(b.name)+'</div>'
       + '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:'+(on?tc:'var(--text-secondary)')+'">'+fmtMi(b.mi)+' mi</div></div>';
   }).join('');
-  return '<div class="card"><h3 class="section-title">'+svgIcon('walk',18)+' Walking milestones</h3>'
+  return '<div class="card">'+panelHead(svgIcon('walk',18)+' Walking milestones', '', 'walking-milestones')
     + '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;flex-wrap:wrap;gap:8px"><div style="font-family:JetBrains Mono,monospace;font-size:22px;font-weight:700">'+fmtMi(mi)+' <span style="font-size:13px;color:var(--text-secondary);font-family:DM Sans,sans-serif;font-weight:400">mi walked</span></div><div style="font-size:12px;color:var(--text-secondary)">'+(fx?'<strong style="color:'+fx.col+'">Prestige '+P+'</strong> · ':'')+'<strong style="color:var(--text-primary)">'+earned.length+'</strong> of '+WALK_BADGES.length+' badges</div></div>'
     + banner + prog
     + '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(94px,1fr));gap:10px">'+grid+'</div></div>';
@@ -3322,6 +3334,39 @@ function renderNextBadgeToday(){
     + '<div style="font-weight:700;font-size:15px">'+esc(name)+' <span style="font-weight:400;color:var(--text-secondary);font-size:12px">· '+toGo+'</span></div>'
     + '<div style="height:7px;background:var(--bg-tertiary);border-radius:5px;overflow:hidden;margin-top:6px"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,var(--accent),var(--accent-2));border-radius:5px"></div></div></div>'
     + '<div style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary);flex-shrink:0">'+earned.length+'/'+WALK_BADGES.length+'</div></div></div>';
+}
+// ── Insights panel → PNG export (camera button on each panel). html2canvas lazy-loaded. ──
+let _h2cLoading = null;
+function loadHtml2Canvas(){
+  if(typeof html2canvas === 'function') return Promise.resolve();
+  if(_h2cLoading) return _h2cLoading;
+  _h2cLoading = new Promise((res,rej)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js'; s.onload=res; s.onerror=()=>{_h2cLoading=null;rej(new Error('load failed'));}; document.head.appendChild(s); });
+  return _h2cLoading;
+}
+// Camera button (top-right of an Insights panel header) + shared panel header row.
+function camBtn(label){ return '<button class="panel-cam" type="button" title="Save this panel as an image" aria-label="Save this panel as an image" onclick="exportPanelPng(event,\''+label+'\')">'+svgIcon('camera',16)+'</button>'; }
+function panelHead(titleHtml, rightHtml, label){
+  return '<div class="section-head-row"><h3 class="section-title" style="margin:0">'+titleHtml+'</h3>'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">'+(rightHtml||'')+camBtn(label)+'</div></div>';
+}
+async function exportPanelPng(ev, label){
+  if(ev) ev.stopPropagation();
+  const btn = ev && ev.currentTarget;
+  const card = btn && btn.closest('.card'); if(!card) return;
+  const cams = card.querySelectorAll('.panel-cam');
+  try {
+    showToast('📷 Rendering image…');
+    await loadHtml2Canvas();
+    cams.forEach(c=>c.style.visibility='hidden'); // don't capture the buttons
+    const bg = getComputedStyle(card).backgroundColor || getComputedStyle(document.body).backgroundColor || '#0d1117';
+    const canvas = await html2canvas(card, { backgroundColor:bg, scale:2, useCORS:true, logging:false });
+    cams.forEach(c=>c.style.visibility='');
+    const pet = activePet(); const petSlug = pet && pet.name ? pet.name.trim().replace(/[^\w]+/g,'-').toLowerCase()+'-' : '';
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png'); a.download = 'pawprints-'+petSlug+label+'.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast('📷 Saved image');
+  } catch(e){ cams.forEach(c=>c.style.visibility=''); showToast('⚠️ Couldn\'t export image'); }
 }
 // Range toggle (30d / 90d / YTD) for the Spending and Potty breakdown cards.
 const RANGES = [{k:'7',label:'7d'},{k:'14',label:'14d'},{k:'30',label:'30d'},{k:'90',label:'90d'},{k:'ytd',label:'YTD'},{k:'all',label:'Lifetime'}];
@@ -3362,10 +3407,10 @@ function renderInsights(){
   html += renderBadgesCard();
   // Weight trend — the original dedicated chart, kept above the selectable Trends chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
-  if(weights.length>=2) html += '<div class="card"><h3 class="section-title">'+svgIcon('weight',18)+' Weight trend</h3><div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
+  if(weights.length>=2) html += '<div class="card">'+panelHead(svgIcon('weight',18)+' Weight trend', '', 'weight-trend')+'<div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
   // Trends — selectable chart (feeding / potty / walks / weight). Controls live in their own
   // container so changing an option refreshes only this chart, not the weight chart above.
-  html += '<div class="card"><h3 class="section-title">'+svgIcon('insights',18)+' Trends</h3>'
+  html += '<div class="card">'+panelHead(svgIcon('insights',18)+' Trends', '', 'trends')
     + '<div id="trend-controls">'+trendControlsHTML()+'</div>'
     + '<div style="height:260px"><canvas class="trend-chart"></canvas></div>'
     + '<p id="trend-hint" style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+esc(TREND_METRICS.find(m=>m.k===trendMetric).hint)+'</p>'
@@ -3391,7 +3436,7 @@ function renderSpendCard(){
   const allDates = [...petArr('vetVisits').map(v=>dateMs(v.date)), ...petArr('grooming').map(g=>dateMs(g.date)), ...petArr('inventory').map(i=>dateMs(i.purchaseDate))].filter(t=>!isNaN(t));
   const earliest = allDates.length ? Math.min(...allDates) : Date.now();
   const bar = (label,val,color)=>{ const pct = spendTotal?Math.round(val/spendTotal*100):0; return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:3px"><span>'+label+'</span><span style="font-family:JetBrains Mono,monospace;color:'+color+'">'+money(val)+'</span></div><div style="height:7px;background:var(--bg-tertiary);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px"></div></div></div>'; };
-  return '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('spend',18)+' Spending — '+money(spendTotal)+'</h3>'+rangeToggle('spend', spendRange)+'</div>'
+  return '<div class="card">'+panelHead(svgIcon('spend',18)+' Spending — '+money(spendTotal), rangeToggle('spend', spendRange), 'spending')
     + rangeSpanLine(spendRange, earliest)
     + (spendTotal>0
         ? bar(svgIcon('vet',16)+' Vet', spendVet, 'var(--blue)') + bar(svgIcon('groom',16)+' Grooming', spendGroom, 'var(--accent)') + bar(svgIcon('supplies',16)+' Food & supplies', spendSupplies, 'var(--success)')
@@ -3406,7 +3451,7 @@ function renderPottyCard(){
   const potty = all.filter(p=>p.dateTime && new Date(p.dateTime).getTime() >= R.ms);
   const allMs = all.map(p=>new Date(p.dateTime).getTime()).filter(t=>!isNaN(t));
   const earliest = allMs.length ? Math.min(...allMs) : Date.now();
-  const head = '<div class="card"><div class="section-head-row"><h3 class="section-title" style="margin:0">'+svgIcon('potty',18)+' Potty breakdown</h3>'+rangeToggle('potty', pottyRange)+'</div>'+rangeSpanLine(pottyRange, earliest);
+  const head = '<div class="card">'+panelHead(svgIcon('potty',18)+' Potty breakdown', rangeToggle('potty', pottyRange), 'potty-breakdown')+rangeSpanLine(pottyRange, earliest);
   if(!potty.length) return head + '<p style="font-size:12px;color:var(--text-secondary);margin:0">No potty breaks in the '+R.label+'.</p></div>';
   const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
   // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
