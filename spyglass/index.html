@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.7.2 — watch any web page for changes</title>
+<title>Spyglass v0.8.2 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -107,7 +107,10 @@
   .card .fav{width:34px;height:34px;border-radius:8px;background:var(--surface-2);flex:none;
     display:flex;align-items:center;justify-content:center;overflow:hidden}
   .card .fav img{width:22px;height:22px}
+  .card .thumb{width:78px;height:50px;border-radius:8px;border:1px solid var(--border);
+    object-fit:cover;object-position:top center;flex:none;background:var(--surface-2);cursor:pointer}
   .card .meta{flex:1;min-width:0}
+  .card .meta .val{font-weight:700;font-size:.98rem;margin:.05rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .card .meta .name{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .card .meta .url{font-size:.8rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .card .meta .sub{font-size:.76rem;color:var(--muted);margin-top:.15rem}
@@ -410,6 +413,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.8.2</strong> — Each monitor card now shows its <em>current value</em> at a glance (the rate, price, or keyword state) and a <em>thumbnail</em> of the page — the &#8635; refresh button updates both. Two reliability fixes: an empty read (page didn't finish loading) is now treated as a temporary error and retried, never a false &ldquo;it changed&rdquo; alert; and if a browser render fails, Spyglass falls back to the r.jina.ai reader.</li>
         <li><strong>v0.7.2</strong> — Spyglass now renders JavaScript pages with its own browser, replacing the outside r.jina.ai service (which started rate-limiting). New <em>Render in a browser</em> toggle for JS-built pages — and <em>Test it now</em> / the pattern builder switch it on automatically when a value only appears after scripts run. Your bank-rate monitors were moved onto it.</li>
         <li><strong>v0.7.1</strong> — Screenshots are much faster (a few seconds instead of ~25) and no longer come back blank on script-heavy sites — the capture now waits for the page's text to actually render instead of for network traffic to go quiet, which banking sites never do.</li>
         <li><strong>v0.7.0</strong> — Four VisualPing-inspired upgrades: <em>&#128207; screenshot region picker</em> (drag a box over a live screenshot; that monitor's screenshots crop to just that area), <em>keyword direction</em> (alert only when a phrase is <em>added</em> or only when it's <em>removed</em> — perfect for restock watching), <em>Discord &amp; custom webhook alert channels</em> (set in &#9881; Settings), and <em>schedule windows</em> (limit checks to certain days/hours). Keyword monitors are now clearly labeled &ldquo;Keyword / exact phrase&rdquo;.</li>
@@ -439,7 +443,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.7.2";
+  const APP_VERSION = "0.8.2";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -514,15 +518,18 @@ function demoData(){
   const now = Date.now();
   return [
     {id:"d1", name:"GPU restock page", url:"https://example.com/gpu", type:"keyword", keyword:"In stock",
-     frequencyMinutes:15, enabled:true, lastStatus:"changed", changeCount:3, lastCheckedAt:now-1000*60*4},
-    {id:"d2", name:"Apartment listing", url:"https://example.com/rentals/123", type:"element", selector:".price",
-     frequencyMinutes:60, enabled:true, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*40},
+     frequencyMinutes:15, enabled:true, lastStatus:"changed", changeCount:3, lastCheckedAt:now-1000*60*4,
+     lastContent:'Keyword "In stock": present'},
+    {id:"d2", name:"Apartment listing", url:"https://example.com/rentals/123", type:"pattern", pattern:"\\$([\\d,]+)/mo",
+     frequencyMinutes:60, enabled:true, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*40,
+     lastContent:"$1,850/mo"},
     {id:"d3", name:"Company careers", url:"https://example.com/careers", type:"text",
      frequencyMinutes:1440, enabled:true, lastStatus:"changed", changeCount:1, lastCheckedAt:now-1000*60*60*6},
     {id:"d4", name:"Terms of service", url:"https://example.com/tos", type:"text",
      frequencyMinutes:1440, enabled:false, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*60*30},
     {id:"d5", name:"Status page", url:"https://example.com/status", type:"keyword", keyword:"operational",
-     frequencyMinutes:5, enabled:true, lastStatus:"error", changeCount:0, lastCheckedAt:now-1000*60*9},
+     frequencyMinutes:5, enabled:true, lastStatus:"error", changeCount:0, lastCheckedAt:now-1000*60*9,
+     lastContent:'Keyword "operational": absent'},
   ];
 }
 const DEMO_SNAPS = {
@@ -628,11 +635,29 @@ function renderList(){
     return;
   }
   if(items.length===0){ list.innerHTML = `<div class="empty"><p>No monitors match this filter.</p></div>`; return; }
-  list.innerHTML = items.map(m => `
+  list.innerHTML = items.map(renderCard).join("");
+}
+
+/* The current extracted value, if short enough to show at a glance (rates,
+   prices, keyword state). Whole-page-text monitors have huge content → skip. */
+function currentValue(m){
+  const c = (m.lastContent||"").trim();
+  if(!c || c.length > 70) return "";
+  const kw = c.match(/^Keyword "(.*)": (present|absent)$/);
+  if(kw) return `“${kw[1]}” ${kw[2]}`;
+  return c;
+}
+function renderCard(m){
+  const val = currentValue(m);
+  const left = m.lastShot
+    ? `<img class="thumb" src="data:image/jpeg;base64,${m.lastShot}" onclick="openDetail('${m.id}')" alt="page thumbnail">`
+    : `<div class="fav">${favOf(m.url) ? `<img src="${favOf(m.url)}" onerror="this.style.display='none'">` : "&#128279;"}</div>`;
+  return `
     <div class="card">
-      <div class="fav">${favOf(m.url) ? `<img src="${favOf(m.url)}" onerror="this.style.display='none'">` : "&#128279;"}</div>
+      ${left}
       <div class="meta" onclick="openDetail('${m.id}')" style="cursor:pointer">
         <div class="name">${escapeHtml(m.name || domainOf(m.url))}</div>
+        ${val ? `<div class="val">${escapeHtml(val)}</div>` : ""}
         <div class="url">${escapeHtml(m.url)}</div>
         <div class="sub">Checks ${freqLabel(m.frequencyMinutes)} &middot; last ${fmtAgo(m.lastCheckedAt)} &middot; ${m.changeCount||0} change${(m.changeCount||0)===1?"":"s"}</div>
       </div>
@@ -643,7 +668,7 @@ function renderList(){
         <button class="btn sm ghost" title="Edit" onclick="openEdit('${m.id}')">&#9998;</button>
         <button class="btn sm ghost" title="Delete" onclick="deleteMonitor('${m.id}')">&#128465;</button>
       </div>
-    </div>`).join("");
+    </div>`;
 }
 function monitorById(id){ return monitors.find(m => m.id===id); }
 

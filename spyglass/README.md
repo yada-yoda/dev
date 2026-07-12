@@ -126,6 +126,20 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.8.2 (worker v0.8.2)
+Monitor cards show the current extracted value at a glance (short values only — rates, prices,
+keyword state) and a screenshot thumbnail of the page; the worker stores the latest screenshot as
+`lastShot` on the monitor doc whenever one is captured (baseline, change, or a manual ↻ refresh —
+the cron doesn't re-shoot on unchanged, to spare the browser-minutes budget).
+
+**Reliability:** an *empty* extraction (page didn't finish rendering, JS value hadn't painted,
+selector briefly missing, fetch blocked) is now treated as a transient **error and retried next
+cycle — never a change**. You can't "change into nothing", so this eliminates false "it changed"
+alerts when a render is slow. The browser render also retries once on an empty pattern/element
+result. Plus a resilience fallback: if browser rendering fails outright, extraction falls back to
+r.jina.ai's rendered text (text/keyword/pattern only — element selectors need a real DOM). r.jina.ai
+is now a backup, not the primary path.
+
 ### v0.7.2 (worker v0.7.0)
 Own-browser rendering replaces the external r.jina.ai dependency (which started returning 429s).
 A monitor `render: true` (new "Render in a browser" toggle) routes extraction through Cloudflare
