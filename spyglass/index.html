@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.7.1 — watch any web page for changes</title>
+<title>Spyglass v0.7.2 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -275,6 +275,9 @@
           </select>
         </label>
       </div>
+      <label class="toggle" style="margin-bottom:1rem"><input type="checkbox" id="mRender" style="width:auto">
+        Render in a browser <span class="hint" style="font-weight:400">— for JavaScript-built pages (bank rates, prices) or sites that block plain fetches. A little slower; the &#128269; Test button will suggest this automatically if it's needed.</span>
+      </label>
       <label class="field hidden" id="selField">
         <span class="lab">CSS selector <span class="hint">— e.g. <code>#price</code> or <code>.status</code></span></span>
         <input id="mSelector" type="text" placeholder="#price" />
@@ -407,6 +410,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.7.2</strong> — Spyglass now renders JavaScript pages with its own browser, replacing the outside r.jina.ai service (which started rate-limiting). New <em>Render in a browser</em> toggle for JS-built pages — and <em>Test it now</em> / the pattern builder switch it on automatically when a value only appears after scripts run. Your bank-rate monitors were moved onto it.</li>
         <li><strong>v0.7.1</strong> — Screenshots are much faster (a few seconds instead of ~25) and no longer come back blank on script-heavy sites — the capture now waits for the page's text to actually render instead of for network traffic to go quiet, which banking sites never do.</li>
         <li><strong>v0.7.0</strong> — Four VisualPing-inspired upgrades: <em>&#128207; screenshot region picker</em> (drag a box over a live screenshot; that monitor's screenshots crop to just that area), <em>keyword direction</em> (alert only when a phrase is <em>added</em> or only when it's <em>removed</em> — perfect for restock watching), <em>Discord &amp; custom webhook alert channels</em> (set in &#9881; Settings), and <em>schedule windows</em> (limit checks to certain days/hours). Keyword monitors are now clearly labeled &ldquo;Keyword / exact phrase&rdquo;.</li>
         <li><strong>v0.6.1</strong> — Added a <a href="legal.html">Privacy, Terms &amp; Disclaimer</a> page explaining exactly what Spyglass stores, where it lives, and what it will never do (no analytics, no ads, no data sale) — linked from the new footer.</li>
@@ -435,7 +439,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.7.1";
+  const APP_VERSION = "0.7.2";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -655,6 +659,7 @@ function openEdit(id){
   $("#mSelector").value = m ? (m.selector||"") : "";
   $("#mKeyword").value = m ? (m.keyword||"") : "";
   $("#mPattern").value = m ? (m.pattern||"") : "";
+  $("#mRender").checked = m ? !!m.render : false;
   $("#mEnabled").checked = m ? !!m.enabled : true;
   $("#testResult").classList.add("hidden"); $("#testResult").innerHTML = "";
   $("#patBuilder").classList.add("hidden"); $("#pbValue").value = ""; $("#pbNear").value = "";
@@ -832,32 +837,29 @@ async function buildPattern(){
   btn.disabled = true; btn.textContent = "Testing patterns…";
   try{
     const idToken = await auth.currentUser.getIdToken();
-    const tryOne = async (u, pattern) => {
+    const tryOne = async (pattern, render) => {
       const resp = await fetch(WORKER_URL + "/preview", {
         method: "POST",
         headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
-        body: JSON.stringify({ url: u, type: "pattern", pattern }),
+        body: JSON.stringify({ url, type: "pattern", pattern, render }),
       });
       return resp.json();
     };
     const candidates = buildCandidates(value, near);
-    // Round 1: the URL as entered. Round 2: through r.jina.ai (renders
-    // JavaScript pages in a real browser) if nothing matched directly.
-    const rounds = [url];
-    if(!url.includes("r.jina.ai")) rounds.push("https://r.jina.ai/" + url);
-    for(const u of rounds){
+    // Round 1: plain fetch. Round 2: rendered in a browser (for JS-built
+    // pages) if nothing matched directly — and turn on the toggle if it works.
+    for(const render of [false, true]){
+      if(render) show(`<div class="muted" style="font-size:.85rem">Not on the plain page — trying a browser render…</div>`);
       for(const pattern of candidates){
-        const r = await tryOne(u, pattern);
+        const r = await tryOne(pattern, render);
         // require the literal value in the result so we know we captured the right thing
         if(r.ok && r.matched && r.preview.includes(value)){
           $("#mPattern").value = pattern;
-          if(u !== url){
-            $("#mUrl").value = u;
-            toast("Page needed JavaScript — URL switched to the r.jina.ai rendered version");
-          }
+          if(render){ $("#mRender").checked = true; }
           show(`<div style="border:1px solid var(--green);border-radius:10px;padding:.7rem .85rem;background:var(--green-bg);font-size:.85rem">
             <strong style="color:var(--green)">Pattern built &amp; working.</strong>
             <div style="font-size:.78rem;margin:.3rem 0">Pattern: <code>${escapeHtml(pattern)}</code></div>
+            ${render?'<div style="font-size:.78rem;color:var(--muted);margin-bottom:.3rem">Turned on <em>Render in a browser</em> — this page builds the value with JavaScript.</div>':''}
             <div class="diff" style="max-height:120px">${escapeHtml(r.preview)}</div>
             <div style="font-size:.78rem;margin-top:.3rem;color:var(--muted)">When this value changes on the page, you'll get an alert showing old &rarr; new — no need to update anything.</div></div>`);
           $("#patBuilder").classList.add("hidden");
@@ -866,7 +868,7 @@ async function buildPattern(){
       }
     }
     show(`<div style="border:1px solid var(--amber);border-radius:10px;padding:.7rem .85rem;background:var(--amber-bg);color:var(--amber);font-size:.85rem">
-      <strong>Couldn't find "${escapeHtml(value)}" on the page</strong> (tried the rendered version too).<br>
+      <strong>Couldn't find "${escapeHtml(value)}" on the page</strong> (tried a browser render too).<br>
       <span style="font-size:.78rem">Double-check the value is visible on that exact URL, or try without the nearby word.</span></div>`);
   }catch(e){
     show(`<div style="border:1px solid var(--red);border-radius:10px;padding:.7rem .85rem;background:var(--red-bg);color:var(--red);font-size:.85rem">Builder failed: ${escapeHtml(e.message)}</div>`);
@@ -916,6 +918,8 @@ function collectForm(){
   data.checkEndHour = he==="" ? null : parseInt(he,10);
   if(data.checkStartHour != null && data.checkEndHour < data.checkStartHour){ toast("Until must be at or after From","err"); return null; }
   data.tz = (Intl.DateTimeFormat().resolvedOptions().timeZone) || null;
+  // render in a browser (JS pages)
+  data.render = $("#mRender").checked;
   // screenshot crop region
   data.region = currentRegion || null;
   return data;
@@ -934,26 +938,32 @@ async function testMonitor(){
   show(`<div class="muted" style="font-size:.85rem">Fetching ${escapeHtml(domainOf(d.url))}…</div>`);
   try{
     const idToken = await auth.currentUser.getIdToken();
-    const resp = await fetch(WORKER_URL + "/preview", {
+    const runTest = (render) => fetch(WORKER_URL + "/preview", {
       method: "POST",
       headers: { "Authorization": "Bearer " + idToken, "Content-Type": "application/json" },
-      body: JSON.stringify({ url: d.url, type: d.type, selector: d.selector, keyword: d.keyword, pattern: d.pattern }),
-    });
-    const r = await resp.json();
+      body: JSON.stringify({ url: d.url, type: d.type, selector: d.selector, keyword: d.keyword, pattern: d.pattern, render }),
+    }).then(x => x.json());
+    let r = await runTest(d.render);
+    // If a plain fetch found nothing/failed, auto-retry rendered in a browser —
+    // and if THAT works, turn the toggle on for the user.
+    let autoRendered = false;
+    if((!r.ok || !r.matched) && !d.render){
+      show(`<div class="muted" style="font-size:.85rem">Nothing on the plain page — rendering it in a browser…</div>`);
+      const r2 = await runTest(true);
+      if(r2.ok && r2.matched){ r = r2; autoRendered = true; $("#mRender").checked = true; }
+    }
     if(!r.ok){
       show(`<div style="border:1px solid var(--red);border-radius:10px;padding:.7rem .85rem;background:var(--red-bg);color:var(--red);font-size:.85rem">
-        <strong>Couldn't fetch the page:</strong> ${escapeHtml(r.error||"unknown error")}<br>
-        <span style="font-size:.78rem">Some sites block server-side checks. Try prefixing the URL with
-        <code>https://r.jina.ai/</code> — it renders the page in a real browser (works for JavaScript-built pages too).</span></div>`);
+        <strong>Couldn't read the page:</strong> ${escapeHtml(r.error||"unknown error")}<br>
+        <span style="font-size:.78rem">The site may be blocking automated access, or the page may be unreachable.</span></div>`);
     }else if(!r.matched){
       show(`<div style="border:1px solid var(--amber);border-radius:10px;padding:.7rem .85rem;background:var(--amber-bg);color:var(--amber);font-size:.85rem">
-        <strong>Fetched the page, but extracted nothing.</strong><br>
-        <span style="font-size:.78rem">The selector matched no server-rendered content — many sites inject values
-        (prices, rates) with JavaScript, which a plain fetch can't see. Try prefixing the URL with
-        <code>https://r.jina.ai/</code> and switching to a keyword monitor on the value you care about.</span></div>`);
+        <strong>Read the page, but your ${escapeHtml(d.type)} matched nothing.</strong><br>
+        <span style="font-size:.78rem">Double-check the ${d.type==='pattern'?'pattern':d.type==='element'?'selector':'keyword'} against what's actually on the page${d.render?'':' — or tick "Render in a browser" above if the value is built by JavaScript'}.</span></div>`);
     }else{
       show(`<div style="border:1px solid var(--green);border-radius:10px;padding:.7rem .85rem;background:var(--green-bg);font-size:.85rem">
         <strong style="color:var(--green)">Matched — this is what Spyglass will watch (${r.length} chars):</strong>
+        ${autoRendered?'<div style="font-size:.78rem;color:var(--muted);margin:.3rem 0">Turned on <em>Render in a browser</em> for you — the value only appears once JavaScript runs.</div>':''}
         <div class="diff" style="margin-top:.5rem;max-height:180px">${escapeHtml(r.preview)}${r.length>1200?" …":""}</div></div>`);
     }
   }catch(e){

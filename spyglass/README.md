@@ -67,15 +67,14 @@ Existing accounts are never affected.
 `404.html` in this folder is the Spyglass-branded not-found page; the dev.rizzo.cc root
 `404.html` bounces `/spyglass/*` misses here (GitHub Pages only supports one site-wide 404).
 
-### Phase 1 limitations & the rendered-page trick
-- Pages that render their content **only via JavaScript** look empty to the server-side fetch, and
-  some sites (banks especially) block datacenter IPs outright. The **Test it now** button in the
-  monitor form shows you exactly what Spyglass can see before you save.
-- **Workaround that usually fixes both:** prefix the URL with `https://r.jina.ai/` — a free public
-  reader that loads the page in a real browser and returns its rendered text. Pair it with a
-  *keyword* monitor on the exact value you care about (e.g. keyword `3.00%` on a bank's rates page:
-  the alert fires the moment that rate changes). Visual screenshot monitoring (Phase 2) will handle
-  these natively.
+### JavaScript-built pages — "Render in a browser"
+Pages that build their content with JavaScript (bank rates, prices) look empty to a plain fetch,
+and some sites block datacenter IPs. Tick **Render in a browser** on the monitor and Spyglass loads
+the page in its own Cloudflare headless browser — rendering the JS natively — then extracts from the
+result. It waits for the *watched* content (the pattern/keyword/selector) to actually appear before
+reading, so it doesn't catch a page mid-render. **Test it now** and the pattern builder turn this
+toggle on automatically when a value only shows up after scripts run. (This replaced an earlier
+dependency on the external `r.jina.ai` reader, which began rate-limiting.)
 
 ### Worker endpoints
 - `POST /trigger` — run a sweep immediately (`x-trigger-key` header).
@@ -126,6 +125,16 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 `index.html?demo=1` shows a populated dashboard with sample monitors — no sign-in, nothing saved.
 
 ## Changelog
+
+### v0.7.2 (worker v0.7.0)
+Own-browser rendering replaces the external r.jina.ai dependency (which started returning 429s).
+A monitor `render: true` (new "Render in a browser" toggle) routes extraction through Cloudflare
+Browser Rendering — shared `withRenderedPage` navigation with screenshots — and waits for the
+watched pattern/keyword/selector to render before reading, so JS-loaded values are captured
+reliably. Test-it-now and the pattern builder auto-enable render + auto-retry when a value is
+JS-built. The two bank monitors were migrated off jina URLs to `render:true` with re-tuned,
+anchored patterns (Ally "buckets and boosters" → 3.00%; Synchrony "HYS APY" → its real current
+2.85%, not the stale 3.30% jina had cached); verified unchanged across repeated live checks.
 
 ### v0.7.1 (worker v0.6.1)
 Faster, reliable screenshots. The capture waited on `networkidle2`, which never settles on
