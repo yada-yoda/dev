@@ -127,6 +127,21 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.9.0 (worker v0.9.0)
+**Guaranteed change screenshots.** A detected change always captures a screenshot for the alert
+email (retried), taken with the method that shows the page's real content — jina's own screenshot
+for jina monitors (whose rate API blocks our IPs, so our browser renders a blank value), our
+browser otherwise. The email always carries the full image; it's stored in the snapshot/thumbnail
+only if it fits Firestore's ~1MB doc limit (jina PNGs can exceed it).
+
+**Safe fallback.** Each monitor has a primary method (plain / browser / jina). If it fails or reads
+empty, Spyglass tries the *other* methods — but ONLY to **confirm the value is unchanged**, never
+to declare a change. Different methods can legitimately read different values for the same page
+(Synchrony: our browser sees a 2.85% calculator, jina the real 3.30%), so a change is only ever
+trusted from the monitor's own primary method. Result: availability when a method is briefly down,
+without false-alarm risk. Verified: fallback confirms unchanged when it matches the baseline, and
+refuses to alert (errors + retries) when it reads a different value.
+
 ### v0.8.4 (worker v0.8.4)
 Some sites (Synchrony's HYS/CD pages) inject their rate from an API (`api.syf.com`) that **blocks
 Cloudflare's IPs** — so both a plain fetch (403) and our own headless browser (the API call fails
