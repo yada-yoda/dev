@@ -38,7 +38,7 @@ const SEED_PAY_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
 const SEED_CHECK_TYPES = ['Regular', 'Bonus', 'Reimbursement', 'Adjustment', 'Other one-time'];
 const SEED_INCOME_GROUPS = [
   'Wages', 'Acting', 'Side Jobs', 'Dividends', 'Investments', 'Interest',
-  'Passive / Affiliate', 'Rewards', 'Selling', 'Other'
+  'Passive / Affiliate', 'Rewards', 'Selling', 'Retirement / IRA', 'Other'
 ];
 // Expense groups seed with useful default subcategories (only applied on first
 // run — existing users keep their own lists and can add these in Settings).
@@ -85,6 +85,15 @@ function migrateExpenseSeeds(cats) {
     });
   });
   return changed;
+}
+
+// Existing users predate the Retirement / IRA income group — add it once so
+// IRA/estate distributions have a home (additive, idempotent).
+function migrateIncomeSeeds(cats) {
+  if (!Array.isArray(cats)) return false;
+  if (cats.some(c => /\bira\b|retire/i.test(c.name || ''))) return false;
+  cats.push({ id: mkId('cat'), name: 'Retirement / IRA', order: cats.length, subs: [] });
+  return true;
 }
 
 function seedGroups(items) {
@@ -225,6 +234,7 @@ function apply(data) {
   state.incomeCategories = s.incomeCategories;
   state.expenseCategories = s.expenseCategories;
   if (migrateExpenseSeeds(state.expenseCategories)) scheduleSave();
+  if (migrateIncomeSeeds(state.incomeCategories)) scheduleSave();
   state.accounts = s.accounts;
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;

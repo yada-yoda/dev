@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.95 — IRA / estate distributions as income
+
+- New **Retirement / IRA** income category (added automatically for existing
+  data). Pick it on an income entry and a dedicated section appears for
+  recording a retirement distribution — including an **inherited IRA from an
+  estate**.
+- Fields: **Distribution type** (Inherited IRA (Estate), Traditional/Roth IRA,
+  401(k), pension, RMD, lump-sum…), **Payer / plan**, **Distributed from**
+  (the account the money came out of, e.g. the estate’s IRA), and separate
+  **Federal** and **State tax withheld** amounts.
+- Enter the gross distribution and the withholdings, and the **net is computed
+  for you** (gross − federal − state) — so your take-home is right in both the
+  grid and the list. The Account field relabels to **Deposited to** (where the
+  money landed), and Taxable defaults to Yes. The income list shows the payer
+  and distribution type at a glance.
+
 ### v1.0.94 — Budget page for placeholders + monthly reconciliation
 
 - **New Budget page** (in the nav under Bills & Subscriptions) gathers every

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.94';
+const VERSION = '1.0.95';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1213,14 +1213,21 @@ function buildIncomeListCol(store, key) {
 function incomeList(data) {
   const store = window.cloverStore;
   const rows = [];
-  data.income.forEach(e => rows.push({
-    kind: 'income', raw: e, date: e.date, catName: store.incomeGroupName(e.categoryId),
-    source: e.rewardSource || e.otherType || e.symbol || store.subName('income', e.categoryId, e.subId) || '',
-    srcSub: e.rewardType || e.description || (e.symbol && e.action ? e.action : ''), reinvested: !!e.reinvested,
-    account: store.accountName(e.accountId) || '', via: e.receivedVia || '', gross: amountOf(e), net: Number(e.net) || 0,
-    person: store.personName(e.personId), status: e.status === 'pending' ? 'Pending' : 'Received', notes: e.notes || '',
-    categoryId: e.categoryId
-  }));
+  data.income.forEach(e => {
+    const wh = [];
+    if (e.fedWithheld) wh.push('Fed ' + money(e.fedWithheld));
+    if (e.stateWithheld) wh.push('State ' + money(e.stateWithheld));
+    const source = e.rewardSource || e.otherType || e.payer || e.symbol || store.subName('income', e.categoryId, e.subId) || e.distType || '';
+    const srcSub = e.rewardType || e.description || (e.symbol && e.action ? e.action : '')
+      || (e.payer && e.distType ? e.distType : '') || (wh.length ? wh.join(' · ') + ' withheld' : '');
+    rows.push({
+      kind: 'income', raw: e, date: e.date, catName: store.incomeGroupName(e.categoryId),
+      source, srcSub, reinvested: !!e.reinvested,
+      account: store.accountName(e.accountId) || '', via: e.receivedVia || '', gross: amountOf(e), net: Number(e.net) || 0,
+      person: store.personName(e.personId), status: e.status === 'pending' ? 'Pending' : 'Received', notes: e.notes || '',
+      categoryId: e.categoryId
+    });
+  });
   data.paychecks.forEach(pc => rows.push({
     kind: 'paycheck', raw: pc, date: pc.payDate, catName: store.incomeGroupName(pc.incomeCategoryId) || 'Wages',
     source: pc.employer || '', srcSub: (n => n ? 'Period #' + n : '')(paycheckPeriodNum(store, pc)), reinvested: false,
@@ -1350,24 +1357,55 @@ function incomeModal(existing) {
   otWrap.appendChild(field('Type', fOtType, 'What kind of “other” income this is — e.g. Lawsuit settlement, Gift, Stimulus, Rebate, Winnings.'));
   otWrap.appendChild(field('Description', fDesc, 'A short label or name — e.g. the class-action case name, or what the gift/rebate was for.'));
 
+  // Retirement / IRA distribution fields (shown when the category looks like a
+  // retirement or IRA/pension distribution) — e.g. an inherited IRA from an
+  // estate, often with federal/state tax withheld at the source.
+  const isRetMode = () => { const g = s.incomeCategories.find(c => c.id === fCat.value); return !!(g && /\bira\b|retire|pension|401\(?k\)?|403\(?b\)?|annuity|distribution/i.test(g.name)); };
+  const retTypeList = el('datalist'); retTypeList.id = 'ret-type-list';
+  ['Inherited IRA (Estate)', 'Traditional IRA', 'Roth IRA', 'SEP IRA', 'SIMPLE IRA', 'Rollover IRA', '401(k)', '403(b)', 'Pension', 'Annuity', 'Required Minimum Distribution (RMD)', 'Lump-sum distribution'].forEach(v => { const o = el('option'); o.value = v; retTypeList.appendChild(o); });
+  body.appendChild(retTypeList);
+  const fRetType = input(e.distType || '', { placeholder: 'e.g. Inherited IRA (Estate)', list: 'ret-type-list' });
+  const fPayer = input(e.payer || '', { placeholder: 'e.g. estate or plan custodian' });
+  const fFromAcct = accountSelect(s, e.fromAccountId || '', '— Select account —');
+  const fFedWh = input(e.fedWithheld != null ? e.fedWithheld : '', { type: 'number', placeholder: '0.00' }); fFedWh.step = '0.01'; fFedWh.min = 0;
+  const fStateWh = input(e.stateWithheld != null ? e.stateWithheld : '', { type: 'number', placeholder: '0.00' }); fStateWh.step = '0.01'; fStateWh.min = 0;
+  const retWrap = el('div', 'div-fields');
+  retWrap.appendChild(field('Distribution type', fRetType, 'What kind of retirement distribution this is — e.g. an inherited IRA from an estate, a Traditional/Roth IRA, a 401(k), pension, or a required minimum distribution.'));
+  retWrap.appendChild(field('Payer / plan', fPayer, 'Who paid the distribution — the estate, or the IRA/plan custodian (e.g. the brokerage). Free text.'));
+  retWrap.appendChild(field('Distributed from', fFromAcct, 'Which account the distribution came OUT of — e.g. the estate’s inherited IRA. Pair it with the Account field above (where the money landed).'));
+  const whRow = el('div', 'two-col');
+  whRow.appendChild(field('Federal tax withheld', fFedWh, 'Amount withheld for FEDERAL income tax at the source. Subtracted from the gross to give your net.'));
+  whRow.appendChild(field('State tax withheld', fStateWh, 'Amount withheld for STATE income tax at the source, if any. Also subtracted from the gross.'));
+  retWrap.appendChild(whRow);
+  const retNum = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+  const computeRetNet = () => { const g = parseFloat(fGross.value); if (isNaN(g)) { fNet.value = ''; return; } fNet.value = Math.round((g - retNum(fFedWh.value) - retNum(fStateWh.value)) * 100) / 100; };
+
   const syncCat = () => {
     const g = s.incomeCategories.find(c => c.id === fCat.value);
     const isRw = !!(g && /reward/i.test(g.name));
+    const isRet = isRetMode();
     divWrap.style.display = (g && /dividend/i.test(g.name)) ? '' : 'none';
     rwWrap.style.display = isRw ? '' : 'none';
     otWrap.style.display = (g && /other/i.test(g.name)) ? '' : 'none';
+    retWrap.style.display = isRet ? '' : 'none';
     // Rewards don't need the generic plumbing: Received via is replaced by the
     // reward type, and the reinvested/paid-out flags don't apply.
     viaField.style.display = isRw ? 'none' : '';
     flagsField.style.display = isRw ? 'none' : '';
-    syncRwAcct();
+    syncAcctLabel();
     // Rewards are take-home by definition: you enter the NET, and Gross is greyed
     // out and mirrors it (they're always equal for rewards).
     fGross.readOnly = isRw;
     fGross.classList.toggle('mirrored', isRw);
     if (isRw) { if (!fNet.value && fGross.value) fNet.value = fGross.value; fGross.value = fNet.value; }
+    // IRA/retirement: Net is gross minus withholdings and is computed, not typed.
+    fNet.readOnly = isRet;
+    fNet.classList.toggle('mirrored', isRet);
+    if (isRet) { computeRetNet(); if (fTax.value === 'unknown') fTax.value = 'yes'; }
   };
   fNet.addEventListener('input', () => { if (fGross.readOnly) fGross.value = fNet.value; });
+  fGross.addEventListener('input', () => { if (isRetMode()) computeRetNet(); });
+  [fFedWh, fStateWh].forEach(f => f.addEventListener('input', () => { if (isRetMode()) computeRetNet(); }));
   fCat.addEventListener('change', () => { rebuildSubs(); syncCat(); });
 
   body.appendChild(field('Date', fDate, 'When you received this money. For pending items, the date you expect it.'));
@@ -1395,19 +1433,23 @@ function incomeModal(existing) {
   body.appendChild(divWrap);
   body.appendChild(rwWrap);
   body.appendChild(otWrap);
+  body.appendChild(retWrap);
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this entry.'));
-  // For rewards, the account field only matters when the reward was DEPOSITED
-  // somewhere — the label flips to "Deposited to" and hides otherwise.
+  // The Account field means "where the money landed". For rewards it only
+  // matters when the reward was DEPOSITED (label → "Deposited to", hidden
+  // otherwise); for an IRA/retirement distribution it's the deposit account,
+  // paired with "Distributed from" above (label → "Deposited to").
   const acctLbl = acctField.querySelector('span').childNodes[0];
-  const syncRwAcct = () => {
+  const syncAcctLabel = () => {
     const g = s.incomeCategories.find(c => c.id === fCat.value);
     const isRw = !!(g && /reward/i.test(g.name));
+    const isRet = isRetMode();
     const dep = /deposit/i.test(rwTypeVal());
-    acctField.style.display = (!isRw || dep) ? '' : 'none';
-    acctLbl.nodeValue = (isRw && dep) ? 'Deposited to' : 'Account';
+    acctField.style.display = (isRw && !dep) ? 'none' : '';
+    acctLbl.nodeValue = (isRet || (isRw && dep)) ? 'Deposited to' : 'Account';
   };
-  fRwTypeSel.addEventListener('change', () => { rwTypeOtherWrap.style.display = fRwTypeSel.value === '__other' ? '' : 'none'; if (fRwTypeSel.value === '__other') fRwTypeOther.focus(); syncRwAcct(); });
-  fRwTypeOther.addEventListener('input', syncRwAcct);
+  fRwTypeSel.addEventListener('change', () => { rwTypeOtherWrap.style.display = fRwTypeSel.value === '__other' ? '' : 'none'; if (fRwTypeSel.value === '__other') fRwTypeOther.focus(); syncAcctLabel(); });
+  fRwTypeOther.addEventListener('input', syncAcctLabel);
   rebuildSubs(); syncCat();
 
   openModal({
@@ -1428,7 +1470,9 @@ function incomeModal(existing) {
         symbol: fSym.value.trim(), action: fAction.value.trim(),
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
         rewardSource: (fRwSel.value === '__other' ? fRwOther.value : fRwSel.value).trim(), rewardType: rwTypeVal(), orderConf: fOrderConf.value.trim(),
-        otherType: fOtType.value.trim(), description: fDesc.value.trim()
+        otherType: fOtType.value.trim(), description: fDesc.value.trim(),
+        distType: fRetType.value.trim(), payer: fPayer.value.trim(), fromAccountId: fFromAcct.value || '',
+        fedWithheld: fFedWh.value === '' ? null : parseFloat(fFedWh.value), stateWithheld: fStateWh.value === '' ? null : parseFloat(fStateWh.value)
       });
       store.saveIncome(activeYear, entry);
       toast(existing ? 'Income updated' : 'Income added');
