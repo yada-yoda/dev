@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Pulse v0.1.0 — personal uptime monitor</title>
+<meta name="description" content="Pulse watches your sites and workers and alerts you when they go down. Your own personal uptime monitor." />
+
+<!-- Open Graph / Twitter -->
+<meta property="og:title" content="Pulse — personal uptime monitor" />
+<meta property="og:description" content="Watch your sites and get alerted when they go down." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://dev.rizzo.cc/pulse/" />
+<meta property="og:image" content="https://dev.rizzo.cc/pulse/og.png" />
+<meta name="twitter:card" content="summary_large_image" />
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310b981'/%3E%3Cpath d='M4 17h6l3-8 4 14 3-9 2 3h6' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E" />
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+  :root{
+    --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f0f2f8; --border:#e3e6ef;
+    --text:#1d2333; --muted:#6b7280; --primary:#0d9488; --primary-d:#0f766e;
+    --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
+    --amber:#d97706; --amber-bg:#fef3c7; --gray:#6b7280; --gray-bg:#eef1f6;
+    --shadow:0 6px 24px rgba(20,24,40,.08); --radius:14px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0f1220; --surface:#171a2b; --surface-2:#1e2236; --border:#2a2f48;
+      --text:#e7e9f3; --muted:#9aa0b4; --primary:#2dd4bf; --primary-d:#14b8a6;
+      --green:#34d399; --green-bg:#0f3d2e; --red:#f87171; --red-bg:#3d1717;
+      --amber:#fbbf24; --amber-bg:#3d2f0f; --gray:#9aa0b4; --gray-bg:#242842;
+      --shadow:0 8px 30px rgba(0,0,0,.4);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;max-width:100%;overflow-x:hidden}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5; -webkit-font-smoothing:antialiased;
+  }
+  button{font-family:inherit;cursor:pointer}
+  a{color:var(--primary)}
+  h1,h2,h3{margin:0}
+
+  /* ---------- header ---------- */
+  header{
+    position:sticky; top:0; z-index:30; background:var(--surface);
+    border-bottom:1px solid var(--border); padding:.7rem 1rem;
+    display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:center;gap:.55rem;font-weight:700;font-size:1.15rem}
+  .brand .logo{width:28px;height:28px;flex:none}
+  .verchip{
+    font-size:.7rem;font-weight:600;color:var(--muted);background:var(--surface-2);
+    border:1px solid var(--border);border-radius:999px;padding:.1rem .5rem;
+  }
+  .spacer{flex:1 1 auto}
+  .btn{
+    border:1px solid var(--border); background:var(--surface-2); color:var(--text);
+    border-radius:10px; padding:.5rem .85rem; font-size:.85rem; font-weight:600;
+    display:inline-flex; align-items:center; gap:.4rem;
+  }
+  .btn:hover{border-color:var(--primary)}
+  .btn.primary{background:var(--primary); border-color:var(--primary); color:#fff}
+  .btn.primary:hover{background:var(--primary-d)}
+  .btn.ghost{background:transparent}
+  .btn.sm{padding:.32rem .6rem;font-size:.78rem}
+  .btn.danger:hover{border-color:var(--red);color:var(--red)}
+
+  main{max-width:1100px;margin:0 auto;padding:1rem}
+
+  /* ---------- sign-in gate ---------- */
+  #gate{
+    min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    text-align:center;gap:1rem;padding:2rem 1rem;
+  }
+  #gate .logo{width:64px;height:64px}
+  #gate h1{font-size:1.6rem}
+  #gate p{color:var(--muted);max-width:30rem}
+  .config-warn{
+    background:var(--amber-bg);border:1px solid var(--amber);color:var(--amber);
+    border-radius:10px;padding:.6rem .9rem;font-size:.85rem;max-width:34rem;
+  }
+
+  /* ---------- summary bar ---------- */
+  .summary{
+    display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center;
+  }
+  .stat{
+    background:var(--surface);border:1px solid var(--border);border-radius:12px;
+    padding:.5rem .9rem;display:flex;align-items:center;gap:.5rem;box-shadow:var(--shadow);
+  }
+  .stat .n{font-size:1.25rem;font-weight:800}
+  .stat .l{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+  .stat.up .n{color:var(--green)} .stat.down .n{color:var(--red)} .stat.paused .n{color:var(--gray)}
+  .lastrun{font-size:.78rem;color:var(--muted);margin-left:auto}
+
+  /* ---------- monitor cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:.85rem}
+  .card{
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:.9rem 1rem;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:.6rem;
+    border-left:4px solid var(--gray);
+  }
+  .card.up{border-left-color:var(--green)}
+  .card.down{border-left-color:var(--red)}
+  .card.paused{border-left-color:var(--gray);opacity:.75}
+  .card .top{display:flex;align-items:flex-start;gap:.5rem}
+  .card .name{font-weight:700;font-size:1rem;word-break:break-word}
+  .card .url{font-size:.76rem;color:var(--muted);word-break:break-all}
+  .pill{
+    font-size:.7rem;font-weight:700;padding:.15rem .55rem;border-radius:999px;
+    text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;flex:none;
+  }
+  .pill.up{background:var(--green-bg);color:var(--green)}
+  .pill.down{background:var(--red-bg);color:var(--red)}
+  .pill.paused{background:var(--gray-bg);color:var(--gray)}
+  .pill.unknown{background:var(--gray-bg);color:var(--gray)}
+  .uptime{display:flex;gap:.6rem;flex-wrap:wrap}
+  .uptime .u{font-size:.72rem;color:var(--muted)}
+  .uptime .u b{display:block;font-size:.95rem;color:var(--text)}
+  .sparkwrap{display:flex;align-items:center;gap:.5rem}
+  .sparkwrap svg{flex:1 1 auto;height:34px;width:100%}
+  .rt{font-size:.78rem;color:var(--muted);white-space:nowrap}
+  .card .meta{font-size:.72rem;color:var(--muted)}
+  .card .err{font-size:.74rem;color:var(--red);word-break:break-word}
+  .card .actions{display:flex;gap:.35rem;flex-wrap:wrap;margin-top:.1rem}
+
+  /* ---------- section + incidents table ---------- */
+  .section{margin-top:1.6rem}
+  .section h2{font-size:1.05rem;margin-bottom:.5rem}
+  .tabletools{display:flex;justify-content:flex-end;gap:.4rem;margin-bottom:.5rem;position:relative}
+  .tablewrap{overflow-x:auto}
+  table{width:100%;border-collapse:collapse;font-size:.85rem;background:var(--surface);
+    border:1px solid var(--border);border-radius:12px;overflow:hidden}
+  th,td{padding:.55rem .7rem;text-align:left;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);
+    cursor:pointer;user-select:none;white-space:nowrap}
+  th .arr{opacity:.5;font-size:.7rem}
+  td{word-break:break-word}
+  tr:last-child td{border-bottom:none}
+  .colmenu{
+    position:absolute;top:100%;right:0;margin-top:.3rem;background:var(--surface);
+    border:1px solid var(--border);border-radius:10px;box-shadow:var(--shadow);
+    padding:.5rem;z-index:20;min-width:12rem;
+  }
+  .colmenu label{display:flex;align-items:center;gap:.5rem;padding:.25rem .3rem;font-size:.82rem}
+  .colmenu .reset{margin-top:.3rem;width:100%}
+  .empty{color:var(--muted);font-size:.86rem;padding:1rem;text-align:center}
+
+  /* ---------- modal ---------- */
+  .backdrop{position:fixed;inset:0;background:rgba(10,12,22,.55);display:none;
+    align-items:flex-start;justify-content:center;z-index:50;padding:1.2rem;overflow-y:auto}
+  .backdrop.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);width:100%;max-width:32rem;margin:auto;overflow:hidden}
+  .modal .mhead{display:flex;align-items:center;justify-content:space-between;
+    padding:.9rem 1.1rem;border-bottom:1px solid var(--border)}
+  .modal .mhead h3{font-size:1.05rem}
+  .xbtn{border:none;background:transparent;font-size:1.3rem;line-height:1;color:var(--muted);padding:.1rem .3rem}
+  .mbody{padding:1rem 1.1rem;display:flex;flex-direction:column;gap:.8rem}
+  .mfoot{padding:.85rem 1.1rem;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:.5rem}
+  .field{display:flex;flex-direction:column;gap:.28rem}
+  .field label{font-size:.8rem;font-weight:600;display:flex;align-items:center;gap:.35rem}
+  .field .hint{color:var(--muted);cursor:help;font-weight:400;border:1px solid var(--border);
+    border-radius:50%;width:15px;height:15px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:.62rem}
+  .field input,.field select{width:100%;min-width:0;padding:.5rem .6rem;border:1px solid var(--border);
+    border-radius:9px;background:var(--surface-2);color:var(--text);font-size:.9rem;font-family:inherit}
+  .field .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem}
+  .field.sub{margin:0}
+  select.needs-choice{border-color:var(--amber);box-shadow:0 0 0 3px var(--amber-bg)}
+  .ferr{color:var(--red);font-size:.8rem;min-height:1rem}
+
+  /* ---------- toasts (top-center) ---------- */
+  #toasts{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:80;
+    display:flex;flex-direction:column;gap:.5rem;align-items:center;pointer-events:none}
+  .toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary);
+    border-radius:10px;box-shadow:var(--shadow);padding:.6rem .9rem;font-size:.85rem;
+    max-width:90vw;animation:tin .2s ease}
+  .toast.ok{border-left-color:var(--green)} .toast.err{border-left-color:var(--red)}
+  @keyframes tin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+  /* ---------- mobile: restack incident table into cards ---------- */
+  @media (max-width:640px){
+    table,thead,tbody,th,td,tr{display:block}
+    thead{position:absolute;left:-9999px}
+    tr{border:1px solid var(--border);border-radius:10px;margin-bottom:.6rem;padding:.3rem .1rem}
+    td{border-bottom:none;padding:.3rem .8rem;display:flex;justify-content:space-between;gap:1rem}
+    td::before{content:attr(data-label);font-size:.7rem;text-transform:uppercase;
+      letter-spacing:.03em;color:var(--muted);font-weight:600;flex:none}
+    td[data-label] > span{text-align:right}
+  }
+</style>
+</head>
+<body>
+
+<div id="toasts"></div>
+
+<!-- Sign-in gate -->
+<div id="gate">
+  <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10b981"/>
+    <path d="M4 17h6l3-8 4 14 3-9 2 3h6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+  <h1>Pulse</h1>
+  <p>Your personal uptime monitor. Sign in with the Google account on the allowlist to continue.</p>
+  <div id="signinBtn"></div>
+  <div id="cfgWarn" class="config-warn" style="display:none"></div>
+</div>
+
+<!-- App (hidden until authed) -->
+<div id="app" style="display:none">
+  <header>
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10b981"/>
+        <path d="M4 17h6l3-8 4 14 3-9 2 3h6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
+      Pulse <span class="verchip">v0.1.0</span>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn ghost sm" id="refreshBtn" title="Reload status">↻ Refresh</button>
+    <button class="btn primary sm" id="addBtn">+ Monitor</button>
+    <button class="btn ghost sm" id="signoutBtn" title="Sign out">Sign out</button>
+  </header>
+
+  <main>
+    <div class="summary" id="summary"></div>
+    <div class="cards" id="cards"></div>
+    <div id="cardsEmpty" class="empty" style="display:none">No monitors yet. Add one to start watching.</div>
+
+    <div class="section">
+      <h2>Recent incidents</h2>
+      <div class="tabletools">
+        <button class="btn ghost sm" id="colBtn">⚙ Columns</button>
+        <div class="colmenu" id="colMenu" style="display:none"></div>
+      </div>
+      <div class="tablewrap">
+        <table id="incTable">
+          <thead><tr id="incHead"></tr></thead>
+          <tbody id="incBody"></tbody>
+        </table>
+      </div>
+      <div id="incEmpty" class="empty" style="display:none">No incidents recorded. 🎉</div>
+    </div>
+  </main>
+</div>
+
+<!-- Add/Edit monitor modal -->
+<div class="backdrop" id="modal">
+  <div class="modal">
+    <div class="mhead">
+      <h3 id="modalTitle">Add monitor</h3>
+      <button class="xbtn" id="modalX" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <div class="field">
+        <label>Name <span class="hint" title="A label for you — e.g. 'BookHockeys home'. Shown on the card and in alerts.">i</span></label>
+        <input id="fName" placeholder="BookHockeys home" />
+      </div>
+      <div class="field">
+        <label>URL <span class="hint" title="Full URL including https://. This is the exact address Pulse fetches every check.">i</span></label>
+        <input id="fUrl" placeholder="https://bookhockeys.com" />
+      </div>
+      <div class="field">
+        <label>Check type <span class="hint" title="HTTP status: passes if the response code is in the expected set. Keyword: also requires a string to be present (or absent) in the page body — catches blank/broken deploys that still return 200.">i</span></label>
+        <select id="fType">
+          <option value="">Choose…</option>
+          <option value="http">HTTP status</option>
+          <option value="keyword">Keyword in page</option>
+        </select>
+      </div>
+      <div class="field sub" id="kwWrap" style="display:none">
+        <div class="row">
+          <div class="field sub">
+            <label>Keyword <span class="hint" title="Text that must be present (or absent) in the page HTML. e.g. your version chip 'v0.1' or a footer string.">i</span></label>
+            <input id="fKeyword" placeholder="v0.1" />
+          </div>
+          <div class="field sub">
+            <label>Rule <span class="hint" title="Present = alert if the keyword disappears. Absent = alert if the keyword appears (e.g. an error banner).">i</span></label>
+            <select id="fKwType">
+              <option value="present">Must be present</option>
+              <option value="absent">Must be absent</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem">
+        <div class="field sub">
+          <label>Expected status <span class="hint" title="'2xx' accepts any 200–299. Or list explicit codes like '200,301,401' for pages that legitimately return those.">i</span></label>
+          <input id="fStatus" value="2xx" />
+        </div>
+        <div class="field sub">
+          <label>Interval (min) <span class="hint" title="How often to check, in minutes. Minimum effective is 5 — the pinger drives checks every 5 minutes.">i</span></label>
+          <input id="fInterval" type="number" value="5" min="5" max="1440" />
+        </div>
+      </div>
+      <div class="row" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem">
+        <div class="field sub">
+          <label>Fail threshold <span class="hint" title="Consecutive failed checks before declaring DOWN. 2 (default) means ~10 min of failures before you're alerted — suppresses flapping on transient blips.">i</span></label>
+          <input id="fFail" type="number" value="2" min="1" max="10" />
+        </div>
+        <div class="field sub">
+          <label>Recover threshold <span class="hint" title="Consecutive passing checks before declaring UP again. 1 (default) recovers on the first good check.">i</span></label>
+          <input id="fRecover" type="number" value="1" min="1" max="10" />
+        </div>
+      </div>
+      <div class="ferr" id="fErr"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn ghost" id="modalCancel">Cancel</button>
+      <button class="btn primary" id="modalSave">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CFG = {
+  VERSION: '0.1.0',
+  WORKER: 'https://pulse-worker.sevendwarfs.workers.dev',
+  CLIENT_ID: 'REPLACE_WITH_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
+};
+
+let ID_TOKEN = null;
+let TOKEN_EXP = 0;
+let editingId = null;
+let STATE = { monitors: [], incidents: [], summary: null };
+
+// ---------- auth ----------
+function jwtExp(tok){ try{ return JSON.parse(atob(tok.split('.')[1])).exp * 1000; }catch(_){ return 0; } }
+
+function onCredential(resp){
+  ID_TOKEN = resp.credential;
+  TOKEN_EXP = jwtExp(ID_TOKEN);
+  document.getElementById('gate').style.display='none';
+  document.getElementById('app').style.display='block';
+  refresh();
+}
+
+function initAuth(){
+  const badCfg = CFG.CLIENT_ID.startsWith('REPLACE_WITH');
+  if(badCfg){
+    const w=document.getElementById('cfgWarn');
+    w.style.display='block';
+    w.textContent='Set CFG.CLIENT_ID (Google OAuth Web client ID) before sign-in will work.';
+    return;
+  }
+  if(!window.google || !google.accounts){ setTimeout(initAuth, 300); return; }
+  google.accounts.id.initialize({ client_id: CFG.CLIENT_ID, callback: onCredential, auto_select: true });
+  google.accounts.id.renderButton(document.getElementById('signinBtn'), { theme:'filled_black', size:'large', shape:'pill' });
+  google.accounts.id.prompt();
+}
+
+// Re-prompt when the token is near expiry (Google ID tokens last ~1h).
+function ensureFreshToken(){
+  if(ID_TOKEN && Date.now() < TOKEN_EXP - 5*60*1000) return true;
+  if(window.google && google.accounts){ google.accounts.id.prompt(); }
+  return false;
+}
+
+function signOut(){
+  ID_TOKEN=null; TOKEN_EXP=0;
+  if(window.google && google.accounts){ google.accounts.id.disableAutoSelect(); }
+  document.getElementById('app').style.display='none';
+  document.getElementById('gate').style.display='flex';
+}
+
+// ---------- api ----------
+async function api(path, opts={}){
+  ensureFreshToken();
+  if(!ID_TOKEN){ toast('Session expired — sign in again','err'); throw new Error('no token'); }
+  const res = await fetch(CFG.WORKER + path, {
+    ...opts,
+    headers:{ 'Authorization':'Bearer '+ID_TOKEN, 'Content-Type':'application/json', ...(opts.headers||{}) },
+  });
+  if(res.status===401){ toast('Sign-in needed','err'); if(window.google&&google.accounts) google.accounts.id.prompt(); throw new Error('401'); }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok) throw new Error(data.error || ('HTTP '+res.status));
+  return data;
+}
+
+// ---------- load + render ----------
+async function refresh(){
+  try{
+    const [mons, incs, sum] = await Promise.all([
+      api('/api/monitors'), api('/api/incidents'), api('/api/summary'),
+    ]);
+    STATE.monitors = mons.monitors || [];
+    STATE.incidents = incs.incidents || [];
+    STATE.summary = sum;
+    renderSummary(); renderCards(); renderIncidents();
+  }catch(e){ if(e.message!=='401'&&e.message!=='no token') toast(e.message,'err'); }
+}
+
+function renderSummary(){
+  const s = STATE.summary; if(!s) return;
+  const c = s.counts||{};
+  const el = document.getElementById('summary');
+  el.innerHTML =
+    stat('up', c.up||0, 'Up') + stat('down', c.down||0, 'Down') +
+    stat('paused', (c.paused||0)+(c.unknown||0), 'Paused') +
+    `<span class="lastrun">Last check run: ${s.lastRunAt?ago(s.lastRunAt):'never'}</span>`;
+}
+function stat(cls,n,l){ return `<div class="stat ${cls}"><span class="n">${n}</span><span class="l">${l}</span></div>`; }
+
+function renderCards(){
+  const wrap=document.getElementById('cards'); const empty=document.getElementById('cardsEmpty');
+  const list=STATE.monitors;
+  empty.style.display = list.length?'none':'block';
+  wrap.innerHTML = list.map(cardHtml).join('');
+  list.forEach(m=>{ const svg=document.getElementById('spark-'+m.id); if(svg) drawSpark(svg, m._history||[]); });
+  // fetch sparkline history lazily per card
+  list.forEach(async m=>{
+    try{ const d=await api('/api/monitors/'+m.id); m._history=d.history||[];
+      const svg=document.getElementById('spark-'+m.id); if(svg) drawSpark(svg, m._history); }catch(_){}
+  });
+}
+
+function cardHtml(m){
+  const st=m.status||'unknown';
+  const u=m.uptime||{};
+  const rt = m.last_response_ms!=null ? m.last_response_ms+' ms' : '—';
+  return `<div class="card ${st}">
+    <div class="top">
+      <div style="flex:1;min-width:0">
+        <div class="name">${esc(m.name)}</div>
+        <div class="url">${esc(m.url)}</div>
+      </div>
+      <span class="pill ${st}">${st}</span>
+    </div>
+    <div class="uptime">
+      <span class="u">24h<b>${fmtPct(u.d1)}</b></span>
+      <span class="u">7d<b>${fmtPct(u.d7)}</b></span>
+      <span class="u">30d<b>${fmtPct(u.d30)}</b></span>
+    </div>
+    <div class="sparkwrap"><svg id="spark-${m.id}" viewBox="0 0 100 34" preserveAspectRatio="none"></svg><span class="rt">${rt}</span></div>
+    ${m.last_error && st==='down' ? `<div class="err">${esc(m.last_error)}</div>`:''}
+    <div class="meta">Checked ${m.last_checked_at?ago(m.last_checked_at):'never'}${m.type==='keyword'?' · keyword':''}</div>
+    <div class="actions">
+      <button class="btn ghost sm" onclick="checkNow('${m.id}')">Check now</button>
+      <button class="btn ghost sm" onclick="openEdit('${m.id}')">Edit</button>
+      ${st==='paused'
+        ? `<button class="btn ghost sm" onclick="resumeMon('${m.id}')">Resume</button>`
+        : `<button class="btn ghost sm" onclick="pauseMon('${m.id}')">Pause 1h</button>`}
+      <button class="btn ghost sm danger" onclick="delMon('${m.id}','${esc(m.name)}')">Delete</button>
+    </div>
+  </div>`;
+}
+
+function drawSpark(svg, hist){
+  if(!hist||!hist.length){ svg.innerHTML=''; return; }
+  const vals=hist.map(h=>h.response_ms||0);
+  const max=Math.max(...vals,1);
+  const n=hist.length;
+  const pts=hist.map((h,i)=>{
+    const x=n>1?(i/(n-1))*100:50;
+    const y=32-(Math.min(h.response_ms||0,max)/max)*30 - 1;
+    return {x,y,ok:h.ok};
+  });
+  const line=pts.map((p,i)=>(i?'L':'M')+p.x.toFixed(1)+' '+p.y.toFixed(1)).join(' ');
+  const dots=pts.filter(p=>!p.ok).map(p=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="1.6" fill="var(--red)"/>`).join('');
+  svg.innerHTML=`<path d="${line}" fill="none" stroke="var(--primary)" stroke-width="1.4" vector-effect="non-scaling-stroke"/>${dots}`;
+}
+
+// ---------- incidents table (sortable + column manager) ----------
+const INC_COLS=[
+  {key:'name', label:'Monitor', def:true},
+  {key:'started_at', label:'Started', def:true},
+  {key:'duration', label:'Duration', def:true},
+  {key:'cause', label:'Cause', def:true},
+  {key:'last_code', label:'Code', def:false},
+];
+let incSort={key:'started_at', dir:'desc'};
+function colPrefs(){ try{ return JSON.parse(localStorage.getItem('pulse_inc_cols')||'null')||defaultCols(); }catch(_){ return defaultCols(); } }
+function defaultCols(){ const o={}; INC_COLS.forEach(c=>o[c.key]=c.def); return o; }
+function saveCols(o){ localStorage.setItem('pulse_inc_cols', JSON.stringify(o)); }
+
+function renderIncidents(){
+  const cols=colPrefs();
+  const visible=INC_COLS.filter(c=>cols[c.key]);
+  const head=document.getElementById('incHead');
+  head.innerHTML=visible.map(c=>{
+    const arr = incSort.key===c.key ? (incSort.dir==='asc'?'▲':'▼') : '';
+    return `<th onclick="sortInc('${c.key}')">${c.label} <span class="arr">${arr}</span></th>`;
+  }).join('');
+
+  let rows=[...STATE.incidents];
+  rows.sort((a,b)=>{
+    let av=incVal(a,incSort.key), bv=incVal(b,incSort.key);
+    if(av<bv) return incSort.dir==='asc'?-1:1;
+    if(av>bv) return incSort.dir==='asc'?1:-1;
+    return 0;
+  });
+
+  const body=document.getElementById('incBody');
+  const empty=document.getElementById('incEmpty');
+  document.getElementById('incTable').style.display = rows.length?'':'none';
+  empty.style.display = rows.length?'none':'block';
+  body.innerHTML=rows.map(r=>'<tr>'+visible.map(c=>
+    `<td data-label="${c.label}"><span>${incCell(r,c.key)}</span></td>`).join('')+'</tr>').join('');
+}
+function incVal(r,k){ if(k==='duration') return r.duration_s==null?Infinity:r.duration_s; if(k==='name') return (r.name||'').toLowerCase(); return r[k]??0; }
+function incCell(r,k){
+  if(k==='name') return `<b>${esc(r.name||'—')}</b>`;
+  if(k==='started_at') return esc(fmtTime(r.started_at));
+  if(k==='duration') return r.resolved_at?esc(humanDur(r.duration_s)):'<span style="color:var(--red)">ongoing</span>';
+  if(k==='cause') return esc(r.cause||'—');
+  if(k==='last_code') return r.last_code??'—';
+  return '';
+}
+function sortInc(k){ if(incSort.key===k){ incSort.dir = incSort.dir==='asc'?'desc':(incSort.key==='started_at'?'asc':'desc'); } else { incSort={key:k,dir:k==='started_at'?'desc':'asc'}; } renderIncidents(); }
+
+function toggleColMenu(){
+  const menu=document.getElementById('colMenu');
+  if(menu.style.display==='none'){
+    const cols=colPrefs();
+    menu.innerHTML=INC_COLS.map(c=>
+      `<label><input type="checkbox" ${cols[c.key]?'checked':''} onchange="setCol('${c.key}',this.checked)"> ${c.label}</label>`).join('')
+      +`<button class="btn ghost sm reset" onclick="resetCols()">Reset to default</button>`;
+    menu.style.display='block';
+  } else menu.style.display='none';
+}
+function setCol(k,v){ const o=colPrefs(); o[k]=v; saveCols(o); renderIncidents(); }
+function resetCols(){ saveCols(defaultCols()); toggleColMenu(); toggleColMenu(); renderIncidents(); }
+
+// ---------- monitor actions ----------
+async function checkNow(id){ try{ toast('Checking…'); await api('/api/monitors/'+id+'/check',{method:'POST'}); await refresh(); toast('Checked','ok'); }catch(e){ toast(e.message,'err'); } }
+async function pauseMon(id){ try{ await api('/api/monitors/'+id,{method:'PATCH',body:JSON.stringify({pause_minutes:60})}); await refresh(); toast('Paused 1h','ok'); }catch(e){ toast(e.message,'err'); } }
+async function resumeMon(id){ try{ await api('/api/monitors/'+id,{method:'PATCH',body:JSON.stringify({resume:true})}); await refresh(); toast('Resumed','ok'); }catch(e){ toast(e.message,'err'); } }
+async function delMon(id,name){
+  showConfirm(`Delete "${name}" and all its history?`, async ()=>{
+    try{ await api('/api/monitors/'+id,{method:'DELETE'}); await refresh(); toast('Deleted','ok'); }catch(e){ toast(e.message,'err'); }
+  });
+}
+
+// ---------- modal ----------
+function openAdd(){ editingId=null; document.getElementById('modalTitle').textContent='Add monitor'; fillForm({}); openModal(); }
+function openEdit(id){
+  const m=STATE.monitors.find(x=>x.id===id); if(!m) return;
+  editingId=id; document.getElementById('modalTitle').textContent='Edit monitor'; fillForm(m); openModal();
+}
+function fillForm(m){
+  fName.value=m.name||''; fUrl.value=m.url||''; fType.value=m.type||'';
+  fKeyword.value=m.keyword||''; fKwType.value=m.keyword_type||'present';
+  fStatus.value=m.expected_status||'2xx'; fInterval.value=m.interval_min||5;
+  fFail.value=m.fail_threshold||2; fRecover.value=m.recover_threshold||1;
+  fErr.textContent=''; syncType();
+}
+function syncType(){
+  document.getElementById('kwWrap').style.display = fType.value==='keyword'?'block':'none';
+  fType.classList.toggle('needs-choice', fType.value==='');
+}
+function openModal(){ document.getElementById('modal').classList.add('open'); }
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+
+async function saveMonitor(){
+  const body={
+    name:fName.value.trim(), url:fUrl.value.trim(), type:fType.value,
+    keyword:fKeyword.value.trim(), keyword_type:fKwType.value,
+    expected_status:fStatus.value.trim()||'2xx', interval_min:+fInterval.value,
+    fail_threshold:+fFail.value, recover_threshold:+fRecover.value,
+  };
+  if(!body.name){ fErr.textContent='Name is required.'; return; }
+  if(!/^https?:\/\//i.test(body.url)){ fErr.textContent='URL must start with http:// or https://'; return; }
+  if(!body.type){ fErr.textContent='Choose a check type.'; fType.classList.add('needs-choice'); return; }
+  if(body.type==='keyword' && !body.keyword){ fErr.textContent='Keyword is required for keyword monitors.'; return; }
+  try{
+    if(editingId) await api('/api/monitors/'+editingId,{method:'PATCH',body:JSON.stringify(body)});
+    else await api('/api/monitors',{method:'POST',body:JSON.stringify(body)});
+    closeModal(); await refresh(); toast(editingId?'Saved':'Monitor added','ok');
+  }catch(e){ fErr.textContent=e.message; }
+}
+
+// ---------- confirm (modal, not toast) ----------
+function showConfirm(msg, onYes){
+  const bd=document.createElement('div'); bd.className='backdrop open';
+  bd.innerHTML=`<div class="modal" style="max-width:24rem"><div class="mhead"><h3>Confirm</h3></div>
+    <div class="mbody"><div>${esc(msg)}</div></div>
+    <div class="mfoot"><button class="btn ghost" data-no>Cancel</button><button class="btn primary" data-yes>Delete</button></div></div>`;
+  document.body.appendChild(bd);
+  bd.querySelector('[data-no]').onclick=()=>bd.remove();
+  bd.querySelector('[data-yes]').onclick=()=>{ bd.remove(); onYes(); };
+}
+
+// ---------- helpers ----------
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtPct(v){ return v==null?'—':v+'%'; }
+function fmtTime(s){ if(!s) return '—'; const d=new Date(s*1000); return d.toLocaleString(); }
+function humanDur(sec){ sec=Math.max(0,Math.round(sec||0)); const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60;
+  if(d)return d+'d '+h+'h'; if(h)return h+'h '+m+'m'; if(m)return m+'m '+s+'s'; return s+'s'; }
+function ago(s){ const diff=Math.floor(Date.now()/1000)-s; if(diff<60)return diff+'s ago'; if(diff<3600)return Math.floor(diff/60)+'m ago'; if(diff<86400)return Math.floor(diff/3600)+'h ago'; return Math.floor(diff/86400)+'d ago'; }
+function toast(msg,kind){ const el=document.createElement('div'); el.className='toast '+(kind||''); el.textContent=msg;
+  document.getElementById('toasts').appendChild(el); setTimeout(()=>{ el.style.opacity='0'; setTimeout(()=>el.remove(),200); }, kind==='err'?4000:2200); }
+
+// ---------- wire up ----------
+document.getElementById('addBtn').onclick=openAdd;
+document.getElementById('refreshBtn').onclick=()=>{ toast('Refreshing…'); refresh(); };
+document.getElementById('signoutBtn').onclick=signOut;
+document.getElementById('modalX').onclick=closeModal;
+document.getElementById('modalCancel').onclick=closeModal;
+document.getElementById('modalSave').onclick=saveMonitor;
+document.getElementById('fType').onchange=syncType;
+document.getElementById('colBtn').onclick=(e)=>{ e.stopPropagation(); toggleColMenu(); };
+document.addEventListener('click',(e)=>{ const menu=document.getElementById('colMenu');
+  if(menu.style.display==='block' && !menu.contains(e.target) && e.target.id!=='colBtn') menu.style.display='none'; });
+// NOTE: data-entry modal intentionally does NOT close on backdrop click — only ✕ / Cancel / Save.
+window.checkNow=checkNow; window.openEdit=openEdit; window.pauseMon=pauseMon; window.resumeMon=resumeMon;
+window.delMon=delMon; window.sortInc=sortInc; window.setCol=setCol; window.resetCols=resetCols;
+
+initAuth();
+// keep "last check run / ago" fresh
+setInterval(()=>{ if(document.getElementById('app').style.display!=='none' && STATE.summary){ renderSummary(); } }, 30000);
+</script>
+</body>
+</html>
