@@ -45,6 +45,25 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.97 — Class Action Settlements tracker
+
+- New **Class Actions** page (left nav) to track the settlement claims you’ve
+  submitted to and their progress — its first job is letting you **search to
+  see whether you already submitted** to one.
+- Each claim records: name, full case name/number, status (Not submitted →
+  Submitted → Approved → Paid, plus Denied/Excluded), date filed, claim
+  deadline, claim/confirmation numbers, payout method, estimated payout,
+  proof-required flag, URL, notes, and a **payouts** list (a single claim can
+  pay out more than once). Stat cards summarize tracked / submitted / awaiting
+  payout / paid / total received. Sortable, searchable, customizable columns.
+- **+ Income** on any row prefills an income entry (Other → Class Action
+  Settlement) from the latest payout — nothing is added to income
+  automatically.
+- **Class Action Settlement** is now a default subcategory under the **Other**
+  income category (added for existing accounts too).
+- Import your existing list from a JSON file via **⬆ Import** (adds to this tab
+  only; duplicates by name + date are skipped).
+
 ### v1.0.96 — Convert between expenses, bills & budget placeholders
 
 - Every expense, bill, and budget placeholder now has a **Convert** button

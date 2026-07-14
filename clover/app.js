@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.96';
+const VERSION = '1.0.97';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -20,6 +20,7 @@ const ROUTES = [
   { id: 'paychecks',     label: 'Paychecks',      ico: '▤', phase: 4 },
   { id: 'raises',        label: 'Raises',         ico: '↗', phase: 9 },
   { id: 'selling',       label: 'Selling',        ico: '▧', phase: 9 },
+  { id: 'settlements',   label: 'Class Actions',  ico: '⚖', phase: 10 },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
   { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
   { id: 'budget',        label: 'Budget',         ico: '◐', phase: 10 },
@@ -52,6 +53,9 @@ let subPriceSel = null;            // which bill's price history the chart shows
 let subsSearch = '';               // live search over the bills table
 let subsBadgeFilter = null;        // { key, value } from clicking a subs value badge
 let budgetReconMonth = null;       // Budget check-in target month (0-based, within activeYear); null = auto (prev month)
+let settleSort = { key: 'dateFiled', dir: 'desc' };
+let settleSearch = '';             // live search over the settlements table
+let settleStatusFilter = 'all';    // 'all' | a specific status
 let taxesSort = { key: 'taxYear', dir: 'desc' };
 let salesSort = { key: 'orderDate', dir: 'desc' };
 let salesImportState = null;   // parsed Poshmark sales awaiting review
@@ -144,7 +148,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, settlements: renderSettlements, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -1407,7 +1411,7 @@ function incomeModal(existing) {
   // Other-income fields (shown when the category looks like Other) — e.g. lawsuit
   // settlements, gifts, stimulus, rebates, winnings.
   const otTypeList = el('datalist'); otTypeList.id = 'ot-type-list';
-  ['Lawsuit', 'Class action', 'Settlement', 'Gift', 'Stimulus', 'Rebate', 'Winnings', 'Survey reward', 'Refund', 'Inheritance'].forEach(v => { const o = el('option'); o.value = v; otTypeList.appendChild(o); });
+  ['Class Action Settlement', 'Lawsuit', 'Settlement', 'Gift', 'Stimulus', 'Rebate', 'Winnings', 'Survey reward', 'Refund', 'Inheritance'].forEach(v => { const o = el('option'); o.value = v; otTypeList.appendChild(o); });
   body.appendChild(otTypeList);
   const fOtType = input(e.otherType || '', { placeholder: 'e.g. Lawsuit, Gift, Rebate', list: 'ot-type-list' });
   const fDesc = input(e.description || '', { placeholder: 'e.g. case name or what it was' });
@@ -1510,8 +1514,11 @@ function incomeModal(existing) {
   fRwTypeOther.addEventListener('input', syncAcctLabel);
   rebuildSubs(); syncCat();
 
+  // A prefill without an id (e.g. "+ Income" from a settlement) is still a NEW
+  // entry — title/toast key off a real id, not merely a truthy arg.
+  const incIsEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
+    title: incIsEdit ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
     onConfirm: () => {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const gross = parseFloat(fGross.value);
@@ -1533,7 +1540,7 @@ function incomeModal(existing) {
         fedWithheld: fFedWh.value === '' ? null : parseFloat(fFedWh.value), stateWithheld: fStateWh.value === '' ? null : parseFloat(fStateWh.value)
       });
       store.saveIncome(activeYear, entry);
-      toast(existing ? 'Income updated' : 'Income added');
+      toast(incIsEdit ? 'Income updated' : 'Income added');
     }
   });
 }
@@ -2061,6 +2068,237 @@ function renderBudget(view) {
     tb.appendChild(tr);
   });
   table.appendChild(tb); card.appendChild(table); view.appendChild(card);
+}
+
+// ============================================================
+// Class Action Settlements — a tracker for the claims you've submitted to,
+// their status/progress, and payouts. Its top purpose: search to see whether
+// you've already submitted to a given settlement. Nothing here touches Income
+// unless you explicitly use the "+ Income" button.
+// ============================================================
+const SETTLE_STATUSES = ['Not submitted', 'Submitted', 'Approved', 'Paid', 'Denied', 'Excluded'];
+const SETTLE_METHODS = ['PayPal', 'Venmo', 'Check', 'ACH / Direct Deposit', 'Zelle', 'Virtual Debit Card', 'Prepaid Card', 'Digital Mastercard', 'Gift Card'];
+function firstLine(s) { s = (s || '').trim(); const i = s.indexOf('\n'); return i >= 0 ? s.slice(0, i) : s; }
+function settleReceived(s) { return (s.payments || []).reduce((a, p) => a + (Number(p.amount) || 0), 0); }
+function settleLastPayout(s) { const ds = (s.payments || []).map(p => p.date).filter(Boolean).sort(); return ds.length ? ds[ds.length - 1] : ''; }
+function settleIsSubmitted(s) { const st = s.status || 'Not submitted'; return st !== 'Not submitted'; }
+function settleIsPaid(s) { return s.status === 'Paid' || settleReceived(s) > 0; }
+function settleIsOpen(s) { return settleIsSubmitted(s) && !settleIsPaid(s) && s.status !== 'Denied' && s.status !== 'Excluded'; }
+function settleStatusBadge(r) {
+  const st = r.status || 'Not submitted';
+  const tone = st === 'Paid' ? 'green' : (st === 'Submitted' || st === 'Approved') ? 'amber' : (st === 'Denied' || st === 'Excluded') ? 'red' : '';
+  return badge(st, tone);
+}
+const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', person: 'Person', notes: 'Notes' };
+const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'received', 'payouts', 'lastPayout', 'person', 'notes'];
+const SETTLE_DEFAULT_COLS = ['name', 'status', 'dateFiled', 'claimNumber', 'method', 'received', 'lastPayout'];
+function buildSettleCol(store, key) {
+  switch (key) {
+    case 'name': return { label: 'Settlement', key: 'name', value: r => r.name || '', cell: r => { const td = el('td'); td.appendChild(el('span', null, r.name || '—')); if (r.caseName) td.appendChild(el('div', 'acct-sub', firstLine(r.caseName))); return td; } };
+    case 'status': return { label: 'Status', key: 'status', value: r => r.status || '', cell: r => { const td = el('td'); td.appendChild(settleStatusBadge(r)); return td; } };
+    case 'dateFiled': return { label: 'Filed', key: 'dateFiled', value: r => r.dateFiled || '', cell: r => el('td', null, r.dateFiled ? fmtDate(r.dateFiled) : '—') };
+    case 'deadline': return { label: 'Deadline', key: 'deadline', value: r => r.deadline || '', cell: r => el('td', 'muted', r.deadline ? fmtDate(r.deadline) : '—') };
+    case 'claimNumber': return { label: 'Claim / confirmation #', key: 'claimNumber', value: r => r.claimNumber || '', cell: r => { const td = el('td', 'mono-sm'); td.textContent = firstLine(r.claimNumber) || '—'; if (r.claimNumber) td.title = r.claimNumber; return td; } };
+    case 'claimId': return { label: 'Claim ID', key: 'claimId', value: r => r.claimId || '', cell: r => el('td', 'mono-sm', r.claimId || '—') };
+    case 'method': return { label: 'Method', key: 'method', value: r => r.method || '', cell: r => el('td', 'muted', r.method || '—') };
+    case 'received': return { label: 'Received', key: 'received', num: true, value: r => settleReceived(r), cell: r => numCell(settleReceived(r), true) };
+    case 'payouts': return { label: 'Payouts', key: 'payouts', num: true, value: r => (r.payments || []).length, cell: r => el('td', 'num', String((r.payments || []).length || '—')) };
+    case 'lastPayout': return { label: 'Last payout', key: 'lastPayout', value: r => settleLastPayout(r), cell: r => el('td', 'muted', settleLastPayout(r) ? fmtDate(settleLastPayout(r)) : '—') };
+    case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = firstLine(r.notes) || '—'; if (r.notes) td.title = r.notes; return td; } };
+  }
+  return null;
+}
+function renderSettlements(view) {
+  destroyCharts();
+  const store = window.cloverStore, s = store.state;
+  const all = s.settlements || [];
+  let rows = all.slice();
+  if (settleStatusFilter !== 'all') rows = rows.filter(r => (r.status || 'Not submitted') === settleStatusFilter);
+  if (settleSearch.trim()) {
+    const q = settleSearch.trim().toLowerCase();
+    rows = rows.filter(r => [r.name, r.caseName, r.claimNumber, r.claimId, r.method, r.notes, r.status, r.url].some(v => (v || '').toLowerCase().includes(q)));
+  }
+
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Class Action Settlements'));
+  left.appendChild(el('p', 'muted', all.length + ' tracked · search to check whether you’ve already submitted to one'));
+  head.appendChild(left);
+  const acts = el('div', 'head-actions');
+  const imp = el('button', 'btn-ghost', '⬆ Import'); imp.title = 'Import settlements from a JSON file (adds to this tab only — never touches Income)'; imp.addEventListener('click', () => importSettlements());
+  acts.appendChild(imp);
+  const add = el('button', 'btn-primary', '+ Add settlement'); add.addEventListener('click', () => settlementModal(null));
+  acts.appendChild(add);
+  head.appendChild(acts);
+  view.appendChild(head);
+
+  const submitted = all.filter(settleIsSubmitted).length;
+  const paid = all.filter(settleIsPaid).length;
+  const open = all.filter(settleIsOpen).length;
+  const received = all.reduce((a, r) => a + settleReceived(r), 0);
+  const sum = el('div', 'sub-summary');
+  const scard = (label, val, tone, hint) => { const c = el('div', 'sum-card'); c.appendChild(el('div', 'sum-label', label)); c.appendChild(el('div', 'sum-value ' + (tone || ''), val)); if (hint) c.appendChild(el('div', 'sum-hint', hint)); return c; };
+  sum.appendChild(scard('Tracked', String(all.length), '', 'total claims'));
+  sum.appendChild(scard('Submitted', String(submitted), 'neutral', 'claims filed'));
+  sum.appendChild(scard('Awaiting payout', String(open), open ? 'amber' : '', 'submitted, not yet paid'));
+  sum.appendChild(scard('Paid', String(paid), 'income', 'received a payout'));
+  sum.appendChild(scard('Total received', received > 0 ? money(received) : '–', 'income', 'across all payouts'));
+  view.appendChild(sum);
+
+  const bar = el('div', 'filter-bar');
+  const statusSel = select([{ value: 'all', label: 'All statuses' }].concat(SETTLE_STATUSES.map(v => ({ value: v, label: v }))), settleStatusFilter);
+  statusSel.addEventListener('change', () => { settleStatusFilter = statusSel.value; renderView(currentRoute); });
+  bar.appendChild(labelWrap('Status', statusSel));
+  const searchIn = input(settleSearch, { placeholder: 'Search name, case, claim #…' }); searchIn.id = 'settle-search'; searchIn.type = 'search';
+  searchIn.addEventListener('input', () => {
+    settleSearch = searchIn.value; renderView(currentRoute);
+    const n = document.getElementById('settle-search'); if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (e) {} }
+  });
+  bar.appendChild(labelWrap('Search', searchIn));
+  const colsBtn = columnsButton('settlements', SETTLE_ALL_COLS, SETTLE_DEFAULT_COLS, SETTLE_COL_LABELS, 'Class Action columns'); colsBtn.style.marginLeft = 'auto';
+  bar.appendChild(colsBtn);
+  view.appendChild(bar);
+
+  if (!all.length) { view.appendChild(emptyState('No settlements tracked yet', 'Track the class-action claims you’ve submitted to — so you can see their status and never submit to the same one twice. Add one, or import your existing list.', '+ Add settlement', () => settlementModal(null))); return; }
+  if (!rows.length) { view.appendChild(el('div', 'card muted', 'No settlements match your search.')); return; }
+
+  const cols = [
+    ...tableColKeys(store, 'settlements', SETTLE_COL_LABELS, SETTLE_DEFAULT_COLS).map(k => buildSettleCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: r => {
+        const td = el('td', 'row-actions');
+        const inc = el('button', 'icon-btn', '+ Income'); inc.title = 'Record a payout from this settlement as income'; inc.addEventListener('click', () => settlementToIncome(r));
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => settlementModal(r));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeSettlement(r.id)));
+        td.appendChild(inc); td.appendChild(edit); td.appendChild(del); return td; } }
+  ];
+  const tcard = el('div', 'card table-card');
+  tcard.appendChild(sortableTable(cols, rows, settleSort, ns => { settleSort = ns || { key: 'dateFiled', dir: 'desc' }; renderView(currentRoute); }, null));
+  view.appendChild(tcard);
+}
+function settlementModal(existing) {
+  const store = window.cloverStore, s = store.state;
+  const r = existing ? JSON.parse(JSON.stringify(existing)) : { status: 'Submitted', dateFiled: todayISO(), payments: [], personId: s.persons[0] && s.persons[0].id };
+  if (!Array.isArray(r.payments)) r.payments = [];
+  const body = el('div', 'form-grid');
+  const methList = el('datalist'); methList.id = 'settle-method-list'; SETTLE_METHODS.forEach(v => { const o = el('option'); o.value = v; methList.appendChild(o); }); body.appendChild(methList);
+
+  const fName = input(r.name || '', { placeholder: 'e.g. Facebook Biometric Privacy' });
+  const fCase = document.createElement('textarea'); fCase.value = r.caseName || ''; fCase.rows = 2; fCase.placeholder = 'Full case name / number (optional)';
+  const fStatus = select(SETTLE_STATUSES.map(v => ({ value: v, label: v })), r.status || 'Submitted');
+  const fFiled = input(r.dateFiled || '', { type: 'date' });
+  const fDeadline = input(r.deadline || '', { type: 'date' });
+  const fClaimNo = document.createElement('textarea'); fClaimNo.value = r.claimNumber || ''; fClaimNo.rows = 2; fClaimNo.placeholder = 'Claim ID / confirmation code(s)';
+  const fClaimId = input(r.claimId || '', { placeholder: 'Settlement claim ID (optional)' });
+  const fMethod = input(r.method || '', { placeholder: 'e.g. PayPal, Venmo, Check', list: 'settle-method-list' });
+  const fExpected = input(r.expectedAmount != null ? r.expectedAmount : '', { type: 'number', placeholder: 'estimate (optional)' }); fExpected.step = '0.01';
+  const cProof = checkbox('Proof required', r.proofRequired, 'Tick if this claim required proof of purchase / documentation (vs. a “no proof” claim).');
+  const fUrl = input(r.url || '', { placeholder: 'https:// settlement site (optional)' });
+  const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
+  const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Deadlines, correlation IDs, anything else';
+
+  body.appendChild(field('Settlement name', fName, 'A short name you’ll recognize — this is what you search to check whether you already submitted.'));
+  body.appendChild(field('Case name / number', fCase, 'The full legal case caption and number, if you have it.'));
+  const row1 = el('div', 'two-col'); row1.appendChild(field('Status', fStatus, 'Where the claim stands. Paid = you received a payout.')); row1.appendChild(field('Filed', fFiled, 'The date you submitted the claim.')); body.appendChild(row1);
+  const row2 = el('div', 'two-col'); row2.appendChild(field('Claim deadline', fDeadline, 'The claim-submission deadline, if known.')); row2.appendChild(field('Default method', fMethod, 'How payouts are/were paid — used to prefill new payout rows below.')); body.appendChild(row2);
+  body.appendChild(field('Claim / confirmation #', fClaimNo, 'The claim ID and/or confirmation code(s) the settlement gave you.'));
+  const row3 = el('div', 'two-col'); row3.appendChild(field('Settlement claim ID', fClaimId, 'A separate settlement-assigned ID, if any.')); row3.appendChild(field('Estimated payout', fExpected, 'A rough expected amount, if published (optional).')); body.appendChild(row3);
+  const row4 = el('div', 'two-col'); row4.appendChild(field('Person', fPerson, 'Who the claim belongs to.')); const proofWrap = el('div', 'check-row'); proofWrap.appendChild(cProof); row4.appendChild(field('Flags', proofWrap)); body.appendChild(row4);
+  body.appendChild(field('Settlement URL', fUrl, 'Link to the settlement site (optional).'));
+
+  const payWrap = el('div');
+  const payList = el('div', 'pay-list');
+  const totalLine = el('div', 'muted');
+  const updateTotal = () => { const t = r.payments.reduce((x, p) => x + (Number(p.amount) || 0), 0); totalLine.textContent = 'Total received: ' + (t > 0 ? money(t) : '$0.00'); };
+  const renderPays = () => {
+    payList.innerHTML = '';
+    if (!r.payments.length) payList.appendChild(el('div', 'muted', 'No payouts recorded yet.'));
+    r.payments.forEach((p, i) => {
+      const row = el('div', 'pay-row');
+      const d = input(p.date || '', { type: 'date' }); d.addEventListener('input', () => { p.date = d.value; });
+      const a = input(p.amount != null ? p.amount : '', { type: 'number', placeholder: 'amount' }); a.step = '0.01'; a.addEventListener('input', () => { p.amount = a.value === '' ? null : parseFloat(a.value); updateTotal(); });
+      const m = input(p.method || '', { placeholder: 'method', list: 'settle-method-list' }); m.addEventListener('input', () => { p.method = m.value; });
+      const rm = el('button', 'icon-btn danger', '✕'); rm.title = 'Remove payout'; rm.addEventListener('click', () => { r.payments.splice(i, 1); renderPays(); updateTotal(); });
+      row.appendChild(d); row.appendChild(a); row.appendChild(m); row.appendChild(rm);
+      payList.appendChild(row);
+    });
+  };
+  const addPay = el('button', 'btn-ghost', '+ Add payout'); addPay.addEventListener('click', () => { r.payments.push({ id: 'pay' + Date.now() + Math.floor(Math.random() * 1000), date: todayISO(), amount: null, method: fMethod.value.trim() }); renderPays(); updateTotal(); });
+  const payFoot = el('div', 'pay-foot'); payFoot.appendChild(addPay); payFoot.appendChild(totalLine);
+  payWrap.appendChild(payList); payWrap.appendChild(payFoot);
+  body.appendChild(field('Payouts', payWrap, 'Each payout you received from this settlement. The total flows into “Received”, and “+ Income” records the latest one as income.'));
+  renderPays(); updateTotal();
+  body.appendChild(field('Notes', fNotes, 'Deadlines, correlation IDs, or anything else worth keeping.'));
+
+  const isEdit = !!(existing && existing.id);
+  openModal({
+    title: isEdit ? 'Edit settlement' : 'Add settlement', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const name = fName.value.trim();
+      if (!name) { fName.focus(); toast('Settlement name is required', 'warn'); return false; }
+      const item = Object.assign(r, {
+        name, caseName: fCase.value.trim(), status: fStatus.value, dateFiled: fFiled.value || '',
+        deadline: fDeadline.value || '', claimNumber: fClaimNo.value.trim(), claimId: fClaimId.value.trim(),
+        method: fMethod.value.trim(), expectedAmount: fExpected.value === '' ? null : parseFloat(fExpected.value),
+        proofRequired: cProof.__input.checked, url: fUrl.value.trim(), personId: fPerson.value, notes: fNotes.value.trim(),
+        payments: r.payments.filter(p => (p.amount != null && p.amount !== '') || p.date).map(p => ({ id: p.id || ('pay' + Math.random().toString(36).slice(2)), date: p.date || '', amount: Number(p.amount) || 0, method: p.method || '' }))
+      });
+      store.saveSettlement(item);
+      toast(isEdit ? 'Settlement updated' : 'Settlement added');
+    }
+  });
+}
+// Prefill the income modal from a settlement — records the latest payout (or the
+// estimate) under Other → Class Action Settlement. Never auto-saves.
+function settlementToIncome(st) {
+  const store = window.cloverStore, s = store.state;
+  const otherCat = s.incomeCategories.find(c => /^other$/i.test((c.name || '').trim())) || s.incomeCategories.find(c => /other/i.test(c.name || ''));
+  const caSub = otherCat && (otherCat.subs || []).find(su => /class action/i.test(su.name || ''));
+  const pays = (st.payments || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const last = pays[pays.length - 1];
+  const amt = last ? last.amount : (st.expectedAmount != null ? st.expectedAmount : '');
+  incomeModal({
+    categoryId: otherCat ? otherCat.id : '', subId: caSub ? caSub.id : '',
+    otherType: 'Class Action Settlement', description: st.name || '',
+    gross: amt, net: amt, date: (last && last.date) || todayISO(),
+    receivedVia: (last && last.method) || st.method || '', status: 'received', taxable: 'yes'
+  });
+}
+function importSettlements() {
+  const store = window.cloverStore;
+  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
+  inp.addEventListener('change', () => {
+    const f = inp.files && inp.files[0]; if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      let data;
+      try { data = JSON.parse(reader.result); } catch (e) { toast('Couldn’t read that file (not valid JSON)', 'warn'); return; }
+      const arr = Array.isArray(data) ? data : (data && Array.isArray(data.settlements) ? data.settlements : null);
+      if (!arr) { toast('No settlements found in the file', 'warn'); return; }
+      const existing = store.state.settlements || [];
+      const key = x => ((x.name || '').trim().toLowerCase() + '|' + (x.dateFiled || ''));
+      const seen = new Set(existing.map(key));
+      let added = 0, skipped = 0;
+      arr.forEach(row => {
+        if (!row || !row.name) { skipped++; return; }
+        if (seen.has(key(row))) { skipped++; return; }
+        seen.add(key(row));
+        store.saveSettlement({
+          name: String(row.name).trim(), caseName: row.caseName || '', status: row.status || 'Submitted',
+          dateFiled: row.dateFiled || '', deadline: row.deadline || '', claimNumber: row.claimNumber || '',
+          claimId: row.claimId || '', method: row.method || '', expectedAmount: row.expectedAmount != null ? Number(row.expectedAmount) : null,
+          proofRequired: !!row.proofRequired, url: row.url || '', notes: row.notes || '',
+          personId: row.personId || (store.state.persons[0] && store.state.persons[0].id),
+          payments: Array.isArray(row.payments) ? row.payments.map(p => ({ id: p.id || ('pay' + Math.random().toString(36).slice(2)), date: p.date || '', amount: Number(p.amount) || 0, method: p.method || '' })) : []
+        });
+        added++;
+      });
+      toast('Imported ' + added + (skipped ? (' · skipped ' + skipped + ' duplicate' + (skipped === 1 ? '' : 's')) : ''));
+      renderView(currentRoute);
+    };
+    reader.readAsText(f);
+  });
+  inp.click();
 }
 
 function sumCard(label, value, tone, hint, bar) {

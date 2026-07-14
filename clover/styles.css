@@ -504,6 +504,11 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .convert-opt:hover { border-color: var(--accent); background: var(--surface-2); }
 .convert-opt-label { font-weight: 600; font-size: 14px; }
 .convert-opt-hint { font-size: 12px; color: var(--text-muted); }
+.pay-list { display: flex; flex-direction: column; gap: 6px; }
+.pay-row { display: grid; grid-template-columns: minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) auto; gap: 6px; align-items: center; }
+.pay-row input { width: 100%; min-width: 0; }
+.pay-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.mono-sm { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
 .mini-right { display: flex; align-items: center; gap: 6px; }
 .pos { color: var(--income); font-weight: 600; white-space: nowrap; }
 .neg { color: var(--expense); font-weight: 600; white-space: nowrap; }

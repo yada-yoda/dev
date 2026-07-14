@@ -38,7 +38,8 @@ const SEED_PAY_METHODS = ['Direct deposit', 'Check', 'Office pickup', 'Other'];
 const SEED_CHECK_TYPES = ['Regular', 'Bonus', 'Reimbursement', 'Adjustment', 'Other one-time'];
 const SEED_INCOME_GROUPS = [
   'Wages', 'Acting', 'Side Jobs', 'Dividends', 'Investments', 'Interest',
-  'Passive / Affiliate', 'Rewards', 'Selling', 'Retirement / IRA', 'Other'
+  'Passive / Affiliate', 'Rewards', 'Selling', 'Retirement / IRA',
+  { name: 'Other', subs: ['Class Action Settlement', 'Lawsuit / Settlement', 'Gift', 'Rebate'] }
 ];
 // Expense groups seed with useful default subcategories (only applied on first
 // run — existing users keep their own lists and can add these in Settings).
@@ -91,9 +92,22 @@ function migrateExpenseSeeds(cats) {
 // IRA/estate distributions have a home (additive, idempotent).
 function migrateIncomeSeeds(cats) {
   if (!Array.isArray(cats)) return false;
-  if (cats.some(c => /\bira\b|retire/i.test(c.name || ''))) return false;
-  cats.push({ id: mkId('cat'), name: 'Retirement / IRA', order: cats.length, subs: [] });
-  return true;
+  let changed = false;
+  const norm = s => (s || '').trim().toLowerCase();
+  if (!cats.some(c => /\bira\b|retire/i.test(c.name || ''))) {
+    cats.push({ id: mkId('cat'), name: 'Retirement / IRA', order: cats.length, subs: [] });
+    changed = true;
+  }
+  // Ensure the "Other" income group offers a Class Action Settlement subcategory.
+  const other = cats.find(c => norm(c.name) === 'other');
+  if (other) {
+    if (!Array.isArray(other.subs)) other.subs = [];
+    if (!other.subs.some(s => norm(s.name) === 'class action settlement')) {
+      other.subs.push({ id: mkId('sub'), name: 'Class Action Settlement' });
+      changed = true;
+    }
+  }
+  return changed;
 }
 
 function seedGroups(items) {
@@ -160,7 +174,11 @@ function defaults() {
     taxRecords: [],
     // Raise history per employer: {id, employer, date, amount (new gross per check),
     // prevAmount, notes}
-    raises: []
+    raises: [],
+    // Class-action settlement claims tracker: {id, name, caseName, status, dateFiled,
+    // deadline, claimNumber, claimId, method, expectedAmount, proofRequired, url,
+    // notes, personId, payments:[{id,date,amount,method}]}. Cross-year, meta doc.
+    settlements: []
   };
 }
 
@@ -223,7 +241,8 @@ function snapshot() {
     rateHistory: state.rateHistory,
     paySchedules: state.paySchedules,
     taxRecords: state.taxRecords,
-    raises: state.raises
+    raises: state.raises,
+    settlements: state.settlements
   };
 }
 
@@ -243,6 +262,7 @@ function apply(data) {
   state.paySchedules = s.paySchedules || [];
   state.taxRecords = s.taxRecords || [];
   state.raises = s.raises || [];
+  state.settlements = s.settlements || [];
   state._loaded = true;
 }
 
@@ -344,6 +364,14 @@ window.cloverStore = {
   },
   expenseGroup(id) { return state.expenseCategories.find(c => c.id === id) || null; },
   expenseGroupName(id) { const g = this.expenseGroup(id); return g ? g.name : '—'; },
+
+  // --- class-action settlement claims (meta doc, cross-year) ---
+  saveSettlement(item) {
+    if (item.id) { const i = state.settlements.findIndex(x => x.id === item.id); if (i >= 0) state.settlements[i] = item; else state.settlements.push(item); }
+    else { item.id = mkId('set'); state.settlements.push(item); }
+    scheduleSave(); notify(); return item;
+  },
+  removeSettlement(id) { state.settlements = state.settlements.filter(x => x.id !== id); scheduleSave(); notify(); },
 
   // --- credit scores + savings-rate history (Phase 5, meta doc, cross-year) ---
   saveCreditScore(entry) {
