@@ -499,6 +499,11 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .mini-row:first-child { border-top: none; }
 .brow-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .budget-reminder { margin-bottom: 16px; }
+.convert-list { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.convert-opt { display: flex; flex-direction: column; gap: 3px; text-align: left; width: 100%; padding: 11px 13px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; }
+.convert-opt:hover { border-color: var(--accent); background: var(--surface-2); }
+.convert-opt-label { font-weight: 600; font-size: 14px; }
+.convert-opt-hint { font-size: 12px; color: var(--text-muted); }
 .mini-right { display: flex; align-items: center; gap: 6px; }
 .pos { color: var(--income); font-weight: 600; white-space: nowrap; }
 .neg { color: var(--expense); font-weight: 600; white-space: nowrap; }

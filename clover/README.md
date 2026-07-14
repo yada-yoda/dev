@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.96 — Convert between expenses, bills & budget placeholders
+
+- Every expense, bill, and budget placeholder now has a **Convert** button
+  that changes what it is and carries all its details over (amount, category,
+  account, person, notes):
+  - An **Expense** → a **budget placeholder** or a **recurring bill**.
+  - A **Bill** → a **budget placeholder** (or back to a regular bill), or a
+    **one-off expense**.
+  - A **Budget placeholder** → a regular bill, or a one-off expense.
+- Budget placeholders and bills are the same kind of record (a recurring item
+  flagged as an estimate), so switching between them is instant; converting
+  to/from an expense moves the record to the right page and removes the
+  original. Available from the Expenses list, Bills & Subscriptions, and the
+  Budget page.
+
 ### v1.0.95 — IRA / estate distributions as income
 
 - New **Retirement / IRA** income category (added automatically for existing

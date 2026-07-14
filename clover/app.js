@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.95';
+const VERSION = '1.0.96';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -475,10 +475,13 @@ function wireModal() {
   });
   // Intentionally NO backdrop-click close for data-entry modals.
 }
-function openModal({ title, body, confirmLabel = 'Save', onConfirm = null }) {
+function openModal({ title, body, confirmLabel = 'Save', onConfirm = null, hideConfirm = false }) {
   document.getElementById('modal-title').textContent = title;
   const b = document.getElementById('modal-body'); b.innerHTML = ''; if (body) b.appendChild(body);
-  document.getElementById('modal-confirm').textContent = confirmLabel;
+  const confirmBtn = document.getElementById('modal-confirm');
+  confirmBtn.textContent = confirmLabel;
+  confirmBtn.style.display = hideConfirm ? 'none' : '';
+  document.getElementById('modal-cancel').textContent = hideConfirm ? 'Close' : 'Cancel';
   modalConfirmHandler = onConfirm;
   document.getElementById('modal-host').classList.remove('hidden');
   const f = b.querySelector('input,select,textarea'); if (f) setTimeout(() => f.focus(), 30);
@@ -501,6 +504,61 @@ function promptText(title, initial, onSave) {
 function confirmRemove(name, onYes) {
   const body = el('div'); body.appendChild(el('p', null, `Remove “${name}”? This can’t be undone.`));
   openModal({ title: 'Remove', body, confirmLabel: 'Remove', onConfirm: () => { onYes(); toast('Removed'); } });
+}
+
+// ---- Type conversion between Expense / Bill / Budget placeholder ----
+// Budget placeholders and bills are the SAME thing (a recurring item with the
+// budgetEst flag), so toggling between them is just the flag. Expenses live in
+// a different collection, so converting to/from one moves the record and carries
+// every shared field over.
+function expenseToRecurring(exp, asPlaceholder) {
+  const store = window.cloverStore;
+  const rec = {
+    name: (exp.title || exp.vendor || 'Untitled').trim(), vendor: exp.vendor || '',
+    categoryId: exp.categoryId || '', subId: exp.subId || '',
+    amount: Number(exp.amount) || 0, frequency: 'monthly', renewalDate: exp.date || todayISO(),
+    accountId: exp.accountId || '', personId: exp.personId, priority: 'Medium', status: 'Active',
+    budgetEst: !!asPlaceholder, notes: exp.notes || '', checkNo: exp.checkNo || ''
+  };
+  store.saveRecurring(rec);
+  store.removeExpense(activeYear, exp.id);
+  toast(asPlaceholder ? 'Converted to a budget placeholder' : 'Converted to a recurring bill');
+}
+function recurringToExpense(rec) {
+  const store = window.cloverStore;
+  const exp = {
+    date: todayISO(), title: rec.name || '', vendor: rec.vendor || '',
+    categoryId: rec.categoryId || '', subId: rec.subId || '', amount: Number(rec.amount) || 0,
+    accountId: rec.accountId || '', personId: rec.personId, notes: rec.notes || '', checkNo: rec.checkNo || ''
+  };
+  store.saveExpense(activeYear, exp);
+  store.removeRecurring(rec.id);
+  toast('Converted to a one-off expense');
+}
+// kind: 'expense' (an expensePayment) or 'recurring' (a bill or placeholder).
+function convertModal(kind, item) {
+  const store = window.cloverStore;
+  const body = el('div');
+  const name = kind === 'expense' ? (item.title || item.vendor || 'this expense') : item.name;
+  body.appendChild(el('p', 'muted', 'Change what “' + name + '” is — its amount, category, account, person and notes carry over, and the original entry is replaced.'));
+  const list = el('div', 'convert-list');
+  const opt = (label, hint, run) => {
+    const b = el('button', 'convert-opt');
+    b.appendChild(el('span', 'convert-opt-label', label));
+    b.appendChild(el('span', 'convert-opt-hint', hint));
+    b.addEventListener('click', () => { run(); closeModal(); renderView(currentRoute); });
+    list.appendChild(b);
+  };
+  if (kind === 'expense') {
+    opt('→ Budget placeholder', 'A recurring, estimated cost counted in your budget (monthly to start). Moves it off the Expenses page onto Budget & Bills.', () => expenseToRecurring(item, true));
+    opt('→ Recurring bill', 'A real repeating bill on the Bills & Subscriptions page (monthly to start).', () => expenseToRecurring(item, false));
+  } else {
+    if (item.budgetEst) opt('→ Regular bill', 'Drop the budget-estimate flag — treat it as an actual recurring bill.', () => { store.saveRecurring(Object.assign({}, item, { budgetEst: false })); toast('Now a regular bill'); });
+    else opt('→ Budget placeholder', 'Flag it as an expected/estimated cost. It still counts toward totals and appears on the Budget page.', () => { store.saveRecurring(Object.assign({}, item, { budgetEst: true })); toast('Now a budget placeholder'); });
+    opt('→ One-off expense', 'Log it once on the Expenses page (dated today) and remove the recurring entry.', () => recurringToExpense(item));
+  }
+  body.appendChild(list);
+  openModal({ title: 'Convert', body, hideConfirm: true });
 }
 
 // ============================================================
@@ -1785,8 +1843,9 @@ function renderSubscriptions(view) {
     { label: '', sortable: false, cell: r => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => subscriptionModal(r));
+        const conv = el('button', 'icon-btn', 'Convert'); conv.title = 'Make this a budget placeholder, or turn it into a one-off expense'; conv.addEventListener('click', () => convertModal('recurring', r));
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeRecurring(r.id)));
-        td.appendChild(edit); td.appendChild(del); return td; } }
+        td.appendChild(edit); td.appendChild(conv); td.appendChild(del); return td; } }
   ];
   const subsColsBtn = columnsButton('subs', SUBS_ALL_COLS, SUBS_DEFAULT_COLS, SUBS_COL_LABELS, 'Bills & Subscriptions columns');
   subsColsBtn.style.marginLeft = 'auto';   // share the filter row instead of its own row
@@ -1996,8 +2055,9 @@ function renderBudget(view) {
     const stTd = el('td'); stTd.appendChild(badge(b.status || 'Active', isSubActive(b) ? 'green' : '')); tr.appendChild(stTd);
     const actTd = el('td', 'row-actions');
     const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => subscriptionModal(b));
+    const conv = el('button', 'icon-btn', 'Convert'); conv.title = 'Turn this back into a regular bill or a one-off expense'; conv.addEventListener('click', () => convertModal('recurring', b));
     const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(b.name, () => store.removeRecurring(b.id)));
-    actTd.appendChild(edit); actTd.appendChild(del); tr.appendChild(actTd);
+    actTd.appendChild(edit); actTd.appendChild(conv); actTd.appendChild(del); tr.appendChild(actTd);
     tb.appendChild(tr);
   });
   table.appendChild(tb); card.appendChild(table); view.appendChild(card);
@@ -2413,8 +2473,9 @@ function expenseList(data) {
     const dup = el('button', 'icon-btn', 'Duplicate');
     dup.title = 'Start a new expense prefilled from this one (date set to today)';
     dup.addEventListener('click', () => { const pre = Object.assign({}, e); delete pre.id; pre.date = todayISO(); expenseModal(pre); });
+    const conv = el('button', 'icon-btn', 'Convert'); conv.title = 'Turn this into a recurring bill or a budget placeholder'; conv.addEventListener('click', () => convertModal('expense', e));
     const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.expenseGroupName(e.categoryId), () => store.removeExpense(activeYear, e.id)));
-    act.appendChild(edit); act.appendChild(dup); act.appendChild(del); tr.appendChild(act);
+    act.appendChild(edit); act.appendChild(dup); act.appendChild(conv); act.appendChild(del); tr.appendChild(act);
     tb.appendChild(tr);
   });
   table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
