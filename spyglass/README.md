@@ -127,6 +127,12 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.9.1 (worker v0.9.1)
+Added longer check-frequency options (every 2 days, 3 days, weekly, every 2 weeks, monthly) for
+slow-changing pages. `freqLabel` renders multi-day/week/month intervals cleanly. After an *error*,
+a monitor retries within `min(interval, 6h)` (`errorRetryMs`) so a monthly monitor doesn't sit
+broken for a month on a transient failure.
+
 ### v0.9.0 (worker v0.9.0)
 **Guaranteed change screenshots.** A detected change always captures a screenshot for the alert
 email (retried), taken with the method that shows the page's real content — jina's own screenshot

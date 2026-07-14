@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.9.0 — watch any web page for changes</title>
+<title>Spyglass v0.9.1 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -274,7 +274,12 @@
             <option value="60" selected>1 hour</option>
             <option value="360">6 hours</option>
             <option value="720">12 hours</option>
-            <option value="1440">1 day</option>
+            <option value="1440">Once a day</option>
+            <option value="2880">Every 2 days</option>
+            <option value="4320">Every 3 days</option>
+            <option value="10080">Once a week</option>
+            <option value="20160">Every 2 weeks</option>
+            <option value="43200">Once a month</option>
           </select>
         </label>
       </div>
@@ -413,6 +418,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.9.1</strong> — More check-frequency options for pages that change slowly: every 2 days, every 3 days, once a week, every 2 weeks, and once a month. (A monitor that hits a temporary error still retries within a few hours, so a monthly one won't sit broken for a month.)</li>
         <li><strong>v0.9.0</strong> — Every change alert now <em>always</em> includes a screenshot — and for pages we can only read through jina, the screenshot is taken by jina too, so it shows the real value instead of a blank. Plus a <em>safe fallback</em>: if a monitor's usual method is briefly down, Spyglass can use another method to confirm nothing changed — but it will never send a change alert based on a different method, so no false alarms.</li>
         <li><strong>v0.8.4</strong> — Some banks (e.g. Synchrony) load their rate from an API that blocks datacenter IPs, so neither a plain fetch nor our own browser can see it — only the r.jina.ai reader can. Spyglass now supports an optional free jina API key to make those pages reliable, and correctly reads Synchrony's rate again.</li>
         <li><strong>v0.8.2</strong> — Each monitor card now shows its <em>current value</em> at a glance (the rate, price, or keyword state) and a <em>thumbnail</em> of the page — the &#8635; refresh button updates both. Two reliability fixes: an empty read (page didn't finish loading) is now treated as a temporary error and retried, never a false &ldquo;it changed&rdquo; alert; and if a browser render fails, Spyglass falls back to the r.jina.ai reader.</li>
@@ -445,7 +451,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.9.0";
+  const APP_VERSION = "0.9.1";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -484,7 +490,15 @@ function fmtAgo(ts){
 function domainOf(u){ try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return u; } }
 function favOf(u){ try{ return "https://www.google.com/s2/favicons?sz=64&domain=" + new URL(u).hostname; }catch(e){ return ""; } }
 function freqLabel(m){
-  if(m>=1440) return "daily"; if(m>=60) return (m/60)+"h"; return m+"m";
+  m = +m;
+  const map = {5:"5 min",15:"15 min",30:"30 min",60:"hour",360:"6 hr",720:"12 hr",
+    1440:"day",2880:"2 days",4320:"3 days",10080:"week",20160:"2 weeks",43200:"month"};
+  if(map[m]) return map[m];
+  if(m>=43200) return Math.round(m/43200)+" months";
+  if(m>=10080) return Math.round(m/10080)+" weeks";
+  if(m>=1440) return Math.round(m/1440)+" days";
+  if(m>=60) return Math.round(m/60)+" hr";
+  return m+" min";
 }
 function escapeHtml(s){ return (s||"").replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
@@ -661,7 +675,7 @@ function renderCard(m){
         <div class="name">${escapeHtml(m.name || domainOf(m.url))}</div>
         ${val ? `<div class="val">${escapeHtml(val)}</div>` : ""}
         <div class="url">${escapeHtml(m.url)}</div>
-        <div class="sub">Checks ${freqLabel(m.frequencyMinutes)} &middot; last ${fmtAgo(m.lastCheckedAt)} &middot; ${m.changeCount||0} change${(m.changeCount||0)===1?"":"s"}</div>
+        <div class="sub">Checks every ${freqLabel(m.frequencyMinutes)} &middot; last ${fmtAgo(m.lastCheckedAt)} &middot; ${m.changeCount||0} change${(m.changeCount||0)===1?"":"s"}</div>
       </div>
       ${statusPill(m)}
       <div class="actions">
