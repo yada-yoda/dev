@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.99';
+const VERSION = '1.0.100';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -58,6 +58,7 @@ let budgetReconMonth = null;       // Budget check-in target month (0-based, wit
 let settleSort = { key: 'dateFiled', dir: 'desc' };
 let settleSearch = '';             // live search over the settlements table
 let settleStatusFilter = 'all';    // 'all' | a specific status
+let settleBadgeFilter = null;      // { key, value } from clicking a settlement value bubble
 let taxesSort = { key: 'taxYear', dir: 'desc' };
 let salesSort = { key: 'orderDate', dir: 'desc' };
 let salesImportState = null;   // parsed Poshmark sales awaiting review
@@ -2173,10 +2174,22 @@ function settleLastPayout(s) { const ds = (s.payments || []).map(p => p.date).fi
 function settleIsSubmitted(s) { const st = s.status || 'Not submitted'; return st !== 'Not submitted'; }
 function settleIsPaid(s) { return s.status === 'Paid' || settleReceived(s) > 0; }
 function settleIsOpen(s) { return settleIsSubmitted(s) && !settleIsPaid(s) && s.status !== 'Denied' && s.status !== 'Excluded'; }
-function settleStatusBadge(r) {
-  const st = r.status || 'Not submitted';
-  const tone = st === 'Paid' ? 'green' : (st === 'Submitted' || st === 'Approved') ? 'amber' : (st === 'Denied' || st === 'Excluded') ? 'red' : '';
-  return badge(st, tone);
+function settleStatusTone(st) {
+  return st === 'Paid' ? 'green' : (st === 'Submitted' || st === 'Approved') ? 'amber' : (st === 'Denied' || st === 'Excluded') ? 'red' : '';
+}
+// Clickable value bubble that narrows the settlements table to that value
+// (click again to clear) — mirrors the Bills & Subscriptions filter badges.
+function settleFilterBadge(key, text, tone) {
+  const b = badge(text, tone);
+  b.style.cursor = 'pointer';
+  b.title = 'Click to show only “' + text + '”';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const cur = settleBadgeFilter;
+    settleBadgeFilter = (cur && cur.key === key && cur.value === text) ? null : { key, value: text };
+    renderView(currentRoute);
+  });
+  return b;
 }
 const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', person: 'Person', notes: 'Notes' };
 const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'received', 'payouts', 'lastPayout', 'person', 'notes'];
@@ -2184,16 +2197,16 @@ const SETTLE_DEFAULT_COLS = ['name', 'status', 'dateFiled', 'claimNumber', 'meth
 function buildSettleCol(store, key) {
   switch (key) {
     case 'name': return { label: 'Settlement', key: 'name', value: r => r.name || '', cell: r => { const td = el('td'); td.appendChild(el('span', null, r.name || '—')); if (r.caseName) td.appendChild(el('div', 'acct-sub', firstLine(r.caseName))); return td; } };
-    case 'status': return { label: 'Status', key: 'status', value: r => r.status || '', cell: r => { const td = el('td'); td.appendChild(settleStatusBadge(r)); return td; } };
+    case 'status': return { label: 'Status', key: 'status', value: r => r.status || '', cell: r => { const td = el('td'); const st = r.status || 'Not submitted'; td.appendChild(settleFilterBadge('status', st, settleStatusTone(st))); return td; } };
     case 'dateFiled': return { label: 'Filed', key: 'dateFiled', value: r => r.dateFiled || '', cell: r => el('td', null, r.dateFiled ? fmtDate(r.dateFiled) : '—') };
     case 'deadline': return { label: 'Deadline', key: 'deadline', value: r => r.deadline || '', cell: r => el('td', 'muted', r.deadline ? fmtDate(r.deadline) : '—') };
     case 'claimNumber': return { label: 'Claim / confirmation #', key: 'claimNumber', value: r => r.claimNumber || '', cell: r => { const td = el('td', 'mono-sm'); td.textContent = firstLine(r.claimNumber) || '—'; if (r.claimNumber) td.title = r.claimNumber; return td; } };
     case 'claimId': return { label: 'Claim ID', key: 'claimId', value: r => r.claimId || '', cell: r => el('td', 'mono-sm', r.claimId || '—') };
-    case 'method': return { label: 'Method', key: 'method', value: r => r.method || '', cell: r => el('td', 'muted', r.method || '—') };
+    case 'method': return { label: 'Method', key: 'method', value: r => r.method || '', cell: r => { const td = el('td'); if (r.method) td.appendChild(settleFilterBadge('method', r.method, 'type')); else td.textContent = '—'; return td; } };
     case 'received': return { label: 'Received', key: 'received', num: true, value: r => settleReceived(r), cell: r => numCell(settleReceived(r), true) };
     case 'payouts': return { label: 'Payouts', key: 'payouts', num: true, value: r => (r.payments || []).length, cell: r => el('td', 'num', String((r.payments || []).length || '—')) };
     case 'lastPayout': return { label: 'Last payout', key: 'lastPayout', value: r => settleLastPayout(r), cell: r => el('td', 'muted', settleLastPayout(r) ? fmtDate(settleLastPayout(r)) : '—') };
-    case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
+    case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => { const td = el('td'); const n = store.personName(r.personId); if (n && n !== '—') td.appendChild(settleFilterBadge('person', n, '')); else td.textContent = '—'; return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = firstLine(r.notes) || '—'; if (r.notes) td.title = r.notes; return td; } };
   }
   return null;
@@ -2204,10 +2217,16 @@ function renderSettlements(view) {
   const all = s.settlements || [];
   let rows = all.slice();
   if (settleStatusFilter !== 'all') rows = rows.filter(r => (r.status || 'Not submitted') === settleStatusFilter);
+  if (settleBadgeFilter) {
+    const f = settleBadgeFilter;
+    const valOf = r => f.key === 'status' ? (r.status || 'Not submitted') : f.key === 'method' ? (r.method || '') : f.key === 'person' ? store.personName(r.personId) : '';
+    rows = rows.filter(r => valOf(r) === f.value);
+  }
   if (settleSearch.trim()) {
     const q = settleSearch.trim().toLowerCase();
     rows = rows.filter(r => [r.name, r.caseName, r.claimNumber, r.claimId, r.method, r.notes, r.status, r.url].some(v => (v || '').toLowerCase().includes(q)));
   }
+  const narrowed = !!(settleBadgeFilter || settleStatusFilter !== 'all' || settleSearch.trim());
 
   const head = el('div', 'view-head');
   const left = el('div');
@@ -2221,17 +2240,20 @@ function renderSettlements(view) {
   head.appendChild(acts);
   view.appendChild(head);
 
-  const submitted = all.filter(settleIsSubmitted).length;
-  const paid = all.filter(settleIsPaid).length;
-  const open = all.filter(settleIsOpen).length;
-  const received = all.reduce((a, r) => a + settleReceived(r), 0);
+  // Stat cards reflect what's displayed (narrow via the bubbles/search to see
+  // subtotals), matching the Bills & Subscriptions behavior.
+  const submitted = rows.filter(settleIsSubmitted).length;
+  const paid = rows.filter(settleIsPaid).length;
+  const open = rows.filter(settleIsOpen).length;
+  const received = rows.reduce((a, r) => a + settleReceived(r), 0);
+  const fHint = narrowed ? 'filtered view' : undefined;
   const sum = el('div', 'sub-summary');
   const scard = (label, val, tone, hint) => { const c = el('div', 'sum-card'); c.appendChild(el('div', 'sum-label', label)); c.appendChild(el('div', 'sum-value ' + (tone || ''), val)); if (hint) c.appendChild(el('div', 'sum-hint', hint)); return c; };
-  sum.appendChild(scard('Tracked', String(all.length), '', 'total claims'));
-  sum.appendChild(scard('Submitted', String(submitted), 'neutral', 'claims filed'));
-  sum.appendChild(scard('Awaiting payout', String(open), open ? 'amber' : '', 'submitted, not yet paid'));
-  sum.appendChild(scard('Paid', String(paid), 'income', 'received a payout'));
-  sum.appendChild(scard('Total received', received > 0 ? money(received) : '–', 'income', 'across all payouts'));
+  sum.appendChild(scard('Tracked', String(rows.length), '', narrowed ? 'of ' + all.length + ' total' : 'total claims'));
+  sum.appendChild(scard('Submitted', String(submitted), 'neutral', fHint || 'claims filed'));
+  sum.appendChild(scard('Awaiting payout', String(open), open ? 'amber' : '', fHint || 'submitted, not yet paid'));
+  sum.appendChild(scard('Paid', String(paid), 'income', fHint || 'received a payout'));
+  sum.appendChild(scard('Total received', received > 0 ? money(received) : '–', 'income', fHint || 'across all payouts'));
   view.appendChild(sum);
 
   const bar = el('div', 'filter-bar');
@@ -2247,6 +2269,16 @@ function renderSettlements(view) {
   const colsBtn = columnsButton('settlements', SETTLE_ALL_COLS, SETTLE_DEFAULT_COLS, SETTLE_COL_LABELS, 'Class Action columns'); colsBtn.style.marginLeft = 'auto';
   bar.appendChild(colsBtn);
   view.appendChild(bar);
+
+  if (settleBadgeFilter) {
+    const f = settleBadgeFilter;
+    const chip = el('div', 'filter-bar');
+    chip.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (SETTLE_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { settleBadgeFilter = null; renderView(currentRoute); });
+    chip.appendChild(clear);
+    view.appendChild(chip);
+  }
 
   if (!all.length) { view.appendChild(emptyState('No settlements tracked yet', 'Track the class-action claims you’ve submitted to — so you can see their status and never submit to the same one twice. Add one, or import your existing list.', '+ Add settlement', () => settlementModal(null))); return; }
   if (!rows.length) { view.appendChild(el('div', 'card muted', 'No settlements match your search.')); return; }

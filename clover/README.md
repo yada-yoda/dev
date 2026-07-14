@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.100 — Clickable filter bubbles on the Class Actions table
+
+- On the Class Actions table, the **Status**, **Method**, and **Person** values
+  are now **clickable bubbles** — click one to narrow the list to just those
+  entries, click it again (or ✕ Clear filter) to clear. The stat cards update
+  to reflect what’s shown, matching how Bills & Subscriptions works.
+
 ### v1.0.99 — Class Action CSV import, APY on all accounts, fresh-JS on deploy
 
 - **APY is now editable on (almost) every account.** The Current APY field
