@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.102 — One unified APY column for accounts
+
+- The separate **APY**, **CD APY**, and **Savings APY (latest)** account
+  columns are now a **single APY column** that shows the right rate for any
+  account — a checking/savings/money-market account’s own APY, a CD’s APY, or
+  (as a fallback) the latest rate you recorded on the Credit & Rates page.
+- Each rate now shows its **date underneath** (“as of …” for a rate you entered
+  on the account, or “recorded …” for one pulled from your rate history) — the
+  way the old Savings column did. Add/Edit an account now has an **APY as of**
+  date next to the APY (defaults to today when you set a rate).
+- Fixes the APY you typed on a checking account not appearing — it lives in
+  this one column now, which is shown by default. Existing custom column
+  layouts are migrated automatically.
+
 ### v1.0.101 — Class Actions: durations, paid-by-year, and pay-range stats
 
 - **Paid by year** — a breakdown card showing how much you were paid each

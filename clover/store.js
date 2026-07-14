@@ -131,6 +131,18 @@ function migrateLegacyFees(yd) {
   return changed;
 }
 
+// v1.0.102 unified the three account APY columns (apy / cdApy / savingsRate)
+// into one "apy" column — remap any saved accounts column layout so users who
+// customized their columns see the unified one instead of losing it.
+function migrateAccountApyCols(settings) {
+  const tc = settings && settings.tableCols; if (!tc || !Array.isArray(tc.accounts)) return false;
+  const before = tc.accounts.join(',');
+  const seen = new Set(), out = [];
+  tc.accounts.forEach(k => { const nk = (k === 'cdApy' || k === 'savingsRate') ? 'apy' : k; if (!seen.has(nk)) { seen.add(nk); out.push(nk); } });
+  tc.accounts = out;
+  return out.join(',') !== before;
+}
+
 function seedGroups(items) {
   return items.map((it, i) => {
     const name = typeof it === 'string' ? it : it.name;
@@ -275,6 +287,7 @@ function apply(data) {
   state.expenseCategories = s.expenseCategories;
   if (migrateExpenseSeeds(state.expenseCategories)) scheduleSave();
   if (migrateIncomeSeeds(state.incomeCategories)) scheduleSave();
+  if (migrateAccountApyCols(state.settings)) scheduleSave();
   state.accounts = s.accounts;
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;

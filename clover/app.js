@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.101';
+const VERSION = '1.0.102';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -763,9 +763,21 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
-const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', cdApy: 'CD APY', cdMaturity: 'CD maturity', savingsRate: 'Savings APY (latest)', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
-const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'cdApy', 'cdMaturity', 'savingsRate', 'beneficiaries', 'closedDate', 'notes'];
-const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags'];
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', cdMaturity: 'CD maturity', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'cdMaturity', 'beneficiaries', 'closedDate', 'notes'];
+const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'apy', 'flags'];
+// Unified APY for the single "APY" account column. Uses the account's own rate
+// (a CD's cdApy, or a.apy for everything else) with its "as of" date; falls back
+// to the latest recorded rate from Credit & Rates when no rate is set on the
+// account. Returns { pct, date, as } or null.
+function accountApy(store, a) {
+  if (a.type === 'CD') { if (a.cdApy != null && a.cdApy !== '') return { pct: Number(a.cdApy), date: a.apyAsOf || '', as: 'as of' }; }
+  else if (a.type !== 'Credit Card' && a.apy != null && a.apy !== '') return { pct: Number(a.apy), date: a.apyAsOf || '', as: 'as of' };
+  const r = /savings|cd|money market/i.test(a.type || '') ? latestRateFor(store, a.institution) : null;
+  if (r && r.apy != null && r.apy !== '') return { pct: Number(r.apy), date: r.date || '', as: 'recorded' };
+  return null;
+}
+
 // Colored value badge: each column gets a base hue, each distinct value a shade —
 // so CD vs Checking (or Ally vs Chase) is recognizable at a glance. Clicking one
 // filters the table to that value.
@@ -830,16 +842,16 @@ function buildAcctCol(store, key) {
         if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } };
     case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'beneficiaries', (a.beneficiaries || '').trim())); return td; } };
-    case 'apy': return { label: 'APY', key: 'apy', num: true, value: a => Number(a.apy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.apy != null && a.apy !== '') ? (Number(a.apy).toFixed(2) + '%') : '—'; return td; } };
-    case 'cdApy': return { label: 'CD APY', key: 'cdApy', num: true, value: a => Number(a.cdApy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.type === 'CD' && a.cdApy != null && a.cdApy !== '') ? (Number(a.cdApy).toFixed(2) + '%') : '—'; return td; } };
+    case 'apy': return { label: 'APY', key: 'apy', num: true,
+        value: a => { const x = accountApy(store, a); return x ? x.pct : -1; },
+        cell: a => {
+          const td = el('td', 'num');
+          const x = accountApy(store, a);
+          if (!x) { td.textContent = '—'; return td; }
+          td.textContent = x.pct.toFixed(2) + '%';
+          if (x.date) td.appendChild(el('div', 'acct-sub', x.as + ' ' + fmtDate(x.date)));
+          return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
-    case 'savingsRate': return { label: 'Savings APY (latest)', key: 'savingsRate', num: true, value: a => { const r = latestRateFor(store, a.institution); return r ? Number(r.apy) || 0 : -1; }, cell: a => {
-        const td = el('td', 'num');
-        const r = /savings|cd/i.test(a.type || '') ? latestRateFor(store, a.institution) : null;
-        if (!r) { td.textContent = '—'; return td; }
-        td.textContent = Number(r.apy).toFixed(2) + '%';
-        td.appendChild(el('div', 'acct-sub', 'recorded ' + fmtDate(r.date)));
-        return td; } };
     case 'closedDate': return { label: 'Closed on', key: 'closedDate', value: a => a.closedDate || '', cell: a => el('td', null, a.closedDate ? fmtDate(a.closedDate) : '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: a => a.notes || '', cell: a => { const td = el('td', 'muted'); td.textContent = a.notes || '—'; return td; } };
   }
@@ -1038,9 +1050,11 @@ function accountModal(existing) {
   const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 12 months' });
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
   const fMat = input(a.cdMaturity || '', { type: 'date' });
+  const fCdApyDate = input(a.apyAsOf || '', { type: 'date' });
   const cdWrap = el('div', 'cd-fields');
   cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD — e.g. "12 months".'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
+  cdWrap.appendChild(field('APY as of', fCdApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
   cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
 
   const fCcOpen = dayField('Statement opens (day)', 'Day of month the statement period begins (optional; static cycle only).', a.statementStartDay);
@@ -1052,8 +1066,10 @@ function accountModal(existing) {
   // Current APY for interest-bearing accounts — shown for every type except a
   // CD (which has its own APY field above) and a Credit Card (no yield).
   const fAcctApy = input(a.apy != null ? a.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fAcctApy.step = '0.01'; fAcctApy.min = 0;
+  const fApyDate = input(a.apyAsOf || '', { type: 'date' });
   const apyWrap = el('div', 'cd-fields');
   apyWrap.appendChild(field('Current APY %', fAcctApy, 'The annual percentage yield this account currently earns — for savings, checking, money-market, sweep, brokerage cash, and similar accounts.'));
+  apyWrap.appendChild(field('APY as of', fApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
 
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
@@ -1106,6 +1122,12 @@ function accountModal(existing) {
         const prev = store.account(prevId);
         if (prev && a.id && prev.previousAccountId === a.id) { toast('That would link the two accounts in a loop', 'warn'); return false; }
       }
+      // A single "as of" date backs whichever APY field applies to this type;
+      // default it to today when a rate is set but no date was given.
+      const t = fType.value;
+      const apyValSet = t === 'CD' ? fApy.value.trim() !== '' : (t !== 'Credit Card' && fAcctApy.value !== '');
+      const apyDateRaw = t === 'CD' ? fCdApyDate.value : (t === 'Credit Card' ? (a.apyAsOf || '') : fApyDate.value);
+      const apyAsOf = apyValSet ? (apyDateRaw || todayISO()) : (apyDateRaw || '');
       const acc = Object.assign(a, {
         name, institution: fInst.value.trim(), type: fType.value,
         last4: fLast4.value.replace(/\D/g, '').slice(0, 4), personId: fOwner.value,
@@ -1114,7 +1136,7 @@ function accountModal(existing) {
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
-        apy: fAcctApy.value === '' ? null : parseFloat(fAcctApy.value),
+        apy: fAcctApy.value === '' ? null : parseFloat(fAcctApy.value), apyAsOf,
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
       });
