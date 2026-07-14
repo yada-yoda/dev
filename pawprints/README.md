@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.53.0**
+**Current Version: v0.53.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.53.1** — **One-time supplies (no lifecycle tracking)** — a new "One-time item — no start /
+  finish tracking" checkbox in the supply form for things you buy once and keep (tags, collar,
+  license, toys). When on, the item hides the opened/finished dates, shows no Start/Finish button in
+  the list, and stays out of the on-hand "Inventory" nudges — while consumables like food and treats
+  keep their normal Start/Finish lifecycle.
 - **v0.53.0** — **Insights PNG export, badge-toast fix, PDF refresh:**
   - **Save any Insights panel as a PNG** — each panel (Walking milestones, Weight trend, Trends,
     Spending, Potty breakdown) now has a **camera button** that downloads a crisp image of just that

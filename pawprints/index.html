@@ -235,7 +235,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.53.0';
+const APP_VERSION = 'v0.53.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2199,16 +2199,19 @@ function invModal(id, pre){
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="iv-cclast4" inputmode="numeric" maxlength="4" value="'+(it?esc(it.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
-    +'<div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
-    +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="iv-nolife" '+(it&&it.noLifecycle?'checked':'')+' onchange="ivLifecycleToggle()"> One-time item — no start / finish tracking'+tip('For things you buy once and keep — tags, collar, license, toys. Hides the opened/finished dates and the Start/Finish buttons, and keeps the item out of the on-hand "Inventory" nudges. Leave off for consumables like food or treats.')+'</label>'
+    +'<div id="iv-lifecycle-wrap"><div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
+    +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open (or since purchase). Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="saveInv('+(editing?"'"+id+"'":'null')+')">Save</button>'
     +(editing?'<button class="btn" onclick="dupInv(\''+id+'\')" title="Add another of this same item">Duplicate</button><button class="btn btn-danger" onclick="deleteInv(\''+id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  payToggle('iv');
+  payToggle('iv'); ivLifecycleToggle();
 }
+// Hide the Started/Finished dates for one-time items that don't have a use-up lifecycle.
+function ivLifecycleToggle(){ const w=document.getElementById('iv-lifecycle-wrap'), cb=document.getElementById('iv-nolife'); if(w&&cb) w.style.display = cb.checked ? 'none' : ''; }
 // Open a fresh Add form pre-filled from an existing item — quick "buy another of the same".
 function dupInv(id){
   if(denyManage()) return;
@@ -2223,8 +2226,9 @@ function saveInv(id){
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
+  const noLifecycle = document.getElementById('iv-nolife').checked;
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', startDate:fv('iv-start'), endDate:fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -3169,7 +3173,7 @@ function renderIllnessTab(){
 
 // ── SUPPLIES ──
 // Lifecycle from the date fields: no start = on-hand inventory, start = in use, end = finished.
-function invStatus(i){ return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
+function invStatus(i){ if(i.noLifecycle) return 'Item'; return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
 function daysBetween(a, b){ if(!a||!b) return null; const d1 = new Date(a+'T00:00'), d2 = new Date(b+'T00:00'); if(isNaN(d1)||isNaN(d2)) return null; return Math.round((d2-d1)/86400000); }
 // "5 days in use" while open, or "used 20 days" once finished.
 function invDurationText(i){
@@ -3179,6 +3183,7 @@ function invDurationText(i){
 }
 function invStatusChip(i){
   const s = invStatus(i);
+  if(s==='Item') return ''; // one-time item — no lifecycle status
   if(s==='In use') return '<span class="chip-2" style="font-size:10px">In use</span>';
   if(s==='Finished') return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Finished</span>';
   return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Inventory</span>';
@@ -3640,6 +3645,7 @@ function enterDemo(){
       { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', size:'30 lb', cost:'62.99', purchaseDate:dAgo(14), startDate:dAgo(12), store:'Chewy', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, trackCost:true, notes:'' },
       { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
+      { id:'inv4', petId:pid, category:'Other', brand:'', name:'Engraved ID tag', qty:'1', unit:'', cost:'14.99', purchaseDate:dAgo(58), noLifecycle:true, notes:'On the collar' },
     ],
     contacts: [
       { id:'c1', role:'Vet', name:'Dr. Patel', org:'Riverside Animal Hospital', phone:'(555) 012-3456', email:'care@riversideah.example', address:'420 River Rd, Springfield, IL 62704', website:'https://riversideah.example', notes:'Ask for the established-patient line' },
