@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.101 — Class Actions: durations, paid-by-year, and pay-range stats
+
+- **Paid by year** — a breakdown card showing how much you were paid each
+  calendar year (by payout date), with a bar for each year.
+- **Duration insights** — new stat cards for **Avg time to pay**, **Fastest
+  payout**, and **Slowest payout** (filed → first payout, in days), each naming
+  the settlement, plus **Lowest paid** and **Highest paid** amounts.
+- **Duration column** on the table: a *completed* duration (filed → first
+  payout) for paid claims, or an *ongoing* day count for claims still awaiting
+  payout.
+- All of these respect the filter bubbles — click a Status/Method/Person to see
+  the durations, ranges, and paid-by-year for just that slice.
+
 ### v1.0.100 — Clickable filter bubbles on the Class Actions table
 
 - On the Class Actions table, the **Status**, **Method**, and **Person** values

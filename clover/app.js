@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.100';
+const VERSION = '1.0.101';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2171,9 +2171,15 @@ const SETTLE_METHODS = ['PayPal', 'Venmo', 'Check', 'ACH / Direct Deposit', 'Zel
 function firstLine(s) { s = (s || '').trim(); const i = s.indexOf('\n'); return i >= 0 ? s.slice(0, i) : s; }
 function settleReceived(s) { return (s.payments || []).reduce((a, p) => a + (Number(p.amount) || 0), 0); }
 function settleLastPayout(s) { const ds = (s.payments || []).map(p => p.date).filter(Boolean).sort(); return ds.length ? ds[ds.length - 1] : ''; }
+function settleFirstPayout(s) { const ds = (s.payments || []).map(p => p.date).filter(Boolean).sort(); return ds.length ? ds[0] : ''; }
 function settleIsSubmitted(s) { const st = s.status || 'Not submitted'; return st !== 'Not submitted'; }
 function settleIsPaid(s) { return s.status === 'Paid' || settleReceived(s) > 0; }
 function settleIsOpen(s) { return settleIsSubmitted(s) && !settleIsPaid(s) && s.status !== 'Denied' && s.status !== 'Excluded'; }
+// Completed duration: days from filed to the FIRST payout (when it first paid out).
+function settleTimeToPay(s) { const fp = settleFirstPayout(s); if (!s.dateFiled || !fp) return null; const d = daysBetweenISO(fp, s.dateFiled); return (d >= 0 && d < 1e9) ? d : null; }
+// Ongoing duration: days since filed for a still-unpaid (but submitted) claim.
+function settleCurrentDuration(s) { if (!s.dateFiled || settleIsPaid(s) || !settleIsSubmitted(s)) return null; const d = daysBetweenISO(todayISO(), s.dateFiled); return (d >= 0 && d < 1e9) ? d : null; }
+function durDays(n) { return n == null ? '–' : (n + (n === 1 ? ' day' : ' days')); }
 function settleStatusTone(st) {
   return st === 'Paid' ? 'green' : (st === 'Submitted' || st === 'Approved') ? 'amber' : (st === 'Denied' || st === 'Excluded') ? 'red' : '';
 }
@@ -2191,9 +2197,9 @@ function settleFilterBadge(key, text, tone) {
   });
   return b;
 }
-const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', person: 'Person', notes: 'Notes' };
-const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'received', 'payouts', 'lastPayout', 'person', 'notes'];
-const SETTLE_DEFAULT_COLS = ['name', 'status', 'dateFiled', 'claimNumber', 'method', 'received', 'lastPayout'];
+const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', duration: 'Duration', person: 'Person', notes: 'Notes' };
+const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'received', 'payouts', 'lastPayout', 'duration', 'person', 'notes'];
+const SETTLE_DEFAULT_COLS = ['name', 'status', 'dateFiled', 'claimNumber', 'method', 'received', 'lastPayout', 'duration'];
 function buildSettleCol(store, key) {
   switch (key) {
     case 'name': return { label: 'Settlement', key: 'name', value: r => r.name || '', cell: r => { const td = el('td'); td.appendChild(el('span', null, r.name || '—')); if (r.caseName) td.appendChild(el('div', 'acct-sub', firstLine(r.caseName))); return td; } };
@@ -2206,6 +2212,14 @@ function buildSettleCol(store, key) {
     case 'received': return { label: 'Received', key: 'received', num: true, value: r => settleReceived(r), cell: r => numCell(settleReceived(r), true) };
     case 'payouts': return { label: 'Payouts', key: 'payouts', num: true, value: r => (r.payments || []).length, cell: r => el('td', 'num', String((r.payments || []).length || '—')) };
     case 'lastPayout': return { label: 'Last payout', key: 'lastPayout', value: r => settleLastPayout(r), cell: r => el('td', 'muted', settleLastPayout(r) ? fmtDate(settleLastPayout(r)) : '—') };
+    case 'duration': return { label: 'Duration', key: 'duration', num: true,
+        value: r => { const c = settleTimeToPay(r); if (c != null) return c; const cur = settleCurrentDuration(r); return cur != null ? cur : -1; },
+        cell: r => {
+          const td = el('td');
+          const done = settleTimeToPay(r);
+          if (done != null) { td.textContent = done + 'd'; td.title = 'Filed → first payout (completed): ' + durDays(done); }
+          else { const cur = settleCurrentDuration(r); if (cur != null) { td.appendChild(document.createTextNode(cur + 'd ')); td.appendChild(badge('ongoing', 'amber')); td.title = 'Days since filed — still awaiting payout: ' + durDays(cur); } else td.textContent = '—'; }
+          return td; } };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => { const td = el('td'); const n = store.personName(r.personId); if (n && n !== '—') td.appendChild(settleFilterBadge('person', n, '')); else td.textContent = '—'; return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = firstLine(r.notes) || '—'; if (r.notes) td.title = r.notes; return td; } };
   }
@@ -2254,7 +2268,44 @@ function renderSettlements(view) {
   sum.appendChild(scard('Awaiting payout', String(open), open ? 'amber' : '', fHint || 'submitted, not yet paid'));
   sum.appendChild(scard('Paid', String(paid), 'income', fHint || 'received a payout'));
   sum.appendChild(scard('Total received', received > 0 ? money(received) : '–', 'income', fHint || 'across all payouts'));
+  // Extended insight cards — only once there's paid data to summarize.
+  const paidRows = rows.filter(settleIsPaid);
+  const amtEntries = paidRows.map(r => ({ r, amt: settleReceived(r) })).filter(x => x.amt > 0);
+  const durEntries = paidRows.map(r => ({ r, d: settleTimeToPay(r) })).filter(x => x.d != null);
+  if (amtEntries.length) {
+    const minAmt = amtEntries.reduce((m, x) => x.amt < m.amt ? x : m);
+    const maxAmt = amtEntries.reduce((m, x) => x.amt > m.amt ? x : m);
+    sum.appendChild(scard('Lowest paid', money(minAmt.amt), 'income', minAmt.r.name));
+    sum.appendChild(scard('Highest paid', money(maxAmt.amt), 'income', maxAmt.r.name));
+  }
+  if (durEntries.length) {
+    const avgDur = Math.round(durEntries.reduce((a, x) => a + x.d, 0) / durEntries.length);
+    const minDur = durEntries.reduce((m, x) => x.d < m.d ? x : m);
+    const maxDur = durEntries.reduce((m, x) => x.d > m.d ? x : m);
+    sum.appendChild(scard('Avg time to pay', durDays(avgDur), 'neutral', 'filed → first payout' + (narrowed ? ' · filtered' : '')));
+    sum.appendChild(scard('Fastest payout', durDays(minDur.d), 'income', minDur.r.name));
+    sum.appendChild(scard('Slowest payout', durDays(maxDur.d), 'amber', maxDur.r.name));
+  }
   view.appendChild(sum);
+
+  // Paid by year — how much landed each calendar year (by payout date).
+  const byYear = {};
+  rows.forEach(r => (r.payments || []).forEach(p => { const m = /^(\d{4})/.exec(p.date || ''); if (m && Number(p.amount)) byYear[m[1]] = (byYear[m[1]] || 0) + Number(p.amount); }));
+  const yrs = Object.keys(byYear).sort((a, b) => b - a);
+  if (yrs.length) {
+    const pyCard = el('div', 'card');
+    pyCard.appendChild(el('h3', 'strip-title', 'Paid by year' + (narrowed ? ' · filtered view' : '')));
+    const maxY = Math.max.apply(null, yrs.map(y => byYear[y]));
+    const list = el('div', 'mini-list');
+    yrs.forEach(y => {
+      const wrap = el('div');
+      const rowl = el('div', 'mini-row'); rowl.appendChild(el('span', null, y)); const rt = el('span', 'mini-right'); rt.appendChild(el('span', null, money(byYear[y]))); rowl.appendChild(rt); wrap.appendChild(rowl);
+      const track = el('div', 'sum-bar'); const fill = el('div', 'sum-bar-fill income'); fill.style.width = (byYear[y] / maxY * 100) + '%'; track.appendChild(fill); wrap.appendChild(track);
+      list.appendChild(wrap);
+    });
+    pyCard.appendChild(list);
+    view.appendChild(pyCard);
+  }
 
   const bar = el('div', 'filter-bar');
   const statusSel = select([{ value: 'all', label: 'All statuses' }].concat(SETTLE_STATUSES.map(v => ({ value: v, label: v }))), settleStatusFilter);
