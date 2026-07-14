@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.99 — Class Action CSV import, APY on all accounts, fresh-JS on deploy
+
+- **APY is now editable on (almost) every account.** The Current APY field
+  shows for every account type except CDs (which have their own APY) and
+  credit cards — so brokerage cash, retirement, sweep, and the rest can hold a
+  rate. (If you didn’t see it before, a stale cached copy of the app was the
+  culprit — see below.)
+- **Class Action Settlements import moved into Import / Export**, working just
+  like every other import: pick “Class Action Settlements”, upload a CSV, map
+  the columns, preview, and import — with a downloadable **template**. The
+  ⬆ Import button on the Class Actions page now takes you there.
+- **Returning visitors always get the latest app.** The app’s scripts are now
+  version-stamped, so a new release busts the browser cache instead of
+  occasionally serving yesterday’s code.
+
 ### v1.0.98 — Help guide, fee categories, account APY & closing
 
 - **New Help / Guide page** (left nav) explaining, in plain language, what

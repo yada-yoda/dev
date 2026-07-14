@@ -563,6 +563,12 @@ window.cloverStore = {
       d.importBatches = d.importBatches || []; d.importBatches.push(batch);
       scheduleSave(); this.scheduleSaveYear(y); notify(); return;
     }
+    if (target === 'settlements') {
+      // settlements also live in the meta doc; log the batch in the year doc.
+      entries.forEach(e => { delete e.amount; delete e.payoutDate; e.id = mkId('set'); e.batchId = batch.id; state.settlements.push(e); });
+      d.importBatches = d.importBatches || []; d.importBatches.push(batch);
+      scheduleSave(); this.scheduleSaveYear(y); notify(); return;
+    }
     const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : target === 'sales' ? 'sales' : 'paychecks';
     entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
     d.importBatches = d.importBatches || [];
@@ -580,6 +586,7 @@ window.cloverStore = {
       this.scheduleSaveYear(yr);
     });
     if (state.recurring.some(r => r.batchId === batchId)) { state.recurring = state.recurring.filter(r => r.batchId !== batchId); scheduleSave(); }
+    if ((state.settlements || []).some(x => x.batchId === batchId)) { state.settlements = state.settlements.filter(x => x.batchId !== batchId); scheduleSave(); }
     notify();
   },
 

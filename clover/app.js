@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.98';
+const VERSION = '1.0.99';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1048,17 +1048,16 @@ function accountModal(existing) {
   const ccWrap = el('div', 'cd-fields');
   ccWrap.appendChild(fCcOpen); ccWrap.appendChild(fCcClose); ccWrap.appendChild(fCcDue);
 
-  // Current APY for interest-bearing deposit accounts (checking / savings /
-  // money market / sweep). CDs use their own APY field above.
-  const APY_TYPES = ['Checking', 'Savings', 'Money Market', 'Cash / Sweep'];
+  // Current APY for interest-bearing accounts — shown for every type except a
+  // CD (which has its own APY field above) and a Credit Card (no yield).
   const fAcctApy = input(a.apy != null ? a.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fAcctApy.step = '0.01'; fAcctApy.min = 0;
   const apyWrap = el('div', 'cd-fields');
-  apyWrap.appendChild(field('Current APY %', fAcctApy, 'The annual percentage yield this account currently earns — for savings, checking, money-market, or sweep accounts.'));
+  apyWrap.appendChild(field('Current APY %', fAcctApy, 'The annual percentage yield this account currently earns — for savings, checking, money-market, sweep, brokerage cash, and similar accounts.'));
 
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
     ccWrap.style.display = fType.value === 'Credit Card' ? '' : 'none';
-    apyWrap.style.display = APY_TYPES.includes(fType.value) ? '' : 'none';
+    apyWrap.style.display = (fType.value === 'CD' || fType.value === 'Credit Card') ? 'none' : '';
   };
   fType.addEventListener('change', syncTypeFields);
 
@@ -2216,8 +2215,7 @@ function renderSettlements(view) {
   left.appendChild(el('p', 'muted', all.length + ' tracked · search to check whether you’ve already submitted to one'));
   head.appendChild(left);
   const acts = el('div', 'head-actions');
-  const imp = el('button', 'btn-ghost', '⬆ Import'); imp.title = 'Import settlements from a JSON file (adds to this tab only — never touches Income)'; imp.addEventListener('click', () => importSettlements());
-  acts.appendChild(imp);
+  acts.appendChild(importButton('settlements'));
   const add = el('button', 'btn-primary', '+ Add settlement'); add.addEventListener('click', () => settlementModal(null));
   acts.appendChild(add);
   head.appendChild(acts);
@@ -2354,42 +2352,6 @@ function settlementToIncome(st) {
     receivedVia: (last && last.method) || st.method || '', status: 'received', taxable: 'yes'
   });
 }
-function importSettlements() {
-  const store = window.cloverStore;
-  const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json,application/json';
-  inp.addEventListener('change', () => {
-    const f = inp.files && inp.files[0]; if (!f) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      let data;
-      try { data = JSON.parse(reader.result); } catch (e) { toast('Couldn’t read that file (not valid JSON)', 'warn'); return; }
-      const arr = Array.isArray(data) ? data : (data && Array.isArray(data.settlements) ? data.settlements : null);
-      if (!arr) { toast('No settlements found in the file', 'warn'); return; }
-      const existing = store.state.settlements || [];
-      const key = x => ((x.name || '').trim().toLowerCase() + '|' + (x.dateFiled || ''));
-      const seen = new Set(existing.map(key));
-      let added = 0, skipped = 0;
-      arr.forEach(row => {
-        if (!row || !row.name) { skipped++; return; }
-        if (seen.has(key(row))) { skipped++; return; }
-        seen.add(key(row));
-        store.saveSettlement({
-          name: String(row.name).trim(), caseName: row.caseName || '', status: row.status || 'Submitted',
-          dateFiled: row.dateFiled || '', deadline: row.deadline || '', claimNumber: row.claimNumber || '',
-          claimId: row.claimId || '', method: row.method || '', expectedAmount: row.expectedAmount != null ? Number(row.expectedAmount) : null,
-          proofRequired: !!row.proofRequired, url: row.url || '', notes: row.notes || '',
-          personId: row.personId || (store.state.persons[0] && store.state.persons[0].id),
-          payments: Array.isArray(row.payments) ? row.payments.map(p => ({ id: p.id || ('pay' + Math.random().toString(36).slice(2)), date: p.date || '', amount: Number(p.amount) || 0, method: p.method || '' })) : []
-        });
-        added++;
-      });
-      toast('Imported ' + added + (skipped ? (' · skipped ' + skipped + ' duplicate' + (skipped === 1 ? '' : 's')) : ''));
-      renderView(currentRoute);
-    };
-    reader.readAsText(f);
-  });
-  inp.click();
-}
 
 // ============================================================
 // Help / Guide — a plain-language wiki explaining what every page is for.
@@ -2427,7 +2389,7 @@ const HELP_SECTIONS = [
       'Its first job: search to check whether you already submitted to a settlement before filing again.',
       'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
       '“+ Income” records a payout as income under Other → Class Action Settlement — nothing is added to income automatically.',
-      'Import your existing list from a JSON file with ⬆ Import.'
+      'Import your existing list from a CSV on the Import / Export page (a template is provided), or with the ⬆ Import button here.'
     ] },
   { id: 'expenses', ico: '▼', title: 'Expenses', what: 'Your actual, one-off spending (cash-basis).',
     points: [
@@ -6157,6 +6119,9 @@ const PAYCHECKS_TEMPLATE_CSV = 'Pay date,Gross,Net,Received date,Employer,Person
 const SUBS_TEMPLATE_CSV = 'Name,Amount,Frequency,Category,Renewal date,Account,Priority,Status,Auto-pay,Vendor,Notes\n'
   + 'Netflix,15.49,monthly,Streaming,2026-08-08,Chase ••1111,Low,Active,Yes,Netflix,\n'
   + 'Example Insurance,600.00,semiannual,Insurance,2026-11-01,Checking ••2222,Essential,Active,No,Example Mutual,\n';
+const SETTLEMENTS_TEMPLATE_CSV = 'Settlement name,Case name,Status,Date filed,Claim deadline,Claim / confirmation #,Claim ID,Method,Amount received,Payout date,Estimated payout,Proof required,URL,Notes\n'
+  + 'Facebook Biometric Privacy,In re Facebook Biometric Info Privacy Litigation,Paid,2020-09-23,,FBY-106847310401,,PayPal,397.00,2022-05-18,,No,,\n'
+  + 'Example No-Proof Settlement,Doe v. Example Corp,Submitted,2026-03-01,2026-06-30,ABC12345,,PayPal,,,15.00,No,https://examplesettlement.com,\n';
 const IMPORT_FIELDS = {
   income: [
     { key: 'date', label: 'Date', req: true, kw: ['date'] },
@@ -6211,8 +6176,34 @@ const IMPORT_FIELDS = {
     { key: 'autoPay', label: 'Auto-pay', kw: ['auto', 'autopay'] },
     { key: 'vendor', label: 'Vendor', kw: ['vendor'] },
     { key: 'notes', label: 'Notes', kw: ['note', 'description', 'memo'] }
+  ],
+  settlements: [
+    { key: 'name', label: 'Settlement name', req: true, kw: ['settlement name', 'name', 'description', 'settlement', 'title'] },
+    { key: 'caseName', label: 'Case name', kw: ['case name', 'case', 'caption'] },
+    { key: 'status', label: 'Status', kw: ['status'] },
+    { key: 'dateFiled', label: 'Date filed', kw: ['date filed', 'filed', 'submitted', 'date'] },
+    { key: 'deadline', label: 'Claim deadline', kw: ['deadline'] },
+    { key: 'claimNumber', label: 'Claim / confirmation #', kw: ['claim / confirmation', 'confirmation', 'claim #', 'claim number', 'claim no'] },
+    { key: 'claimId', label: 'Claim ID', kw: ['claim id', 'settlement claim id', 'identification'] },
+    { key: 'method', label: 'Method', kw: ['method', 'payment method'] },
+    { key: 'amount', label: 'Amount received', num: true, kw: ['amount received', 'actual payment', 'payout', 'amount', 'payment', 'received'] },
+    { key: 'payoutDate', label: 'Payout date', kw: ['payout date', 'payment date', 'paid date'] },
+    { key: 'expectedAmount', label: 'Estimated payout', num: true, kw: ['estimated', 'expected', 'estimate'] },
+    { key: 'proofRequired', label: 'Proof required', kw: ['proof'] },
+    { key: 'url', label: 'URL', kw: ['url', 'link', 'site'] },
+    { key: 'notes', label: 'Notes', kw: ['note', 'other', 'memo'] }
   ]
 };
+function normalizeSettleStatus(t) {
+  t = (t || '').trim().toLowerCase();
+  if (!t) return 'Submitted';
+  if (/paid|complete/.test(t)) return 'Paid';
+  if (/approv/.test(t)) return 'Approved';
+  if (/deni|reject/.test(t)) return 'Denied';
+  if (/exclud|opt.?out/.test(t)) return 'Excluded';
+  if (/not.?submit|research|unknown/.test(t)) return 'Submitted';
+  return 'Submitted';
+}
 function parseFrequency(t) {
   t = (t || '').toLowerCase();
   if (/bi.?week/.test(t)) return 'biweekly';
@@ -6312,6 +6303,9 @@ function importPreviewText(key, e, store, kind) {
     case 'periodStart': return e.periodStart ? fmtDate(e.periodStart) : '—';
     case 'periodEnd': return e.periodEnd ? fmtDate(e.periodEnd) : '—';
     case 'renewalDate': return e.renewalDate ? fmtDate(e.renewalDate) : '—';
+    case 'dateFiled': return e.dateFiled ? fmtDate(e.dateFiled) : '—';
+    case 'deadline': return e.deadline ? fmtDate(e.deadline) : '—';
+    case 'payoutDate': return (e.payments && e.payments[0] && e.payments[0].date) ? fmtDate(e.payments[0].date) : '—';
     case 'category': return store[gName](e.categoryId || e.incomeCategoryId) || '—';
     case 'account': return store.accountName(e.accountId) || '—';
     case 'person': return store.personName(e.personId) || '—';
@@ -6324,7 +6318,7 @@ function importPreviewText(key, e, store, kind) {
 function buildImportEntries(store) {
   const { target, rows, mapping, fallbackCat } = importState;
   const yd = store.yearData(activeYear);
-  const existingArr = target === 'income' ? yd.income : target === 'expenses' ? yd.expensePayments : target === 'paychecks' ? yd.paychecks : store.state.recurring;
+  const existingArr = target === 'income' ? yd.income : target === 'expenses' ? yd.expensePayments : target === 'paychecks' ? yd.paychecks : target === 'settlements' ? (store.state.settlements || []) : store.state.recurring;
   const existing = new Set(existingArr.map(e => dupKey(target, e)));
   const entries = []; let dupes = 0, skipped = 0;
   rows.forEach(row => {
@@ -6335,6 +6329,24 @@ function buildImportEntries(store) {
       const amount = parseImportAmount(g('amount'));
       if (!name || isNaN(amount)) { skipped++; return; }
       e = { name, vendor: String(g('vendor')).trim(), categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', amount, frequency: parseFrequency(g('frequency')), interval: null, renewalDate: parseImportDate(g('renewalDate')), accountId: matchAccount(store, g('account')), backupAccountId: '', personId: matchPerson(store, g('person')), priority: normalizePriority(g('priority')), status: normalizeSubStatus(g('status')), autoPay: /^(y|yes|true|1)$/i.test(String(g('autoPay')).trim()), url: '', notes: g('notes') };
+    } else if (target === 'settlements') {
+      const name = String(g('name')).trim();
+      if (!name) { skipped++; return; }
+      const amt = g('amount') ? parseImportAmount(g('amount')) : null;
+      const payoutDate = parseImportDate(g('payoutDate'));
+      const method = String(g('method')).trim();
+      const payments = (amt != null && !isNaN(amt)) ? [{ id: 'pay' + Math.random().toString(36).slice(2), date: payoutDate || '', amount: amt, method }] : [];
+      const expAmt = g('expectedAmount') ? parseImportAmount(g('expectedAmount')) : null;
+      e = {
+        name, caseName: String(g('caseName')).trim(), status: normalizeSettleStatus(g('status')),
+        dateFiled: parseImportDate(g('dateFiled')), deadline: parseImportDate(g('deadline')),
+        claimNumber: String(g('claimNumber')).trim(), claimId: String(g('claimId')).trim(), method,
+        expectedAmount: (expAmt != null && !isNaN(expAmt)) ? expAmt : null,
+        proofRequired: /^(y|yes|true|1)$/i.test(String(g('proofRequired')).trim()), url: String(g('url')).trim(),
+        personId: (store.state.persons[0] && store.state.persons[0].id) || '', notes: g('notes'), payments,
+        // Mirrors of the single payout, used only for the import preview; stripped on save.
+        amount: (amt != null && !isNaN(amt)) ? amt : null, payoutDate: payoutDate || ''
+      };
     } else {
       const date = parseImportDate(target === 'paychecks' ? g('payDate') : g('date'));
       const amt = parseImportAmount(target === 'expenses' ? g('amount') : g('gross'));
@@ -6362,6 +6374,7 @@ function buildImportEntries(store) {
   return { entries, dupes, skipped };
 }
 function dupKey(target, e) {
+  if (target === 'settlements') return (e.name || '').trim().toLowerCase() + '|' + (e.dateFiled || '');
   if (target === 'subscriptions') return (e.name || '').toLowerCase() + '|' + (Number(e.amount) || 0).toFixed(2);
   if (target === 'expenses') return e.date + '|' + (Number(e.amount) || 0).toFixed(2) + '|' + (e.categoryId || '');
   if (target === 'paychecks') return (e.payDate || '') + '|' + (Number(e.gross) || 0).toFixed(2);
@@ -6996,7 +7009,7 @@ function importSection() {
       ? 'Upload your Poshmark “My Sales Report” CSV (on Poshmark: your avatar → My Sales → My Sales Report → email the report to yourself). Duplicates are skipped automatically and earnings roll into your Selling income.'
       : 'Upload a CSV of transactions and map its columns to Clover fields. Rows import into the selected year (' + activeYear + ').'));
     const row = el('div', 'io-actions');
-    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }, { value: 'dividends', label: 'Dividends (broker activity)' }, { value: 'selling', label: 'Poshmark sales' }], importState.target);
+    const tSel = select([{ value: 'income', label: 'Income' }, { value: 'expenses', label: 'Expenses' }, { value: 'paychecks', label: 'Paychecks' }, { value: 'subscriptions', label: 'Bills & Subscriptions' }, { value: 'settlements', label: 'Class Action Settlements' }, { value: 'dividends', label: 'Dividends (broker activity)' }, { value: 'selling', label: 'Poshmark sales' }], importState.target);
     tSel.addEventListener('change', () => { importState.target = tSel.value; renderView(currentRoute); });
     row.appendChild(labelWrap('Import as', tSel));
     const fileLabel = el('label', 'btn-primary file-btn'); fileLabel.textContent = 'Choose CSV…';
@@ -7077,7 +7090,8 @@ function importSection() {
       income: ['clover-income-template.csv', INCOME_TEMPLATE_CSV],
       expenses: ['clover-expenses-template.csv', EXPENSES_TEMPLATE_CSV],
       paychecks: ['clover-paychecks-template.csv', PAYCHECKS_TEMPLATE_CSV],
-      subscriptions: ['clover-bills-template.csv', SUBS_TEMPLATE_CSV]
+      subscriptions: ['clover-bills-template.csv', SUBS_TEMPLATE_CSV],
+      settlements: ['clover-class-action-template.csv', SETTLEMENTS_TEMPLATE_CSV]
     };
     if (GEN_TEMPLATES[importState.target]) {
       const tRow = el('div', 'io-actions');
@@ -7101,12 +7115,14 @@ function importSection() {
   });
   card.appendChild(mapGrid);
 
-  // fallback category
+  // fallback category (settlements have no category, so skip it there)
   const kind = (importState.target === 'expenses' || importState.target === 'subscriptions') ? 'expense' : 'income';
-  const cats = kind === 'expense' ? store.state.expenseCategories : store.state.incomeCategories;
-  const fbSel = select([{ value: '', label: '— none —' }].concat(cats.map(c => ({ value: c.id, label: c.name }))), importState.fallbackCat);
-  fbSel.addEventListener('change', () => { importState.fallbackCat = fbSel.value; renderView(currentRoute); });
-  card.appendChild(field(importState.target === 'paychecks' ? 'Income category for these paychecks' : 'Category for unmatched rows', fbSel, 'Rows whose category text doesn’t match one of your categories go here.'));
+  if (importState.target !== 'settlements') {
+    const cats = kind === 'expense' ? store.state.expenseCategories : store.state.incomeCategories;
+    const fbSel = select([{ value: '', label: '— none —' }].concat(cats.map(c => ({ value: c.id, label: c.name }))), importState.fallbackCat);
+    fbSel.addEventListener('change', () => { importState.fallbackCat = fbSel.value; renderView(currentRoute); });
+    card.appendChild(field(importState.target === 'paychecks' ? 'Income category for these paychecks' : 'Category for unmatched rows', fbSel, 'Rows whose category text doesn’t match one of your categories go here.'));
+  }
 
   const { entries, dupes, skipped } = buildImportEntries(store);
   // preview — show every column the user mapped (plus the resolved category),
@@ -7145,7 +7161,7 @@ function importSection() {
     if (missingReq.length) { toast('Map the required fields: ' + missingReq.map(f => f.label).join(', '), 'warn'); return; }
     const batch = { id: 'batch_' + Math.random().toString(36).slice(2, 9), importedAt: new Date().toISOString(), target, source: importState.filename, count: entries.length };
     importState = { target, rows: null, headers: null, mapping: {}, fallbackCat: '', filename: '' };
-    if (target === 'subscriptions') {
+    if (target === 'subscriptions' || target === 'settlements') {
       store.importEntries(activeYear, target, entries, batch);
     } else {
       // Route each row to the year of its date so a multi-year CSV imports correctly.
