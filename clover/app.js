@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.102';
+const VERSION = '1.0.103';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -849,7 +849,8 @@ function buildAcctCol(store, key) {
           const x = accountApy(store, a);
           if (!x) { td.textContent = '—'; return td; }
           td.textContent = x.pct.toFixed(2) + '%';
-          if (x.date) td.appendChild(el('div', 'acct-sub', x.as + ' ' + fmtDate(x.date)));
+          // Just the date (keeps the column narrow); the full phrasing is in the tooltip.
+          if (x.date) { const sub = el('div', 'acct-sub', fmtDate(x.date)); sub.title = x.as + ' ' + fmtDate(x.date); td.appendChild(sub); }
           return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
     case 'closedDate': return { label: 'Closed on', key: 'closedDate', value: a => a.closedDate || '', cell: a => el('td', null, a.closedDate ? fmtDate(a.closedDate) : '—') };

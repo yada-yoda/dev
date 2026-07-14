@@ -143,6 +143,21 @@ function migrateAccountApyCols(settings) {
   return out.join(',') !== before;
 }
 
+// Accounts whose APY was entered before the "APY as of" date existed have no
+// date to show. Stamp them with today's date once (the user can correct it per
+// account) so every rate in the APY column shows a date.
+function migrateAccountApyDates(accounts) {
+  if (!Array.isArray(accounts)) return false;
+  const p = k => String(k).padStart(2, '0');
+  const d = new Date(); const today = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  let changed = false;
+  accounts.forEach(a => {
+    const hasOwn = (a.type === 'CD') ? (a.cdApy != null && a.cdApy !== '') : (a.type !== 'Credit Card' && a.apy != null && a.apy !== '');
+    if (hasOwn && !a.apyAsOf) { a.apyAsOf = today; changed = true; }
+  });
+  return changed;
+}
+
 function seedGroups(items) {
   return items.map((it, i) => {
     const name = typeof it === 'string' ? it : it.name;
@@ -289,6 +304,7 @@ function apply(data) {
   if (migrateIncomeSeeds(state.incomeCategories)) scheduleSave();
   if (migrateAccountApyCols(state.settings)) scheduleSave();
   state.accounts = s.accounts;
+  if (migrateAccountApyDates(state.accounts)) scheduleSave();
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;
   state.creditScores = s.creditScores || [];

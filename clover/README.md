@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.103 — APY column: just the date, and no missing dates
+
+- The APY column now shows **only the date** under the rate (no “as of / recorded”
+  word), so the column stays narrow — the full phrasing is in the hover tooltip.
+- Accounts whose APY was entered before the date field existed now get a date
+  automatically (stamped to today; editable per account), so every rate in the
+  column shows one.
+
 ### v1.0.102 — One unified APY column for accounts
 
 - The separate **APY**, **CD APY**, and **Savings APY (latest)** account
