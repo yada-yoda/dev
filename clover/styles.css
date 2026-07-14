@@ -509,6 +509,15 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .pay-row input { width: 100%; min-width: 0; }
 .pay-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .mono-sm { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+.acct-admin { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.help-card { margin-bottom: 12px; }
+.help-head { display: flex; align-items: flex-start; gap: 12px; }
+.help-ico { font-size: 20px; line-height: 1.2; width: 28px; text-align: center; flex: 0 0 auto; }
+.help-title { font-size: 16px; font-weight: 600; }
+.help-head .btn-ghost { margin-left: auto; flex: 0 0 auto; }
+.help-points { margin: 10px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.help-points li, .help-tips li { font-size: 13px; line-height: 1.5; }
+.help-tips { margin: 10px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
 .mini-right { display: flex; align-items: center; gap: 6px; }
 .pos { color: var(--income); font-weight: 600; white-space: nowrap; }
 .neg { color: var(--expense); font-weight: 600; white-space: nowrap; }

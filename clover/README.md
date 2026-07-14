@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.98 — Help guide, fee categories, account APY & closing
+
+- **New Help / Guide page** (left nav) explaining, in plain language, what
+  every page and tab is for — a starting point for new users. It’s kept in
+  step with the app as features change.
+- **Bank Fees** and **Investment Fees** are now subcategories under the
+  **Other** expense category (added to existing accounts automatically). A
+  Chase-style checking monthly fee → Other → Bank Fees. If you had a separate
+  “Investment Fees” category, its logged entries move into Other → Investment
+  Fees automatically, and broker-fee imports default there too.
+- **Current APY** field when adding/editing a checking, savings, money-market,
+  or sweep account (plus an optional APY column).
+- **Close an account** right from its Edit form: you get a warning of what’s
+  tied to it — auto-pay bills, other bills paid from it, and bills that list it
+  as a backup — and the close date is recorded. Closed accounts move to a new
+  **Closed** tab on the Accounts page and can be reopened anytime.
+
 ### v1.0.97 — Class Action Settlements tracker
 
 - New **Class Actions** page (left nav) to track the settlement claims you’ve

@@ -58,7 +58,7 @@ const SEED_EXPENSE_GROUPS = [
   { name: 'Auto', subs: ['Fuel', 'Maintenance', 'Registration', 'Parking & Tolls'] },
   { name: 'Food', subs: ['Groceries', 'Dining Out', 'Delivery'] },
   { name: 'Entertainment', subs: ['Games', 'Events', 'Hobbies'] },
-  'Other'
+  { name: 'Other', subs: ['Bank Fees', 'Investment Fees'] }
 ];
 
 export const ACCOUNT_TYPES = [
@@ -107,6 +107,27 @@ function migrateIncomeSeeds(cats) {
       changed = true;
     }
   }
+  return changed;
+}
+
+// One-time, per-year remap: if the user has a legacy top-level "Investment
+// Fees" expense category, move its logged expenses into the new
+// Other → Investment Fees subcategory. Safe & idempotent — only touches
+// entries that reference that exact category. Leaves the now-empty legacy
+// category in place for the user to delete.
+function migrateLegacyFees(yd) {
+  if (!yd || !Array.isArray(yd.expensePayments)) return false;
+  const cats = state.expenseCategories || [];
+  const norm = s => (s || '').trim().toLowerCase();
+  const legacy = cats.find(c => /^investment\s*fees?$/i.test((c.name || '').trim()));
+  const other = cats.find(c => norm(c.name) === 'other');
+  if (!legacy || !other) return false;
+  const invSub = (other.subs || []).find(su => norm(su.name) === 'investment fees');
+  if (!invSub) return false;
+  let changed = false;
+  yd.expensePayments.forEach(e => {
+    if (e.categoryId === legacy.id) { e.categoryId = other.id; e.subId = invSub.id; changed = true; }
+  });
   return changed;
 }
 
@@ -443,6 +464,7 @@ window.cloverStore = {
       let data = null;
       if (state._uid) { try { data = await window.cloverData.getYear(state._uid, y); } catch (e) { console.warn('year load failed:', e); } }
       state.years[y] = Object.assign(emptyYear(), data || {});
+      if (migrateLegacyFees(state.years[y])) this.scheduleSaveYear(y);
       delete state._yearLoading[y];
       notify();
       return state.years[y];

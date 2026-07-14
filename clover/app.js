@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.97';
+const VERSION = '1.0.98';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -32,7 +32,8 @@ const ROUTES = [
   { id: 'calendar',      label: 'Calendar',       ico: '▣', phase: 7 },
   { sep: true },
   { id: 'import',        label: 'Import / Export', ico: '⇅', phase: 8 },
-  { id: 'settings',      label: 'Settings',       ico: '⚙', phase: 1 }
+  { id: 'settings',      label: 'Settings',       ico: '⚙', phase: 1 },
+  { id: 'help',          label: 'Help / Guide',   ico: '?', phase: 1 }
 ];
 const DEFAULT_ROUTE = 'dashboard';
 
@@ -46,6 +47,7 @@ let incomeAmountMode = 'gross';     // annual grid shows 'gross' | 'net' amounts
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
 let accountsFilter = null;   // { key, value } from clicking a value badge
+let accountsTab = 'open';    // Accounts page: 'open' | 'closed'
 let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
@@ -148,7 +150,7 @@ function routeTo(id) {
 }
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, settlements: renderSettlements, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, settlements: renderSettlements, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport, help: renderHelp };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -760,8 +762,8 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
-const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', cdApy: 'CD APY', cdMaturity: 'CD maturity', savingsRate: 'Savings APY (latest)', beneficiaries: 'Beneficiaries', notes: 'Notes' };
-const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'cdApy', 'cdMaturity', 'savingsRate', 'beneficiaries', 'notes'];
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', cdApy: 'CD APY', cdMaturity: 'CD maturity', savingsRate: 'Savings APY (latest)', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'cdApy', 'cdMaturity', 'savingsRate', 'beneficiaries', 'closedDate', 'notes'];
 const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags'];
 // Colored value badge: each column gets a base hue, each distinct value a shade —
 // so CD vs Checking (or Ally vs Chase) is recognizable at a glance. Clicking one
@@ -827,6 +829,7 @@ function buildAcctCol(store, key) {
         if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } };
     case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'beneficiaries', (a.beneficiaries || '').trim())); return td; } };
+    case 'apy': return { label: 'APY', key: 'apy', num: true, value: a => Number(a.apy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.apy != null && a.apy !== '') ? (Number(a.apy).toFixed(2) + '%') : '—'; return td; } };
     case 'cdApy': return { label: 'CD APY', key: 'cdApy', num: true, value: a => Number(a.cdApy) || 0, cell: a => { const td = el('td', 'num'); td.textContent = (a.type === 'CD' && a.cdApy != null && a.cdApy !== '') ? (Number(a.cdApy).toFixed(2) + '%') : '—'; return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
     case 'savingsRate': return { label: 'Savings APY (latest)', key: 'savingsRate', num: true, value: a => { const r = latestRateFor(store, a.institution); return r ? Number(r.apy) || 0 : -1; }, cell: a => {
@@ -836,9 +839,51 @@ function buildAcctCol(store, key) {
         td.textContent = Number(r.apy).toFixed(2) + '%';
         td.appendChild(el('div', 'acct-sub', 'recorded ' + fmtDate(r.date)));
         return td; } };
+    case 'closedDate': return { label: 'Closed on', key: 'closedDate', value: a => a.closedDate || '', cell: a => el('td', null, a.closedDate ? fmtDate(a.closedDate) : '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: a => a.notes || '', cell: a => { const td = el('td', 'muted'); td.textContent = a.notes || '—'; return td; } };
   }
   return null;
+}
+
+// Bills/subscriptions tied to an account — used by the close-account warning.
+function accountTiedItems(store, accId) {
+  const recs = store.state.recurring || [];
+  return { paidFrom: recs.filter(r => r.accountId === accId), backup: recs.filter(r => r.backupAccountId === accId) };
+}
+function closeAccountModal(acc) {
+  const store = window.cloverStore;
+  const tied = accountTiedItems(store, acc.id);
+  const names = list => list.map(r => r.name).slice(0, 8).join(', ') + (list.length > 8 ? '…' : '');
+  const body = el('div');
+  body.appendChild(el('p', null, 'Close “' + acc.name + '”' + (acc.last4 ? ' ••' + acc.last4 : '') + '? It stays in your history and on the Closed tab, but is marked inactive and hidden from pickers.'));
+  const autopay = tied.paidFrom.filter(r => r.autoPay);
+  const nonAuto = tied.paidFrom.filter(r => !r.autoPay);
+  if (tied.paidFrom.length || tied.backup.length) {
+    const warn = el('div', 'card warn-strip'); warn.style.margin = '12px 0';
+    const wl = el('div', 'warn-list');
+    if (autopay.length) { const w = el('div', 'warn-item'); w.appendChild(badge('Auto-pay', 'red')); w.appendChild(el('span', null, autopay.length + ' auto-pay bill' + (autopay.length === 1 ? '' : 's') + ' pay FROM here — move these first: ' + names(autopay))); wl.appendChild(w); }
+    if (nonAuto.length) { const w = el('div', 'warn-item'); w.appendChild(badge('Paid from', 'amber')); w.appendChild(el('span', null, nonAuto.length + ' bill' + (nonAuto.length === 1 ? '' : 's') + ' paid from here: ' + names(nonAuto))); wl.appendChild(w); }
+    if (tied.backup.length) { const w = el('div', 'warn-item'); w.appendChild(badge('Backup', '')); w.appendChild(el('span', null, tied.backup.length + ' bill' + (tied.backup.length === 1 ? '' : 's') + ' list it as a backup account: ' + names(tied.backup))); wl.appendChild(w); }
+    warn.appendChild(wl); body.appendChild(warn);
+  } else {
+    body.appendChild(el('p', 'muted', 'No bills or subscriptions are tied to this account.'));
+  }
+  const uses = [];
+  if (acc.usedForIncome) uses.push('receives income');
+  if (acc.usedForExpenses) uses.push('pays expenses');
+  if (acc.usedForAutopay) uses.push('has auto-pay set up');
+  if (uses.length) body.appendChild(el('p', 'muted', 'Also flagged as: ' + uses.join(', ') + '. Past income/expense entries stay linked to it for history.'));
+  const fDate = input(acc.closedDate || todayISO(), { type: 'date' });
+  body.appendChild(field('Date closed', fDate, 'When the account was closed — tracked on the account and shown on the Closed tab.'));
+  openModal({
+    title: 'Close account', body, confirmLabel: 'Close account',
+    onConfirm: () => {
+      acc.closed = true; acc.active = false; acc.closedDate = fDate.value || todayISO();
+      store.saveAccount(acc);
+      accountsTab = 'closed';
+      toast('Account closed');
+    }
+  });
 }
 
 function renderAccounts(view) {
@@ -860,22 +905,40 @@ function renderAccounts(view) {
     return;
   }
 
+  const openAccts = s.accounts.filter(a => !a.closed);
+  const closedAccts = s.accounts.filter(a => a.closed);
+  if (accountsTab === 'closed' && !closedAccts.length) accountsTab = 'open';
+  const onClosed = accountsTab === 'closed';
+  const tabs = el('div', 'tabs');
+  [['open', 'Open (' + openAccts.length + ')'], ['closed', 'Closed (' + closedAccts.length + ')']].forEach(([t, label]) => {
+    const b = el('button', 'tab' + (accountsTab === t ? ' active' : ''), label);
+    b.addEventListener('click', () => { accountsTab = t; renderView(currentRoute); });
+    tabs.appendChild(b);
+  });
+  view.appendChild(tabs);
+
+  const baseAccts = onClosed ? closedAccts : openAccts;
+  const dataCols = onClosed
+    ? ['name', 'type', 'institution', 'last4', 'owner', 'closedDate'].map(k => buildAcctCol(store, k)).filter(Boolean)
+    : tableColKeys(store, 'accounts', ACCT_COL_LABELS, ACCT_DEFAULT_COLS).map(k => buildAcctCol(store, k)).filter(Boolean);
   const cols = [
-    ...tableColKeys(store, 'accounts', ACCT_COL_LABELS, ACCT_DEFAULT_COLS).map(k => buildAcctCol(store, k)).filter(Boolean),
+    ...dataCols,
     { label: '', sortable: false, cell: a => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => accountModal(a));
+        td.appendChild(edit);
+        if (a.closed) { const re = el('button', 'icon-btn', 'Reopen'); re.title = 'Mark this account open and active again'; re.addEventListener('click', () => { a.closed = false; a.active = true; a.closedDate = ''; store.saveAccount(a); toast('Account reopened'); accountsTab = 'open'; }); td.appendChild(re); }
+        else { const cl = el('button', 'icon-btn', 'Close'); cl.title = 'Close this account (shows what’s tied to it first)'; cl.addEventListener('click', () => closeAccountModal(a)); td.appendChild(cl); }
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
-        td.appendChild(edit); td.appendChild(del); return td; } }
+        td.appendChild(del); return td; } }
   ];
-  const bestCal = bestCardCallout(store);
-  if (bestCal) view.appendChild(bestCal);
+  if (!onClosed) { const bestCal = bestCardCallout(store); if (bestCal) view.appendChild(bestCal); }
 
-  let acctRows = s.accounts;
+  let acctRows = baseAccts;
   if (accountsFilter) {
     const f = accountsFilter;
     const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? (a.beneficiaries || '').trim() : (a[f.key] || '');
-    acctRows = s.accounts.filter(a => valOf(a) === f.value);
+    acctRows = baseAccts.filter(a => valOf(a) === f.value);
     const bar = el('div', 'filter-bar');
     bar.appendChild(el('span', 'muted', 'Showing ' + acctRows.length + ' account' + (acctRows.length === 1 ? '' : 's') + ' where ' + (ACCT_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
     const clear = el('button', 'btn-ghost', '✕ Clear filter');
@@ -883,7 +946,7 @@ function renderAccounts(view) {
     bar.appendChild(clear);
     view.appendChild(bar);
   }
-  view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
+  if (!onClosed) view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, acctRows, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
@@ -985,9 +1048,17 @@ function accountModal(existing) {
   const ccWrap = el('div', 'cd-fields');
   ccWrap.appendChild(fCcOpen); ccWrap.appendChild(fCcClose); ccWrap.appendChild(fCcDue);
 
+  // Current APY for interest-bearing deposit accounts (checking / savings /
+  // money market / sweep). CDs use their own APY field above.
+  const APY_TYPES = ['Checking', 'Savings', 'Money Market', 'Cash / Sweep'];
+  const fAcctApy = input(a.apy != null ? a.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fAcctApy.step = '0.01'; fAcctApy.min = 0;
+  const apyWrap = el('div', 'cd-fields');
+  apyWrap.appendChild(field('Current APY %', fAcctApy, 'The annual percentage yield this account currently earns — for savings, checking, money-market, or sweep accounts.'));
+
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
     ccWrap.style.display = fType.value === 'Credit Card' ? '' : 'none';
+    apyWrap.style.display = APY_TYPES.includes(fType.value) ? '' : 'none';
   };
   fType.addEventListener('change', syncTypeFields);
 
@@ -1002,10 +1073,28 @@ function accountModal(existing) {
   body.appendChild(prevField);
   body.appendChild(cdWrap);
   body.appendChild(ccWrap);
+  body.appendChild(apyWrap);
   const flags = el('div', 'check-row'); [cActive, cIncome, cExpense, cAuto, cRewards].forEach(c => flags.appendChild(c));
   body.appendChild(field('Flags', flags));
   body.appendChild(field('Notes', fNotes));
   syncTypeFields();
+
+  // Close / reopen an existing account, right from its Edit form.
+  if (existing && existing.id) {
+    const adminNode = el('div', 'acct-admin');
+    if (a.closed) {
+      adminNode.appendChild(el('span', 'muted', 'Closed ' + (a.closedDate ? fmtDate(a.closedDate) : '') + '. '));
+      const reopen = el('button', 'btn-ghost', '↻ Reopen account');
+      reopen.addEventListener('click', () => { existing.closed = false; existing.active = true; existing.closedDate = ''; store.saveAccount(existing); closeModal(); toast('Account reopened'); renderView(currentRoute); });
+      adminNode.appendChild(reopen);
+    } else {
+      const closeBtn = el('button', 'btn-ghost danger', '⊘ Close account…');
+      closeBtn.title = 'Mark this account closed and see what’s tied to it';
+      closeBtn.addEventListener('click', () => { closeModal(); closeAccountModal(existing); });
+      adminNode.appendChild(closeBtn);
+    }
+    body.appendChild(field('Account status', adminNode, 'Closing keeps the account in your history and on the Closed tab, but hides it from pickers.'));
+  }
 
   openModal({
     title: existing ? 'Edit account' : 'Add account', body, confirmLabel: 'Save',
@@ -1025,6 +1114,7 @@ function accountModal(existing) {
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
+        apy: fAcctApy.value === '' ? null : parseFloat(fAcctApy.value),
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
       });
@@ -2299,6 +2389,134 @@ function importSettlements() {
     reader.readAsText(f);
   });
   inp.click();
+}
+
+// ============================================================
+// Help / Guide — a plain-language wiki explaining what every page is for.
+// KEEP THIS UPDATED when pages/features are added, changed, or removed.
+// ============================================================
+const HELP_SECTIONS = [
+  { id: 'dashboard', ico: '◆', title: 'Dashboard', what: 'Your at-a-glance home screen.',
+    points: [
+      'Key numbers for the selected month: income in, money spent, and what’s left (net).',
+      'Projected annual income and expenses based on your trend so far.',
+      '“⚠ Attention” collects things that need you — bills renewing soon, late or missing paychecks, and budget placeholders waiting on last month’s actuals.',
+      'Donut charts break down income and spending by category. Every panel can be moved, resized, hidden, or restored in edit mode.'
+    ] },
+  { id: 'income', ico: '▲', title: 'Income', what: 'Money coming in that isn’t a regular paycheck.',
+    points: [
+      'Covers dividends, interest, rewards/cash-back, IRA & estate distributions, class-action payouts, selling, and anything under “Other.”',
+      'Annual grid view totals income by category across the months; List view shows every entry — and now includes your paychecks.',
+      'Picking certain categories reveals tailored fields (e.g. a dividend’s ticker, a reward’s program/type, an IRA distribution’s withholdings).'
+    ] },
+  { id: 'paychecks', ico: '▤', title: 'Paychecks', what: 'Your wages — the source of truth for employment income.',
+    points: [
+      'Log each paycheck with gross, net, deductions, method, and pay period.',
+      'The “Missing” tab flags paychecks that should have arrived (based on your pay schedule) but aren’t entered yet.',
+      'Paychecks roll up automatically into the Income grid under Wages, so you never enter wages twice.'
+    ] },
+  { id: 'raises', ico: '↗', title: 'Raises', what: 'A history of your pay changes per employer.',
+    points: [
+      'Track hourly vs. salary, part-/full-time/seasonal, and each raise’s new amount vs. the previous one.',
+      'See how each raise compared to inflation (real raise), how long you’ve been at each pay, and a year-over-year table.'
+    ] },
+  { id: 'selling', ico: '▧', title: 'Selling', what: 'Track marketplace sales (e.g. Poshmark) as income.',
+    points: ['Log or import sales; they feed your income picture without cluttering the main Income list.'] },
+  { id: 'settlements', ico: '⚖', title: 'Class Actions', what: 'A tracker for the class-action settlement claims you’ve submitted to.',
+    points: [
+      'Its first job: search to check whether you already submitted to a settlement before filing again.',
+      'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
+      '“+ Income” records a payout as income under Other → Class Action Settlement — nothing is added to income automatically.',
+      'Import your existing list from a JSON file with ⬆ Import.'
+    ] },
+  { id: 'expenses', ico: '▼', title: 'Expenses', what: 'Your actual, one-off spending (cash-basis).',
+    points: [
+      'Annual grid totals spending by category — with your recurring bills rolled in — and List shows each logged expense.',
+      'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
+      'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.'
+    ] },
+  { id: 'subscriptions', ico: '↻', title: 'Bills & Subscriptions', what: 'Everything that recurs — bills, subscriptions, memberships, loans.',
+    points: [
+      'Enter the charge and how often it bills; Clover computes the monthly-equivalent and annual cost, and warns before renewals.',
+      'Track priority, status, auto-pay, account/customer numbers (masked), price history, and a one-time vs. recurring frequency.',
+      'Convert any bill to/from a budget placeholder, or into a one-off expense, from its row.'
+    ] },
+  { id: 'budget', ico: '◐', title: 'Budget', what: 'Your “budget placeholders” — expected or future costs you want reflected before they’re real bills.',
+    points: [
+      'Stat cards summarize how many placeholders you have and their estimated monthly/annual cost.',
+      'Each month, the check-in asks you to confirm whether each placeholder actually happened — log the real amount, or mark it not used.',
+      'A few days into a new month, a reminder (here and on the Dashboard) nudges you to enter last month’s actuals.'
+    ] },
+  { id: 'accounts', ico: '▦', title: 'Accounts', what: 'Your banks, cards, brokerages, and other financial accounts.',
+    points: [
+      'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
+      'List beneficiaries so you can spot accounts that don’t have them set.',
+      'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
+    ] },
+  { id: 'credit', ico: '％', title: 'Credit & Rates', what: 'Credit-score history and savings-rate history.',
+    points: [
+      'Chart your credit scores over time by provider.',
+      'Log savings APYs per bank; some (e.g. Synchrony) can auto-sync from a public rate feed.'
+    ] },
+  { id: 'taxes', ico: '§', title: 'Taxes', what: 'Your tax-filing history.',
+    points: ['Record each year’s forms, whether you got a refund or owed, prep cost, and preparer — original filings and amendments.'] },
+  { id: 'reports', ico: '▥', title: 'Reports', what: 'Charts and summaries that pull your year together.',
+    points: ['Visual breakdowns across income, expenses, and trends. Panels can be customized like the Dashboard.'] },
+  { id: 'calendar', ico: '▣', title: 'Calendar', what: 'A month view of money events.',
+    points: [
+      'Shows expected pay dates, bill renewals, and CD maturities (with a 7-day heads-up). Click any day for the full detail.',
+      'Optionally push these events one-way into a dedicated Google Calendar.'
+    ] },
+  { id: 'import', ico: '⇅', title: 'Import / Export', what: 'Get data in and out.',
+    points: [
+      'Import CSVs and broker files (dividends, interest, fees, expenses, paychecks, bills). Templates are provided for each.',
+      'Back up all your data to a file, or restore from one.'
+    ] },
+  { id: 'settings', ico: '⚙', title: 'Settings', what: 'Everything you can customize.',
+    points: [
+      'Manage people, income/expense categories and their subcategories, and catalog lists (institutions, reward programs, gift-card types, tax forms, pay methods, check types).',
+      'Set new-account defaults. Table columns and dashboard/report panel layouts are saved per person.'
+    ] }
+];
+function renderHelp(view) {
+  const head = el('div', 'view-head');
+  const left = el('div');
+  left.appendChild(el('h3', null, 'Help / Guide'));
+  left.appendChild(el('p', 'muted', 'What each page is for, in plain language. New here? Start with Accounts and Paychecks, then Bills & Subscriptions.'));
+  head.appendChild(left);
+  view.appendChild(head);
+
+  const intro = el('div', 'card');
+  intro.appendChild(el('p', null, 'Clover is your private, single-user finance hub — it replaces a stack of spreadsheets. Your data is stored under your own account and is visible only to you.'));
+  const tips = el('ul', 'help-tips');
+  [
+    'Tables can be sorted (click a header) and their columns customized (the ⚙ Columns button).',
+    'Most list pages have a live search box; forms explain each field with an ⓘ tooltip.',
+    'The year and month selectors at the top control what most pages show.'
+  ].forEach(t => tips.appendChild(el('li', null, t)));
+  intro.appendChild(tips);
+  view.appendChild(intro);
+
+  HELP_SECTIONS.forEach(sec => {
+    const card = el('div', 'card help-card');
+    const h = el('div', 'help-head');
+    h.appendChild(el('span', 'help-ico', sec.ico));
+    const ht = el('div');
+    ht.appendChild(el('h3', 'help-title', sec.title));
+    ht.appendChild(el('p', 'muted', sec.what));
+    h.appendChild(ht);
+    const go = el('button', 'btn-ghost', 'Open →'); go.addEventListener('click', () => { location.hash = sec.id; });
+    h.appendChild(go);
+    card.appendChild(h);
+    const ul = el('ul', 'help-points');
+    sec.points.forEach(p => ul.appendChild(el('li', null, p)));
+    card.appendChild(ul);
+    view.appendChild(card);
+  });
+
+  const foot = el('div', 'card muted');
+  foot.textContent = 'Clover v' + VERSION + '. This guide is kept in step with the app as features change.';
+  view.appendChild(foot);
 }
 
 function sumCard(label, value, tone, hint, bar) {
@@ -6496,9 +6714,13 @@ function dividendReviewCard(store) {
         receivedVia: st.broker, notes: (t.desc || '').slice(0, 120)
       });
     });
+    // Default investment fees into the Investment Fees subcategory when the
+    // chosen fee category offers one (e.g. Other → Investment Fees).
+    const feeCatObj = s.expenseCategories.find(c => c.id === st.feeCat);
+    const feeSubId = feeCatObj ? (((feeCatObj.subs || []).find(su => /investment fees?/i.test(su.name)) || {}).id || '') : '';
     if (st.includeFees && st.feeCat) st.fees.forEach(f => {
       const yr = +f.date.slice(0, 4);
-      (feeByYear[yr] = feeByYear[yr] || []).push({ date: f.date, amount: f.amount, categoryId: st.feeCat, subId: '', accountId: st.accountId || '', personId: me, notes: ((f.symbol ? f.symbol + ' — ' : '') + f.desc).trim() });
+      (feeByYear[yr] = feeByYear[yr] || []).push({ date: f.date, amount: f.amount, categoryId: st.feeCat, subId: feeSubId, accountId: st.accountId || '', personId: me, notes: ((f.symbol ? f.symbol + ' — ' : '') + f.desc).trim() });
     });
     const years = [...new Set(Object.keys(byYear).concat(Object.keys(feeByYear)))];
     await Promise.all(years.map(y => store.loadYear(y)));
