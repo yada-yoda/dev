@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.114';
+const VERSION = '1.0.115';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4708,6 +4708,15 @@ async function buildDoughnut(canvas, cfg) {
   let Chart;
   try { Chart = await ensureChart(); } catch (e) { canvas.parentElement && canvas.parentElement.appendChild(el('div', 'muted', 'Chart could not load (offline?).')); return; }
   if (!canvas.isConnected) return;
+  // The right-hand legend needs a row per slice. If the box is too short,
+  // Chart.js silently wraps it into a second column that runs off the canvas
+  // and gets clipped — grow the container to fit rather than lose a category
+  // off the edge.
+  const host = canvas.parentElement;
+  if (host) {
+    const need = cfg.labels.length * 26 + 24;
+    if (need > host.clientHeight) host.style.height = need + 'px';
+  }
   _charts.push(new Chart(canvas, {
     type: 'doughnut',
     data: { labels: cfg.labels, datasets: [{ data: cfg.data, backgroundColor: cfg.labels.map((_, i) => CHART_PALETTE[i % CHART_PALETTE.length]), borderWidth: 2, borderColor: '#fff' }] },

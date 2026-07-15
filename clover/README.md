@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.115 — Fixed the cut-off dot in the donut chart keys
+
+With enough categories, the chart key ran out of room and silently spilled into
+a second column that hung off the edge of the chart — you’d see a stray colored
+dot and a sliver of text. The chart panel now grows to give every category its
+own row in the key, so nothing gets clipped. Charts with only a few categories
+are unchanged. Applies to the Dashboard and Reports donuts.
+
 ### v1.0.114 — “Paid for this year” was the wrong name for that checkbox
 
 That checkbox never meant “I’ve paid this” — it means **“is there a charge for
