@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.112 — The Expenses list is a standard table now
+
+It was the last hand-built table in the app, so it was missing the treatment
+every other table has. It now gets all of it:
+
+- **Clickable bubbles** on Category, Source, Paid from, and Person — click one
+  to narrow the list to just those rows, click again (or ✕ Clear filter) to
+  clear.
+- **Sortable headers** (click to sort, again to flip, a third time to reset).
+- **⚙ Columns** manager with a saved layout, and four extra columns you can
+  turn on: Applies to, Check #, Notes — plus the existing seven.
+
 ### v1.0.111 — The menu now reads like how you actually use it
 
 The sidebar is grouped under four labels instead of one long list:

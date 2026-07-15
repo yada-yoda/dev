@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.111';
+const VERSION = '1.0.112';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -70,6 +70,8 @@ let salesSort = { key: 'orderDate', dir: 'desc' };
 let salesImportState = null;   // parsed Poshmark sales awaiting review
 let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
+let expenseListSort = { key: 'date', dir: 'desc' };
+let expenseBadgeFilter = null;     // { key, value } from clicking an expense value bubble
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
 let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
@@ -3098,12 +3100,82 @@ function expenseGrid(data) {
   return card;
 }
 
+// Clickable value bubble that narrows the expense list to that value
+// (click again to clear) — same behavior as Bills and Class Actions.
+function expenseFilterBadge(key, text, tone) {
+  const b = badge(text, tone);
+  b.style.cursor = 'pointer';
+  b.title = 'Click to show only “' + text + '”';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    const cur = expenseBadgeFilter;
+    expenseBadgeFilter = (cur && cur.key === key && cur.value === text) ? null : { key, value: text };
+    renderView(currentRoute);
+  });
+  return b;
+}
+const EXPLIST_COL_LABELS = { date: 'Date', description: 'Description', category: 'Category', source: 'Source', account: 'Paid from', amount: 'Amount', person: 'Person', forDate: 'Applies to', checkNo: 'Check #', notes: 'Notes' };
+const EXPLIST_ALL_COLS = ['date', 'description', 'category', 'source', 'account', 'amount', 'person', 'forDate', 'checkNo', 'notes'];
+const EXPLIST_DEFAULT_COLS = ['date', 'description', 'category', 'source', 'account', 'amount', 'person'];
+function buildExpenseListCol(store, key) {
+  switch (key) {
+    case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => {
+        const td = el('td', null, fmtDate(r.date));
+        // When the row was logged (or last edited) — the date above is the day
+        // the money moved, which is often not the day you typed it in.
+        const stamp = r.updatedAt || r.createdAt;
+        if (stamp) {
+          const edited = !!(r.updatedAt && r.createdAt && r.updatedAt !== r.createdAt);
+          const t = el('div', 'acct-sub', stampText(stamp, r.date));
+          t.title = (edited ? 'Last edited ' : 'Added ') + fmtDateTimeLocal(stamp);
+          td.appendChild(t);
+        }
+        return td; } };
+    case 'description': return { label: 'Description', key: 'description', value: r => r.title || '', cell: r => {
+        const td = el('td', null, r.title || '—');
+        if (r.vendor) td.appendChild(el('div', 'acct-sub', r.vendor));
+        // The "applies to" day belongs with what it describes, not the pay date.
+        if (r.forDate) { const f = el('div', 'acct-sub', 'for ' + fmtDate(r.forDate)); f.title = 'The day this charge was for'; td.appendChild(f); }
+        return td; } };
+    case 'category': return { label: 'Category', key: 'category', value: r => store.expenseGroupName(r.categoryId), cell: r => {
+        const td = el('td'); const n = store.expenseGroupName(r.categoryId);
+        if (n && n !== '—') td.appendChild(expenseFilterBadge('category', n, 'type')); else td.textContent = '—';
+        return td; } };
+    case 'source': return { label: 'Source', key: 'source', value: r => store.subName('expense', r.categoryId, r.subId) || '', cell: r => {
+        const td = el('td'); const n = store.subName('expense', r.categoryId, r.subId);
+        if (n) td.appendChild(expenseFilterBadge('source', n, '')); else td.textContent = '—';
+        return td; } };
+    case 'account': return { label: 'Paid from', key: 'account', value: r => store.accountName(r.accountId) || '', cell: r => {
+        const td = el('td'); const n = store.accountName(r.accountId);
+        if (n && n !== '—') td.appendChild(expenseFilterBadge('account', n, '')); else td.textContent = '—';
+        if (r.checkNo) td.appendChild(el('div', 'acct-sub', 'Check #' + r.checkNo));
+        // Transfers (savings/investment) show where the money landed.
+        if (r.toAccountId) { const t = el('div', 'acct-sub', '→ ' + (store.accountName(r.toAccountId) || 'account')); t.title = 'Transferred into this account — moved, not spent'; td.appendChild(t); }
+        return td; } };
+    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => expenseAmount(r), cell: r => numCell(expenseAmount(r), true) };
+    case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => {
+        const td = el('td'); const n = store.personName(r.personId);
+        if (n && n !== '—') td.appendChild(expenseFilterBadge('person', n, '')); else td.textContent = '—';
+        return td; } };
+    case 'forDate': return { label: 'Applies to', key: 'forDate', value: r => r.forDate || '', cell: r => el('td', 'muted', r.forDate ? fmtDate(r.forDate) : '—') };
+    case 'checkNo': return { label: 'Check #', key: 'checkNo', value: r => r.checkNo || '', cell: r => el('td', 'mono-sm', r.checkNo || '—') };
+    case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = firstLine(r.notes) || '—'; if (r.notes) td.title = r.notes; return td; } };
+  }
+  return null;
+}
 function expenseList(data) {
   const store = window.cloverStore;
   let rows = data.expensePayments.slice();
   if (activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
   if (expenseCatFilter !== 'all') rows = rows.filter(e => e.categoryId === expenseCatFilter);
-  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  if (expenseBadgeFilter) {
+    const f = expenseBadgeFilter;
+    const valOf = r => f.key === 'category' ? store.expenseGroupName(r.categoryId)
+      : f.key === 'source' ? (store.subName('expense', r.categoryId, r.subId) || '')
+      : f.key === 'account' ? (store.accountName(r.accountId) || '')
+      : f.key === 'person' ? store.personName(r.personId) : '';
+    rows = rows.filter(r => valOf(r) === f.value);
+  }
 
   const wrap = el('div');
   const bar = el('div', 'filter-bar');
@@ -3111,56 +3183,41 @@ function expenseList(data) {
   catSel.addEventListener('change', () => { expenseCatFilter = catSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Category', catSel));
   bar.appendChild(el('div', 'muted', rows.length + ' shown' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  const colsBtn = columnsButton('expenseList', EXPLIST_ALL_COLS, EXPLIST_DEFAULT_COLS, EXPLIST_COL_LABELS, 'Expense list columns');
+  colsBtn.style.marginLeft = 'auto';
+  bar.appendChild(colsBtn);
   wrap.appendChild(bar);
 
+  if (expenseBadgeFilter) {
+    const f = expenseBadgeFilter;
+    const chip = el('div', 'filter-bar');
+    chip.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (EXPLIST_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { expenseBadgeFilter = null; renderView(currentRoute); });
+    chip.appendChild(clear);
+    wrap.appendChild(chip);
+  }
+
   if (!rows.length) {
-    wrap.appendChild(emptyState('No expenses logged', 'Add one-off or actual expenses for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '. (Recurring bills live on the Subscriptions page.)', '+ Add expense', () => expenseModal(null)));
+    wrap.appendChild(emptyState('No expenses logged', 'Add one-off or actual expenses for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '. (Recurring bills live on the Bills & Subscriptions page.)', '+ Add expense', () => expenseModal(null)));
     return wrap;
   }
 
+  const cols = [
+    ...tableColKeys(store, 'expenseList', EXPLIST_COL_LABELS, EXPLIST_DEFAULT_COLS).map(k => buildExpenseListCol(store, k)).filter(Boolean),
+    { label: '', sortable: false, cell: e => {
+        const act = el('td', 'row-actions');
+        const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => expenseModal(e));
+        const dup = el('button', 'icon-btn', 'Duplicate');
+        dup.title = 'Start a new expense prefilled from this one (date set to today)';
+        dup.addEventListener('click', () => { const pre = Object.assign({}, e); delete pre.id; pre.date = todayISO(); expenseModal(pre); });
+        const conv = el('button', 'icon-btn', 'Convert'); conv.title = 'Turn this into a recurring bill or a budget placeholder'; conv.addEventListener('click', () => convertModal('expense', e));
+        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.expenseGroupName(e.categoryId), () => store.removeExpense(activeYear, e.id)));
+        act.appendChild(edit); act.appendChild(dup); act.appendChild(conv); act.appendChild(del); return act; } }
+  ];
   const card = el('div', 'card table-card');
-  const table = el('table', 'data-table');
-  table.innerHTML = '<thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Source</th><th>Paid from</th><th class="num">Amount</th><th>Person</th><th></th></tr></thead>';
-  const tb = el('tbody');
-  rows.forEach(e => {
-    const tr = el('tr');
-    const dateTd = el('td', null, fmtDate(e.date));
-    // When the row was logged (or last edited) — the date above is the day the
-    // money moved, which is often not the day you typed it in.
-    const stamp = e.updatedAt || e.createdAt;
-    if (stamp) {
-      const edited = !!(e.updatedAt && e.createdAt && e.updatedAt !== e.createdAt);
-      const t = el('div', 'acct-sub', stampText(stamp, e.date));
-      t.title = (edited ? 'Last edited ' : 'Added ') + fmtDateTimeLocal(stamp);
-      dateTd.appendChild(t);
-    }
-    tr.appendChild(dateTd);
-    const descTd = el('td', null, e.title || '—');
-    if (e.vendor) descTd.appendChild(el('div', 'acct-sub', e.vendor));
-    // The "applies to" day (parking day / toll issued day) belongs with what it
-    // describes, not with the date the money left.
-    if (e.forDate) { const f = el('div', 'acct-sub', 'for ' + fmtDate(e.forDate)); f.title = 'The day this charge was for'; descTd.appendChild(f); }
-    tr.appendChild(descTd);
-    tr.appendChild(el('td', null, store.expenseGroupName(e.categoryId)));
-    tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
-    const accTd = el('td', null, store.accountName(e.accountId) || '—');
-    if (e.checkNo) accTd.appendChild(el('div', 'acct-sub', 'Check #' + e.checkNo));
-    // Transfers (savings/investment contributions) show where the money landed.
-    if (e.toAccountId) { const t = el('div', 'acct-sub', '→ ' + (store.accountName(e.toAccountId) || 'account')); t.title = 'Transferred into this account — moved, not spent'; accTd.appendChild(t); }
-    tr.appendChild(accTd);
-    tr.appendChild(numCell(expenseAmount(e), true));
-    tr.appendChild(el('td', null, store.personName(e.personId)));
-    const act = el('td', 'row-actions');
-    const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => expenseModal(e));
-    const dup = el('button', 'icon-btn', 'Duplicate');
-    dup.title = 'Start a new expense prefilled from this one (date set to today)';
-    dup.addEventListener('click', () => { const pre = Object.assign({}, e); delete pre.id; pre.date = todayISO(); expenseModal(pre); });
-    const conv = el('button', 'icon-btn', 'Convert'); conv.title = 'Turn this into a recurring bill or a budget placeholder'; conv.addEventListener('click', () => convertModal('expense', e));
-    const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(fmtDate(e.date) + ' · ' + store.expenseGroupName(e.categoryId), () => store.removeExpense(activeYear, e.id)));
-    act.appendChild(edit); act.appendChild(dup); act.appendChild(conv); act.appendChild(del); tr.appendChild(act);
-    tb.appendChild(tr);
-  });
-  table.appendChild(tb); card.appendChild(table); wrap.appendChild(card);
+  card.appendChild(sortableTable(cols, rows, expenseListSort, ns => { expenseListSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null));
+  wrap.appendChild(card);
   return wrap;
 }
 
