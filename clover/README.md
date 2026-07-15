@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.108 — When it was logged, and a tidier expense row
+
+- The **Expenses list now shows when each row was logged** in small grey text
+  under the date — “10:19 AM” if you logged it the same day, or “Jul 15,
+  10:19 AM” if the entry’s date is a different day (so a bare time never sits
+  misleadingly under another date). Edit a row and the stamp updates; hover it
+  for the full “Added / Last edited …”.
+- The **“for Aug 1, 2026” line moved next to the Description**, where it
+  belongs — it describes the parking/toll, not the day the money left. Same
+  small grey styling.
+
 ### v1.0.107 — Dollar fields look like dollars
 
 - **Money fields always show two decimals.** A stored 21.2 now displays as

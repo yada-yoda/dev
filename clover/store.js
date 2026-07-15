@@ -168,6 +168,16 @@ function migrateAccountApyDates(accounts) {
   return changed;
 }
 
+// Records carry when they were first logged and when they were last touched, so
+// a list can show "added 3:42 PM" / "last edited …" — the entry's own date is
+// the day the money moved, which is often not the day it was typed in.
+function stampSaved(entry) {
+  const now = new Date().toISOString();
+  if (!entry.createdAt) entry.createdAt = now;
+  entry.updatedAt = now;
+  return entry;
+}
+
 function seedGroups(items) {
   return items.map((it, i) => {
     const name = typeof it === 'string' ? it : it.name;
@@ -405,6 +415,7 @@ window.cloverStore = {
 
   // --- recurring / subscriptions ---
   saveRecurring(item) {
+    stampSaved(item);
     if (item.id) { const i = state.recurring.findIndex(x => x.id === item.id); if (i >= 0) state.recurring[i] = item; else state.recurring.push(item); }
     else { item.id = mkId('rec'); state.recurring.push(item); }
     scheduleSave(); notify(); return item;
@@ -427,6 +438,7 @@ window.cloverStore = {
 
   // --- class-action settlement claims (meta doc, cross-year) ---
   saveSettlement(item) {
+    stampSaved(item);
     if (item.id) { const i = state.settlements.findIndex(x => x.id === item.id); if (i >= 0) state.settlements[i] = item; else state.settlements.push(item); }
     else { item.id = mkId('set'); state.settlements.push(item); }
     scheduleSave(); notify(); return item;
@@ -480,6 +492,7 @@ window.cloverStore = {
 
   // --- accounts ---
   saveAccount(acc) {
+    stampSaved(acc);
     if (acc.id) {
       const i = state.accounts.findIndex(a => a.id === acc.id);
       if (i >= 0) state.accounts[i] = acc; else state.accounts.push(acc);
@@ -535,6 +548,7 @@ window.cloverStore = {
   // --- income ---
   saveIncome(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
+    stampSaved(entry);
     if (entry.id) { const i = d.income.findIndex(x => x.id === entry.id); if (i >= 0) d.income[i] = entry; else d.income.push(entry); }
     else { entry.id = mkId('inc'); d.income.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
@@ -544,6 +558,7 @@ window.cloverStore = {
   // --- expense payments (one-off / actual cash-basis expenses) ---
   saveExpense(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
+    stampSaved(entry);
     if (entry.id) { const i = d.expensePayments.findIndex(x => x.id === entry.id); if (i >= 0) d.expensePayments[i] = entry; else d.expensePayments.push(entry); }
     else { entry.id = mkId('exp'); d.expensePayments.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
@@ -553,6 +568,7 @@ window.cloverStore = {
   // --- paychecks (source of truth for wages; roll into income categories) ---
   savePaycheck(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
+    stampSaved(entry);
     if (entry.id) { const i = d.paychecks.findIndex(x => x.id === entry.id); if (i >= 0) d.paychecks[i] = entry; else d.paychecks.push(entry); }
     else { entry.id = mkId('pay'); d.paychecks.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
@@ -609,7 +625,7 @@ window.cloverStore = {
       scheduleSave(); this.scheduleSaveYear(y); notify(); return;
     }
     const key = target === 'income' ? 'income' : target === 'expenses' ? 'expensePayments' : target === 'sales' ? 'sales' : 'paychecks';
-    entries.forEach(e => { e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
+    entries.forEach(e => { stampSaved(e); e.id = mkId(target.slice(0, 3)); e.batchId = batch.id; d[key].push(e); });
     d.importBatches = d.importBatches || [];
     // One history entry per batch per year, even when a batch spans targets
     // (e.g. dividends + their fees land in income AND expensePayments).

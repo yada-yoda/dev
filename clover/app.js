@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.107';
+const VERSION = '1.0.108';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3003,10 +3003,21 @@ function expenseList(data) {
   rows.forEach(e => {
     const tr = el('tr');
     const dateTd = el('td', null, fmtDate(e.date));
-    if (e.forDate) dateTd.appendChild(el('div', 'acct-sub', 'for ' + fmtDate(e.forDate)));
+    // When the row was logged (or last edited) — the date above is the day the
+    // money moved, which is often not the day you typed it in.
+    const stamp = e.updatedAt || e.createdAt;
+    if (stamp) {
+      const edited = !!(e.updatedAt && e.createdAt && e.updatedAt !== e.createdAt);
+      const t = el('div', 'acct-sub', stampText(stamp, e.date));
+      t.title = (edited ? 'Last edited ' : 'Added ') + fmtDateTimeLocal(stamp);
+      dateTd.appendChild(t);
+    }
     tr.appendChild(dateTd);
     const descTd = el('td', null, e.title || '—');
     if (e.vendor) descTd.appendChild(el('div', 'acct-sub', e.vendor));
+    // The "applies to" day (parking day / toll issued day) belongs with what it
+    // describes, not with the date the money left.
+    if (e.forDate) { const f = el('div', 'acct-sub', 'for ' + fmtDate(e.forDate)); f.title = 'The day this charge was for'; descTd.appendChild(f); }
     tr.appendChild(descTd);
     tr.appendChild(el('td', null, store.expenseGroupName(e.categoryId)));
     tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
@@ -4469,6 +4480,18 @@ const CHART_PALETTE = ['#16a34a', '#2563eb', '#d97706', '#dc2626', '#7c3aed', '#
 let _charts = [];
 function destroyCharts() { _charts.forEach(c => { try { c.destroy(); } catch (e) {} }); _charts = []; }
 function fmtDateShort(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); if (!m) return iso; return (+m[2]) + '/' + (+m[3]) + '/' + m[1].slice(2); }
+// Local wall-clock of a stored timestamp (createdAt/updatedAt are ISO/UTC).
+function fmtDateTimeLocal(iso) { const d = new Date(iso); return isNaN(d.getTime()) ? '' : d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+// Compact "when it was logged" stamp. Shows just the time when it happened on
+// the same day as the row's own date; otherwise it leads with the day, so a
+// bare time never sits misleadingly under a different date.
+function stampText(iso, refDateIso) {
+  const d = new Date(iso); if (isNaN(d.getTime())) return '';
+  const p = n => String(n).padStart(2, '0');
+  const dayOf = d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  const time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  return (refDateIso && dayOf === String(refDateIso).slice(0, 10)) ? time : (d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + time);
+}
 
 async function buildLineChart(canvas, cfg) {
   let Chart;
