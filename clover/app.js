@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.108';
+const VERSION = '1.0.109';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -384,6 +384,92 @@ function field(label, node, hint) {
   w.appendChild(lab); w.appendChild(node.__wrap || node); return w;
 }
 function setFieldHint(fieldEl, hint) { const i = fieldEl && fieldEl.querySelector('.info'); if (i) i.title = hint; }
+
+// ---- per-record edit history (the "History" tab on edit modals) ----
+// The store logs raw field keys/ids; these turn that into something readable.
+const HIST_LABELS = {
+  date: 'Date', payDate: 'Pay date', receivedDate: 'Received date', forDate: 'Applies to', dateFiled: 'Filed',
+  amount: 'Amount', gross: 'Gross', net: 'Net', title: 'Description', vendor: 'Vendor', name: 'Name',
+  categoryId: 'Category', incomeCategoryId: 'Income category', subId: 'Subcategory',
+  accountId: 'Account', toAccountId: 'Moved to', fromAccountId: 'From account', backupAccountId: 'Backup account',
+  personId: 'Person', recurringId: 'Linked bill', notes: 'Notes', status: 'Status', checkNo: 'Check #',
+  apy: 'APY', apyAsOf: 'APY as of', cdApy: 'CD APY', closed: 'Closed', closedDate: 'Date closed', active: 'Active',
+  budgetEst: 'Budget placeholder', autoPay: 'Auto-pay', frequency: 'Frequency', renewalDate: 'Renewal date',
+  priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #'
+};
+function prettyKey(k) { return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace(/\s*Id\b/, '').trim(); }
+function histFieldLabel(f) { return HIST_LABELS[f] || prettyKey(f); }
+// Dollar-valued fields, so history reads "$42.80 → $51.25" and not "42.8".
+const HIST_MONEY = new Set(['amount', 'gross', 'net', 'prevAmount', 'yearGross', 'yearNet', 'fedAmount', 'stateAmount', 'prepCost', 'orderPrice', 'earnings', 'costPrice', 'expectedAmount', 'fedWithheld', 'stateWithheld', 'price']);
+// Stored history holds raw values (ids, booleans) — resolve them to names.
+function histValueText(store, field, v) {
+  if (v === '' || v == null) return '—';
+  if (HIST_MONEY.has(field) && v !== '' && !isNaN(parseFloat(v))) return '$' + Number(v).toFixed(2);
+  if (/^(accountId|toAccountId|fromAccountId|backupAccountId)$/.test(field)) return store.accountName(v) || String(v);
+  if (field === 'personId') return store.personName(v) || String(v);
+  if (field === 'recurringId') { const r = (store.state.recurring || []).find(x => x.id === v); return r ? r.name : String(v); }
+  if (field === 'categoryId' || field === 'incomeCategoryId') {
+    const a = store.expenseGroupName(v), b = store.incomeGroupName(v);
+    return (a && a !== '—') ? a : ((b && b !== '—') ? b : String(v));
+  }
+  if (field === 'subId') {
+    for (const cats of [store.state.expenseCategories || [], store.state.incomeCategories || []]) {
+      for (const c of cats) { const s = (c.subs || []).find(x => x.id === v); if (s) return s.name; }
+    }
+    return String(v);
+  }
+  if (v === true || v === 'true') return 'Yes';
+  if (v === false || v === 'false') return 'No';
+  return String(v);
+}
+function historyPanel(store, item) {
+  const p = el('div', 'hist-panel');
+  if (item.createdAt) p.appendChild(el('div', 'muted', 'Added ' + fmtDateTimeLocal(item.createdAt)));
+  const hist = (item.history || []).slice().reverse();   // newest first
+  if (!hist.length) {
+    p.appendChild(el('p', 'muted', 'No edits yet — this is exactly as it was first saved.'));
+    return p;
+  }
+  const list = el('div', 'hist-list');
+  hist.forEach(h => {
+    const card = el('div', 'hist-entry');
+    card.appendChild(el('div', 'hist-when', fmtDateTimeLocal(h.at)));
+    (h.changes || []).forEach(c => {
+      const row = el('div', 'hist-change');
+      row.appendChild(el('span', 'hist-field', histFieldLabel(c.f)));
+      row.appendChild(el('span', 'hist-from', histValueText(store, c.f, c.from)));
+      row.appendChild(el('span', 'hist-arrow', '→'));
+      row.appendChild(el('span', 'hist-to', histValueText(store, c.f, c.to)));
+      card.appendChild(row);
+    });
+    list.appendChild(card);
+  });
+  p.appendChild(list);
+  return p;
+}
+// Wraps a modal body with Details | History tabs. Only for saved records —
+// a brand-new one has nothing to show yet.
+function withHistoryTab(bodyEl, existing) {
+  const store = window.cloverStore;
+  if (!existing || !existing.id) return bodyEl;
+  const wrap = el('div');
+  const tabs = el('div', 'tabs');
+  const n = (existing.history || []).length;
+  const dBtn = el('button', 'tab active', 'Details');
+  const hBtn = el('button', 'tab', 'History' + (n ? ' (' + n + ')' : ''));
+  const panel = historyPanel(store, existing);
+  panel.style.display = 'none';
+  const show = hist => {
+    dBtn.classList.toggle('active', !hist); hBtn.classList.toggle('active', hist);
+    bodyEl.style.display = hist ? 'none' : '';
+    panel.style.display = hist ? '' : 'none';
+  };
+  dBtn.addEventListener('click', ev => { ev.preventDefault(); show(false); });
+  hBtn.addEventListener('click', ev => { ev.preventDefault(); show(true); });
+  tabs.appendChild(dBtn); tabs.appendChild(hBtn);
+  wrap.appendChild(tabs); wrap.appendChild(bodyEl); wrap.appendChild(panel);
+  return wrap;
+}
 // Dollar amounts always show 2 decimals (21.20, not 21.2; 21 becomes 21.00) —
 // a raw number input drops the trailing zero, which reads wrong for money.
 function attachMoney2dp(i, value) {
@@ -914,8 +1000,9 @@ function closeAccountModal(acc) {
   openModal({
     title: 'Close account', body, confirmLabel: 'Close account',
     onConfirm: () => {
-      acc.closed = true; acc.active = false; acc.closedDate = fDate.value || todayISO();
-      store.saveAccount(acc);
+      // Save a copy, not the stored object — the store diffs old vs new to build
+      // the edit history, and mutating in place would leave nothing to compare.
+      store.saveAccount(Object.assign({}, acc, { closed: true, active: false, closedDate: fDate.value || todayISO() }));
       accountsTab = 'closed';
       toast('Account closed');
     }
@@ -963,7 +1050,7 @@ function renderAccounts(view) {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => accountModal(a));
         td.appendChild(edit);
-        if (a.closed) { const re = el('button', 'icon-btn', 'Reopen'); re.title = 'Mark this account open and active again'; re.addEventListener('click', () => { a.closed = false; a.active = true; a.closedDate = ''; store.saveAccount(a); toast('Account reopened'); accountsTab = 'open'; }); td.appendChild(re); }
+        if (a.closed) { const re = el('button', 'icon-btn', 'Reopen'); re.title = 'Mark this account open and active again'; re.addEventListener('click', () => { store.saveAccount(Object.assign({}, a, { closed: false, active: true, closedDate: '' })); toast('Account reopened'); accountsTab = 'open'; }); td.appendChild(re); }
         else { const cl = el('button', 'icon-btn', 'Close'); cl.title = 'Close this account (shows what’s tied to it first)'; cl.addEventListener('click', () => closeAccountModal(a)); td.appendChild(cl); }
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(a.name, () => store.removeAccount(a.id)));
         td.appendChild(del); return td; } }
@@ -1124,7 +1211,7 @@ function accountModal(existing) {
     if (a.closed) {
       adminNode.appendChild(el('span', 'muted', 'Closed ' + (a.closedDate ? fmtDate(a.closedDate) : '') + '. '));
       const reopen = el('button', 'btn-ghost', '↻ Reopen account');
-      reopen.addEventListener('click', () => { existing.closed = false; existing.active = true; existing.closedDate = ''; store.saveAccount(existing); closeModal(); toast('Account reopened'); renderView(currentRoute); });
+      reopen.addEventListener('click', () => { store.saveAccount(Object.assign({}, existing, { closed: false, active: true, closedDate: '' })); closeModal(); toast('Account reopened'); renderView(currentRoute); });
       adminNode.appendChild(reopen);
     } else {
       const closeBtn = el('button', 'btn-ghost danger', '⊘ Close account…');
@@ -1136,7 +1223,7 @@ function accountModal(existing) {
   }
 
   openModal({
-    title: existing ? 'Edit account' : 'Add account', body, confirmLabel: 'Save',
+    title: existing ? 'Edit account' : 'Add account', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
@@ -1653,7 +1740,7 @@ function incomeModal(existing) {
   // entry — title/toast key off a real id, not merely a truthy arg.
   const incIsEdit = !!(existing && existing.id);
   openModal({
-    title: incIsEdit ? 'Edit income' : 'Add income', body, confirmLabel: 'Save',
+    title: incIsEdit ? 'Edit income' : 'Add income', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const gross = parseFloat(fGross.value);
@@ -2448,7 +2535,7 @@ function settlementModal(existing) {
 
   const isEdit = !!(existing && existing.id);
   openModal({
-    title: isEdit ? 'Edit settlement' : 'Add settlement', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit settlement' : 'Add settlement', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Settlement name is required', 'warn'); return false; }
@@ -2583,7 +2670,8 @@ function renderHelp(view) {
   [
     'Tables can be sorted (click a header) and their columns customized (the ⚙ Columns button).',
     'Most list pages have a live search box; forms explain each field with an ⓘ tooltip.',
-    'The year and month selectors at the top control what most pages show.'
+    'The year and month selectors at the top control what most pages show.',
+    'Editing an expense, income entry, paycheck, bill, account, or settlement? Its form has a “History” tab showing exactly what changed and when — e.g. “Amount $42.80 → $51.25”.'
   ].forEach(t => tips.appendChild(el('li', null, t)));
   intro.appendChild(tips);
   view.appendChild(intro);
@@ -2742,7 +2830,7 @@ function subscriptionModal(existing) {
   // is still a NEW bill — key the wording off a real id, not merely a truthy arg.
   const isEdit = !!(existing && existing.id);
   openModal({
-    title: isEdit ? 'Edit subscription' : 'Add subscription', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit subscription' : 'Add subscription', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
@@ -3148,7 +3236,7 @@ function expenseModal(existing) {
 
   const isEdit = !!(existing && existing.id);
   openModal({
-    title: isEdit ? 'Edit expense' : 'Add expense', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit expense' : 'Add expense', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const amount = parseFloat(fAmount.value);
@@ -3718,7 +3806,7 @@ function paycheckModal(existing) {
 
   const isEdit = !!(existing && existing.id);
   openModal({
-    title: isEdit ? 'Edit paycheck' : 'Add paycheck', body, confirmLabel: 'Save',
+    title: isEdit ? 'Edit paycheck' : 'Add paycheck', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const gross = parseFloat(fGross.value);
       if (isNaN(gross)) { fGross.focus(); toast('Gross is required', 'warn'); return false; }

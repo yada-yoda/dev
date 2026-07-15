@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.109 — Every record keeps its own edit history
+
+- Editing an **expense, income entry, paycheck, bill, account, or settlement**
+  now shows a **Details | History** tab. History lists every edit with the date
+  and exactly what changed — “Amount $42.80 → $51.25”, “Account Chase Checking
+  → Amex Card”, “Subcategory Groceries → Dining Out” — plus when the record was
+  first added.
+- Changes are recorded automatically on save (no extra step), values read as
+  names and dollars rather than raw ids, and each record keeps its most recent
+  25 edits so a long-lived entry stays lean.
+
 ### v1.0.108 — When it was logged, and a tidier expense row
 
 - The **Expenses list now shows when each row was logged** in small grey text

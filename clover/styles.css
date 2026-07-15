@@ -509,6 +509,18 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .pay-row input { width: 100%; min-width: 0; }
 .pay-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .mono-sm { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+/* Per-record edit history (the History tab in edit modals). */
+.hist-panel { padding-top: 4px; }
+.hist-list { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.hist-entry { border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; background: var(--surface-2); }
+.hist-when { font-size: 12px; font-weight: 600; margin-bottom: 6px; }
+.hist-change { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) auto minmax(0,1fr); gap: 6px; align-items: baseline; font-size: 12px; padding: 2px 0; }
+.hist-field { color: var(--text-muted); }
+.hist-from { text-decoration: line-through; color: var(--text-muted); word-break: break-word; }
+.hist-arrow { color: var(--text-muted); }
+.hist-to { font-weight: 600; word-break: break-word; }
+@media (max-width: 560px) { .hist-change { grid-template-columns: 1fr; gap: 0; } .hist-arrow { display: none; } }
+
 /* Currency field: the $ sits inside the box so the value is obviously USD. */
 .money-input { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }
 .money-pre { position: absolute; left: 11px; color: var(--text-muted); font-size: 13px; pointer-events: none; }

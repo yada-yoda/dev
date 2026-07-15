@@ -178,6 +178,38 @@ function stampSaved(entry) {
   return entry;
 }
 
+// ---- per-record edit history ----
+// Every save diffs the incoming record against the stored one and appends what
+// changed, so each item can show its own audit trail. Capped so a long-lived
+// record can't bloat its year doc.
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory']);
+const HISTORY_MAX = 25;
+function histSnap(v) {
+  if (v == null || v === '') return '';
+  if (Array.isArray(v)) return v.length ? (v.length + ' item' + (v.length === 1 ? '' : 's')) : '';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
+function diffRecord(before, after) {
+  const out = [];
+  const keys = new Set(Object.keys(before || {}).concat(Object.keys(after || {})));
+  keys.forEach(k => {
+    if (HISTORY_SKIP.has(k)) return;
+    const a = histSnap(before ? before[k] : ''), b = histSnap(after ? after[k] : '');
+    if (String(a) !== String(b)) out.push({ f: k, from: a, to: b });
+  });
+  return out;
+}
+// `before` is the record as currently stored; creation needs no entry (createdAt covers it).
+function pushHistory(entry, before) {
+  if (!before || before === entry) return;
+  const changes = diffRecord(before, entry);
+  if (!changes.length) return;
+  const hist = Array.isArray(before.history) ? before.history.slice() : [];
+  hist.push({ at: new Date().toISOString(), changes });
+  entry.history = hist.slice(-HISTORY_MAX);
+}
+
 function seedGroups(items) {
   return items.map((it, i) => {
     const name = typeof it === 'string' ? it : it.name;
@@ -416,7 +448,7 @@ window.cloverStore = {
   // --- recurring / subscriptions ---
   saveRecurring(item) {
     stampSaved(item);
-    if (item.id) { const i = state.recurring.findIndex(x => x.id === item.id); if (i >= 0) state.recurring[i] = item; else state.recurring.push(item); }
+    if (item.id) { const i = state.recurring.findIndex(x => x.id === item.id); if (i >= 0) { pushHistory(item, state.recurring[i]); state.recurring[i] = item; } else state.recurring.push(item); }
     else { item.id = mkId('rec'); state.recurring.push(item); }
     scheduleSave(); notify(); return item;
   },
@@ -439,7 +471,7 @@ window.cloverStore = {
   // --- class-action settlement claims (meta doc, cross-year) ---
   saveSettlement(item) {
     stampSaved(item);
-    if (item.id) { const i = state.settlements.findIndex(x => x.id === item.id); if (i >= 0) state.settlements[i] = item; else state.settlements.push(item); }
+    if (item.id) { const i = state.settlements.findIndex(x => x.id === item.id); if (i >= 0) { pushHistory(item, state.settlements[i]); state.settlements[i] = item; } else state.settlements.push(item); }
     else { item.id = mkId('set'); state.settlements.push(item); }
     scheduleSave(); notify(); return item;
   },
@@ -495,7 +527,7 @@ window.cloverStore = {
     stampSaved(acc);
     if (acc.id) {
       const i = state.accounts.findIndex(a => a.id === acc.id);
-      if (i >= 0) state.accounts[i] = acc; else state.accounts.push(acc);
+      if (i >= 0) { pushHistory(acc, state.accounts[i]); state.accounts[i] = acc; } else state.accounts.push(acc);
     } else {
       acc.id = mkId('acct');
       state.accounts.push(acc);
@@ -549,7 +581,7 @@ window.cloverStore = {
   saveIncome(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
     stampSaved(entry);
-    if (entry.id) { const i = d.income.findIndex(x => x.id === entry.id); if (i >= 0) d.income[i] = entry; else d.income.push(entry); }
+    if (entry.id) { const i = d.income.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, d.income[i]); d.income[i] = entry; } else d.income.push(entry); }
     else { entry.id = mkId('inc'); d.income.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
   },
@@ -559,7 +591,7 @@ window.cloverStore = {
   saveExpense(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
     stampSaved(entry);
-    if (entry.id) { const i = d.expensePayments.findIndex(x => x.id === entry.id); if (i >= 0) d.expensePayments[i] = entry; else d.expensePayments.push(entry); }
+    if (entry.id) { const i = d.expensePayments.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, d.expensePayments[i]); d.expensePayments[i] = entry; } else d.expensePayments.push(entry); }
     else { entry.id = mkId('exp'); d.expensePayments.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
   },
@@ -569,7 +601,7 @@ window.cloverStore = {
   savePaycheck(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
     stampSaved(entry);
-    if (entry.id) { const i = d.paychecks.findIndex(x => x.id === entry.id); if (i >= 0) d.paychecks[i] = entry; else d.paychecks.push(entry); }
+    if (entry.id) { const i = d.paychecks.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, d.paychecks[i]); d.paychecks[i] = entry; } else d.paychecks.push(entry); }
     else { entry.id = mkId('pay'); d.paychecks.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
   },
