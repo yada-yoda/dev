@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.107 — Dollar fields look like dollars
+
+- **Money fields always show two decimals.** A stored 21.2 now displays as
+  **21.20**, and typing `21` becomes **21.00** when you leave the field — no
+  more amounts that look like they’re missing a digit.
+- **A `$` now sits inside every dollar field**, so it’s obvious the value is
+  USD (percent fields like APY/APR correctly don’t get one). Applied to all
+  ~25 money inputs — expenses, income, paychecks, bills, raises, taxes,
+  selling, settlements — and paycheck deductions now read **−$**.
+- **“Type of savings / investment” → “What it’s for”** — plainer English for
+  the same question, with the same auto-fill and examples behind the ⓘ.
+
 ### v1.0.106 — Tooltips that show you an example
 
 - Every field on the expense form now explains itself with a **concrete

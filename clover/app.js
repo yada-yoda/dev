@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.106';
+const VERSION = '1.0.107';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -381,9 +381,27 @@ function field(label, node, hint) {
   const w = el('label', 'field');
   const lab = el('span', null, label);
   if (hint) { const i = el('span', 'info', 'ⓘ'); i.title = hint; lab.appendChild(document.createTextNode(' ')); lab.appendChild(i); }
-  w.appendChild(lab); w.appendChild(node); return w;
+  w.appendChild(lab); w.appendChild(node.__wrap || node); return w;
 }
 function setFieldHint(fieldEl, hint) { const i = fieldEl && fieldEl.querySelector('.info'); if (i) i.title = hint; }
+// Dollar amounts always show 2 decimals (21.20, not 21.2; 21 becomes 21.00) —
+// a raw number input drops the trailing zero, which reads wrong for money.
+function attachMoney2dp(i, value) {
+  if (value != null && value !== '' && !isNaN(Number(value))) i.value = Number(value).toFixed(2);
+  i.step = '0.01'; i.inputMode = 'decimal';
+  i.addEventListener('blur', () => { const n = parseFloat(i.value); if (i.value !== '' && !isNaN(n)) i.value = n.toFixed(2); });
+  return i;
+}
+// A currency field: $ sits inside the box so it's obvious the value is USD.
+// Callers keep using .value; field() renders the wrapper via __wrap.
+function moneyInput(value, attrs = {}) {
+  const i = attachMoney2dp(input('', Object.assign({ type: 'number', placeholder: '0.00' }, attrs)), value);
+  const wrap = el('div', 'money-input');
+  wrap.appendChild(el('span', 'money-pre', '$'));
+  wrap.appendChild(i);
+  i.__wrap = wrap;
+  return i;
+}
 function input(value = '', attrs = {}) {
   const i = document.createElement('input');
   i.type = attrs.type || 'text'; i.value = value;
@@ -1472,8 +1490,8 @@ function incomeModal(existing) {
   };
   const fAcct = accountSelect(s, e.accountId || '');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
-  const fGross = input(e.gross != null ? e.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
-  const fNet = input(e.net != null ? e.net : '', { type: 'number', placeholder: 'optional' }); fNet.step = '0.01';
+  const fGross = moneyInput(e.gross);
+  const fNet = moneyInput(e.net, { placeholder: 'optional' });
   const fStatus = select([{ value: 'received', label: 'Received' }, { value: 'pending', label: 'Pending / expected' }], e.status || 'received');
   const fExpected = input(e.expectedDate || '', { type: 'date' });
   const fVia = input(e.receivedVia || '', { placeholder: 'e.g. Direct Deposit, PayPal', list: 'via-list' });
@@ -1485,7 +1503,7 @@ function incomeModal(existing) {
   const fSym = input(e.symbol || '', { placeholder: 'e.g. AAPL' });
   const fAction = input(e.action || '', { placeholder: 'e.g. Qualified Dividend' });
   const fQty = input(e.qty != null ? e.qty : '', { type: 'number', placeholder: 'shares' }); fQty.step = 'any';
-  const fPrice = input(e.price != null ? e.price : '', { type: 'number', placeholder: 'price' }); fPrice.step = '0.01';
+  const fPrice = moneyInput(e.price, { placeholder: 'price' });
   const divWrap = el('div', 'div-fields');
   divWrap.appendChild(field('Symbol', fSym, 'The stock/fund ticker this dividend came from.'));
   divWrap.appendChild(field('Action', fAction, 'The dividend type as your broker labels it — e.g. Qualified Dividend, Cash Dividend, Reinvest.'));
@@ -1546,8 +1564,8 @@ function incomeModal(existing) {
   const fRetType = input(e.distType || '', { placeholder: 'e.g. Inherited IRA (Estate)', list: 'ret-type-list' });
   const fPayer = input(e.payer || '', { placeholder: 'e.g. estate or plan custodian' });
   const fFromAcct = accountSelect(s, e.fromAccountId || '', '— Select account —');
-  const fFedWh = input(e.fedWithheld != null ? e.fedWithheld : '', { type: 'number', placeholder: '0.00' }); fFedWh.step = '0.01'; fFedWh.min = 0;
-  const fStateWh = input(e.stateWithheld != null ? e.stateWithheld : '', { type: 'number', placeholder: '0.00' }); fStateWh.step = '0.01'; fStateWh.min = 0;
+  const fFedWh = moneyInput(e.fedWithheld); fFedWh.min = 0;
+  const fStateWh = moneyInput(e.stateWithheld); fStateWh.min = 0;
   const retWrap = el('div', 'div-fields');
   retWrap.appendChild(field('Distribution type', fRetType, 'What kind of retirement distribution this is — e.g. an inherited IRA from an estate, a Traditional/Roth IRA, a 401(k), pension, or a required minimum distribution.'));
   retWrap.appendChild(field('Payer / plan', fPayer, 'Who paid the distribution — the estate, or the IRA/plan custodian (e.g. the brokerage). Free text.'));
@@ -2389,7 +2407,7 @@ function settlementModal(existing) {
   const fClaimNo = document.createElement('textarea'); fClaimNo.value = r.claimNumber || ''; fClaimNo.rows = 2; fClaimNo.placeholder = 'Claim ID / confirmation code(s)';
   const fClaimId = input(r.claimId || '', { placeholder: 'Settlement claim ID (optional)' });
   const fMethod = input(r.method || '', { placeholder: 'e.g. PayPal, Venmo, Check', list: 'settle-method-list' });
-  const fExpected = input(r.expectedAmount != null ? r.expectedAmount : '', { type: 'number', placeholder: 'estimate (optional)' }); fExpected.step = '0.01';
+  const fExpected = moneyInput(r.expectedAmount, { placeholder: 'estimate (optional)' });
   const cProof = checkbox('Proof required', r.proofRequired, 'Tick if this claim required proof of purchase / documentation (vs. a “no proof” claim).');
   const fUrl = input(r.url || '', { placeholder: 'https:// settlement site (optional)' });
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
@@ -2414,10 +2432,10 @@ function settlementModal(existing) {
     r.payments.forEach((p, i) => {
       const row = el('div', 'pay-row');
       const d = input(p.date || '', { type: 'date' }); d.addEventListener('input', () => { p.date = d.value; });
-      const a = input(p.amount != null ? p.amount : '', { type: 'number', placeholder: 'amount' }); a.step = '0.01'; a.addEventListener('input', () => { p.amount = a.value === '' ? null : parseFloat(a.value); updateTotal(); });
+      const a = moneyInput(p.amount, { placeholder: 'amount' }); a.addEventListener('input', () => { p.amount = a.value === '' ? null : parseFloat(a.value); updateTotal(); });
       const m = input(p.method || '', { placeholder: 'method', list: 'settle-method-list' }); m.addEventListener('input', () => { p.method = m.value; });
       const rm = el('button', 'icon-btn danger', '✕'); rm.title = 'Remove payout'; rm.addEventListener('click', () => { r.payments.splice(i, 1); renderPays(); updateTotal(); });
-      row.appendChild(d); row.appendChild(a); row.appendChild(m); row.appendChild(rm);
+      row.appendChild(d); row.appendChild(a.__wrap); row.appendChild(m); row.appendChild(rm);
       payList.appendChild(row);
     });
   };
@@ -2635,7 +2653,7 @@ function subscriptionModal(existing) {
   const fCat = select([{ value: '', label: '— Select —' }].concat(s.expenseCategories.map(c => ({ value: c.id, label: c.name }))), r.categoryId || '');
   const fSub = select([{ value: '', label: '—' }], r.subId || '');
   const rebuildSubs = () => { const g = s.expenseCategories.find(c => c.id === fCat.value); const opts = [{ value: '', label: '—' }].concat((g ? g.subs : []).map(x => ({ value: x.id, label: x.name }))); fSub.innerHTML = ''; opts.forEach(o => { const op = el('option'); op.value = o.value; op.textContent = o.label; fSub.appendChild(op); }); if (r.subId) fSub.value = r.subId; };
-  const fAmount = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
+  const fAmount = moneyInput(r.amount);
   const fFreq = select(FREQUENCIES.map(f => ({ value: f.key, label: f.label })), r.frequency || 'monthly');
   const fInterval = input(r.interval || '', { type: 'number', placeholder: 'N' }); fInterval.min = 1;
   const intervalWrap = field('Interval (N)', fInterval, 'How many months or years between charges.');
@@ -3031,7 +3049,7 @@ function expenseModal(existing) {
   const fAcct = accountSelect(s, e.accountId || '');
   const fToAcct = accountSelect(s, e.toAccountId || '', '— Select account —');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
-  const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
+  const fAmount = moneyInput(e.amount);
   const fTitle = input(e.title || '', { placeholder: 'e.g. Parking — Main St Garage' });
   const fVendor = input(e.vendor || '', { placeholder: 'e.g. SpotHero' });
   const fForDate = input(e.forDate || '', { type: 'date' });
@@ -3083,7 +3101,7 @@ function expenseModal(existing) {
     acctLbl.nodeValue = t ? 'Moved from' : 'Paid from';
     vendorField.style.display = t ? 'none' : '';
     if (billField) billField.style.display = (t && !fBill.value) ? 'none' : '';
-    subLbl.nodeValue = t ? 'Type of savings / investment' : 'Subcategory';
+    subLbl.nodeValue = t ? 'What it’s for' : 'Subcategory';
     fTitle.placeholder = t ? 'auto-filled from “Moved to”' : 'e.g. Parking — Main St Garage';
     // The same fields mean different things for a transfer — so do their hints.
     setFieldHint(subField, t ? SUB_HINT_TRANSFER : SUB_HINT);
@@ -3642,8 +3660,8 @@ function paycheckModal(existing) {
 
   const fPay = input(p.payDate || todayISO(), { type: 'date' });
   const fRecv = input(p.receivedDate || '', { type: 'date' });
-  const fGross = input(p.gross != null ? p.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
-  const fNet = input(p.net != null ? p.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
+  const fGross = moneyInput(p.gross);
+  const fNet = moneyInput(p.net);
   const fEmp = input(p.employer || '', { placeholder: 'Employer / source', list: 'emp-list' });
   const fCat = select(s.incomeCategories.map(c => ({ value: c.id, label: c.name })), p.incomeCategoryId || (wages && wages.id));
   const fPerson = select(s.persons.map(x => ({ value: x.id, label: x.name })), p.personId || (s.persons[0] && s.persons[0].id));
@@ -3765,8 +3783,8 @@ function payScheduleModal(existing) {
   const fHire = input(c.hireDate || '', { type: 'date' });
   const fHours = input(c.hoursPerCheck != null ? c.hoursPerCheck : '', { type: 'number', placeholder: 'e.g. 80' }); fHours.step = '0.25';
   const fDay2 = input(c.day2 != null ? c.day2 : '', { type: 'number', placeholder: 'e.g. 30 (blank = last day)' }); fDay2.min = 1; fDay2.max = 31;
-  const fGross = input(c.gross != null ? c.gross : '', { type: 'number', placeholder: '0.00' }); fGross.step = '0.01';
-  const fNet = input(c.net != null ? c.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
+  const fGross = moneyInput(c.gross);
+  const fNet = moneyInput(c.net);
   const fTaxForm = select([{ value: 'W-2', label: 'W-2 (employee)' }, { value: '1099-NEC', label: '1099-NEC (contractor / gig)' }, { value: '1099-MISC', label: '1099-MISC' }, { value: 'none', label: 'None / cash' }], c.taxForm || 'W-2');
   const cActive = checkbox('Active', c.active !== false, 'Only active schedules flag missing paychecks and fill period numbers.');
 
@@ -3809,13 +3827,13 @@ function payScheduleModal(existing) {
       const row = el('div', 'io-actions');
       const fName2 = input(d0.name, { placeholder: 'e.g. Federal Withholding', list: 'deduct-list' });
       fName2.addEventListener('input', () => { d0.name = fName2.value; });
-      const fAmt2 = input(d0.amount != null ? Math.abs(d0.amount) : '', { type: 'number', placeholder: 'e.g. 150.00' }); fAmt2.step = '0.01'; fAmt2.min = 0;
+      const fAmt2 = attachMoney2dp(input('', { type: 'number', placeholder: 'e.g. 150.00' }), d0.amount != null ? Math.abs(d0.amount) : ''); fAmt2.min = 0;
       fAmt2.title = 'Enter as a positive amount — it\u2019s subtracted from gross automatically (that\u2019s what the \u2212 means).';
       fAmt2.addEventListener('input', () => { d0.amount = fAmt2.value === '' ? null : Math.abs(parseFloat(fAmt2.value)); });
       const x = el('button', 'icon-btn danger', '✕'); x.title = 'Remove this line item';
       x.addEventListener('click', () => { deductions.splice(i, 1); renderDed(); });
       const amtWrap = el('span', 'ded-amt');
-      const minus = el('span', 'ded-minus', '−'); minus.title = fAmt2.title;
+      const minus = el('span', 'ded-minus', '−$'); minus.title = fAmt2.title;
       amtWrap.appendChild(minus); amtWrap.appendChild(fAmt2);
       row.appendChild(fName2); row.appendChild(amtWrap); row.appendChild(x);
       dedWrap.appendChild(row);
@@ -4317,14 +4335,14 @@ function raiseModal(existing) {
   const fEmpType = select([{ value: '', label: '—' }, 'Full-time', 'Part-time', 'Seasonal', 'Contract', 'Temporary', 'Per diem'], r.empType || '');
   const fDate = input(r.date || todayISO(), { type: 'date' });
   const fBasis = select([{ value: 'check', label: 'Per paycheck' }, { value: 'annual', label: 'Annual salary' }, { value: 'hourly', label: 'Hourly rate' }], r.basis || 'check');
-  const fAmt = input(r.amount != null ? r.amount : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
-  const fNet = input(r.net != null ? r.net : '', { type: 'number', placeholder: '0.00' }); fNet.step = '0.01';
-  const fPrev = input(r.prevAmount != null ? r.prevAmount : '', { type: 'number', placeholder: '0.00' }); fPrev.step = '0.01';
+  const fAmt = moneyInput(r.amount);
+  const fNet = moneyInput(r.net);
+  const fPrev = moneyInput(r.prevAmount);
   const cNoPrev = checkbox('Doesn’t follow the prior raise', r.noPrev, 'Normally, when Previous is left blank, Clover infers it from this employer’s prior recorded raise. Tick this when that comparison doesn’t apply — e.g. a different role or pay structure.');
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional — promotion, annual review, etc.';
   const fHoursYr = input(r.hoursYear != null ? r.hoursYear : '', { type: 'number', placeholder: 'e.g. 1200' }); fHoursYr.step = 'any'; fHoursYr.min = 0;
-  const fYearGross = input(r.yearGross != null ? r.yearGross : '', { type: 'number', placeholder: '0.00' }); fYearGross.step = '0.01';
-  const fYearNet = input(r.yearNet != null ? r.yearNet : '', { type: 'number', placeholder: '0.00' }); fYearNet.step = '0.01';
+  const fYearGross = moneyInput(r.yearGross);
+  const fYearNet = moneyInput(r.yearNet);
   body.appendChild(field('Employer', fEmp, 'Which job the raise is from — matches your paycheck employer names.'));
   const cNoRaise = checkbox('No new raise — year record only', r.noRaise, 'Tick to log a year where pay stayed the same: same gross/net as before, plus that year’s hours and totals. It shows greyed in the tables and counts as +0% against that year’s inflation — which is the honest picture of a flat year.');
   const nrWrap = el('div', 'check-row'); nrWrap.appendChild(cNoRaise);
@@ -5638,7 +5656,7 @@ function taxModal(existing, preset) {
   const fKind = select([{ value: 'original', label: 'Original return' }, { value: 'amendment', label: 'Amendment' }], r.kind || 'original');
   const fFedForm = input(r.fedForm || '', { placeholder: 'e.g. 1040', list: 'fed-form-list' });
   const fFedOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.fedOutcome || 'refund');
-  const fFedAmt = input(r.fedAmount != null ? r.fedAmount : '', { type: 'number', placeholder: '0.00' }); fFedAmt.step = '0.01';
+  const fFedAmt = moneyInput(r.fedAmount);
   const fStateFiled = input(r.state || '', { placeholder: 'e.g. two-letter code', list: 'us-states-list' });
   const stateHint = el('div', 'sum-hint');
   const syncStateFiled = () => {
@@ -5649,11 +5667,11 @@ function taxModal(existing, preset) {
   fStateFiled.addEventListener('input', syncStateFiled);
   const fStForm = input(r.stateForm || '', { placeholder: 'your state’s return form', list: 'state-form-list' });
   const fStOut = select([{ value: 'refund', label: 'Refund' }, { value: 'owed', label: 'Owed / paid' }, { value: 'none', label: 'Neither / zero' }], r.stateOutcome || 'refund');
-  const fStAmt = input(r.stateAmount != null ? r.stateAmount : '', { type: 'number', placeholder: '0.00' }); fStAmt.step = '0.01';
+  const fStAmt = moneyInput(r.stateAmount);
   const fFiled = input(r.filedDate || '', { type: 'date' });
   const cExt = checkbox('Filed an extension', !!r.extended, 'You filed for an extension this year (e.g. Form 4868), moving the filing deadline out.');
   const fCpa = input(r.preparer || '', { placeholder: 'CPA / preparer, or “Self”', list: 'cpa-list' });
-  const fCost = input(r.prepCost != null ? r.prepCost : '', { type: 'number', placeholder: '0.00' }); fCost.step = '0.01';
+  const fCost = moneyInput(r.prepCost);
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   // Live plain-English hint under the form inputs (what the typed form means).
@@ -5675,11 +5693,11 @@ function taxModal(existing, preset) {
       const row = el('div', 'io-actions');
       const fForm = input(fc.form, { placeholder: 'e.g. Schedule C', list: 'tax-form-all-list' });
       fForm.addEventListener('input', () => { fc.form = fForm.value; const info = taxFormInfo(fForm.value); fForm.title = info || ''; });
-      const fAmt = input(fc.cost != null ? fc.cost : '', { type: 'number', placeholder: '0.00' }); fAmt.step = '0.01';
+      const fAmt = moneyInput(fc.cost);
       fAmt.addEventListener('input', () => { fc.cost = fAmt.value === '' ? null : parseFloat(fAmt.value); });
       const x = el('button', 'icon-btn danger', '✕'); x.title = 'Remove this form cost';
       x.addEventListener('click', () => { formCosts.splice(i, 1); renderFC(); });
-      row.appendChild(fForm); row.appendChild(fAmt); row.appendChild(x);
+      row.appendChild(fForm); row.appendChild(fAmt.__wrap); row.appendChild(x);
       fcWrap.appendChild(row);
     });
     const addFc = el('button', 'btn-ghost', '＋ Add form cost');
@@ -7075,9 +7093,9 @@ function saleModal(existing) {
   const fTitle = input(r.title || '', { placeholder: 'Listing title' });
   const fBrand = input(r.brand || '', { placeholder: 'Brand' });
   const fSize = input(r.size || '', { placeholder: 'Size' });
-  const fOrder = input(r.orderPrice != null ? r.orderPrice : '', { type: 'number', placeholder: '0.00' }); fOrder.step = '0.01';
-  const fEarn = input(r.earnings != null ? r.earnings : '', { type: 'number', placeholder: '0.00' }); fEarn.step = '0.01';
-  const fCost = input(r.costPrice != null ? r.costPrice : '', { type: 'number', placeholder: '0.00' }); fCost.step = '0.01';
+  const fOrder = moneyInput(r.orderPrice);
+  const fEarn = moneyInput(r.earnings);
+  const fCost = moneyInput(r.costPrice);
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
   body.appendChild(field('Order date', fDate, 'When the sale happened.'));
   body.appendChild(field('Listing title', fTitle));

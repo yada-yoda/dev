@@ -509,6 +509,10 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .pay-row input { width: 100%; min-width: 0; }
 .pay-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
 .mono-sm { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12px; }
+/* Currency field: the $ sits inside the box so the value is obviously USD. */
+.money-input { position: relative; display: flex; align-items: center; width: 100%; min-width: 0; }
+.money-pre { position: absolute; left: 11px; color: var(--text-muted); font-size: 13px; pointer-events: none; }
+.money-input input { width: 100%; min-width: 0; padding-left: 22px; }
 .acct-admin { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .help-card { margin-bottom: 12px; }
 .help-head { display: flex; align-items: flex-start; gap: 12px; }
