@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.105';
+const VERSION = '1.0.106';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -374,12 +374,16 @@ function friendlyAuthError(e) {
 // Small DOM helpers
 // ============================================================
 function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+// Hints should say WHY the field exists and give a concrete example — see
+// [[feedback_field_tooltips]]. Use setFieldHint when a field's meaning changes
+// with context (e.g. an expense that's really a transfer).
 function field(label, node, hint) {
   const w = el('label', 'field');
   const lab = el('span', null, label);
   if (hint) { const i = el('span', 'info', 'ⓘ'); i.title = hint; lab.appendChild(document.createTextNode(' ')); lab.appendChild(i); }
   w.appendChild(lab); w.appendChild(node); return w;
 }
+function setFieldHint(fieldEl, hint) { const i = fieldEl && fieldEl.querySelector('.info'); if (i) i.title = hint; }
 function input(value = '', attrs = {}) {
   const i = document.createElement('input');
   i.type = attrs.type || 'text'; i.value = value;
@@ -3033,16 +3037,18 @@ function expenseModal(existing) {
   const fForDate = input(e.forDate || '', { type: 'date' });
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
-  body.appendChild(field('Date paid', fDate, 'The day the money left — the expense counts in this month.'));
-  const billField = recActive.length ? field('Linked bill (optional)', fBill, 'Only if this expense IS the payment for one of your recurring bills — e.g. the actual ComEd amount this month. Linking replaces that bill’s estimate for the month so it isn’t double-counted. Leave as “None” for anything else.') : null;
+  body.appendChild(field('Date paid', fDate, 'The day the money actually left your account — e.g. Jul 15. The expense counts toward that month.'));
+  const billField = recActive.length ? field('Linked bill (optional)', fBill, 'Only if this expense IS the payment for one of your recurring bills — e.g. your ComEd bill estimates $120/mo and the real July bill was $138.42, so you log $138.42 and link it to ComEd. That replaces the estimate for July so it isn’t counted twice. Leave as “None” for a normal expense.') : null;
   if (billField) body.appendChild(billField);
   const dvRow = el('div', 'two-col');
-  const descField = field('Description', fTitle, 'What this expense was — e.g. which garage, which trip, which purchase.');
-  const vendorField = field('Vendor', fVendor, 'Who you paid — the merchant or service (SpotHero, the tollway, the store).');
+  const descField = field('Description', fTitle, 'A short label so you recognize it later — e.g. “Parking — Main St Garage”, “Weekly groceries”, “New running shoes”.');
+  const vendorField = field('Vendor', fVendor, 'Who you paid — e.g. SpotHero, Jewel-Osco, ComEd, Amazon.');
   dvRow.appendChild(descField); dvRow.appendChild(vendorField);
   body.appendChild(dvRow);
-  body.appendChild(field('Category', fCat, 'The type of expense. Manage the list in Settings.'));
-  const subField = field('Subcategory', fSub, 'A more specific grouping within the category (optional).');
+  body.appendChild(field('Category', fCat, 'The broad type of expense — e.g. Food, Auto, Housing, Savings & Investments. Manage the list in Settings.'));
+  const SUB_HINT = 'A more specific grouping inside the category, so your annual grid breaks the category into rows — e.g. Food → Groceries vs Dining Out; Auto → Fuel vs Parking & Tolls. Optional.';
+  const SUB_HINT_TRANSFER = 'What the money is FOR, so your grid shows retirement vs taxable investing vs cash savings as separate rows — e.g. $300 into a brokerage → Brokerage; $500 into a Roth → Retirement / IRA; $200 into a rainy-day account → Emergency Fund. It follows the “Moved to” account automatically — change it when the purpose differs, e.g. a plain savings account you actually use as your Emergency Fund.';
+  const subField = field('Subcategory', fSub, SUB_HINT);
   body.appendChild(subField);
   const subLbl = subField.querySelector('span').childNodes[0];
   // Parking/toll expenses are often paid on a different day than they apply
@@ -3056,11 +3062,13 @@ function expenseModal(existing) {
     forField.style.display = (park || toll || e.forDate) ? '' : 'none';
     forLbl.nodeValue = toll && !park ? 'Toll issued day' : park ? 'Parking day' : 'Applies to (day)';
   };
-  const acctField = field('Paid from', fAcct, 'The account or card the money came OUT of — your checking, a credit card, etc.');
+  const ACCT_HINT = 'The account or card the money came OUT of — e.g. Chase Checking, or Amex ••1234 if you put it on a card.';
+  const ACCT_HINT_TRANSFER = 'The account the money came OUT of — e.g. the checking account your paycheck was deposited into.';
+  const acctField = field('Paid from', fAcct, ACCT_HINT);
   body.appendChild(acctField);
   // Savings/investment contributions are TRANSFERS: the money isn't spent, it
   // moved to another of your accounts. Capture where it went so it's traceable.
-  const toField = field('Moved to', fToAcct, 'Which of your accounts the money went INTO — e.g. your brokerage or retirement account. This is a transfer: it leaves your spendable pool (so it counts toward the month), but the money is still yours.');
+  const toField = field('Moved to', fToAcct, 'Which of your accounts the money went INTO — e.g. Fidelity Brokerage, Vanguard Roth IRA, Ally Savings. This is a transfer: it leaves your spendable pool (so it counts toward the month), but the money is still yours. Picking it also fills in the type and description below.');
   body.appendChild(toField);
   const acctLbl = acctField.querySelector('span').childNodes[0];
   const isTransferCat = () => {
@@ -3077,6 +3085,10 @@ function expenseModal(existing) {
     if (billField) billField.style.display = (t && !fBill.value) ? 'none' : '';
     subLbl.nodeValue = t ? 'Type of savings / investment' : 'Subcategory';
     fTitle.placeholder = t ? 'auto-filled from “Moved to”' : 'e.g. Parking — Main St Garage';
+    // The same fields mean different things for a transfer — so do their hints.
+    setFieldHint(subField, t ? SUB_HINT_TRANSFER : SUB_HINT);
+    setFieldHint(acctField, t ? ACCT_HINT_TRANSFER : ACCT_HINT);
+    setFieldHint(amountField, t ? AMT_HINT_TRANSFER : AMT_HINT);
   };
   // Picking the destination answers the fiddly questions: the subcategory follows
   // the account's type, and the description writes itself.
@@ -3094,11 +3106,14 @@ function expenseModal(existing) {
     syncForDate(); syncTransfer();
   });
   fSub.addEventListener('change', () => { syncForDate(); syncTransfer(); });
-  body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
-  body.appendChild(field('Amount', fAmount, 'How much you paid.'));
+  body.appendChild(field('Person', fPerson, 'Who this expense belongs to — you, joint, or another person you track.'));
+  const AMT_HINT = 'How much you paid — e.g. 42.80 for a $42.80 grocery run.';
+  const AMT_HINT_TRANSFER = 'How much you moved — e.g. 300 for a $300 transfer into investments.';
+  const amountField = field('Amount', fAmount, AMT_HINT);
+  body.appendChild(amountField);
   const fExpCheckNo = input(e.checkNo || '', { placeholder: 'optional' });
-  body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — handy for tracing it later.'));
-  body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this expense.'));
+  body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — e.g. 1042. Handy for tracing it later.'));
+  body.appendChild(field('Notes', fNotes, 'Anything else worth remembering — e.g. “split with a friend”, “reimbursable”, “promo price ends in March”.'));
   rebuildSubs(); syncForDate(); syncTransfer();
   fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); syncTransfer(); });
 

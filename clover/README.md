@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.106 — Tooltips that show you an example
+
+- Every field on the expense form now explains itself with a **concrete
+  example** rather than a definition — e.g. Amount: “42.80 for a $42.80 grocery
+  run”; Linked bill: “ComEd estimates $120/mo, the real July bill was $138.42”.
+- **“Type of savings / investment”** now says what it’s *for*: it splits your
+  Savings & Investments row into retirement vs taxable investing vs cash — e.g.
+  $300 into a brokerage → Brokerage, $500 into a Roth → Retirement / IRA, $200
+  into a rainy-day account → Emergency Fund. It follows the “Moved to” account
+  automatically; you only change it when the purpose differs (a plain savings
+  account you actually use as your Emergency Fund).
+- Hints now rewrite themselves for transfers — “Amount” becomes “how much you
+  moved”, “Paid from” becomes the account your paycheck landed in.
+
 ### v1.0.105 — A simpler expense form (especially for transfers)
 
 - **“For which bill?” → “Linked bill (optional)”**, with a clearer hint: it’s
