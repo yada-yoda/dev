@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.110';
+const VERSION = '1.0.111';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -14,23 +14,29 @@ const VERSION = '1.0.110';
 // you can lock both this and firestore.rules to it.
 const OWNER_UIDS = ['I8IKdH8q6XW34vIc4ZkwNj2roVu1'];
 
+// Grouped by what you're actually doing: log money in, log money out, then look
+// at it, then set it up. Pages you visit daily sit above pages you visit
+// occasionally — Raises and Credit & Rates are read-only analysis, and Accounts
+// is something you configure once, so none of them belong in the daily-log flow.
 const ROUTES = [
   { id: 'dashboard',     label: 'Dashboard',      ico: '◆', phase: 6 },
+  { group: 'Money in' },
   { id: 'income',        label: 'Income',         ico: '▲', phase: 2 },
   { id: 'paychecks',     label: 'Paychecks',      ico: '▤', phase: 4 },
-  { id: 'raises',        label: 'Raises',         ico: '↗', phase: 9 },
   { id: 'selling',       label: 'Selling',        ico: '▧', phase: 9 },
   { id: 'settlements',   label: 'Class Actions',  ico: '⚖', phase: 10 },
+  { group: 'Money out' },
   { id: 'expenses',      label: 'Expenses',       ico: '▼', phase: 3 },
   { id: 'subscriptions', label: 'Bills & Subscriptions', ico: '↻', phase: 3 },
   { id: 'budget',        label: 'Budget',         ico: '◐', phase: 10 },
-  { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
-  { sep: true },
-  { id: 'credit',        label: 'Credit & Rates', ico: '％', phase: 5 },
-  { id: 'taxes',         label: 'Taxes',          ico: '§', phase: 9 },
+  { group: 'Insights' },
   { id: 'reports',       label: 'Reports',        ico: '▥', phase: 7 },
   { id: 'calendar',      label: 'Calendar',       ico: '▣', phase: 7 },
-  { sep: true },
+  { id: 'raises',        label: 'Raises',         ico: '↗', phase: 9 },
+  { id: 'credit',        label: 'Credit & Rates', ico: '％', phase: 5 },
+  { id: 'taxes',         label: 'Taxes',          ico: '§', phase: 9 },
+  { group: 'Setup' },
+  { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
   { id: 'import',        label: 'Import / Export', ico: '⇅', phase: 8 },
   { id: 'settings',      label: 'Settings',       ico: '⚙', phase: 1 },
   { id: 'help',          label: 'Help / Guide',   ico: '?', phase: 1 }
@@ -127,6 +133,7 @@ function buildNav() {
   const nav = document.getElementById('nav');
   nav.innerHTML = '';
   for (const r of ROUTES) {
+    if (r.group) { const g = document.createElement('div'); g.className = 'nav-group'; g.textContent = r.group; nav.appendChild(g); continue; }
     if (r.sep) { const d = document.createElement('div'); d.className = 'nav-sep'; nav.appendChild(d); continue; }
     const a = document.createElement('a');
     a.href = '#' + r.id;
@@ -2701,7 +2708,9 @@ function renderHelp(view) {
   intro.appendChild(tips);
   view.appendChild(intro);
 
-  HELP_SECTIONS.forEach(sec => {
+  // Follow the nav's order rather than keeping a second list in sync by hand.
+  const navOrder = ROUTES.filter(r => r.id).map(r => r.id);
+  HELP_SECTIONS.slice().sort((a, b) => navOrder.indexOf(a.id) - navOrder.indexOf(b.id)).forEach(sec => {
     const card = el('div', 'card help-card');
     const h = el('div', 'help-head');
     h.appendChild(el('span', 'help-ico', sec.ico));

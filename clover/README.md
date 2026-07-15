@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.111 — The menu now reads like how you actually use it
+
+The sidebar is grouped under four labels instead of one long list:
+
+- **Money in** — Income, Paychecks, Selling, Class Actions
+- **Money out** — Expenses, Bills & Subscriptions, Budget
+- **Insights** — Reports, Calendar, Raises, Credit & Rates, Taxes
+- **Setup** — Accounts, Import / Export, Settings, Help / Guide
+
+Pages you touch daily sit above pages you visit now and then. **Raises** moved
+down beside Credit & Rates (both are read-only analysis, not somewhere you log
+money), and **Accounts** moved to Setup (you configure it once, then everything
+else just references it). Nothing was removed and every page is still one click
+away. The Help guide follows the same order automatically.
+
 ### v1.0.110 — Confirm your time zone in Settings
 
 - New **Times & time zone** card in Settings showing the time zone Clover

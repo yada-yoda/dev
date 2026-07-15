@@ -115,6 +115,12 @@ button { font-family: inherit; cursor: pointer; }
 .nav a.active { background: var(--accent-soft); color: var(--accent-hover); font-weight: 600; }
 .nav a .ico { width: 18px; text-align: center; font-size: 15px; }
 .nav-sep { height: 1px; background: var(--border); margin: 10px 12px; }
+/* Section labels teach the mental model: log money in, log money out, then
+   look at it, then set it up. */
+.nav-group {
+  font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted); padding: 14px 12px 5px; user-select: none;
+}
 .sidebar-foot { padding: 12px 18px; font-size: 11px; color: var(--text-faint); border-top: 1px solid var(--border); }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
