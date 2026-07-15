@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.113';
+const VERSION = '1.0.114';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1942,7 +1942,7 @@ function subFlags(r) {
   if (r.autoPay) out.push('Auto-pay');
   if (r.priority && r.priority !== 'Medium') out.push(r.priority);
   if (r.budgetEst) out.push('Budget est.');
-  if (r.notPaidYear === new Date().getFullYear()) out.push('Not paid this year');
+  if (r.notPaidYear === new Date().getFullYear()) out.push('Not due this year');
   return out;
 }
 // A tone badge (Essential red, Trial amber, …) that filters the subs table
@@ -1998,7 +1998,7 @@ function buildSubsCol(store, key, net) {
         if (r.autoPay) flags.appendChild(subsFilterBadge('flags', 'Auto-pay', 'amber'));
         if (r.priority && r.priority !== 'Medium') flags.appendChild(subsFilterBadge('flags', r.priority, r.priority === 'Essential' ? 'red' : r.priority === 'High' ? 'amber' : r.priority === 'Low' ? 'green' : ''));
         if (r.budgetEst) { const b = subsFilterBadge('flags', 'Budget est.', 'type'); b.title = 'A budget placeholder — an expected future cost counted in the totals, not an actual bill. ' + b.title; flags.appendChild(b); }
-        if (r.notPaidYear === new Date().getFullYear()) { const b = subsFilterBadge('flags', 'Not paid this year', 'amber'); b.title = 'Excluded from the totals until January — nothing is due this calendar year. ' + b.title; flags.appendChild(b); }
+        if (r.notPaidYear === new Date().getFullYear()) { const b = subsFilterBadge('flags', 'Not due this year', 'amber'); b.title = 'Excluded from the totals until January — nothing is due this calendar year. ' + b.title; flags.appendChild(b); }
         td.appendChild(flags); return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
@@ -2817,7 +2817,14 @@ function subscriptionModal(existing) {
   body.appendChild(amtRow);
   body.appendChild(intervalWrap);
   const renewField = field('Renewal / due date', fRenew, 'The day it recurs — e.g. the 8th. For an active bill this auto-advances each period (monthly → next month’s same day, annual → next year), so you set it once and it never goes overdue or blank. Drives the renewal warnings (7/14/30/60 days). For a one-time bill this is simply the date it’s due — it never rolls forward.');
-  const cPaidYr = checkbox('Paid for this year', r.notPaidYear !== new Date().getFullYear(), 'Whether this year’s charge happened (or will happen) — on by default. Untick when nothing is due this calendar year (e.g. the next renewal isn’t until next year and this year was never paid): the bill then drops out of the Total monthly / annual cards and the expense grid until January, when this resets automatically.');
+  // NOT a "have I paid it yet" flag — it's "is there a charge for this bill in
+  // <year>", which is what makes it count toward the totals. Ticked is the
+  // normal case; unticking drops the bill out of Total monthly / annual and the
+  // expense grid until January. The old "Paid for this year" wording made the
+  // ticked default read like a claim you'd already paid it.
+  const curYr = new Date().getFullYear();
+  const cPaidYr = checkbox('Applies to ' + curYr, r.notPaidYear !== curYr,
+    'Is there a charge for this bill in ' + curYr + '? Leave it ON for a normal bill — that’s what makes it count toward your Total monthly / annual cards and the expense grid. Untick ONLY when nothing at all is due this calendar year — e.g. an annual bill whose next renewal is in ' + (curYr + 1) + ' that you never paid in ' + curYr + ' — and it drops out of the totals until January, when it resets automatically. This is not a “have I paid it yet” flag: a bill you’ll pay later this year should stay ticked.');
   const renewRow = el('div', 'two-col');
   renewRow.appendChild(renewField);
   const pyWrap = el('div', 'check-row'); pyWrap.appendChild(cPaidYr);

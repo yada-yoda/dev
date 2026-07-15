@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.114 — “Paid for this year” was the wrong name for that checkbox
+
+That checkbox never meant “I’ve paid this” — it means **“is there a charge for
+this bill this year?”**, which is what makes the bill count toward your Total
+monthly / annual and the expense grid. Ticked is correct for a normal bill, so
+the ticked default was right but the label made it read like a claim you’d
+already paid.
+
+- Renamed to **“Applies to 2026”** (it shows the current year), with a hint
+  that spells out when to untick it — only when *nothing at all* is due this
+  calendar year, e.g. an annual bill whose next renewal is in 2027 — and states
+  plainly that it isn’t a “have I paid it yet” flag.
+- The matching table flag is now **“Not due this year”** instead of “Not paid
+  this year”.
+
 ### v1.0.113 — History on *every* record, and no more modal jump
 
 - **The History tab now covers every record type.** It was missing from
