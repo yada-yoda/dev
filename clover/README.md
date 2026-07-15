@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.105 — A simpler expense form (especially for transfers)
+
+- **“For which bill?” → “Linked bill (optional)”**, with a clearer hint: it’s
+  only for when an expense *is* the payment for one of your recurring bills.
+  It’s hidden entirely for savings/investment transfers.
+- **“Source (subcategory)” → “Subcategory”** — it was never a “source” on an
+  expense. For a transfer it reads **“Type of savings / investment”**.
+- **Vendor is hidden for transfers** — moving your own money has no merchant.
+- **Picking “Moved to” fills in the rest**: the subcategory follows the
+  destination account’s type (a brokerage account → Brokerage, a retirement
+  account → Retirement / IRA) and the description writes itself
+  (“Transfer to Fidelity Brokerage”). Both stay editable, and anything you
+  chose yourself is never overwritten.
+
 ### v1.0.104 — Log money moved into savings & investments
 
 - New **Savings & Investments** expense category (added to existing accounts

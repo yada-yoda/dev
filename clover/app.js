@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.104';
+const VERSION = '1.0.105';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3034,13 +3034,17 @@ function expenseModal(existing) {
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   body.appendChild(field('Date paid', fDate, 'The day the money left — the expense counts in this month.'));
-  if (recActive.length) body.appendChild(field('For which bill?', fBill, 'Link this to a recurring bill (e.g. the actual ComEd amount this month). It replaces that bill’s estimate for the month so it isn’t double-counted. Leave as “one-off” for regular expenses.'));
+  const billField = recActive.length ? field('Linked bill (optional)', fBill, 'Only if this expense IS the payment for one of your recurring bills — e.g. the actual ComEd amount this month. Linking replaces that bill’s estimate for the month so it isn’t double-counted. Leave as “None” for anything else.') : null;
+  if (billField) body.appendChild(billField);
   const dvRow = el('div', 'two-col');
-  dvRow.appendChild(field('Description', fTitle, 'What this expense was — e.g. which garage, which trip, which purchase.'));
-  dvRow.appendChild(field('Vendor', fVendor, 'Who you paid — the merchant or service (SpotHero, the tollway, the store).'));
+  const descField = field('Description', fTitle, 'What this expense was — e.g. which garage, which trip, which purchase.');
+  const vendorField = field('Vendor', fVendor, 'Who you paid — the merchant or service (SpotHero, the tollway, the store).');
+  dvRow.appendChild(descField); dvRow.appendChild(vendorField);
   body.appendChild(dvRow);
   body.appendChild(field('Category', fCat, 'The type of expense. Manage the list in Settings.'));
-  body.appendChild(field('Source (subcategory)', fSub, 'A more specific grouping within the category (optional).'));
+  const subField = field('Subcategory', fSub, 'A more specific grouping within the category (optional).');
+  body.appendChild(subField);
+  const subLbl = subField.querySelector('span').childNodes[0];
   // Parking/toll expenses are often paid on a different day than they apply
   // to — the field label follows the picked category/subcategory.
   const forField = field('Applies to (day)', fForDate, 'The day this charge was actually FOR — e.g. paid today for next week’s parking, or a toll issued last month. Date paid stays the day the money left.');
@@ -3063,11 +3067,32 @@ function expenseModal(existing) {
     const names = ((s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '') + ' ' + (store.subName('expense', fCat.value, fSub.value) || '');
     return /saving|invest/i.test(names) && !/fee/i.test(names);
   };
+  // A transfer has no merchant and isn't a bill payment — hide the fields that
+  // don't apply, and word the rest for moving money instead of spending it.
   const syncTransfer = () => {
     const t = isTransferCat();
     toField.style.display = (t || e.toAccountId) ? '' : 'none';
     acctLbl.nodeValue = t ? 'Moved from' : 'Paid from';
+    vendorField.style.display = t ? 'none' : '';
+    if (billField) billField.style.display = (t && !fBill.value) ? 'none' : '';
+    subLbl.nodeValue = t ? 'Type of savings / investment' : 'Subcategory';
+    fTitle.placeholder = t ? 'auto-filled from “Moved to”' : 'e.g. Parking — Main St Garage';
   };
+  // Picking the destination answers the fiddly questions: the subcategory follows
+  // the account's type, and the description writes itself.
+  const SUB_BY_ACCT_TYPE = { 'Brokerage': 'Brokerage', 'Retirement': 'Retirement / IRA', 'Savings': 'Other savings', 'Money Market': 'Other savings', 'CD': 'Other savings', 'Cash / Sweep': 'Other savings' };
+  fToAcct.addEventListener('change', () => {
+    const acct = store.account(fToAcct.value);
+    if (!acct || !isTransferCat()) return;
+    if (!fSub.value) {
+      const want = SUB_BY_ACCT_TYPE[acct.type];
+      const g = s.expenseCategories.find(c => c.id === fCat.value);
+      const sub = want && g && (g.subs || []).find(x => (x.name || '').toLowerCase() === want.toLowerCase());
+      if (sub) fSub.value = sub.id;
+    }
+    if (!fTitle.value.trim()) fTitle.value = 'Transfer to ' + acct.name;
+    syncForDate(); syncTransfer();
+  });
   fSub.addEventListener('change', () => { syncForDate(); syncTransfer(); });
   body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
   body.appendChild(field('Amount', fAmount, 'How much you paid.'));
