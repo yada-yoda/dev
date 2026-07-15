@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.112';
+const VERSION = '1.0.113';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -469,6 +469,11 @@ function withHistoryTab(bodyEl, existing) {
   const panel = historyPanel(store, existing);
   panel.style.display = 'none';
   const show = hist => {
+    // Switching to a short History list would otherwise collapse the modal —
+    // jarring when you're just peeking at a tab. Measure the form WHILE it's
+    // still on screen and floor the wrapper there (min-height, so Details can
+    // still grow when fields reveal themselves).
+    if (hist) { const h = wrap.offsetHeight; if (h > 0) wrap.style.minHeight = h + 'px'; }
     dBtn.classList.toggle('active', !hist); hBtn.classList.toggle('active', hist);
     bodyEl.style.display = hist ? 'none' : '';
     panel.style.display = hist ? '' : 'none';
@@ -4040,7 +4045,7 @@ function payScheduleModal(existing) {
   syncFreq(); syncEmp();
 
   openModal({
-    title: existing ? 'Edit pay schedule' : 'Add pay schedule', body, confirmLabel: 'Save',
+    title: existing ? 'Edit pay schedule' : 'Add pay schedule', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const employer = empVal();
       if (!employer) { toast('Pick or enter the employer', 'warn'); return false; }
@@ -4577,7 +4582,7 @@ function raiseModal(existing) {
   fBasis.addEventListener('change', syncBasis); syncBasis();
   body.appendChild(field('Notes', fNotes, 'Anything worth remembering — promotion, title change, merit increase.'));
   openModal({
-    title: existing ? 'Edit raise' : 'Add raise', body, confirmLabel: 'Save',
+    title: existing ? 'Edit raise' : 'Add raise', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       if (!fEmp.value.trim()) { fEmp.focus(); toast('Employer is required', 'warn'); return false; }
       const amount = parseFloat(fAmt.value);
@@ -4953,7 +4958,7 @@ function creditScoreModal(existing) {
   body.appendChild(field('Provider', fProv, 'Who reported it — Credit Karma, Chase, Amex, a bureau, etc. Charted as its own line.'));
 
   openModal({
-    title: existing ? 'Edit score' : 'Add score', body, confirmLabel: 'Save',
+    title: existing ? 'Edit score' : 'Add score', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const score = parseInt(fScore.value, 10);
       if (isNaN(score)) { fScore.focus(); toast('Score is required', 'warn'); return false; }
@@ -4980,7 +4985,7 @@ function rateModal(existing) {
   body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date.'));
 
   openModal({
-    title: existing ? 'Edit rate' : 'Add rate', body, confirmLabel: 'Save',
+    title: existing ? 'Edit rate' : 'Add rate', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const inst = fInst.value.trim();
       if (!inst) { fInst.focus(); toast('Enter a bank / institution', 'warn'); return false; }
@@ -5943,7 +5948,7 @@ function taxModal(existing, preset) {
 
   openModal({
     title: existing ? 'Edit tax return' : (r.kind === 'amendment' ? 'Add amendment · tax year ' + r.taxYear : 'Add tax return'),
-    body, confirmLabel: 'Save',
+    body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const taxYear = parseInt(fYear.value, 10);
       if (!taxYear || taxYear < 1990) { fYear.focus(); toast('Enter the tax year', 'warn'); return false; }
@@ -7309,7 +7314,7 @@ function saleModal(existing) {
   body.appendChild(tr2);
   body.appendChild(field('Notes', fNotes));
   openModal({
-    title: 'Edit sale', body, confirmLabel: 'Save',
+    title: 'Edit sale', body: withHistoryTab(body, r), confirmLabel: 'Save',
     onConfirm: () => {
       Object.assign(r, {
         orderDate: fDate.value || todayISO(), title: fTitle.value.trim(), brand: fBrand.value.trim(), size: fSize.value.trim(),

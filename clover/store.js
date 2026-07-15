@@ -479,31 +479,36 @@ window.cloverStore = {
 
   // --- credit scores + savings-rate history (Phase 5, meta doc, cross-year) ---
   saveCreditScore(entry) {
-    if (entry.id) { const i = state.creditScores.findIndex(x => x.id === entry.id); if (i >= 0) state.creditScores[i] = entry; else state.creditScores.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = state.creditScores.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, state.creditScores[i]); state.creditScores[i] = entry; } else state.creditScores.push(entry); }
     else { entry.id = mkId('cs'); state.creditScores.push(entry); }
     scheduleSave(); notify(); return entry;
   },
   removeCreditScore(id) { state.creditScores = state.creditScores.filter(x => x.id !== id); scheduleSave(); notify(); },
   saveRate(entry) {
-    if (entry.id) { const i = state.rateHistory.findIndex(x => x.id === entry.id); if (i >= 0) state.rateHistory[i] = entry; else state.rateHistory.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = state.rateHistory.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, state.rateHistory[i]); state.rateHistory[i] = entry; } else state.rateHistory.push(entry); }
     else { entry.id = mkId('rate'); state.rateHistory.push(entry); }
     scheduleSave(); notify(); return entry;
   },
   removeRate(id) { state.rateHistory = state.rateHistory.filter(x => x.id !== id); scheduleSave(); notify(); },
   savePaySchedule(entry) {
-    if (entry.id) { const i = state.paySchedules.findIndex(x => x.id === entry.id); if (i >= 0) state.paySchedules[i] = entry; else state.paySchedules.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = state.paySchedules.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, state.paySchedules[i]); state.paySchedules[i] = entry; } else state.paySchedules.push(entry); }
     else { entry.id = mkId('sch'); state.paySchedules.push(entry); }
     scheduleSave(); notify(); return entry;
   },
   removePaySchedule(id) { state.paySchedules = state.paySchedules.filter(x => x.id !== id); scheduleSave(); notify(); },
   saveTaxRecord(entry) {
-    if (entry.id) { const i = state.taxRecords.findIndex(x => x.id === entry.id); if (i >= 0) state.taxRecords[i] = entry; else state.taxRecords.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = state.taxRecords.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, state.taxRecords[i]); state.taxRecords[i] = entry; } else state.taxRecords.push(entry); }
     else { entry.id = mkId('tax'); state.taxRecords.push(entry); }
     scheduleSave(); notify(); return entry;
   },
   removeTaxRecord(id) { state.taxRecords = state.taxRecords.filter(x => x.id !== id); scheduleSave(); notify(); },
   saveRaise(entry) {
-    if (entry.id) { const i = state.raises.findIndex(x => x.id === entry.id); if (i >= 0) state.raises[i] = entry; else state.raises.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = state.raises.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, state.raises[i]); state.raises[i] = entry; } else state.raises.push(entry); }
     else { entry.id = mkId('raise'); state.raises.push(entry); }
     scheduleSave(); notify(); return entry;
   },
@@ -511,7 +516,8 @@ window.cloverStore = {
   saveSale(y, entry) {
     const d = state.years[String(y)]; if (!d) return null;
     d.sales = d.sales || [];
-    if (entry.id) { const i = d.sales.findIndex(x => x.id === entry.id); if (i >= 0) d.sales[i] = entry; else d.sales.push(entry); }
+    stampSaved(entry);
+    if (entry.id) { const i = d.sales.findIndex(x => x.id === entry.id); if (i >= 0) { pushHistory(entry, d.sales[i]); d.sales[i] = entry; } else d.sales.push(entry); }
     else { entry.id = mkId('sale'); d.sales.push(entry); }
     this.scheduleSaveYear(y); notify(); return entry;
   },

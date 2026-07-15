@@ -45,6 +45,20 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.113 — History on *every* record, and no more modal jump
+
+- **The History tab now covers every record type.** It was missing from
+  Raises, Taxes, Selling, Credit scores, Savings rates, and Pay schedules —
+  those six now record and show their edit history like the rest.
+- **The modal no longer shrinks when you switch to History.** It holds the
+  height the form was using, so the tab strip stays put under your cursor.
+
+**On timestamps:** “added / last edited” only exists for records saved since
+the feature shipped — that’s why some expense rows show a time and older ones
+don’t. There’s no hidden record of when an older row was typed in, so rather
+than invent one, older rows stay blank and fill in the first time you edit
+them.
+
 ### v1.0.112 — The Expenses list is a standard table now
 
 It was the last hand-built table in the app, so it was missing the treatment
