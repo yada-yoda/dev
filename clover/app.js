@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.109';
+const VERSION = '1.0.110';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -758,7 +758,31 @@ function renderSettings(view) {
   grid.appendChild(collapsibleCard(paySchedulesCard(), 'set-schedules'));
   grid.appendChild(collapsibleCard(accountDefaultsCard(), 'set-acctDefaults'));
   grid.appendChild(collapsibleCard(yearsCard(), 'set-years'));
+  grid.appendChild(collapsibleCard(timeZoneCard(), 'set-timezone'));
   view.appendChild(grid);
+}
+
+// Read-only on purpose: the browser already knows the zone, and timestamps are
+// stored as UTC — so they render correctly on any device. A manual override
+// could only ever make times wrong. This just lets you confirm what's detected.
+function timeZoneCard() {
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Times & time zone', 'Clover uses your device’s time zone — nothing to set here, but you can check it’s right'));
+  let zone = '';
+  try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) {}
+  const now = new Date();
+  let abbr = '';
+  try { const parts = new Intl.DateTimeFormat('en-US', { timeZoneName: 'short' }).formatToParts(now); const p = parts.find(x => x.type === 'timeZoneName'); abbr = p ? p.value : ''; } catch (e) {}
+  const list = el('div', 'mini-list');
+  const row = (label, value) => { const r = el('div', 'mini-row'); r.appendChild(el('span', 'muted', label)); r.appendChild(el('span', null, value)); list.appendChild(r); };
+  row('Detected time zone', (zone || 'unknown') + (abbr ? ' (' + abbr + ')' : ''));
+  row('Your local time now', now.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }));
+  card.appendChild(list);
+  const note = el('p', 'muted');
+  note.style.marginTop = '10px';
+  note.textContent = 'Times like “added / last edited” are stored in universal time and shown in the zone above, so they stay correct on any device you sign in from. Dates you type (an expense date, a pay date) are plain calendar dates with no time zone. If the zone above looks wrong, change it in your computer or phone’s date & time settings — Clover follows it automatically.';
+  card.appendChild(note);
+  return card;
 }
 
 function yearsCard() {
@@ -2653,7 +2677,8 @@ const HELP_SECTIONS = [
   { id: 'settings', ico: '⚙', title: 'Settings', what: 'Everything you can customize.',
     points: [
       'Manage people, income/expense categories and their subcategories, and catalog lists (institutions, reward programs, gift-card types, tax forms, pay methods, check types).',
-      'Set new-account defaults. Table columns and dashboard/report panel layouts are saved per person.'
+      'Set new-account defaults. Table columns and dashboard/report panel layouts are saved per person.',
+      '“Times & time zone” confirms which zone your times are shown in — Clover follows your device automatically, so there’s nothing to configure.'
     ] }
 ];
 function renderHelp(view) {

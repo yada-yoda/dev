@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.110 — Confirm your time zone in Settings
+
+- New **Times & time zone** card in Settings showing the time zone Clover
+  detected and your current local time, so you can check at a glance that
+  “added / last edited” stamps are right.
+- It’s read-only by design: timestamps are stored in universal time and shown
+  in your device’s zone, so they’re correct on any device you sign in from. If
+  the zone looks wrong, fix it in your computer or phone’s date & time
+  settings — Clover follows it automatically.
+
 ### v1.0.109 — Every record keeps its own edit history
 
 - Editing an **expense, income entry, paycheck, bill, account, or settlement**
