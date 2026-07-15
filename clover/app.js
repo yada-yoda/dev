@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.115';
+const VERSION = '1.0.116';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2616,7 +2616,9 @@ const HELP_SECTIONS = [
       'Key numbers for the selected month: income in, money spent, and what’s left (net).',
       'Projected annual income and expenses based on your trend so far.',
       '“⚠ Attention” collects things that need you — bills renewing soon, late or missing paychecks, and budget placeholders waiting on last month’s actuals.',
-      'Donut charts break down income and spending by category. Every panel can be moved, resized, hidden, or restored in edit mode.'
+      'Donut charts break down income and spending by category. “Expenses by category (YTD)” counts only the months that have already happened, so a yearly premium isn’t weighed against a few months of groceries.',
+      '“Where your take-home goes (YTD)” asks a different question: what share of the money you actually brought home does each category use? The unspent remainder is a slice of its own, so the shares add up to 100% of take-home. If you’ve spent more than you’ve earned so far there’s no remainder to chart, so it lists the shares instead.',
+      'Every panel can be moved, resized, hidden, or restored in edit mode.'
     ] },
   { id: 'income', ico: '▲', title: 'Income', what: 'Money coming in that isn’t a regular paycheck.',
     points: [
@@ -2647,6 +2649,7 @@ const HELP_SECTIONS = [
   { id: 'expenses', ico: '▼', title: 'Expenses', what: 'Your actual, one-off spending (cash-basis).',
     points: [
       'Annual grid totals spending by category — with your recurring bills rolled in — and List shows each logged expense.',
+      'The grid’s “Year total” column adds up every month in the row, and with bills rolled in the months that haven’t happened yet are estimates — so it’s a full-year forecast, not a year-to-date figure. The dashboard’s “Expenses by category (YTD)” donut is the year-to-date view, which is why the two differ.',
       'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
       'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.',
       'Money you move into savings or investments goes under the “Savings & Investments” category — pick it and a “Moved to” field appears for the destination account. It’s a transfer (the money is still yours), but it counts for the month so your leftover reflects it.'
@@ -3017,7 +3020,10 @@ function expenseGrid(data) {
   const entries = data.expensePayments;
   const card = el('div', 'card table-card');
   const table = el('table', 'data-table grid-table');
-  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num">YTD</th><th class="num" title="Average per month, across the months that have amounts">Avg / mo</th></tr></thead>';
+  // Not "YTD": this row sums every visible month, and with recurring bills switched
+  // on the future months hold projected amounts. The dashboard donut is the
+  // year-to-date view; this column is the full-year outlook.
+  table.innerHTML = '<thead><tr><th>Category</th>' + MONTHS.map(m => '<th class="num">' + m + '</th>').join('') + '<th class="num" title="Every month in the row added up. With recurring bills shown, months that have not happened yet are estimates — so this is the full-year outlook, not the year-to-date total.">Year total</th><th class="num" title="Average per month, across the months that have amounts">Avg / mo</th></tr></thead>';
   const tb = el('tbody');
   const grand = new Array(12).fill(0);
 
@@ -5094,13 +5100,19 @@ function incomeByCategory(store, data) {
   (data.sales || []).forEach(x => { m[sellName] = (m[sellName] || 0) + salesEarn(x); });
   return m;
 }
-function donutCard(map) {
+function donutCard(map, opts) {
+  opts = opts || {};
   const card = el('div', 'card');
   const entries = Object.entries(map).filter(([k, v]) => v > 0).sort((a, b) => b[1] - a[1]);
-  if (!entries.length) { card.appendChild(el('div', 'muted', 'No data yet.')); return card; }
+  if (!entries.length) { card.appendChild(el('div', 'muted', opts.empty || 'No data yet.')); return card; }
   const total = entries.reduce((a, e) => a + e[1], 0);
+  // Percentages normally read as a share of the slices themselves. opts.denom lets
+  // a caller measure them against an outside basis instead (take-home income), so
+  // a label means "share of what I earned", not "share of what I spent".
+  const denom = opts.denom > 0 ? opts.denom : total;
   const wrap = el('div', 'donut-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
-  buildDoughnut(cv, { labels: entries.map(e => e[0] + ' · ' + (total > 0 ? (e[1] / total * 100).toFixed(1) : '0.0') + '%'), data: entries.map(e => e[1]) });
+  buildDoughnut(cv, { labels: entries.map(e => e[0] + ' · ' + (denom > 0 ? (e[1] / denom * 100).toFixed(1) : '0.0') + '%'), data: entries.map(e => e[1]) });
+  if (opts.hint) card.appendChild(el('div', 'sum-hint', opts.hint));
   return card;
 }
 function buildWarnings(store, data, s) {
@@ -5190,10 +5202,12 @@ const DASH_PANEL_DEFS = [
   { key: 'warnings', title: '⚠ Attention', span2: true, build: ctx => buildWarnings(ctx.store, ctx.data, ctx.s) || el('div', 'card muted', 'Nothing needs attention right now.') },
   { key: 'incomeMix', title: 'Income mix (YTD)', span2: true, build: ctx => dashIncomeMixBody(ctx) },
   { key: 'incomeDonut', title: 'Income by category (YTD)', build: ctx => donutCard(incomeByCategory(ctx.store, ctx.data)) },
-  // Same engine as the expense annual grid's YTD column: logged payments plus
-  // recurring-bill estimates (overrides, one-time, and not-paid-this-year rules
-  // all honored) — so the donut and the grid always agree.
+  // Logged payments plus recurring-bill estimates (overrides, one-time, and
+  // not-paid-this-year rules all honored), capped at the elapsed months so this is
+  // a true year-to-date mix. It deliberately does NOT match the expense grid's
+  // "Year total" column, which projects the bills out to a full 12 months.
   { key: 'expenseDonut', title: 'Expenses by category (YTD)', build: ctx => donutCard(expenseByCategoryFull(ctx.store, ctx.data)) },
+  { key: 'spendVsNet', title: 'Where your take-home goes (YTD)', build: ctx => dashSpendVsNetBody(ctx) },
   { key: 'renewals', title: 'Upcoming renewals', build: ctx => upcomingRenewalsCard(ctx.store, ctx.s) },
   { key: 'activity', title: 'Recent activity', build: ctx => recentActivityCard(ctx.store, ctx.data) },
   { key: 'taxes', title: 'Taxes', build: ctx => dashTaxesBody(ctx) },
@@ -5260,6 +5274,50 @@ function pagePanelState(store, pageKey, defs) {
   return defs.map(d => ({ k: d.key, c: false, w: 0, off: 0 }));
 }
 function dashPanelState(store) { return pagePanelState(store, 'dashboard', DASH_PANEL_DEFS); }
+// Wording chosen so it cannot collide with a real expense category and silently
+// overwrite that category's slice.
+const LEFTOVER_SLICE = 'Left over (not spent)';
+// Same category mix as the expense donut, but measured against take-home pay
+// instead of against total spending — "insurance is 30% of what I earn" is a very
+// different (and more actionable) statement than "insurance is 52% of what I
+// spend". Adding the unspent remainder as its own slice is what makes the
+// percentages honest: they sum to 100% of net income rather than to 100% of spend.
+function dashSpendVsNetBody(ctx) {
+  const net = ctx.netYTD;
+  if (!(net > 0)) return el('div', 'card muted', 'Record take-home (net) income this year to see what share of it each category uses.');
+  const map = expenseByCategoryFull(ctx.store, ctx.data);
+  const spend = Object.values(map).reduce((a, b) => a + b, 0);
+  if (!(spend > 0)) return el('div', 'card muted', 'No spending recorded yet this year.');
+  const left = net - spend;
+  const pct = spend / net * 100;
+  // A ring can only ever draw parts of a whole. While there IS something left over,
+  // the categories plus that remainder are exactly take-home, so every wedge's size
+  // matches its printed share and the chart reads true. Once spending passes income
+  // the parts exceed the whole: the wedges would still be drawn as shares of
+  // spending while the labels claimed shares of income, so a category could be
+  // marked "140%" on a wedge covering half the ring. Drop to a table in that case —
+  // the numbers stay honest and nothing is implied by an area that can't be drawn.
+  if (left > 0) {
+    const slices = Object.assign({}, map);
+    slices[LEFTOVER_SLICE] = left;
+    return donutCard(slices, { denom: net, hint: 'Of ' + money(net) + ' take-home so far this year, ' + money(spend) + ' (' + pct.toFixed(1) + '%) is spoken for and ' + money(left) + ' is left over. Each slice is that category’s share of take-home.' });
+  }
+  const card = el('div', 'card table-card');
+  const table = el('table', 'data-table');
+  table.innerHTML = '<thead><tr><th>Category</th><th class="num">YTD</th><th class="num">% of take-home</th></tr></thead>';
+  const tb = el('tbody');
+  Object.entries(map).filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).forEach(e => {
+    const tr = el('tr');
+    tr.appendChild(el('td', null, e[0]));
+    const amt = el('td', 'num'); amt.textContent = money(e[1]); tr.appendChild(amt);
+    const p = el('td', 'num'); p.textContent = (e[1] / net * 100).toFixed(1) + '%'; tr.appendChild(p);
+    tb.appendChild(tr);
+  });
+  table.appendChild(tb);
+  card.appendChild(table);
+  card.appendChild(el('div', 'sum-hint', 'Spending so far is ' + money(spend) + ' — ' + pct.toFixed(1) + '% of your ' + money(net) + ' take-home, or ' + money(-left) + ' more than you have brought home this year. There is nothing left over to chart, so the shares are listed instead.'));
+  return card;
+}
 function dashKpisBody(ctx) {
   const kpis = el('div', 'sub-summary');
   // On big stat cards a zero shows as $0.00 — the grid's "–" convention reads
@@ -5500,10 +5558,25 @@ function wageMonthly(data, field) {
   data.paychecks.filter(isPaycheckPaid).forEach(p => { const mi = monthIdx(p.payDate); if (mi >= 0) m[mi] += Number(p[field]) || 0; });
   return m;
 }
+// Months that have actually happened. Past years are complete; a future year has
+// no elapsed months at all, so the only meaningful view there is the full-year
+// projection — the current year is the one that needs capping.
+function ytdMonthCap() {
+  const now = new Date();
+  return activeYear === now.getFullYear() ? now.getMonth() + 1 : 12;
+}
+// "Year to date" has to mean the same window for every slice. Logged payments are
+// facts and only exist for months that happened, but recurringMonthsForCategory
+// projects a bill across all 12 — so an unbounded sum weighed 12 months of
+// estimated premiums against 7 months of real groceries and made bill-heavy
+// categories (insurance, housing) look far larger than they are. Cap the estimate
+// at the elapsed months; leave logged payments alone, since a future-dated payment
+// is still something the user really recorded (and Spend YTD counts it too).
 function expenseByCategoryFull(store, data) {
   const m = {};
+  const cap = ytdMonthCap();
   data.expensePayments.forEach(e => { const g = store.expenseGroupName(e.categoryId); m[g] = (m[g] || 0) + expenseAmount(e); });
-  if (recurringAppliesTo(activeYear)) store.state.expenseCategories.forEach(cat => { const rec = recurringMonthsForCategory(store, cat.id, data.expensePayments).reduce((a, b) => a + b, 0); if (rec > 0) m[cat.name] = (m[cat.name] || 0) + rec; });
+  if (recurringAppliesTo(activeYear)) store.state.expenseCategories.forEach(cat => { const rec = recurringMonthsForCategory(store, cat.id, data.expensePayments).slice(0, cap).reduce((a, b) => a + b, 0); if (rec > 0) m[cat.name] = (m[cat.name] || 0) + rec; });
   return m;
 }
 function expenseByAccount(store, data) {

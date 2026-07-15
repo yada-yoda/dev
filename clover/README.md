@@ -45,6 +45,31 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.116 — “Expenses by category (YTD)” was overstating your biggest bills
+
+The year-to-date donut was mixing two different time windows. Logged expenses
+only exist for months that have actually happened, but a recurring bill was
+counted for all twelve months of the year — so in July a yearly insurance
+premium was being weighed against about seven months of real groceries. Any
+category driven by bills (insurance, housing) looked far bigger than it really
+was. Bill estimates are now capped at the months that have elapsed, so every
+slice covers the same window. If insurance looked implausibly large before,
+this is why — and the new number is the honest one.
+
+The expense grid’s last column was part of the same confusion: it was labelled
+**YTD** but adds up every month in the row, and with bills switched on the
+months that haven’t happened yet are estimates. It’s now called **Year total**
+and says so in its tooltip. It’s a full-year forecast; the dashboard donut is
+the year-to-date view. The two are supposed to differ.
+
+**New panel: “Where your take-home goes (YTD).”** The existing donut tells you
+how your spending splits up. This one answers a more useful question — what
+share of the money you actually brought home does each category use? The
+unspent remainder is its own slice, so the shares add up to 100% of take-home
+rather than 100% of spending. If you’ve spent more than you’ve earned so far
+there’s no remainder to draw, so it lists the shares as a table instead of a
+chart that would size the wedges wrong.
+
 ### v1.0.115 — Fixed the cut-off dot in the donut chart keys
 
 With enough categories, the chart key ran out of room and silently spilled into
