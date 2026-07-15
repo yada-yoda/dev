@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.103';
+const VERSION = '1.0.104';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2501,7 +2501,8 @@ const HELP_SECTIONS = [
     points: [
       'Annual grid totals spending by category — with your recurring bills rolled in — and List shows each logged expense.',
       'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
-      'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.'
+      'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.',
+      'Money you move into savings or investments goes under the “Savings & Investments” category — pick it and a “Moved to” field appears for the destination account. It’s a transfer (the money is still yours), but it counts for the month so your leftover reflects it.'
     ] },
   { id: 'subscriptions', ico: '↻', title: 'Bills & Subscriptions', what: 'Everything that recurs — bills, subscriptions, memberships, loans.',
     points: [
@@ -2989,6 +2990,8 @@ function expenseList(data) {
     tr.appendChild(el('td', null, store.subName('expense', e.categoryId, e.subId) || '—'));
     const accTd = el('td', null, store.accountName(e.accountId) || '—');
     if (e.checkNo) accTd.appendChild(el('div', 'acct-sub', 'Check #' + e.checkNo));
+    // Transfers (savings/investment contributions) show where the money landed.
+    if (e.toAccountId) { const t = el('div', 'acct-sub', '→ ' + (store.accountName(e.toAccountId) || 'account')); t.title = 'Transferred into this account — moved, not spent'; accTd.appendChild(t); }
     tr.appendChild(accTd);
     tr.appendChild(numCell(expenseAmount(e), true));
     tr.appendChild(el('td', null, store.personName(e.personId)));
@@ -3022,6 +3025,7 @@ function expenseModal(existing) {
     if (bill) { fCat.value = bill.categoryId || ''; rebuildSubs(); if (bill.subId) fSub.value = bill.subId; }
   });
   const fAcct = accountSelect(s, e.accountId || '');
+  const fToAcct = accountSelect(s, e.toAccountId || '', '— Select account —');
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), e.personId || (s.persons[0] && s.persons[0].id));
   const fAmount = input(e.amount != null ? e.amount : '', { type: 'number', placeholder: '0.00' }); fAmount.step = '0.01';
   const fTitle = input(e.title || '', { placeholder: 'e.g. Parking — Main St Garage' });
@@ -3048,15 +3052,30 @@ function expenseModal(existing) {
     forField.style.display = (park || toll || e.forDate) ? '' : 'none';
     forLbl.nodeValue = toll && !park ? 'Toll issued day' : park ? 'Parking day' : 'Applies to (day)';
   };
-  fSub.addEventListener('change', syncForDate);
-  body.appendChild(field('Paid from', fAcct, 'The account or card the money came OUT of — your checking, a credit card, etc.'));
+  const acctField = field('Paid from', fAcct, 'The account or card the money came OUT of — your checking, a credit card, etc.');
+  body.appendChild(acctField);
+  // Savings/investment contributions are TRANSFERS: the money isn't spent, it
+  // moved to another of your accounts. Capture where it went so it's traceable.
+  const toField = field('Moved to', fToAcct, 'Which of your accounts the money went INTO — e.g. your brokerage or retirement account. This is a transfer: it leaves your spendable pool (so it counts toward the month), but the money is still yours.');
+  body.appendChild(toField);
+  const acctLbl = acctField.querySelector('span').childNodes[0];
+  const isTransferCat = () => {
+    const names = ((s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '') + ' ' + (store.subName('expense', fCat.value, fSub.value) || '');
+    return /saving|invest/i.test(names) && !/fee/i.test(names);
+  };
+  const syncTransfer = () => {
+    const t = isTransferCat();
+    toField.style.display = (t || e.toAccountId) ? '' : 'none';
+    acctLbl.nodeValue = t ? 'Moved from' : 'Paid from';
+  };
+  fSub.addEventListener('change', () => { syncForDate(); syncTransfer(); });
   body.appendChild(field('Person', fPerson, 'Who this expense belongs to.'));
   body.appendChild(field('Amount', fAmount, 'How much you paid.'));
   const fExpCheckNo = input(e.checkNo || '', { placeholder: 'optional' });
   body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — handy for tracing it later.'));
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering about this expense.'));
-  rebuildSubs(); syncForDate();
-  fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); });
+  rebuildSubs(); syncForDate(); syncTransfer();
+  fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); syncTransfer(); });
 
   const isEdit = !!(existing && existing.id);
   openModal({
@@ -3068,7 +3087,8 @@ function expenseModal(existing) {
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), title: fTitle.value.trim(), vendor: fVendor.value.trim(),
         forDate: fForDate.value || '', categoryId: fCat.value, subId: fSub.value || '',
-        accountId: fAcct.value || '', personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
+        accountId: fAcct.value || '', toAccountId: isTransferCat() ? (fToAcct.value || '') : '',
+        personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
         recurringId: fBill.value || ''
       });
       store.saveExpense(activeYear, entry);

@@ -58,6 +58,9 @@ const SEED_EXPENSE_GROUPS = [
   { name: 'Auto', subs: ['Fuel', 'Maintenance', 'Registration', 'Parking & Tolls'] },
   { name: 'Food', subs: ['Groceries', 'Dining Out', 'Delivery'] },
   { name: 'Entertainment', subs: ['Games', 'Events', 'Hobbies'] },
+  // Money moved into savings/investments isn't "spent" — but it leaves your
+  // spendable pool, so it's tracked here as an allocation (pay-yourself-first).
+  { name: 'Savings & Investments', subs: ['Brokerage', 'Retirement / IRA', '401(k)', 'HSA', 'Emergency Fund', 'Crypto', 'College / 529', 'Other savings'] },
   { name: 'Other', subs: ['Bank Fees', 'Investment Fees'] }
 ];
 
@@ -76,6 +79,13 @@ function migrateExpenseSeeds(cats) {
   const norm = s => (s || '').trim().toLowerCase();
   const mr = cats.find(c => norm(c.name) === 'mortgage / rent');
   if (mr && !cats.some(c => norm(c.name) === 'housing')) { mr.name = 'Housing'; changed = true; }
+  // Existing users predate the Savings & Investments group — add it once so money
+  // moved into investments/savings has a home. Guard on /saving/ (not /invest/) so
+  // a legacy "Investment Fees" category doesn't suppress it. Subs are filled below.
+  if (!cats.some(c => /saving/i.test(c.name || '') || norm(c.name) === 'investments')) {
+    cats.push({ id: mkId('cat'), name: 'Savings & Investments', order: cats.length, subs: [] });
+    changed = true;
+  }
   SEED_EXPENSE_GROUPS.forEach(it => {
     if (typeof it === 'string' || !it.subs || !it.subs.length) return;
     const g = cats.find(c => norm(c.name) === norm(it.name));

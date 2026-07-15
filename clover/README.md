@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.104 — Log money moved into savings & investments
+
+- New **Savings & Investments** expense category (added to existing accounts
+  automatically) with subcategories for Brokerage, Retirement / IRA, 401(k),
+  HSA, Emergency Fund, Crypto, College / 529, and Other savings.
+- Pick it on an expense and a **Moved to** field appears for the destination
+  account, while “Paid from” becomes **Moved from** — so a $300 move from
+  checking into a brokerage is recorded as the transfer it is, with both ends
+  traceable. The list shows it as `Checking → Brokerage`.
+- It still counts toward the month (the money left your spendable pool, so your
+  “left after everything” is right), but it’s labeled as moved, not spent.
+- Note: a *pre-tax payroll deduction* (e.g. 401(k) taken before you’re paid)
+  belongs on the paycheck as a deduction instead — this is for money you move
+  yourself after being paid.
+
 ### v1.0.103 — APY column: just the date, and no missing dates
 
 - The APY column now shows **only the date** under the rate (no “as of / recorded”
