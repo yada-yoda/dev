@@ -45,6 +45,29 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.117 — Gallons and price per gallon on fuel expenses
+
+Pick **Auto → Fuel** on an expense and two fields appear: **Gallons** and
+**Price / gallon**. Fill both and the Amount works itself out (12.4 gal ×
+$3.499 = $43.39). If you’d already typed an Amount it’s left alone — the
+receipt is the authority, and a fill-up often has a car wash or a discount on
+it — but a note tells you when the two don’t agree, so a typo doesn’t pass
+quietly.
+
+Pump prices keep their third decimal. Every other money field in Clover rounds
+to cents, but gas is quoted to a tenth of a cent, and rounding $3.499 up to
+$3.50 would stop price × gallons from ever matching the receipt. The `$` still
+sits in the field, so it’s clearly dollars.
+
+The fields only show for fuel specifically — **Utility → Gas** is natural gas
+and **Insurance → Auto** is a car policy, so neither one asks you for gallons.
+Recategorize a fill-up into something else and the pump figures are dropped
+rather than left behind on a grocery run.
+
+Both are available as optional columns in List view (**⚙ Columns**), and the
+Amount column shows “12.4 gal @ $3.499” under a fill-up’s total. If your CSV
+has Gallons or Price per gallon columns, the importer now picks them up.
+
 ### v1.0.116 — “Expenses by category (YTD)” was overstating your biggest bills
 
 The year-to-date donut was mixing two different time windows. Logged expenses

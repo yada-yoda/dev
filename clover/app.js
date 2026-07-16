@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.116';
+const VERSION = '1.0.117';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -404,7 +404,8 @@ const HIST_LABELS = {
   personId: 'Person', recurringId: 'Linked bill', notes: 'Notes', status: 'Status', checkNo: 'Check #',
   apy: 'APY', apyAsOf: 'APY as of', cdApy: 'CD APY', closed: 'Closed', closedDate: 'Date closed', active: 'Active',
   budgetEst: 'Budget placeholder', autoPay: 'Auto-pay', frequency: 'Frequency', renewalDate: 'Renewal date',
-  priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #'
+  priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #',
+  gallons: 'Gallons', pricePerGallon: 'Price / gallon'
 };
 function prettyKey(k) { return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace(/\s*Id\b/, '').trim(); }
 function histFieldLabel(f) { return HIST_LABELS[f] || prettyKey(f); }
@@ -486,16 +487,20 @@ function withHistoryTab(bodyEl, existing) {
 }
 // Dollar amounts always show 2 decimals (21.20, not 21.2; 21 becomes 21.00) —
 // a raw number input drops the trailing zero, which reads wrong for money.
-function attachMoney2dp(i, value) {
-  if (value != null && value !== '' && !isNaN(Number(value))) i.value = Number(value).toFixed(2);
-  i.step = '0.01'; i.inputMode = 'decimal';
-  i.addEventListener('blur', () => { const n = parseFloat(i.value); if (i.value !== '' && !isNaN(n)) i.value = n.toFixed(2); });
+function attachMoneyDp(i, value, dp) {
+  if (value != null && value !== '' && !isNaN(Number(value))) i.value = Number(value).toFixed(dp);
+  i.step = (1 / Math.pow(10, dp)).toFixed(dp); i.inputMode = 'decimal';
+  i.addEventListener('blur', () => { const n = parseFloat(i.value); if (i.value !== '' && !isNaN(n)) i.value = n.toFixed(dp); });
   return i;
 }
+function attachMoney2dp(i, value) { return attachMoneyDp(i, value, 2); }
 // A currency field: $ sits inside the box so it's obvious the value is USD.
 // Callers keep using .value; field() renders the wrapper via __wrap.
-function moneyInput(value, attrs = {}) {
-  const i = attachMoney2dp(input('', Object.assign({ type: 'number', placeholder: '0.00' }, attrs)), value);
+// dp defaults to the 2-decimal money standard. Pump prices are the one real
+// exception — they're quoted to a tenth of a cent ($3.499), and rounding that to
+// $3.50 would stop price x gallons from ever tying out to the receipt total.
+function moneyInput(value, attrs = {}, dp = 2) {
+  const i = attachMoneyDp(input('', Object.assign({ type: 'number', placeholder: (0).toFixed(dp) }, attrs)), value, dp);
   const wrap = el('div', 'money-input');
   wrap.appendChild(el('span', 'money-pre', '$'));
   wrap.appendChild(i);
@@ -2652,6 +2657,7 @@ const HELP_SECTIONS = [
       'The grid’s “Year total” column adds up every month in the row, and with bills rolled in the months that haven’t happened yet are estimates — so it’s a full-year forecast, not a year-to-date figure. The dashboard’s “Expenses by category (YTD)” donut is the year-to-date view, which is why the two differ.',
       'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
       'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.',
+      'Picking Auto → Fuel adds Gallons and Price / gallon fields. Fill both and the Amount works itself out; the pump price keeps its third decimal (3.499, not 3.50) so it ties out to the receipt. Both are available as optional columns in List view.',
       'Money you move into savings or investments goes under the “Savings & Investments” category — pick it and a “Moved to” field appears for the destination account. It’s a transfer (the money is still yours), but it counts for the month so your leftover reflects it.'
     ] },
   { id: 'subscriptions', ico: '↻', title: 'Bills & Subscriptions', what: 'Everything that recurs — bills, subscriptions, memberships, loans.',
@@ -3132,8 +3138,8 @@ function expenseFilterBadge(key, text, tone) {
   });
   return b;
 }
-const EXPLIST_COL_LABELS = { date: 'Date', description: 'Description', category: 'Category', source: 'Source', account: 'Paid from', amount: 'Amount', person: 'Person', forDate: 'Applies to', checkNo: 'Check #', notes: 'Notes' };
-const EXPLIST_ALL_COLS = ['date', 'description', 'category', 'source', 'account', 'amount', 'person', 'forDate', 'checkNo', 'notes'];
+const EXPLIST_COL_LABELS = { date: 'Date', description: 'Description', category: 'Category', source: 'Source', account: 'Paid from', amount: 'Amount', person: 'Person', forDate: 'Applies to', checkNo: 'Check #', gallons: 'Gallons', pricePerGallon: 'Price / gallon', notes: 'Notes' };
+const EXPLIST_ALL_COLS = ['date', 'description', 'category', 'source', 'account', 'amount', 'person', 'forDate', 'checkNo', 'gallons', 'pricePerGallon', 'notes'];
 const EXPLIST_DEFAULT_COLS = ['date', 'description', 'category', 'source', 'account', 'amount', 'person'];
 function buildExpenseListCol(store, key) {
   switch (key) {
@@ -3170,7 +3176,17 @@ function buildExpenseListCol(store, key) {
         // Transfers (savings/investment) show where the money landed.
         if (r.toAccountId) { const t = el('div', 'acct-sub', '→ ' + (store.accountName(r.toAccountId) || 'account')); t.title = 'Transferred into this account — moved, not spent'; td.appendChild(t); }
         return td; } };
-    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => expenseAmount(r), cell: r => numCell(expenseAmount(r), true) };
+    case 'amount': return { label: 'Amount', key: 'amount', num: true, value: r => expenseAmount(r), cell: r => {
+        const td = numCell(expenseAmount(r), true);
+        // A fill-up's total means more with the pump figures under it.
+        if (r.gallons && r.pricePerGallon) {
+          const g = el('div', 'acct-sub', r.gallons + ' gal @ $' + Number(r.pricePerGallon).toFixed(3));
+          g.title = 'Gallons × price per gallon';
+          td.appendChild(g);
+        }
+        return td; } };
+    case 'gallons': return { label: 'Gallons', key: 'gallons', num: true, value: r => Number(r.gallons) || 0, cell: r => { const td = el('td', 'num'); td.textContent = r.gallons ? String(r.gallons) : '—'; return td; } };
+    case 'pricePerGallon': return { label: 'Price / gallon', key: 'pricePerGallon', num: true, value: r => Number(r.pricePerGallon) || 0, cell: r => { const td = el('td', 'num'); td.textContent = r.pricePerGallon ? '$' + Number(r.pricePerGallon).toFixed(3) : '—'; return td; } };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => {
         const td = el('td'); const n = store.personName(r.personId);
         if (n && n !== '—') td.appendChild(expenseFilterBadge('person', n, '')); else td.textContent = '—';
@@ -3261,6 +3277,10 @@ function expenseModal(existing) {
   const fTitle = input(e.title || '', { placeholder: 'e.g. Parking — Main St Garage' });
   const fVendor = input(e.vendor || '', { placeholder: 'e.g. SpotHero' });
   const fForDate = input(e.forDate || '', { type: 'date' });
+  // input() only forwards type/placeholder/list, so step + inputMode go on directly.
+  const fGallons = input(e.gallons != null && e.gallons !== '' ? e.gallons : '', { type: 'number', placeholder: 'e.g. 12.4' });
+  fGallons.step = '0.001'; fGallons.inputMode = 'decimal';
+  const fPpg = moneyInput(e.pricePerGallon, { placeholder: 'e.g. 3.499' }, 3);
   const fNotes = document.createElement('textarea'); fNotes.value = e.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
 
   body.appendChild(field('Date paid', fDate, 'The day the money actually left your account — e.g. Jul 15. The expense counts toward that month.'));
@@ -3297,6 +3317,46 @@ function expenseModal(existing) {
   const toField = field('Moved to', fToAcct, 'Which of your accounts the money went INTO — e.g. Fidelity Brokerage, Vanguard Roth IRA, Ally Savings. This is a transfer: it leaves your spendable pool (so it counts toward the month), but the money is still yours. Picking it also fills in the type and description below.');
   body.appendChild(toField);
   const acctLbl = acctField.querySelector('span').childNodes[0];
+  // Fuel fill-ups: gallons x price is worth keeping so you can see what you
+  // actually paid per gallon over time, not just the total.
+  //
+  // The category and subcategory are tested SEPARATELY on purpose. Concatenating
+  // their names (the way syncForDate does) would misfire twice over: "Utility ->
+  // Gas" is natural gas billed in therms, and "Insurance -> Auto" / "Loan -> Auto"
+  // are cars but not fuel. Requiring an auto-ish category AND a fuel-ish
+  // subcategory is what keeps both out.
+  const isFuelCat = () => {
+    const cat = (s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '';
+    const sub = store.subName('expense', fCat.value, fSub.value) || '';
+    return /auto|vehicle|\bcar\b|truck|motor/i.test(cat) && /fuel|gas|diesel|petrol|charg/i.test(sub);
+  };
+  const fuelRow = el('div', 'two-col');
+  const galField = field('Gallons', fGallons, 'How much fuel went in — e.g. 12.4. Use the pump’s figure; it’s usually to three decimals.');
+  const ppgField = field('Price / gallon', fPpg, 'The pump price — e.g. 3.499. Tenths of a cent are kept, so this ties out to your receipt instead of rounding to $3.50.');
+  fuelRow.appendChild(galField); fuelRow.appendChild(ppgField);
+  const fuelNote = el('div', 'sum-hint');
+  // Filling both answers the Amount for you — but only when Amount is still
+  // blank. Silently rewriting a total you typed would be wrong: the receipt is
+  // the authority, and a fill-up often has a car wash or a discount on it.
+  const syncFuel = () => {
+    const on = isFuelCat() || e.gallons || e.pricePerGallon;
+    fuelRow.style.display = on ? '' : 'none';
+    fuelNote.style.display = on ? '' : 'none';
+    if (!on) return;
+    const g = parseFloat(fGallons.value), p = parseFloat(fPpg.value);
+    if (isNaN(g) || isNaN(p) || g <= 0 || p <= 0) { fuelNote.textContent = 'Enter both and the Amount fills itself in.'; return; }
+    const calc = g * p;
+    if (!fAmount.value.trim()) { fAmount.value = calc.toFixed(2); fuelNote.textContent = 'Amount set to ' + money(calc) + ' (' + g + ' gal × $' + p.toFixed(3) + ').'; return; }
+    const amt = parseFloat(fAmount.value);
+    // Pump math rounds to the cent, so allow a couple of cents before saying anything.
+    if (!isNaN(amt) && Math.abs(amt - calc) > 0.02) {
+      fuelNote.textContent = g + ' gal × $' + p.toFixed(3) + ' is ' + money(calc) + ', but the Amount says ' + money(amt) + '. That’s fine if the receipt included something else (a car wash, a discount) — otherwise check the figures.';
+    } else {
+      fuelNote.textContent = g + ' gal × $' + p.toFixed(3) + ' = ' + money(calc) + ', which matches the Amount.';
+    }
+  };
+  fGallons.addEventListener('input', syncFuel);
+  fPpg.addEventListener('input', syncFuel);
   const isTransferCat = () => {
     const names = ((s.expenseCategories.find(c => c.id === fCat.value) || {}).name || '') + ' ' + (store.subName('expense', fCat.value, fSub.value) || '');
     return /saving|invest/i.test(names) && !/fee/i.test(names);
@@ -3331,17 +3391,20 @@ function expenseModal(existing) {
     if (!fTitle.value.trim()) fTitle.value = 'Transfer to ' + acct.name;
     syncForDate(); syncTransfer();
   });
-  fSub.addEventListener('change', () => { syncForDate(); syncTransfer(); });
+  fSub.addEventListener('change', () => { syncForDate(); syncTransfer(); syncFuel(); });
   body.appendChild(field('Person', fPerson, 'Who this expense belongs to — you, joint, or another person you track.'));
   const AMT_HINT = 'How much you paid — e.g. 42.80 for a $42.80 grocery run.';
   const AMT_HINT_TRANSFER = 'How much you moved — e.g. 300 for a $300 transfer into investments.';
   const amountField = field('Amount', fAmount, AMT_HINT);
   body.appendChild(amountField);
+  body.appendChild(fuelRow);
+  body.appendChild(fuelNote);
+  fAmount.addEventListener('input', syncFuel);
   const fExpCheckNo = input(e.checkNo || '', { placeholder: 'optional' });
   body.appendChild(field('Check # (optional)', fExpCheckNo, 'If you paid by paper check, the check number — e.g. 1042. Handy for tracing it later.'));
   body.appendChild(field('Notes', fNotes, 'Anything else worth remembering — e.g. “split with a friend”, “reimbursable”, “promo price ends in March”.'));
-  rebuildSubs(); syncForDate(); syncTransfer();
-  fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); syncTransfer(); });
+  rebuildSubs(); syncForDate(); syncTransfer(); syncFuel();
+  fCat.addEventListener('change', () => { rebuildSubs(); syncForDate(); syncTransfer(); syncFuel(); });
 
   const isEdit = !!(existing && existing.id);
   openModal({
@@ -3350,12 +3413,17 @@ function expenseModal(existing) {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const amount = parseFloat(fAmount.value);
       if (isNaN(amount)) { toast('Amount is required', 'warn'); fAmount.focus(); return false; }
+      // Recategorizing away from fuel drops the pump figures rather than leaving
+      // gallons hanging on, say, a grocery run.
+      const fuelOn = isFuelCat();
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), title: fTitle.value.trim(), vendor: fVendor.value.trim(),
         forDate: fForDate.value || '', categoryId: fCat.value, subId: fSub.value || '',
         accountId: fAcct.value || '', toAccountId: isTransferCat() ? (fToAcct.value || '') : '',
         personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
-        recurringId: fBill.value || ''
+        recurringId: fBill.value || '',
+        gallons: fuelOn ? (parseFloat(fGallons.value) || '') : '',
+        pricePerGallon: fuelOn ? (parseFloat(fPpg.value) || '') : ''
       });
       store.saveExpense(activeYear, entry);
       toast(isEdit ? 'Expense updated' : 'Expense added');
@@ -6624,6 +6692,8 @@ const IMPORT_FIELDS = {
     { key: 'vendor', label: 'Vendor', kw: ['vendor', 'merchant', 'payee'] },
     { key: 'category', label: 'Category', kw: ['category', 'reason', 'type'] },
     { key: 'forDate', label: 'Applies to day', kw: ['applies to', 'parking day', 'toll issued', 'service date', 'for date'] },
+    { key: 'gallons', label: 'Gallons', kw: ['gallons', 'gallon', 'qty gal', 'volume'] },
+    { key: 'pricePerGallon', label: 'Price / gallon', kw: ['price per gallon', 'price/gallon', 'ppg', 'unit price', 'price per gal'] },
     { key: 'account', label: 'Paid from', kw: ['account', 'card', 'paid from'] },
     { key: 'person', label: 'Person', kw: ['person', 'owner'] },
     { key: 'checkNo', label: 'Check #', kw: ['check #', 'check no', 'check number'] },
@@ -6838,7 +6908,7 @@ function buildImportEntries(store) {
         if ((net == null || isNaN(net)) && /reward/i.test(store.incomeGroupName(catId) || '')) net = amt;
         e = { date, gross: amt, net, categoryId: catId, subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), status: 'received', rewardSource: String(g('rewardSource')).trim(), rewardType: String(g('rewardType')).trim(), otherType: String(g('otherType')).trim(), description: String(g('description')).trim(), receivedVia: String(g('receivedVia')).trim(), notes: g('notes') };
       }
-      else if (target === 'expenses') e = { date, amount: amt, title: String(g('title')).trim(), vendor: String(g('vendor')).trim(), forDate: parseImportDate(g('forDate')) || '', categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), checkNo: String(g('checkNo')).trim(), notes: g('notes') };
+      else if (target === 'expenses') e = { date, amount: amt, title: String(g('title')).trim(), vendor: String(g('vendor')).trim(), forDate: parseImportDate(g('forDate')) || '', categoryId: matchCategory(store, 'expense', g('category'), fallbackCat), subId: '', accountId: matchAccount(store, g('account')), personId: matchPerson(store, g('person')), checkNo: String(g('checkNo')).trim(), gallons: parseFloat(g('gallons')) || '', pricePerGallon: parseFloat(g('pricePerGallon')) || '', notes: g('notes') };
       else e = {
         payDate: date, gross: amt, net: g('net') ? parseImportAmount(g('net')) : null,
         receivedDate: parseImportDate(g('receivedDate')), employer: String(g('employer')).trim(),
