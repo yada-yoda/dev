@@ -235,7 +235,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.53.1';
+const APP_VERSION = 'v0.53.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1606,15 +1606,33 @@ async function geocodeZip(zip){
   data.settings.weatherGeo = geo; saveLocal();
   return geo;
 }
+// Pick the observation closest to time t — only if it actually lands within 3h of it.
+function pickNearestObs(obs, t){ let chosen=null, bd=Infinity; for(const o of (obs||[])){ const dd=Math.abs(o.ms-t); if(dd<bd){ bd=dd; chosen=o; } } return (chosen && bd <= 3*3600000) ? chosen : null; }
+// Weather saved on a walk/potty must reflect the time OF THE ENTRY, not when it was typed in.
+// Entries at ~now poll a fresh current reading; backdated ones resolve the real reading for that
+// time — nearest NWS station observation, else Open-Meteo's hourly value for that hour.
+async function applyWalkWeather(log, geo){
+  const t = new Date(log.dateTime).getTime(); if(isNaN(t)) return false;
+  if(Math.abs(Date.now() - t) <= 60*60000){
+    const b = await fetchWxBundle(geo); // live fetch, not the cached header pill
+    log.weather = { tempF:b.current.tempF, label:b.current.label, emoji:b.current.emoji, place:geo.name, source:b.source };
+    return true;
+  }
+  try {
+    const chosen = pickNearestObs(await nwsDayObservations(geo, log.dateTime.slice(0,10)), t);
+    if(chosen){ log.weather = { tempF:chosen.tempF, label:chosen.label, emoji:chosen.emoji, place:geo.name, source:'NWS obs', historical:true }; return true; }
+  } catch(e){ /* fall through to Open-Meteo */ }
+  return await fetchWalkWeatherFor(log);
+}
 async function fetchWalkWeather(logId){
   const zip = (data.settings.homeZip||'').trim(); if(!zip) return;
   try {
     const geo = await geocodeZip(zip);
-    const b = await fetchWxBundle(geo);
     const log = data.logs.find(l => l.id === logId); if(!log) return;
-    log.weather = { tempF:b.current.tempF, label:b.current.label, emoji:b.current.emoji, place:geo.name, source:b.source };
-    save(false);
-    if(currentView==='today' || currentView==='log' || currentView==='activity') render();
+    if(await applyWalkWeather(log, geo)){
+      save(false);
+      if(currentView==='today' || currentView==='log' || currentView==='activity') render();
+    }
   } catch(e){ /* weather is optional — silently skip */ }
 }
 // ── Weather (current + hourly). Primary source: NWS / api.weather.gov (US, station-backed,
@@ -1840,8 +1858,7 @@ async function recheckHomeWeather(){
     try { obs = await nwsDayObservations(geo, d); } catch(e){ obs = null; }
     for(const l of byDate[d]){
       const t = new Date(l.dateTime).getTime();
-      let chosen = null;
-      if(obs && obs.length){ let bd = Infinity; for(const o of obs){ const dd = Math.abs(o.ms - t); if(dd < bd){ bd = dd; chosen = o; } } if(bd > 3*3600000) chosen = null; }
+      const chosen = pickNearestObs(obs, t);
       if(chosen){ l.weather = { tempF:chosen.tempF, label:chosen.label, emoji:chosen.emoji, place:geo.name, source:'NWS obs', historical:true }; ok++; nws++; }
       else { try { if(await fetchWalkWeatherFor(l)) ok++; } catch(e){} }
     }

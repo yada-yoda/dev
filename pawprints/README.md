@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.53.1**
+**Current Version: v0.53.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.53.2** — **Walk weather now matches the time of the walk** — logging a walk (or home potty
+  break) used to save whatever the weather was **at the moment you typed it in**, so back-dating an
+  entry recorded the wrong conditions. It now resyncs the reading for the entry's actual time: walks
+  logged around now poll a fresh current reading, while back-dated ones pull the real observation for
+  that hour (nearest NWS station observation, falling back to Open-Meteo's hourly value).
 - **v0.53.1** — **One-time supplies (no lifecycle tracking)** — a new "One-time item — no start /
   finish tracking" checkbox in the supply form for things you buy once and keep (tags, collar,
   license, toys). When on, the item hides the opened/finished dates, shows no Start/Finish button in
