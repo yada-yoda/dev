@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.117';
+const VERSION = '1.0.118';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2690,7 +2690,7 @@ const HELP_SECTIONS = [
   { id: 'calendar', ico: '▣', title: 'Calendar', what: 'A month view of money events.',
     points: [
       'Shows expected pay dates, bill renewals, and CD maturities (with a 7-day heads-up). Click any day for the full detail.',
-      'Optionally push these events one-way into a dedicated Google Calendar.'
+      'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.'
     ] },
   { id: 'import', ico: '⇅', title: 'Import / Export', what: 'Get data in and out.',
     points: [
@@ -6341,7 +6341,7 @@ async function gcalEnsureCalendar(store) {
   }
   const list = await gfetch('/users/me/calendarList?minAccessRole=owner&maxResults=250');
   const found = (list.items || []).find(c => c.summary === wantName);
-  const id = found ? found.id : (await gfetch('/calendars', { method: 'POST', body: JSON.stringify({ summary: wantName, description: 'Pushed from Clover — paychecks, expected pay dates, bills, and CD maturities. Safe to delete; the next sync recreates it.' }) })).id;
+  const id = found ? found.id : (await gfetch('/calendars', { method: 'POST', body: JSON.stringify({ summary: wantName, description: 'Pushed from Clover — paychecks, expected pay dates, bills, and CD maturities. CD maturities email you 7 days ahead. Safe to delete; the next sync recreates it.' }) })).id;
   store.setGcal({ calendarId: id });
   return id;
 }
@@ -6353,6 +6353,31 @@ async function gcalRename(store, name) {
 }
 function isoOfDay(y, m, d) { return y + '-' + String(m + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0'); }
 function isoNextDay(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); const d = addDays(new Date(+m[1], +m[2] - 1, +m[3]), 1); return isoOfDay(d.getFullYear(), d.getMonth(), d.getDate()); }
+// CD maturities are the one event where a nudge matters even if you never open
+// the calendar again — miss the bank's auto-renew window and you're locked into
+// whatever rate they roll you into. So the maturity event carries an EMAIL
+// reminder 7 days out (Google sends it; Clover has no mail server of its own).
+// Everything else stays silent, inheriting the calendar's default.
+// The reminder rides the maturity event, not the separate "7 days before"
+// heads-up event, so the timing is exact and it doesn't depend on that heads-up
+// landing inside the 3-month push window.
+const CD_EMAIL_REMINDER_MIN = 7 * 24 * 60;   // minutes before the all-day start
+function gcalIsCdMaturity(gid) { return typeof gid === 'string' && gid.indexOf('cdm-') === 0; }
+function gcalEventBody(w) {
+  const body = { summary: w.summary, start: { date: w.iso }, end: { date: isoNextDay(w.iso) }, transparency: 'transparent', extendedProperties: { private: { cloverApp: '1', cloverId: w.gid } } };
+  if (gcalIsCdMaturity(w.gid)) body.reminders = { useDefault: false, overrides: [{ method: 'email', minutes: CD_EMAIL_REMINDER_MIN }] };
+  return body;
+}
+// Does the event already in Google carry exactly the reminder we want? Maturity
+// events pushed before this feature shipped won't — flag them for a re-patch so
+// the reminder gets added without waiting for the date or name to change.
+function gcalRemindersMatch(w, ex) {
+  const wantEmail = gcalIsCdMaturity(w.gid);
+  const ov = (ex.reminders && ex.reminders.overrides) || [];
+  const hasEmail = ov.some(o => o.method === 'email' && o.minutes === CD_EMAIL_REMINDER_MIN);
+  // Non-CD events should carry no Clover-set override; a CD event should carry ours.
+  return wantEmail ? hasEmail : !hasEmail;
+}
 function gcalWindowEvents(store) {
   const out = []; const now = new Date();
   for (let i = 0; i < GCAL_MONTHS_AHEAD; i++) {
@@ -6376,12 +6401,12 @@ async function gcalSyncNow(store) {
   (existing.items || []).forEach(ev => { const k = ev.extendedProperties && ev.extendedProperties.private && ev.extendedProperties.private.cloverId; if (k && !byId.has(k)) byId.set(k, ev); });
   let added = 0, updated = 0, removed = 0;
   for (const w of want) {
-    const body = { summary: w.summary, start: { date: w.iso }, end: { date: isoNextDay(w.iso) }, transparency: 'transparent', extendedProperties: { private: { cloverApp: '1', cloverId: w.gid } } };
+    const body = gcalEventBody(w);
     const ex = byId.get(w.gid);
     if (!ex) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events', { method: 'POST', body: JSON.stringify(body) }); added++; }
     else {
       byId.delete(w.gid);
-      if ((ex.start && ex.start.date) !== w.iso || ex.summary !== w.summary) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'PATCH', body: JSON.stringify(body) }); updated++; }
+      if ((ex.start && ex.start.date) !== w.iso || ex.summary !== w.summary || !gcalRemindersMatch(w, ex)) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'PATCH', body: JSON.stringify(body) }); updated++; }
     }
   }
   for (const ex of byId.values()) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'DELETE' }); removed++; }
@@ -6418,7 +6443,7 @@ function renderCalendar(view) {
   const gBtn = el('button', 'btn-ghost', g.calendarId ? '↻ Sync to Google' : 'Connect Google Calendar');
   gBtn.title = g.calendarId
     ? 'Push this month + the next two to your dedicated “Clover” Google calendar (adds, updates, and removes — never duplicates).' + (g.lastSyncAt ? ' Last synced ' + fmtDate(g.lastSyncAt.slice(0, 10)) + ' · ' + (g.lastCount || 0) + ' events.' : '')
-    : 'One-time Google sign-in, then Clover pushes paychecks, expected pay dates, bills, and CD maturities to a dedicated “Clover” calendar in your Google account. One-way: Clover never reads your calendar.';
+    : 'One-time Google sign-in, then Clover pushes paychecks, expected pay dates, bills, and CD maturities to a dedicated “Clover” calendar in your Google account. CD maturities also get an email reminder 7 days ahead, sent by Google. One-way: Clover never reads your calendar.';
   const runSync = async () => {
     gBtn.disabled = true; gBtn.textContent = 'Syncing…';
     try {

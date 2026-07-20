@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.118 — Email reminder 7 days before a CD matures
+
+CDs now email you a week before they mature — time to decide on rollover or
+call the bank about new rates before the auto-renew window closes. It works
+through the Google Calendar you already connect on the Calendar page: Clover
+attaches an email reminder to each CD maturity event, and Google sends the
+email. Nothing new gets access to your data — Clover still has no mail server
+of its own, and the sync stays one-way.
+
+Only CD maturities get the email; paychecks, bills, and the rest stay silent.
+Your existing CDs pick up the reminder automatically on the next sync. Two
+things worth knowing: the reminder is set while a maturity is within the
+roughly three-month sync window, so sync now and then to keep it armed; and a
+CD already inside 7 days won’t email (the reminder time has passed) but still
+shows on the calendar.
+
 ### v1.0.117 — Gallons and price per gallon on fuel expenses
 
 Pick **Auto → Fuel** on an expense and two fields appear: **Gallons** and
