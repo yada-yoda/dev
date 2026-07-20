@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.9.1 — watch any web page for changes</title>
+<title>Spyglass v0.9.2 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -283,9 +283,10 @@
           </select>
         </label>
       </div>
-      <label class="toggle" style="margin-bottom:1rem"><input type="checkbox" id="mRender" style="width:auto">
-        Render in a browser <span class="hint" style="font-weight:400">— for JavaScript-built pages (bank rates, prices) or sites that block plain fetches. A little slower; the &#128269; Test button will suggest this automatically if it's needed.</span>
-      </label>
+      <div class="field" style="margin-bottom:1rem">
+        <label class="toggle"><input type="checkbox" id="mRender" style="width:auto"> Render in a browser</label>
+        <p class="hint" style="font-size:.76rem;color:var(--muted);font-weight:400;margin:.3rem 0 0;line-height:1.45">For JavaScript-built pages (bank rates, prices) or sites that block plain fetches. A little slower — the &#128269; Test button turns this on automatically if it's needed.</p>
+      </div>
       <label class="field hidden" id="selField">
         <span class="lab">CSS selector <span class="hint">— e.g. <code>#price</code> or <code>.status</code></span></span>
         <input id="mSelector" type="text" placeholder="#price" />
@@ -418,6 +419,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.9.2</strong> — Tidied the &ldquo;Render in a browser&rdquo; option in the add/edit form — the label and its description no longer squeeze into a cramped column.</li>
         <li><strong>v0.9.1</strong> — More check-frequency options for pages that change slowly: every 2 days, every 3 days, once a week, every 2 weeks, and once a month. (A monitor that hits a temporary error still retries within a few hours, so a monthly one won't sit broken for a month.)</li>
         <li><strong>v0.9.0</strong> — Every change alert now <em>always</em> includes a screenshot — and for pages we can only read through jina, the screenshot is taken by jina too, so it shows the real value instead of a blank. Plus a <em>safe fallback</em>: if a monitor's usual method is briefly down, Spyglass can use another method to confirm nothing changed — but it will never send a change alert based on a different method, so no false alarms.</li>
         <li><strong>v0.8.4</strong> — Some banks (e.g. Synchrony) load their rate from an API that blocks datacenter IPs, so neither a plain fetch nor our own browser can see it — only the r.jina.ai reader can. Spyglass now supports an optional free jina API key to make those pages reliable, and correctly reads Synchrony's rate again.</li>
@@ -451,7 +453,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.9.1";
+  const APP_VERSION = "0.9.2";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
