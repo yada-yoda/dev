@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.119 — Turn the CD email reminder on or off in Settings
+
+The CD maturity email from v1.0.118 now has a switch: **Settings → Calendar
+reminders → “Email me 7 days before a CD matures.”** It’s on by default, so
+nothing changes unless you want it to. Untick it and the reminders come off
+your Google Calendar the next time you sync — the maturity events stay, just
+without the email nudge.
+
 ### v1.0.118 — Email reminder 7 days before a CD matures
 
 CDs now email you a week before they mature — time to decide on rollover or

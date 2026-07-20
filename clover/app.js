@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.118';
+const VERSION = '1.0.119';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -778,7 +778,32 @@ function renderSettings(view) {
   grid.appendChild(collapsibleCard(accountDefaultsCard(), 'set-acctDefaults'));
   grid.appendChild(collapsibleCard(yearsCard(), 'set-years'));
   grid.appendChild(collapsibleCard(timeZoneCard(), 'set-timezone'));
+  grid.appendChild(collapsibleCard(calendarRemindersCard(), 'set-calReminders'));
   view.appendChild(grid);
+}
+
+// The one notification Clover sends. It rides the Google Calendar you connect on
+// the Calendar page — Clover has no mail server — so the toggle only bites once
+// you've connected, and changes apply on the next sync.
+function calendarRemindersCard() {
+  const store = window.cloverStore;
+  const g = store.state.settings.gcal || {};
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Calendar reminders', 'Email nudges sent through your connected Google Calendar'));
+  const on = g.cdEmailReminder !== false;   // default on, matching the shipped behavior
+  const c = checkbox('Email me 7 days before a CD matures', on, 'When Google Calendar is connected, each CD maturity carries an email reminder 7 days ahead — time to decide on rollover or call for new rates. Untick to stop them; the reminders come off your calendar on the next sync.');
+  c.__input.addEventListener('change', () => {
+    store.setGcal({ cdEmailReminder: c.__input.checked });
+    toast(c.__input.checked ? 'CD email reminders on — sync to apply' : 'CD email reminders off — sync to remove');
+    renderView(currentRoute);
+  });
+  card.appendChild(c);
+  const note = el('p', 'muted'); note.style.marginTop = '10px';
+  note.textContent = g.calendarId
+    ? 'Applies the next time you push to Google Calendar (Calendar page → “↻ Sync to Google”).'
+    : 'Needs Google Calendar connected first — set it up on the Calendar page. Google sends the reminder; Clover has no email server of its own.';
+  card.appendChild(note);
+  return card;
 }
 
 // Read-only on purpose: the browser already knows the zone, and timestamps are
@@ -2690,7 +2715,7 @@ const HELP_SECTIONS = [
   { id: 'calendar', ico: '▣', title: 'Calendar', what: 'A month view of money events.',
     points: [
       'Shows expected pay dates, bill renewals, and CD maturities (with a 7-day heads-up). Click any day for the full detail.',
-      'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.'
+      'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Turn this off under Settings → Calendar reminders. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.'
     ] },
   { id: 'import', ico: '⇅', title: 'Import / Export', what: 'Get data in and out.',
     points: [
@@ -6363,16 +6388,19 @@ function isoNextDay(iso) { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso); const
 // landing inside the 3-month push window.
 const CD_EMAIL_REMINDER_MIN = 7 * 24 * 60;   // minutes before the all-day start
 function gcalIsCdMaturity(gid) { return typeof gid === 'string' && gid.indexOf('cdm-') === 0; }
-function gcalEventBody(w) {
+// emailOn is the user's Settings toggle (default on). Off means CD events go out
+// with no reminder like everything else — and gcalRemindersMatch then flags any
+// already-pushed CD event as needing a re-patch to strip the reminder.
+function gcalEventBody(w, emailOn) {
   const body = { summary: w.summary, start: { date: w.iso }, end: { date: isoNextDay(w.iso) }, transparency: 'transparent', extendedProperties: { private: { cloverApp: '1', cloverId: w.gid } } };
-  if (gcalIsCdMaturity(w.gid)) body.reminders = { useDefault: false, overrides: [{ method: 'email', minutes: CD_EMAIL_REMINDER_MIN }] };
+  if (emailOn && gcalIsCdMaturity(w.gid)) body.reminders = { useDefault: false, overrides: [{ method: 'email', minutes: CD_EMAIL_REMINDER_MIN }] };
   return body;
 }
 // Does the event already in Google carry exactly the reminder we want? Maturity
 // events pushed before this feature shipped won't — flag them for a re-patch so
 // the reminder gets added without waiting for the date or name to change.
-function gcalRemindersMatch(w, ex) {
-  const wantEmail = gcalIsCdMaturity(w.gid);
+function gcalRemindersMatch(w, ex, emailOn) {
+  const wantEmail = emailOn && gcalIsCdMaturity(w.gid);
   const ov = (ex.reminders && ex.reminders.overrides) || [];
   const hasEmail = ov.some(o => o.method === 'email' && o.minutes === CD_EMAIL_REMINDER_MIN);
   // Non-CD events should carry no Clover-set override; a CD event should carry ours.
@@ -6399,14 +6427,15 @@ async function gcalSyncNow(store) {
   const existing = await gfetch('/calendars/' + encodeURIComponent(calId) + '/events?maxResults=2500&privateExtendedProperty=' + encodeURIComponent('cloverApp=1') + '&timeMin=' + encodeURIComponent(tmin) + '&timeMax=' + encodeURIComponent(tmax));
   const byId = new Map();
   (existing.items || []).forEach(ev => { const k = ev.extendedProperties && ev.extendedProperties.private && ev.extendedProperties.private.cloverId; if (k && !byId.has(k)) byId.set(k, ev); });
+  const cdEmailOn = (store.state.settings.gcal || {}).cdEmailReminder !== false;   // default on
   let added = 0, updated = 0, removed = 0;
   for (const w of want) {
-    const body = gcalEventBody(w);
+    const body = gcalEventBody(w, cdEmailOn);
     const ex = byId.get(w.gid);
     if (!ex) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events', { method: 'POST', body: JSON.stringify(body) }); added++; }
     else {
       byId.delete(w.gid);
-      if ((ex.start && ex.start.date) !== w.iso || ex.summary !== w.summary || !gcalRemindersMatch(w, ex)) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'PATCH', body: JSON.stringify(body) }); updated++; }
+      if ((ex.start && ex.start.date) !== w.iso || ex.summary !== w.summary || !gcalRemindersMatch(w, ex, cdEmailOn)) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'PATCH', body: JSON.stringify(body) }); updated++; }
     }
   }
   for (const ex of byId.values()) { await gfetch('/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(ex.id), { method: 'DELETE' }); removed++; }
