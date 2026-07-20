@@ -235,7 +235,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.53.2';
+const APP_VERSION = 'v0.54.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1056,6 +1056,12 @@ function settingsListsHTML(){
   let h = '<div class="label" style="margin-top:18px">Lists &amp; preferences</div>';
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Time zone'+tip('The time zone your logged times are in. Shown on exported PDFs and used for Google Calendar events. Defaults to Central (Chicago).')+'</label><select class="select" id="tz-select" onchange="saveTimezone()" style="margin-bottom:0">'+TIMEZONES.map(t=>'<option value="'+esc(t[0])+'"'+(appTimezone()===t[0]?' selected':'')+'>'+esc(t[1])+'</option>').join('')+'</select><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Times you log are shown in '+esc(tzLabel())+'.</div></div>';
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Daily feeding goal'+tip('How much your dog should eat per day. When set, the Today page shows a progress bar under "Last fed" toward this goal.')+'</label><div style="display:flex;gap:8px"><input class="input" type="number" step="0.25" min="0" id="feed-goal" placeholder="e.g. 2" value="'+esc(s.feedGoal||'')+'" style="margin-bottom:0;flex:1"><input class="input" id="feed-goal-unit" list="feed-unit-list" placeholder="cups" value="'+esc(s.feedGoalUnit||'')+'" style="margin-bottom:0;width:96px"><button class="btn" onclick="saveFeedGoal()">Save</button></div><datalist id="feed-unit-list"><option value="cups"></option><option value="grams"></option><option value="oz"></option><option value="scoops"></option><option value="cans"></option></datalist></div>';
+  const wMode = s.waterReminderMode || 'overall';
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Fresh-water reminder'+tip('Nudges the Today page and the header bell when the water bowl hasn\'t been refilled within this window. "Overall" watches your most recent refill anywhere; "Per bowl / location" watches each place separately. Only nags once you\'ve logged at least one water refill.')+'</label>'
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
+    + '<select class="select" id="water-rem-mode" style="margin-bottom:0;flex:1;min-width:150px"><option value="off"'+(wMode==='off'?' selected':'')+'>Off</option><option value="overall"'+(wMode==='overall'?' selected':'')+'>Overall (last refill)</option><option value="perLocation"'+(wMode==='perLocation'?' selected':'')+'>Per bowl / location</option></select>'
+    + '<div style="display:flex;align-items:center;gap:6px"><input class="input" type="number" min="1" step="1" id="water-rem-hours" value="'+esc(s.waterReminderHours||'24')+'" style="margin-bottom:0;width:76px"><span style="font-size:13px;color:var(--text-secondary)">hours</span></div>'
+    + '<button class="btn" onclick="saveWaterReminder()">Save</button></div></div>';
   h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
   if((s.homeZip||'').trim()){
     const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
@@ -1113,6 +1119,15 @@ function saveFeedGoal(){
   data.settings.feedGoal = (fv('feed-goal')||'').trim();
   data.settings.feedGoalUnit = (fv('feed-goal-unit')||'').trim() || 'cups';
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML); showToast(data.settings.feedGoal?'🍖 Feeding goal saved':'Feeding goal cleared');
+}
+function saveWaterReminder(){
+  if(denyManage()) return;
+  data.settings = data.settings || {};
+  data.settings.waterReminderMode = fv('water-rem-mode') || 'overall';
+  data.settings.waterReminderHours = String(Math.max(1, Math.round(num(fv('water-rem-hours'))||24)));
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  if(typeof updateRemindersPill==='function') updateRemindersPill();
+  showToast(data.settings.waterReminderMode==='off'?'💧 Water reminder off':'💧 Water reminder saved');
 }
 function saveHomeZip(){
   if(denyManage()) return;
@@ -2579,6 +2594,21 @@ function getReminders(){
   });
   petArr('records').forEach(r => { if(r.nextDue){ const u = untilStr(r.nextDue); if(u && u.days <= 30) out.push({ icon:'📋', text:(r.name||r.type||'Record')+' '+(u.past?'due again ('+u.text+')':'due again '+u.text), over:u.past, sort:u.days }); } });
   petArr('inventory').filter(i=>i.runningLow).forEach(i => out.push({ icon:'🛒', text:'Restock '+(i.brand?i.brand+' ':'')+i.name, over:false, sort:99 }));
+  // Fresh-water reminder — nag when the bowl hasn't been refilled within the chosen window.
+  const wMode = (data.settings && data.settings.waterReminderMode) || 'overall';
+  if(wMode !== 'off'){
+    const hrs = Math.max(1, num(data.settings && data.settings.waterReminderHours) || 24);
+    const staleMs = hrs*3600000;
+    const agoStr = ms => { const h = Math.floor(ms/3600000); return h>=24 ? (Math.floor(h/24)+'d '+(h%24)+'h') : (h+'h'); };
+    const waters = petLogs('water').filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+    if(wMode === 'perLocation'){
+      const seen = {}; waters.forEach(w=>{ const p=(w.place||'').trim()||'the bowl'; if(!(p in seen)) seen[p]=w; });
+      Object.keys(seen).forEach(p=>{ const age = Date.now()-new Date(seen[p].dateTime).getTime(); if(age>=staleMs) out.push({ icon:'💧', text:'Fresh water — '+p+' last refilled '+agoStr(age)+' ago', over:true, sort:-(age/staleMs) }); });
+    } else if(waters.length){
+      const age = Date.now()-new Date(waters[0].dateTime).getTime();
+      if(age>=staleMs){ const p=(waters[0].place||'').trim(); out.push({ icon:'💧', text:'Fresh water needed — last refilled '+agoStr(age)+' ago'+(p?' ('+p+')':''), over:true, sort:-(age/staleMs) }); }
+    }
+  }
   return out.sort((a,b)=>a.sort-b.sort);
 }
 

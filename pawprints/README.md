@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.53.2**
+**Current Version: v0.54.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.54.0** — **Fresh-water reminder** — the Today page and header bell now nudge you when the
+  water bowl hasn't been refilled in a while (defaults to 24 hours, tracking your most recent refill
+  and its location). A new **Settings → Lists & preferences → Fresh-water reminder** control lets you
+  switch it **Off**, **Overall** (last refill anywhere), or **Per bowl / location** (each spot tracked
+  separately), and set the number of **hours**. It only nudges once you've logged at least one water
+  refill, so it won't bother anyone who doesn't track water.
 - **v0.53.2** — **Walk weather now matches the time of the walk** — logging a walk (or home potty
   break) used to save whatever the weather was **at the moment you typed it in**, so back-dating an
   entry recorded the wrong conditions. It now resyncs the reading for the entry's actual time: walks
