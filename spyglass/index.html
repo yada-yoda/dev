@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.9.2 — watch any web page for changes</title>
+<title>Spyglass v0.9.3 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -149,6 +149,8 @@
   label.field{display:block;margin-bottom:1rem}
   label.field .lab{font-size:.82rem;font-weight:600;margin-bottom:.3rem;display:block}
   label.field .hint{font-size:.74rem;color:var(--muted);font-weight:400}
+  .info{display:inline-block;margin-left:.35rem;color:var(--muted);font-weight:400;cursor:help;font-size:.95em}
+  .info:hover,.info:focus{color:var(--primary);outline:none}
   input,select,textarea{
     width:100%;padding:.55rem .7rem;border:1px solid var(--border);border-radius:10px;
     background:var(--bg);color:var(--text);font-size:.92rem;font-family:inherit;
@@ -284,8 +286,8 @@
         </label>
       </div>
       <div class="field" style="margin-bottom:1rem">
-        <label class="toggle"><input type="checkbox" id="mRender" style="width:auto"> Render in a browser</label>
-        <p class="hint" style="font-size:.76rem;color:var(--muted);font-weight:400;margin:.3rem 0 0;line-height:1.45">For JavaScript-built pages (bank rates, prices) or sites that block plain fetches. A little slower — the &#128269; Test button turns this on automatically if it's needed.</p>
+        <label class="toggle"><input type="checkbox" id="mRender" style="width:auto"> Render in a browser<span class="info" tabindex="0" title="Most pages don't need this — leave it off (a plain fetch is faster and lighter). Turn it on only for pages that build their content with JavaScript, like live bank rates, or that block simple requests. Not sure? Just click 'Test it now' below — Spyglass switches this on automatically if the page needs it.">&#9432;</span></label>
+        <p class="hint" style="font-size:.76rem;color:var(--muted);font-weight:400;margin:.3rem 0 0;line-height:1.45">Usually leave this off — a plain fetch is faster. The &#128269; Test button turns it on for you if the page needs it (e.g. JavaScript-built pages like bank rates).</p>
       </div>
       <label class="field hidden" id="selField">
         <span class="lab">CSS selector <span class="hint">— e.g. <code>#price</code> or <code>.status</code></span></span>
@@ -419,6 +421,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.9.3</strong> — Made the &ldquo;Render in a browser&rdquo; option clearer: an &#9432; tooltip and plainer wording explain that you can usually leave it off — the Test button turns it on for you when a page actually needs it.</li>
         <li><strong>v0.9.2</strong> — Tidied the &ldquo;Render in a browser&rdquo; option in the add/edit form — the label and its description no longer squeeze into a cramped column.</li>
         <li><strong>v0.9.1</strong> — More check-frequency options for pages that change slowly: every 2 days, every 3 days, once a week, every 2 weeks, and once a month. (A monitor that hits a temporary error still retries within a few hours, so a monthly one won't sit broken for a month.)</li>
         <li><strong>v0.9.0</strong> — Every change alert now <em>always</em> includes a screenshot — and for pages we can only read through jina, the screenshot is taken by jina too, so it shows the real value instead of a blank. Plus a <em>safe fallback</em>: if a monitor's usual method is briefly down, Spyglass can use another method to confirm nothing changed — but it will never send a change alert based on a different method, so no false alarms.</li>
@@ -453,7 +456,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.9.2";
+  const APP_VERSION = "0.9.3";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
