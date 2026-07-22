@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.122';
+const VERSION = '1.0.123';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2721,7 +2721,7 @@ const HELP_SECTIONS = [
     points: [
       'Chart your credit scores over time by provider. Adding a score, the provider is a dropdown of the ones you’ve used before (plus common ones); pick “Add new provider…” to enter a different one.',
       'All-time and current-year high/low cards sit above the chart — like a stock’s range — each naming the provider that reported it (credit models differ between providers, so the source matters).',
-      'Log savings APYs per bank; some (e.g. Synchrony) can auto-sync from a public rate feed.'
+      'Log savings APYs per bank — the bank is a dropdown of ones you’ve logged (plus your Settings list), with “Add new institution…” to enter another. All-time and current-year high/low cards sit above the chart, each naming the bank. Some banks (e.g. Synchrony) can auto-sync from a public rate feed.'
     ] },
   { id: 'taxes', ico: '§', title: 'Taxes', what: 'Your tax-filing history.',
     points: ['Record each year’s forms, whether you got a refund or owed, prep cost, and preparer — original filings and amendments.'] },
@@ -5106,6 +5106,30 @@ function rateSyncButtons(store) {
     return b;
   });
 }
+// High/low APY range, like a stock's all-time and 52-week band — the best and
+// worst rate you've recorded, each naming the bank that had it (rates are tracked
+// per institution, so which bank is the point).
+function ratesHiLoCards(store, all) {
+  const scored = all.filter(r => r.apy != null && r.apy !== '' && !isNaN(Number(r.apy)))
+    .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const wrap = el('div', 'sub-summary');
+  if (!scored.length) return wrap;
+  const hiOf = arr => arr.reduce((best, r) => Number(r.apy) > Number(best.apy) ? r : best, arr[0]);
+  const loOf = arr => arr.reduce((best, r) => Number(r.apy) < Number(best.apy) ? r : best, arr[0]);
+  const apyText = r => Number(r.apy).toFixed(2) + '%';
+  const sub = r => (rateInstitution(store, r) || 'Unknown') + ' · ' + fmtDate(r.date);
+  const hi = hiOf(scored), lo = loOf(scored);
+  wrap.appendChild(sumCard('All-time high', apyText(hi), 'income', sub(hi)));
+  wrap.appendChild(sumCard('All-time low', apyText(lo), '', sub(lo)));
+  const yr = new Date().getFullYear();
+  const yrRows = scored.filter(r => (r.date || '').slice(0, 4) === String(yr));
+  if (yrRows.length) {
+    const yhi = hiOf(yrRows), ylo = loOf(yrRows);
+    wrap.appendChild(sumCard(yr + ' high', apyText(yhi), 'income', sub(yhi)));
+    wrap.appendChild(sumCard(yr + ' low', apyText(ylo), '', sub(ylo)));
+  }
+  return wrap;
+}
 function renderRatesTab(view) {
   const store = window.cloverStore, s = store.state;
   autoSyncRates(store);
@@ -5115,6 +5139,8 @@ function renderRatesTab(view) {
     view.appendChild(emptyState('No savings rates yet', 'Log a bank’s APY over time to compare how each institution’s rate moves.', '+ Add rate', () => rateModal(null)));
     return;
   }
+
+  view.appendChild(ratesHiLoCards(store, s.rateHistory));
 
   normalizeChartRange(allRows);
   view.appendChild(chartRangeControls(allRows, () => renderView(currentRoute)));
@@ -5183,23 +5209,32 @@ function rateModal(existing) {
   const store = window.cloverStore, s = store.state;
   const r = existing ? Object.assign({}, existing) : { date: todayISO() };
   const body = el('div', 'form-grid');
-  const instList = el('datalist'); instList.id = 'rate-inst-list';
-  s.catalog.institutions.slice().sort((a, b) => a.name.localeCompare(b.name))
-    .forEach(i => { const o = el('option'); o.value = i.name; instList.appendChild(o); });
-  body.appendChild(instList);
-
   const fDate = input(r.date || todayISO(), { type: 'date' });
-  const fInst = input(rateInstitution(store, r), { placeholder: 'e.g. Ally', list: 'rate-inst-list' });
   const fApy = input(r.apy != null ? r.apy : '', { type: 'number', placeholder: 'e.g. 3.75' }); fApy.step = '0.01';
+  // Institution dropdown: the ones you've already logged first, then the Settings
+  // catalog, then "Add new" which reveals a text field for a fresh bank.
+  const used = [...new Set(s.rateHistory.map(x => rateInstitution(store, x)).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const opts = used.concat(s.catalog.institutions.map(i => i.name).filter(n => n && !used.includes(n)).sort((a, b) => a.localeCompare(b)));
+  const cur = rateInstitution(store, r) || '';
+  const known = !!cur && opts.includes(cur);
+  const recent = s.rateHistory.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(x => rateInstitution(store, x)).find(Boolean);
+  const instDflt = existing ? (known ? cur : '__other') : (recent || opts[0] || '__other');
+  const fInstSel = select(opts.map(n => ({ value: n, label: n })).concat([{ value: '__other', label: '＋ Add new institution…' }]), instDflt);
+  const fInstNew = input(known ? '' : cur, { placeholder: 'e.g. Ally, Marcus' });
+  const instNewWrap = el('div'); instNewWrap.style.marginTop = '6px'; instNewWrap.appendChild(fInstNew);
+  instNewWrap.style.display = fInstSel.value === '__other' ? '' : 'none';
+  fInstSel.addEventListener('change', () => { instNewWrap.style.display = fInstSel.value === '__other' ? '' : 'none'; if (fInstSel.value === '__other') fInstNew.focus(); });
+  const instNode = el('div'); instNode.appendChild(fInstSel); instNode.appendChild(instNewWrap);
+  const instVal = () => (fInstSel.value === '__other' ? fInstNew.value : fInstSel.value).trim();
   body.appendChild(field('Date', fDate, 'When this rate was in effect.'));
-  body.appendChild(field('Bank / institution', fInst, 'Which bank the APY is for (e.g. Ally, Synchrony). Rates are tracked per institution and each is charted as its own line. Pick from the list or type your own; manage the list in Settings.'));
+  body.appendChild(field('Bank / institution', instNode, 'Which bank the APY is for (e.g. Ally, Synchrony). Rates are tracked per institution and each is charted as its own line. Pick one you’ve logged before, or “Add new institution…” to enter another; manage the full list in Settings.'));
   body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date.'));
 
   openModal({
     title: existing ? 'Edit rate' : 'Add rate', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
-      const inst = fInst.value.trim();
-      if (!inst) { fInst.focus(); toast('Enter a bank / institution', 'warn'); return false; }
+      const inst = instVal();
+      if (!inst) { fInstSel.focus(); toast('Enter a bank / institution', 'warn'); return false; }
       const apy = parseFloat(fApy.value);
       if (isNaN(apy)) { fApy.focus(); toast('APY is required', 'warn'); return false; }
       const entry = Object.assign(r, { date: fDate.value || todayISO(), institution: inst, apy });

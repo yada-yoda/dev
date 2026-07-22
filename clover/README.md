@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.123 — Savings rates: bank dropdown + high/low range cards
+
+The same treatment the credit-score tab just got, now on **Savings rates**.
+Adding a rate, the **bank** is a dropdown of the ones you’ve already logged
+(plus your Settings institution list), defaulting to the one you used most
+recently; pick **“Add new institution…”** to type a different one.
+
+Above the chart there’s now an **all-time and current-year high/low** of your
+APYs — the best and worst rate you’ve recorded — each **naming the bank** that
+had it, since rates are tracked per institution and which bank is the whole
+point.
+
 ### v1.0.122 — Credit scores: provider dropdown + high/low range cards
 
 Adding a credit score, the **provider** is now a dropdown of the ones you’ve
