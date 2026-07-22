@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.121';
+const VERSION = '1.0.122';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2719,7 +2719,8 @@ const HELP_SECTIONS = [
     ] },
   { id: 'credit', ico: '％', title: 'Credit & Rates', what: 'Credit-score history and savings-rate history.',
     points: [
-      'Chart your credit scores over time by provider.',
+      'Chart your credit scores over time by provider. Adding a score, the provider is a dropdown of the ones you’ve used before (plus common ones); pick “Add new provider…” to enter a different one.',
+      'All-time and current-year high/low cards sit above the chart — like a stock’s range — each naming the provider that reported it (credit models differ between providers, so the source matters).',
       'Log savings APYs per bank; some (e.g. Synchrony) can auto-sync from a public rate feed.'
     ] },
   { id: 'taxes', ico: '§', title: 'Taxes', what: 'Your tax-filing history.',
@@ -4984,10 +4985,37 @@ function buildRatesCol(store, key) {
   return null;
 }
 
+// High/low summary, like a stock's all-time and 52-week range. Credit models
+// differ between providers (a Credit Karma VantageScore isn't a FICO 8), so each
+// high/low names the provider that reported it — the record is across everything
+// you've logged, and the provider tells you which model that number came from.
+function creditHiLoCards(all) {
+  const scored = all.filter(r => r.score != null && r.score !== '' && !isNaN(Number(r.score)))
+    .slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+  const wrap = el('div', 'sub-summary');
+  if (!scored.length) return wrap;
+  // Ties keep the earliest date — the day the record was first set.
+  const hiOf = arr => arr.reduce((best, r) => Number(r.score) > Number(best.score) ? r : best, arr[0]);
+  const loOf = arr => arr.reduce((best, r) => Number(r.score) < Number(best.score) ? r : best, arr[0]);
+  const sub = r => (r.provider || 'Unknown') + ' · ' + fmtDate(r.date);
+  const hi = hiOf(scored), lo = loOf(scored);
+  wrap.appendChild(sumCard('All-time high', String(hi.score), 'income', sub(hi)));
+  wrap.appendChild(sumCard('All-time low', String(lo.score), '', sub(lo)));
+  const yr = new Date().getFullYear();
+  const yrScores = scored.filter(r => (r.date || '').slice(0, 4) === String(yr));
+  if (yrScores.length) {
+    const yhi = hiOf(yrScores), ylo = loOf(yrScores);
+    wrap.appendChild(sumCard(yr + ' high', String(yhi.score), 'income', sub(yhi)));
+    wrap.appendChild(sumCard(yr + ' low', String(ylo.score), '', sub(ylo)));
+  }
+  return wrap;
+}
 function renderCreditTab(view) {
   const store = window.cloverStore, s = store.state;
   const allRows = s.creditScores.slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
   if (!allRows.length) { view.appendChild(emptyState('No credit scores yet', 'Log your scores over time to chart them by provider (Credit Karma, Chase, Amex, etc.).', '+ Add score', () => creditScoreModal(null))); return; }
+
+  view.appendChild(creditHiLoCards(s.creditScores));
 
   normalizeChartRange(allRows);
   view.appendChild(chartRangeControls(allRows, () => renderView(currentRoute)));
@@ -5119,23 +5147,33 @@ function creditScoreModal(existing) {
   const store = window.cloverStore, s = store.state;
   const r = existing ? Object.assign({}, existing) : { date: todayISO() };
   const body = el('div', 'form-grid');
-  const provList = el('datalist'); provList.id = 'prov-list';
-  [...new Set(COMMON_PROVIDERS.concat(s.creditScores.map(x => x.provider).filter(Boolean)))].forEach(p => { const o = el('option'); o.value = p; provList.appendChild(o); });
-  body.appendChild(provList);
-
   const fDate = input(r.date || todayISO(), { type: 'date' });
   const fScore = input(r.score != null ? r.score : '', { type: 'number', placeholder: '300–850' }); fScore.min = 300; fScore.max = 900;
-  const fProv = input(r.provider || '', { placeholder: 'e.g. Credit Karma', list: 'prov-list' });
+  // Provider dropdown: the ones you've already logged first, then common
+  // suggestions, then "Add new" which reveals a text field for a fresh name.
+  const used = [...new Set(s.creditScores.map(x => x.provider).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  const opts = used.concat(COMMON_PROVIDERS.filter(p => !used.includes(p)));
+  const cur = r.provider || '';
+  const known = !!cur && opts.includes(cur);
+  const recent = s.creditScores.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(x => x.provider).find(Boolean);
+  const provDflt = existing ? (known ? cur : '__other') : (recent || opts[0] || '__other');
+  const fProvSel = select(opts.map(p => ({ value: p, label: p })).concat([{ value: '__other', label: '＋ Add new provider…' }]), provDflt);
+  const fProvNew = input(known ? '' : cur, { placeholder: 'e.g. myFICO, Rocket Money' });
+  const provNewWrap = el('div'); provNewWrap.style.marginTop = '6px'; provNewWrap.appendChild(fProvNew);
+  provNewWrap.style.display = fProvSel.value === '__other' ? '' : 'none';
+  fProvSel.addEventListener('change', () => { provNewWrap.style.display = fProvSel.value === '__other' ? '' : 'none'; if (fProvSel.value === '__other') fProvNew.focus(); });
+  const provNode = el('div'); provNode.appendChild(fProvSel); provNode.appendChild(provNewWrap);
+  const provVal = () => (fProvSel.value === '__other' ? fProvNew.value : fProvSel.value).trim();
   body.appendChild(field('Date', fDate, 'When this score was reported.'));
   body.appendChild(field('Score', fScore, 'The credit score number (usually 300–850).'));
-  body.appendChild(field('Provider', fProv, 'Who reported it — Credit Karma, Chase, Amex, a bureau, etc. Charted as its own line.'));
+  body.appendChild(field('Provider', provNode, 'Who reported it — pick one you’ve logged before, or “Add new provider…” to enter another (Credit Karma, a bureau, myFICO, etc.). Each provider is charted as its own line.'));
 
   openModal({
     title: existing ? 'Edit score' : 'Add score', body: withHistoryTab(body, existing), confirmLabel: 'Save',
     onConfirm: () => {
       const score = parseInt(fScore.value, 10);
       if (isNaN(score)) { fScore.focus(); toast('Score is required', 'warn'); return false; }
-      store.saveCreditScore(Object.assign(r, { date: fDate.value || todayISO(), score, provider: fProv.value.trim() }));
+      store.saveCreditScore(Object.assign(r, { date: fDate.value || todayISO(), score, provider: provVal() }));
       toast(existing ? 'Score updated' : 'Score added');
     }
   });

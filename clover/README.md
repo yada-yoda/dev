@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.122 — Credit scores: provider dropdown + high/low range cards
+
+Adding a credit score, the **provider** is now a dropdown of the ones you’ve
+already logged (plus common ones like Credit Karma and the bureaus), defaulting
+to the one you used most recently. Need a different one? Pick **“Add new
+provider…”** and a field appears to type it — no more retyping the same name.
+
+Above the chart there’s now a **stock-ticker-style range**: all-time high and
+low, plus this year’s high and low. Each one **names the provider that reported
+it**, on purpose — a Credit Karma VantageScore and a FICO 8 aren’t the same
+scale, so the source matters when you’re eyeing a record.
+
 ### v1.0.121 — FOMC dates now keep themselves current (no manual step)
 
 The FOMC schedule used to be a built-in list that needed a hand-update each
