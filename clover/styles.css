@@ -575,6 +575,9 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .cal-dot.amber { background: var(--warn); }
 .cal-event.blue { background: #e6eefb; color: #2563eb; }
 .cal-dot.blue { background: #2563eb; }
+.cal-event.purple { background: #efe9fb; color: #7c3aed; }
+.cal-dot.purple { background: #7c3aed; }
+.badge.purple { background: #efe9fb; color: #7c3aed; }
 .cal-more { color: var(--text-faint); font-size: 10px; }
 .cal-month { font-weight: 600; font-size: 15px; padding: 0 6px; }
 

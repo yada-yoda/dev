@@ -433,6 +433,9 @@ window.cloverStore = {
     scheduleSave(); notify();
   },
   setGcal(patch) { state.settings.gcal = Object.assign({}, state.settings.gcal, patch); scheduleSave(); notify(); },
+  // Generic top-level settings flag (e.g. showFomc). Use for simple booleans that
+  // don't warrant their own method; anything structured deserves a dedicated one.
+  setSetting(key, val) { state.settings[key] = val; scheduleSave(); notify(); },
   addExtraYear(y) {
     y = Math.floor(+y);
     if (!y || y < 1980 || y > 2100) return false;

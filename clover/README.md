@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.120 — FOMC meeting dates on the calendar (and Google Calendar)
+
+The Fed’s rate-decision meetings are now built in — the backdrop for your
+savings APYs, CDs, and loan rates. They show on the **Calendar** (a purple
+marker on each decision day) and as an **Upcoming FOMC meetings** list on the
+**Credit & Rates** page, and they push to your Google Calendar along with
+everything else. Dates only — no meeting minutes. The projection (“dot plot”)
+meetings are tagged. Hide the whole thing under **Settings → Calendar → Show
+FOMC meeting dates**.
+
+On keeping it current: the Fed doesn’t publish a machine-readable feed, only an
+HTML calendar, and they post dates about 18 months out. So the schedule is
+built in (loaded through **2027** right now) rather than fetched, which is more
+reliable than scraping a web page. The Credit & Rates card shows how far it’s
+loaded and puts up a reminder when it’s within a few months of running out, so
+the once-a-year refresh from federalreserve.gov doesn’t get forgotten.
+
 ### v1.0.119 — Turn the CD email reminder on or off in Settings
 
 The CD maturity email from v1.0.118 now has a switch: **Settings → Calendar
