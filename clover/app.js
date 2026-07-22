@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.120';
+const VERSION = '1.0.121';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -108,6 +108,9 @@ if (window.cloverAuth && window.cloverAuth.currentUser()) {
   currentUser = window.cloverAuth.currentUser();
   renderAuthState();
 }
+
+// Public reference data (FOMC dates) — fetched independently of sign-in.
+loadFomc();
 
 function renderAuthState() {
   const gate = document.getElementById('signin-gate');
@@ -2727,7 +2730,7 @@ const HELP_SECTIONS = [
     points: [
       'Shows expected pay dates, bill renewals, CD maturities (with a 7-day heads-up), and FOMC rate-decision dates. Click any day for the full detail.',
       'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Turn this off under Settings → Calendar. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.',
-      'FOMC meeting dates (when the Fed sets interest rates) are built in and shown on the Calendar and the Credit & Rates page — dates only, no minutes. They push to Google too. Hide them under Settings → Calendar. The schedule is refreshed once a year from the Fed’s official page.'
+      'FOMC meeting dates (when the Fed sets interest rates) are built in and shown on the Calendar and the Credit & Rates page — dates only, no minutes. They push to Google too. Hide them under Settings → Calendar. The dates keep themselves current — a scheduled job re-reads the Fed’s official calendar every month, so nothing manual is needed.'
     ] },
   { id: 'import', ico: '⇅', title: 'Import / Export', what: 'Get data in and out.',
     points: [
@@ -4927,7 +4930,7 @@ function fomcCard() {
   card.appendChild(sectionHead('FOMC meetings', 'When the Fed sets interest rates — the backdrop for your APYs, CDs, and loan rates'));
   if (!fomcShown()) card.appendChild(el('div', 'budget-reminder', 'Hidden from the Calendar right now — turn “Show FOMC meeting dates” back on under Settings → Calendar.'));
   const today = todayISO();
-  const upcoming = FOMC_MEETINGS.filter(m => m.end >= today).slice(0, 5);
+  const upcoming = fomcMeetings().filter(m => m.end >= today).slice(0, 5);
   if (!upcoming.length) {
     card.appendChild(el('div', 'muted', 'The built-in schedule has run out — time to add the next year’s dates.'));
   } else {
@@ -4946,11 +4949,12 @@ function fomcCard() {
   if (fomcNeedsRefresh()) {
     const warn = el('div', 'budget-reminder');
     warn.style.marginTop = '10px';
-    warn.textContent = 'Heads-up: the built-in FOMC schedule runs out after ' + fomcLoadedThroughYear() + '. Add next year’s dates from the official calendar below.';
+    warn.textContent = 'Heads-up: the FOMC schedule only runs through ' + fomcLoadedThroughYear() + '. The monthly auto-update extends it once the Fed posts the next year; if this lingers past then, check the refresh job (or add the dates from the calendar below).';
     card.appendChild(warn);
   }
   const note = el('p', 'muted'); note.style.marginTop = '10px';
-  note.appendChild(document.createTextNode('The decision lands on the second day of each meeting (~2:00 PM ET). Dates only, no minutes. Official schedule, loaded through ' + fomcLoadedThroughYear() + ': '));
+  const srcNote = _fomcLive ? ('Auto-updated ' + (_fomcUpdated ? fmtDate(_fomcUpdated) : 'recently') + ' from the Fed’s calendar by a scheduled job — no manual step. ') : 'Using the built-in schedule (live update not loaded yet). ';
+  note.appendChild(document.createTextNode(srcNote + 'The decision lands on the second day of each meeting (~2:00 PM ET). Dates only, no minutes. Loaded through ' + fomcLoadedThroughYear() + ': '));
   const a = el('a', null, 'federalreserve.gov/monetarypolicy/fomccalendars.htm');
   a.href = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm'; a.target = '_blank'; a.rel = 'noopener noreferrer';
   note.appendChild(a);
@@ -6336,7 +6340,7 @@ function yoyOverview(store) {
 // second day at ~2:00 PM ET. `sep` marks meetings with a Summary of Economic
 // Projections (the "dot plot"). Dates only — no minutes, by request.
 // ============================================================
-const FOMC_MEETINGS = [
+const FOMC_SEED = [
   { start: '2025-01-28', end: '2025-01-29' },
   { start: '2025-03-18', end: '2025-03-19', sep: true },
   { start: '2025-05-06', end: '2025-05-07' },
@@ -6362,11 +6366,30 @@ const FOMC_MEETINGS = [
   { start: '2027-10-26', end: '2027-10-27' },
   { start: '2027-12-07', end: '2027-12-08', sep: true }
 ];
+// Live FOMC schedule. A GitHub Action refreshes clover/fomc.json from the Fed's
+// calendar every month; the app fetches that same-origin file (no CORS) and uses
+// it in place of the built-in seed. Any failure — offline, 404, malformed —
+// falls back to FOMC_SEED, so the calendar is never empty or wrong. No Claude and
+// no server of our own in the loop.
+let _fomcLive = null, _fomcUpdated = '';
+function fomcMeetings() { return _fomcLive || FOMC_SEED; }
+function loadFomc() {
+  fetch('fomc.json?d=' + new Date().toISOString().slice(0, 10), { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(j => {
+      const ms = j && Array.isArray(j.meetings) ? j.meetings : null;
+      if (!ms || ms.length < 8 || !ms.every(m => /^\d{4}-\d{2}-\d{2}$/.test(m.start) && /^\d{4}-\d{2}-\d{2}$/.test(m.end))) return;
+      _fomcLive = ms.slice().sort((a, b) => a.start.localeCompare(b.start));
+      _fomcUpdated = j.updated || '';
+      if (currentRoute === 'calendar' || currentRoute === 'credit') renderView(currentRoute);
+    })
+    .catch(() => {});
+}
 function fomcShown() { return (window.cloverStore.state.settings.showFomc !== false); }   // default on
-function fomcLoadedThroughYear() { return FOMC_MEETINGS[FOMC_MEETINGS.length - 1].end.slice(0, 4); }
+function fomcLoadedThroughYear() { return fomcMeetings()[fomcMeetings().length - 1].end.slice(0, 4); }
 // The schedule needs refreshing once we're within ~5 months of running out —
 // surfaced in the FOMC card so the annual update can't be silently forgotten.
-function fomcNeedsRefresh() { const last = FOMC_MEETINGS[FOMC_MEETINGS.length - 1]; const d = daysUntil(last.end); return d != null && d < 150; }
+function fomcNeedsRefresh() { const last = fomcMeetings()[fomcMeetings().length - 1]; const d = daysUntil(last.end); return d != null && d < 150; }
 // "Jul 28-29, 2026", or "Apr 30 - May 1, 2026" across a month boundary.
 function fomcRangeText(m) {
   const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(m.start), b = /^(\d{4})-(\d{2})-(\d{2})/.exec(m.end);
@@ -6414,7 +6437,7 @@ function calendarEvents(store, year, month) {
         events.push({ day: r.getDate(), type: 'CD reminder', label: name + ' matures in 7 days (' + fmtDate(a.cdMaturity) + ')', tone: 'amber', gid: 'cdr-' + a.id });
     }
   });
-  if (fomcShown()) FOMC_MEETINGS.forEach(mtg => {
+  if (fomcShown()) fomcMeetings().forEach(mtg => {
     const d = dateInMonth(mtg.end, year, month);
     if (d) events.push({ day: d, type: 'FOMC', label: 'FOMC rate decision' + (mtg.sep ? ' + projections' : ''), tone: 'purple', gid: 'fomc-' + mtg.end });
   });

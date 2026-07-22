@@ -1,0 +1,46 @@
+# Keeps clover/fomc.json current with the Fed's FOMC meeting schedule, with no
+# Claude and no server of our own in the loop. Runs monthly (the Fed posts the
+# next year's dates ~mid-year, so monthly catches it within weeks), parses the
+# official calendar page, and commits fomc.json only when the dates actually
+# change. The parser refuses to write anything that doesn't validate, so a Fed
+# page redesign can stall updates but never corrupt the data — the app falls
+# back to the last good fomc.json and its built-in seed.
+
+name: Refresh Clover FOMC dates
+
+on:
+  schedule:
+    - cron: '23 8 5 * *'    # 08:23 UTC on the 5th of each month
+  workflow_dispatch: {}      # allow manual runs from the Actions tab
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Refresh FOMC schedule from federalreserve.gov
+        run: node clover/scripts/refresh-fomc.mjs
+
+      - name: Commit fomc.json (only if the dates changed)
+        run: |
+          if git diff --quiet -- clover/fomc.json; then
+            echo "No change to FOMC schedule."
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add clover/fomc.json
+          git commit -m "Clover: auto-refresh FOMC schedule from federalreserve.gov"
+          git push

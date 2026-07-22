@@ -45,6 +45,25 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.121 — FOMC dates now keep themselves current (no manual step)
+
+The FOMC schedule used to be a built-in list that needed a hand-update each
+year. Now it maintains itself: a scheduled GitHub Action reads the Fed’s
+official calendar every month, writes the dates to a small `fomc.json`, and the
+app loads that. Nothing to remember, and nothing runs on your machine — it’s
+GitHub’s cron plus a static file the site already serves.
+
+It’s deliberately can’t-break-your-data: the refresh script refuses to write
+anything that doesn’t look like a valid schedule, so if the Fed ever redesigns
+their page the updates just pause (and the Credit & Rates card will say so)
+rather than corrupting anything. If the file is ever missing or unreadable, the
+app falls back to the dates baked into the code. The Credit & Rates card now
+shows when the schedule was last auto-updated.
+
+The refresh script lives at `clover/scripts/refresh-fomc.mjs` and the workflow
+at `.github/workflows/clover-fomc.yml`; both are safe to run by hand from the
+Actions tab.
+
 ### v1.0.120 — FOMC meeting dates on the calendar (and Google Calendar)
 
 The Fed’s rate-decision meetings are now built in — the backdrop for your
