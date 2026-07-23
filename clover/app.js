@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.125';
+const VERSION = '1.0.126';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1635,15 +1635,15 @@ function accountModal(existing) {
   const fNotes = document.createElement('textarea'); fNotes.value = a.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
   const fBenef = document.createElement('textarea'); fBenef.value = a.beneficiaries || ''; fBenef.rows = 2; fBenef.placeholder = 'e.g. names and any % split';
 
-  const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 12 months' });
+  const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 13 or 12 months' });
   const fStart = input(a.cdStart || '', { type: 'date' });
   const fPrincipal = moneyInput(a.cdPrincipal != null && a.cdPrincipal !== '' ? a.cdPrincipal : '', { placeholder: 'optional' });
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
   const fMat = input(a.cdMaturity || '', { type: 'date' });
   const fCdApyDate = input(a.apyAsOf || '', { type: 'date' });
   const cdWrap = el('div', 'cd-fields');
-  cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD — e.g. "12 months".'));
-  cdWrap.appendChild(field('Start / opened date', fStart, 'When this CD term began. If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.'));
+  cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD. A number alone means months — 13 is 13 months — or write it out ("18 months", "1 year"). Used to estimate the start date when one isn’t recorded.'));
+  cdWrap.appendChild(field('Start date', fStart, 'When this CD term began (the day it was opened). If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.'));
   if (a.cdStartEst && a.cdStart) cdWrap.appendChild(el('div', 'muted', 'This start date is estimated (maturity − term). Edit it to confirm the real date.'));
   cdWrap.appendChild(field('Principal $', fPrincipal, 'How much is in this CD — e.g. 10000.00. Optional, but it powers the timeline’s principal totals and the maturing-money ladder.'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
@@ -1678,7 +1678,9 @@ function accountModal(existing) {
         const cb = checkbox(o.name + (o.last4 ? ' ••' + o.last4 : '') + (o.cdPrincipal ? ' · ' + money(Number(o.cdPrincipal)) : ''), false);
         consolChecks.push({ cb, o }); cwrap.appendChild(cb);
       });
-      renewWrap.appendChild(field('Also consolidate these CDs into this one', cwrap, 'Tick any CD whose money was combined into this renewal. Each one is marked closed (dated today) and linked here, and the timeline draws the merge — so the money is never counted twice.'));
+      const consolField = field('Also consolidate these CDs into this one', cwrap, 'Tick any CD whose money was combined into this renewal. Each one is marked closed (dated today) and linked here, and the timeline draws the merge — so the money is never counted twice.');
+      consolField.style.gridColumn = '1 / -1';
+      renewWrap.appendChild(consolField);
     }
     const du = daysUntil(a.cdMaturity);
     const soon = du != null && du <= 14;

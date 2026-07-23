@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.126 — CD terms entered as plain numbers now work everywhere
+
+The timeline showed “no CD has enough dates to draw” and start dates weren’t
+being estimated — because the CD terms were entered as plain numbers (“13”)
+and the term parser insisted on a unit (“13 months”). A bare number now means
+months, which is how CDs are quoted anyway. On your next load every CD gets
+its estimated start date (maturity minus term, marked *estimated*) and the
+timeline draws them all.
+
+Also from the same feedback: the CD fields in the account form got wider
+spacing so labels can’t crowd each other, the “Start / opened date” label
+shortened to **Start date** (it was wrapping onto three lines and making the
+columns read wrong), and the Renew section now spans the full width of the
+form instead of being squeezed into one column.
+
 ### v1.0.125 — CD maturity timeline, consolidation, start dates & tidier filter rows
 
 **Click the CD badge in the Accounts table** (the type column) and a timeline

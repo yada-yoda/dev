@@ -189,7 +189,10 @@ function stampSaved(entry) {
 // free-text term ("12 months", "1 year"); subMonthsClamped does REAL calendar
 // math with the day clamped (May 31 minus 3 months is Feb 28/29, not Mar 3).
 function parseTermMonths(t) {
-  const m = /([\d.]+)[\s-]*(year|yr|month|mo)/i.exec(String(t || ''));   // "12 months", "18-month", "1yr"
+  const s2 = String(t || '').trim();
+  // A bare number is months — CDs are conventionally quoted that way ("13" = 13 months).
+  if (/^\d+(\.\d+)?$/.test(s2)) return Math.round(parseFloat(s2)) || null;
+  const m = /([\d.]+)[\s-]*(year|yr|month|mo)/i.exec(s2);   // "12 months", "18-month", "1yr"
   if (!m) return null;
   const n = parseFloat(m[1]); if (!n) return null;
   const u = m[2].toLowerCase();

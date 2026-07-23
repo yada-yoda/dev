@@ -315,10 +315,13 @@ button { font-family: inherit; cursor: pointer; }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.cd-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.cd-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; align-items: start; }
 /* Reserve a consistent label height (≥ 2 lines) so inputs line up even when
    some labels wrap and others don't. */
 .cd-fields .field > span { min-height: 3em; display: block; }
+/* Non-field children (renew button row, the renew sub-form, estimated-date
+   notes) span the whole grid instead of being squeezed into one column. */
+.cd-fields > *:not(.field) { grid-column: 1 / -1; }
 .check-row { display: flex; flex-wrap: wrap; gap: 8px 16px; }
 .check { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: var(--text); }
 .check input { width: 15px; height: 15px; accent-color: var(--accent); }
