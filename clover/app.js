@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.134';
+const VERSION = '1.0.135';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -53,6 +53,7 @@ let incomeAmountMode = 'gross';     // annual grid shows 'gross' | 'net' amounts
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
 let accountsFilter = null;   // { key, value } from clicking a value badge
+let accountsCdTimeline = false;   // CD maturity timeline shown (separate from the value filter)
 let accountsTab = 'open';    // Accounts page: 'open' | 'closed'
 let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
@@ -1019,6 +1020,13 @@ function valueBadge(scope, colKey, text) {
   b.title = 'Click to show only “' + text + '”';
   b.addEventListener('click', ev => {
     ev.stopPropagation();
+    if (scope === 'accounts' && colKey === 'type' && text === 'CD') {
+      accountsCdTimeline = !accountsCdTimeline;
+      if (accountsCdTimeline && accountsFilter && accountsFilter.key === 'type') accountsFilter = null;
+      accountsTab = 'open';
+      renderView(currentRoute); return;
+    }
+    if (scope === 'accounts' && colKey === 'type') accountsCdTimeline = false;
     const cur = tableFilterGet(scope);
     tableFilterSet(scope, (cur && cur.key === colKey && cur.value === text) ? null : { key: colKey, value: text });
     renderView(currentRoute);
@@ -1154,14 +1162,14 @@ function cdTiso(t) { return new Date(t).toISOString().slice(0, 10); }
 
 // One row per CD account (a lineage); cycles = archived terms + the current
 // one, chained so each renewal starts the day the previous term matured.
-function cdTimelineData(store) {
+function cdTimelineData(store, accts) {
   const rows = [];
   const links = [];
   const est = (mat, term) => {
     const mo = store.parseTermMonths(term);
     return mo ? store.subMonthsClamped(mat, mo) : '';
   };
-  store.state.accounts.filter(a => a.type === 'CD' && (a.cdMaturity || (a.cdRenewals || []).length)).forEach(a => {
+  (accts || store.state.accounts).filter(a => a.type === 'CD' && (a.cdMaturity || (a.cdRenewals || []).length)).forEach(a => {
     const cycles = [];
     const arch = a.cdRenewals || [];
     arch.forEach((t, i) => {
@@ -1193,9 +1201,9 @@ const CDTL_STATUS = {
   consolidated: { fill: '#ececef', stroke: '#9ca3af', text: '#4b5563', label: 'Consolidated' }
 };
 
-function cdTimelinePanel(store) {
+function cdTimelinePanel(store, accts) {
   const card = el('div', 'card cdtl-card');
-  const data = cdTimelineData(store);
+  const data = cdTimelineData(store, accts);
   const head = el('div', 'view-head');
   const hl = el('div');
   hl.appendChild(el('h3', 'strip-title', 'CD maturity timeline'));
@@ -1543,12 +1551,13 @@ function renderAccounts(view) {
   // switched, so it can't be missed. Toggle semantics: sets/clears the same
   // type=CD filter that clicking a CD badge does.
   if (s.accounts.some(a => a.type === 'CD' && !a.closed)) {
-    const cdOn = accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
+    const cdOn = accountsCdTimeline;
     const cdTab = el('button', 'tab' + (cdOn ? ' active' : ''), '⧗ CD timeline');
     cdTab.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
       : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates; the table also gains a Principal column with each amount\u2019s as-of date';
     cdTab.addEventListener('click', () => {
-      accountsFilter = cdOn ? null : { key: 'type', value: 'CD' };
+      accountsCdTimeline = !cdOn;
+      if (accountsCdTimeline && accountsFilter && accountsFilter.key === 'type') accountsFilter = null;
       accountsTab = 'open';   // the timeline lives on the Open tab
       renderView(currentRoute);
     });
@@ -1556,14 +1565,21 @@ function renderAccounts(view) {
   }
   view.appendChild(tabs);
 
-  const baseAccts = onClosed ? closedAccts : openAccts;
+  // CD-timeline mode: base set is your open CDs; a value badge (institution,
+  // owner, beneficiary) narrows within them - a type filter is meaningless here.
+  const cdMode = accountsCdTimeline && !onClosed && openAccts.some(a => a.type === 'CD');
+  const secFilter = accountsFilter && accountsFilter.key !== 'type' ? accountsFilter : null;
+  const effFilter = cdMode ? secFilter : accountsFilter;
+  const valOfKey = (a, key) => key === 'owner' ? store.personName(a.personId) : key === 'beneficiaries' ? beneficiaryText(a) : (a[key] || '');
+  let baseAccts = onClosed ? closedAccts : openAccts;
+  if (cdMode) baseAccts = baseAccts.filter(a => a.type === 'CD');
   const dataCols = onClosed
     ? ['name', 'type', 'institution', 'last4', 'owner', 'closedDate'].map(k => buildAcctCol(store, k)).filter(Boolean)
     : tableColKeys(store, 'accounts', ACCT_COL_LABELS, ACCT_DEFAULT_COLS).map(k => buildAcctCol(store, k)).filter(Boolean);
   // With the CD timeline open, principal is the number that matters — surface
   // it as its own column (with the as-of date under each amount) even when the
   // user hasn't added the Balance column to their saved layout.
-  const cdFilterOn = !onClosed && accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
+  const cdFilterOn = cdMode;
   if (cdFilterOn && !dataCols.some(c => c && c.key === 'balance')) {
     const pc = buildAcctCol(store, 'balance');
     if (pc) { pc.label = 'Principal'; dataCols.push(pc); }
@@ -1586,19 +1602,20 @@ function renderAccounts(view) {
   if (!onClosed) { const bestCal = bestCardCallout(store); if (bestCal) view.appendChild(bestCal); }
 
   let acctRows = baseAccts;
-  if (accountsFilter) {
-    const f = accountsFilter;
-    const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? beneficiaryText(a) : (a[f.key] || '');
-    acctRows = baseAccts.filter(a => valOf(a) === f.value);
+  if (effFilter) acctRows = baseAccts.filter(a => valOfKey(a, effFilter.key) === effFilter.value);
+  // The timeline visualizes ALL matching CDs (open + closed/consolidated, so its
+  // own "show matured" toggle still works), narrowed by any active value badge.
+  if (cdMode) {
+    let cdSet = s.accounts.filter(a => a.type === 'CD');
+    if (secFilter) cdSet = cdSet.filter(a => valOfKey(a, secFilter.key) === secFilter.value);
+    view.appendChild(cdTimelinePanel(store, cdSet));
+    const g = cdPrincipalGrowthCard(store, cdSet); if (g) view.appendChild(g);
   }
-  // Filtering to CDs reveals the maturity timeline above the table.
-  if (cdFilterOn) view.appendChild(cdTimelinePanel(store));
-  if (cdFilterOn) { const g = cdPrincipalGrowthCard(store); if (g) view.appendChild(g); }
   // The active-filter chip shares the ⚙ Columns row — a filter shouldn't cost
   // a whole row of empty space. Same pattern as the other filtered tables.
   const acctTools = el('div', 'table-tools');
-  if (accountsFilter) {
-    const f = accountsFilter;
+  if (effFilter) {
+    const f = effFilter;
     const info = el('span', 'muted', 'Showing ' + acctRows.length + ' account' + (acctRows.length === 1 ? '' : 's') + ' where ' + (ACCT_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”');
     info.style.marginRight = 'auto';
     const clear = el('button', 'btn-ghost', '✕ Clear filter');
@@ -1709,9 +1726,9 @@ function cdRenewalsPanel(a) {
 // distinct dates and, at each, the TOTAL across CDs = sum of each CD's latest
 // known principal at-or-before that date (a step function — growth as money is
 // added or balances are updated). Pure — no DOM.
-function cdPrincipalSnapshots(store) {
+function cdPrincipalSnapshots(store, accts) {
   const series = [];
-  store.state.accounts.filter(a => a.type === 'CD').forEach(a => {
+  (accts || store.state.accounts).filter(a => a.type === 'CD').forEach(a => {
     const byDate = {};
     const add = (iso, val) => {
       const d = String(iso || '').slice(0, 10);
@@ -1731,8 +1748,8 @@ function cdPrincipalSnapshots(store) {
   }, 0);
   return { series, allDates, totals: allDates.map(totalAt) };
 }
-function cdPrincipalGrowthCard(store) {
-  const snap = cdPrincipalSnapshots(store);
+function cdPrincipalGrowthCard(store, accts) {
+  const snap = cdPrincipalSnapshots(store, accts);
   if (!snap.series.length) return null;   // no principals entered anywhere
   const card = el('div', 'card');
   card.appendChild(el('h3', 'strip-title', 'CD principal over time'));
@@ -3432,7 +3449,7 @@ const HELP_SECTIONS = [
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. With it open, click an institution, owner, or beneficiary label in the table to narrow the timeline and its charts to just that group. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },

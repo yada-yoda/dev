@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.135 — Filter the CD timeline by institution, owner, or beneficiary
+
+With the CD timeline open, clicking an **institution, owner, or beneficiary**
+label in the table now narrows the **timeline and both charts** to just that
+group — instead of (as before) replacing the CD view and hiding the timeline.
+So you can see, say, only your Ally CDs, or only the ones in a joint owner’s
+name, with the summary cards, maturing-ladder, growth chart, and estimated
+interest all recomputed for that subset. The timeline is now a proper mode
+(the ⧗ tab or clicking the CD badge toggles it) that a value filter narrows,
+rather than being the filter itself. Clear the filter to go back to all CDs.
+
 ### v1.0.134 — Managed beneficiary list, % total, and clearer current-term bars
 
 **Beneficiaries you can pick from.** Settings now has a **Beneficiaries** list
