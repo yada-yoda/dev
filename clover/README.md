@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.143 — Click a quarter to see exactly which CDs are in it
+
+On the CD timeline’s **Maturing principal by quarter** ladder, clicking a
+quarter now opens a panel listing **every CD maturing in it, in full** —
+institution, owner, term (with the years spelled out), start and maturity dates
+(with days remaining), APY and principal with their as-of dates, estimated
+interest for the term, beneficiaries, past renewals, and notes — each with an
+**Open / renew** button. The matching timeline rows still highlight behind it;
+click the quarter again to clear.
+
+The ladder also looks tidier: every quarter tile is now **exactly the same
+size** in an evenly-spaced grid (bars share a fixed-height well so their
+heights stay comparable), each tile shows its CD count, and the whole strip
+reflows properly on a phone.
+
 ### v1.0.142 — Interest rows expand to individual accounts
 
 Building on the last release: click the **CDs** row (or **Checking & Savings**,

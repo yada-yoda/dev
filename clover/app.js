@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.142';
+const VERSION = '1.0.143';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1256,6 +1256,46 @@ const CDTL_STATUS = {
   consolidated: { fill: '#ececef', stroke: '#9ca3af', text: '#4b5563', label: 'Consolidated' }
 };
 
+// Everything about the CDs maturing in one quarter of the ladder.
+function cdQuarterModal(qk, rows) {
+  const store = window.cloverStore;
+  const label = qk.replace('-', ' ');
+  const body = el('div');
+  const known = rows.filter(r => r.a.cdPrincipal != null && r.a.cdPrincipal !== '');
+  const total = known.reduce((s2, r) => s2 + Number(r.a.cdPrincipal), 0);
+  body.appendChild(el('p', 'muted', rows.length + ' CD' + (rows.length === 1 ? '' : 's') + ' maturing in ' + label +
+    (known.length ? ' · ' + money(total) + ' becoming available' + (known.length < rows.length ? ' (from the ' + known.length + ' with a principal entered)' : '') : ' · no principals entered yet')));
+  const list = el('div', 'hist-list');
+  rows.slice().sort((x, y) => (x.a.cdMaturity || '').localeCompare(y.a.cdMaturity || '')).forEach(r => {
+    const a = r.a;
+    const e = el('div', 'hist-entry');
+    e.appendChild(el('div', 'hist-when', a.name + (a.last4 ? ' ••' + a.last4 : '')));
+    const line = (lbl, val) => { if (val === '' || val == null) return; const d = el('div', 'mini-row'); d.appendChild(el('span', 'muted', lbl)); d.appendChild(el('span', null, val)); e.appendChild(d); };
+    line('Institution', a.institution || '');
+    const owner = store.personName(a.personId); line('Owner', owner && owner !== '—' ? owner : '');
+    const mo = store.parseTermMonths(a.cdTerm);
+    line('Term', a.cdTerm ? (mo ? mo + ' month' + (mo === 1 ? '' : 's') + (mo >= 12 ? ' (' + cdTermYears(mo) + ')' : '') : a.cdTerm) + (a.cdTermEst ? ' ≈' : '') : '');
+    line('Start', a.cdStart ? fmtDate(a.cdStart) + (a.cdStartEst ? ' (est.)' : '') : '');
+    const du = daysUntil(a.cdMaturity);
+    line('Matures', fmtDate(a.cdMaturity) + (du == null ? '' : du < 0 ? ' · ' + (-du) + ' days ago' : du === 0 ? ' · today' : ' · in ' + du + ' days'));
+    line('APY', (a.cdApy !== '' && a.cdApy != null) ? Number(a.cdApy).toFixed(2) + '%' + (a.apyAsOf ? ' (as of ' + fmtDate(a.apyAsOf) + ')' : '') : '');
+    line('Principal', (a.cdPrincipal !== '' && a.cdPrincipal != null) ? money(Number(a.cdPrincipal)) + (a.cdPrincipalAsOf ? ' (as of ' + fmtDate(a.cdPrincipalAsOf) + ')' : '') : '');
+    // Interest this term would earn at the stated rate — an estimate, never income.
+    if (mo && a.cdApy !== '' && a.cdApy != null && a.cdPrincipal !== '' && a.cdPrincipal != null)
+      line('Est. interest this term', money(Number(a.cdPrincipal) * (Number(a.cdApy) / 100) * (mo / 12)) + ' (estimate)');
+    line('Beneficiaries', beneficiaryText(a));
+    if ((a.cdRenewals || []).length) line('Past terms', a.cdRenewals.length + ' renewal' + (a.cdRenewals.length === 1 ? '' : 's'));
+    if ((a.cdFundedBy || []).length) line('Consolidated in', a.cdFundedBy.reduce((n2, f) => n2 + (f.sources || []).length, 0) + ' source CD(s)');
+    line('Notes', firstLine(a.notes || ''));
+    const btn = el('button', 'btn-ghost', '↻ Open / renew');
+    btn.addEventListener('click', () => { closeModal(); accountModal(a); });
+    e.appendChild(btn);
+    list.appendChild(e);
+  });
+  body.appendChild(list);
+  body.appendChild(el('div', 'sum-hint', 'Current terms only — a CD already renewed into a new term is counted under that new term, not here.'));
+  openModal({ title: 'Maturing in ' + label, body, hideConfirm: true, onConfirm: () => {} });
+}
 function cdTimelinePanel(store, accts) {
   const card = el('div', 'card cdtl-card');
   const data = cdTimelineData(store, accts);
@@ -1387,7 +1427,8 @@ function cdTimelinePanel(store, accts) {
   const qKey = t => { const d = new Date(t); return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); };
   const qMap = {};
   open.forEach(r => { const t = cdTms(r.a.cdMaturity); if (t == null) return; const k = qKey(t);
-    (qMap[k] = qMap[k] || { total: 0, n: 0, known: 0 }).n++;
+    (qMap[k] = qMap[k] || { total: 0, n: 0, known: 0, rows: [] }).n++;
+    qMap[k].rows.push(r);
     if (r.a.cdPrincipal != null && r.a.cdPrincipal !== '') { qMap[k].total += Number(r.a.cdPrincipal); qMap[k].known++; } });
   const qKeys = Object.keys(qMap).sort();
   if (qKeys.length) {
@@ -1396,12 +1437,21 @@ function cdTimelinePanel(store, accts) {
     qKeys.forEach(k => {
       const q = qMap[k];
       const cell = el('button', 'cdtl-q' + (cdTLopts.hlQ === k ? ' hl' : ''));
-      cell.title = q.n + ' CD' + (q.n === 1 ? '' : 's') + ' maturing · ' + (q.known ? money(q.total) + (q.known < q.n ? ' (from ' + q.known + ' with principal entered)' : '') : 'no principals entered') + ' — click to highlight those rows';
-      const barEl = el('div', 'cdtl-q-bar'); barEl.style.height = Math.max(4, Math.round(q.total / maxQ * 36)) + 'px';
-      cell.appendChild(barEl);
+      cell.title = q.n + ' CD' + (q.n === 1 ? '' : 's') + ' maturing · ' + (q.known ? money(q.total) + (q.known < q.n ? ' (from ' + q.known + ' with principal entered)' : '') : 'no principals entered') + ' — click to see which accounts';
+      // Bars live in a fixed-height well so every tile is the same size and the
+      // heights stay comparable.
+      const well = el('div', 'cdtl-q-well');
+      const barEl = el('div', 'cdtl-q-bar'); barEl.style.height = Math.max(4, Math.round((q.total / maxQ) * 40)) + 'px';
+      well.appendChild(barEl); cell.appendChild(well);
       cell.appendChild(el('div', 'cdtl-q-amt', q.known ? money(q.total) : q.n + '×'));
       cell.appendChild(el('div', 'cdtl-q-lbl', k.replace('-', ' ')));
-      cell.addEventListener('click', () => { cdTLopts.hlQ = cdTLopts.hlQ === k ? null : k; renderView(currentRoute); });
+      cell.appendChild(el('div', 'cdtl-q-n', q.n + ' CD' + (q.n === 1 ? '' : 's')));
+      cell.addEventListener('click', () => {
+        const on = cdTLopts.hlQ !== k;
+        cdTLopts.hlQ = on ? k : null;   // highlight the matching timeline rows
+        renderView(currentRoute);
+        if (on) cdQuarterModal(k, q.rows);
+      });
       lrow.appendChild(cell);
     });
     ladder.appendChild(lrow);

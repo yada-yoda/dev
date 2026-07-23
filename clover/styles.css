@@ -655,13 +655,24 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .cdtl-tip-name { font-weight: 600; }
 .cdtl-ladder { margin-top: 12px; }
 .cdtl-ladder-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
-.cdtl-ladder-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
-.cdtl-q { border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 6px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; min-width: 64px; }
+/* Every quarter tile is the SAME size — equal columns that wrap, a fixed-height
+   bar well, and a fixed footer — so the row reads as one uniform strip. */
+.cdtl-ladder-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; align-items: stretch; }
+.cdtl-q { box-sizing: border-box; height: 108px; border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 8px 6px 6px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 3px; cursor: pointer; text-align: center; overflow: hidden; }
 .cdtl-q:hover { border-color: var(--accent); }
 .cdtl-q.hl { border-color: var(--accent); background: var(--accent-soft); }
+.cdtl-q-well { height: 44px; display: flex; align-items: flex-end; flex-shrink: 0; }
 .cdtl-q-bar { width: 26px; background: var(--accent); border-radius: 3px 3px 0 0; opacity: 0.8; }
-.cdtl-q-amt { font-size: 11.5px; font-weight: 700; }
-.cdtl-q-lbl { font-size: 10.5px; color: var(--text-muted); }
+.cdtl-q-amt { font-size: 11.5px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cdtl-q-lbl { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+.cdtl-q-n { font-size: 10px; color: var(--text-faint); white-space: nowrap; }
+@media (max-width: 560px) {
+  .cdtl-ladder-row { grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 6px; }
+  .cdtl-q { height: 96px; padding: 6px 4px 5px; }
+  .cdtl-q-well { height: 34px; }
+  .cdtl-q-bar { width: 20px; }
+  .cdtl-q-amt { font-size: 11px; }
+}
 @media (max-width: 640px) { .cdtl-names { flex-basis: 130px; max-width: 130px; } .cdtl-name-2 { display: none; } }
 .cal-more { color: var(--text-faint); font-size: 10px; }
 .cal-month { font-weight: 600; font-size: 15px; padding: 0 6px; }
