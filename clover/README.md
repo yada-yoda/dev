@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.138 — CD term field holds just the number, with a “months” label
+
+The CD term field was showing “9 months” inside the editable box (because a
+calculated term is stored that way), which is awkward to edit. Now the field
+holds just the number and **“months” sits as a label to its right** — clearer
+when entering or editing. Opening a calculated term and saving it unchanged no
+longer strips its ≈ (estimated) marker.
+
 ### v1.0.137 — Consistent CD term column with a years breakdown
 
 The CD term column was inconsistent — a term typed as “7” showed as bare “7”

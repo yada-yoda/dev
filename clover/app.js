@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.137';
+const VERSION = '1.0.138';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1843,7 +1843,9 @@ function accountModal(existing) {
   const fNotes = document.createElement('textarea'); fNotes.value = a.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
   const fBenef = beneficiaryEditor(beneficiaryList(a));
 
-  const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 13 or 12 months' });
+  const termMo0 = store.parseTermMonths(a.cdTerm);
+  const fTerm = input(termMo0 != null ? String(termMo0) : (a.cdTerm || ''), { placeholder: 'e.g. 12' });
+  fTerm.__wrap = el('div', 'unit-input'); fTerm.__wrap.appendChild(fTerm); fTerm.__wrap.appendChild(el('span', 'unit-suffix', 'months'));
   const fStart = input(a.cdStart || '', { type: 'date' });
   const fPrincipal = moneyInput(a.cdPrincipal != null && a.cdPrincipal !== '' ? a.cdPrincipal : '', { placeholder: 'optional' });
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
@@ -1879,7 +1881,8 @@ function accountModal(existing) {
   const rApy = input('', { type: 'number', placeholder: 'e.g. 4.25' }); rApy.step = '0.01'; rApy.min = 0;
   const rStart = input(a.cdMaturity || '', { type: 'date' });
   const rMat = input('', { type: 'date' });
-  const rTerm = input('', { placeholder: a.cdTerm ? 'e.g. ' + a.cdTerm : 'e.g. 12 months' });
+  const rTerm = input('', { placeholder: 'e.g. 12 (blank keeps current)' });
+  rTerm.__wrap = el('div', 'unit-input'); rTerm.__wrap.appendChild(rTerm); rTerm.__wrap.appendChild(el('span', 'unit-suffix', 'months'));
   const rLast4 = input('', { placeholder: a.last4 ? 'blank = keep ••' + a.last4 : 'optional' }); rLast4.maxLength = 4; rLast4.inputMode = 'numeric';
   const rPrincipal = moneyInput('', { placeholder: a.cdPrincipal ? 'blank = keep ' + money(Number(a.cdPrincipal)) : 'optional' });
   const consolChecks = [];
@@ -2017,7 +2020,7 @@ function accountModal(existing) {
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(),
-        cdTermEst: fTerm.value.trim() ? (fTerm.value.trim() === (a.cdTerm || '') ? !!a.cdTermEst : false) : false,
+        cdTermEst: fTerm.value.trim() ? (store.parseTermMonths(fTerm.value) === store.parseTermMonths(a.cdTerm) ? !!a.cdTermEst : false) : false,
         cdApy: fApy.value.trim(), cdMaturity: fMat.value,
         cdStart: fStart.value || '', cdStartEst: fStart.value ? (fStart.value === (a.cdStart || '') ? !!a.cdStartEst : false) : false,
         cdPrincipal: fPrincipal.value === '' ? '' : parseFloat(fPrincipal.value),

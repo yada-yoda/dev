@@ -323,6 +323,10 @@ button { font-family: inherit; cursor: pointer; }
 .field input[type="date"] { padding: 0 4px 0 8px; }
 /* "≈ this value was calculated, not typed" marker — tooltip explains how. */
 .est-mark { color: var(--warn); font-weight: 700; margin-left: 5px; cursor: help; font-size: 13px; }
+/* An input with a static unit label attached (e.g. CD term + "months"). */
+.unit-input { display: flex; align-items: stretch; }
+.unit-input > input { flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.unit-suffix { flex-shrink: 0; display: flex; align-items: center; padding: 0 10px; border: 1px solid var(--border-strong); border-left: none; border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--surface-2); color: var(--text-muted); font-size: 13px; white-space: nowrap; }
 /* Beneficiaries: name + % + remove on one row, repeatable. */
 .benef-editor { display: flex; flex-direction: column; gap: 6px; }
 .benef-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px 30px; gap: 8px; align-items: center; }
