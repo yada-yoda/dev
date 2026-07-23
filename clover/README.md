@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.137 — Consistent CD term column with a years breakdown
+
+The CD term column was inconsistent — a term typed as “7” showed as bare “7”
+while others read “6 months.” Now every term shows the same way (**“7 months”**,
+**“13 months”**), and anything a year or longer gets a grey sub-line spelling it
+out — **“1 year 1 month”**, **“1 year 6 months”**, **“5 years.”** The column
+also sorts by actual duration now instead of alphabetically.
+
 ### v1.0.136 — Renewing a CD asks for the new term’s start date
 
 The renew form no longer assumes the new term begins the day you click Renew.

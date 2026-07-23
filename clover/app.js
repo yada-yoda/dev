@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.136';
+const VERSION = '1.0.137';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1040,6 +1040,14 @@ function latestRateFor(store, institution) {
   if (!rows.length) return null;
   return rows.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''))[0];
 }
+// A month count spelled in years + months for the grey sub-line: 13 -> "1 year
+// 1 month", 60 -> "5 years", 18 -> "1 year 6 months".
+function cdTermYears(mo) {
+  const y = Math.floor(mo / 12), m = mo % 12, parts = [];
+  if (y) parts.push(y + ' year' + (y === 1 ? '' : 's'));
+  if (m) parts.push(m + ' month' + (m === 1 ? '' : 's'));
+  return parts.join(' ');
+}
 function buildAcctCol(store, key) {
   switch (key) {
     case 'name': return { label: 'Name', key: 'name', value: a => a.name, cell: a => {
@@ -1083,11 +1091,15 @@ function buildAcctCol(store, key) {
         const asOf = a.type === 'CD' ? a.cdPrincipalAsOf : a.balanceAsOf;
         if (asOf) { const s2 = el('div', 'acct-sub', 'as of ' + fmtDate(asOf)); s2.title = 'When this balance was last entered or updated'; td.appendChild(s2); }
         return td; } };
-    case 'cdTerm': return { label: 'CD term', key: 'cdTerm', value: a => a.cdTerm || '', cell: a => {
+    case 'cdTerm': return { label: 'CD term', key: 'cdTerm', num: true, value: a => (a.type === 'CD' ? store.parseTermMonths(a.cdTerm) : 0) || 0, cell: a => {
         const td = el('td');
+        const mo = a.type === 'CD' && a.cdTerm ? store.parseTermMonths(a.cdTerm) : null;
         if (a.type === 'CD' && a.cdTerm) {
-          td.appendChild(document.createTextNode(a.cdTerm));
+          // Always show the unit so "7" and "6 months" read the same; fall back
+          // to the raw text only if it can't be parsed to a month count.
+          td.appendChild(document.createTextNode(mo ? mo + ' month' + (mo === 1 ? '' : 's') : a.cdTerm));
           if (a.cdTermEst) { const m = el('span', 'est-mark', '≈'); m.title = 'Calculated from the start and maturity dates, not entered by hand.'; td.appendChild(m); }
+          if (mo && mo >= 12) { const sub = el('div', 'acct-sub', cdTermYears(mo)); sub.title = mo + ' months'; td.appendChild(sub); }
         } else td.textContent = '—';
         return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
