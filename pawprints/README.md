@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.54.0**
+**Current Version: v0.54.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.54.1** — **Reorder link on supplies** — a new "Reorder link" field on each supply item. Paste
+  the product page URL and a **↗ Reorder** button appears on the item and — most usefully — right in
+  the **Restock list** when it's running low, so you can re-buy the exact item in one tap. Included in
+  the spreadsheet export. (Only http/https links are accepted, for safety.)
 - **v0.54.0** — **Fresh-water reminder** — the Today page and header bell now nudge you when the
   water bowl hasn't been refilled in a while (defaults to 24 hours, tracking your most recent refill
   and its location). A new **Settings → Lists & preferences → Fresh-water reminder** control lets you

@@ -235,7 +235,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.54.0';
+const APP_VERSION = 'v0.54.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1218,7 +1218,7 @@ async function exportXLSX(){
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
-  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
@@ -2227,6 +2227,7 @@ function invModal(id, pre){
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased</label><input class="input" id="iv-store" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"></div>'
     +'<div><label class="label">UPC / barcode'+tip('The product barcode number — handy for re-ordering the exact item.')+'</label><input class="input" id="iv-upc" inputmode="numeric" value="'+(it?esc(it.upc||''):'')+'" placeholder="012345678905"></div></div>'
+    +'<label class="label">Reorder link'+tip('Paste the product page URL (Chewy, Amazon, the store site). A "Reorder" link then shows on the item and — most usefully — next to it in the Restock list when it\'s running low, so you can re-buy the exact item in one tap.')+'</label><input class="input" type="url" id="iv-url" value="'+(it?esc(it.reorderUrl||''):'')+'" placeholder="https://…">'
     +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="iv-paidby" value="'+(it?esc(it.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
@@ -2260,7 +2261,7 @@ function saveInv(id){
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const noLifecycle = document.getElementById('iv-nolife').checked;
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), reorderUrl:fv('iv-url'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -3221,6 +3222,9 @@ function renderIllnessTab(){
 // ── SUPPLIES ──
 // Lifecycle from the date fields: no start = on-hand inventory, start = in use, end = finished.
 function invStatus(i){ if(i.noLifecycle) return 'Item'; return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
+// Only allow http(s) reorder links (reject javascript:/data:/etc.); bare domains get https:// prefixed.
+function safeUrl(u){ u=(u||'').trim(); if(!u) return ''; if(/^https?:\/\//i.test(u)) return u; if(/^[a-z][a-z0-9+.\-]*:/i.test(u)) return ''; return 'https://'+u; }
+function reorderLink(i){ const u = safeUrl(i && i.reorderUrl); return u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Reorder this item — opens the product page">↗ Reorder</a>' : ''; }
 function daysBetween(a, b){ if(!a||!b) return null; const d1 = new Date(a+'T00:00'), d2 = new Date(b+'T00:00'); if(isNaN(d1)||isNaN(d2)) return null; return Math.round((d2-d1)/86400000); }
 // "5 days in use" while open, or "used 20 days" once finished.
 function invDurationText(i){
@@ -3264,7 +3268,7 @@ function renderSupplies(){
   html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+all.length+'</div><div class="stat-label">Items tracked</div></div>'
     + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(ytd)+'</div><div class="stat-label">Spent this year</div></div>'
     + '<div class="card stat-card"><div class="stat-value" style="color:'+(low.length?'var(--warning)':'var(--text-secondary)')+'">'+low.length+'</div><div class="stat-label">Running low</div></div></div>';
-  if(low.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('restock',18)+' Restock list</h3>'+low.map(i=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('supplies',18)+'</span><span style="flex:1">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span><button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
+  if(low.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('restock',18)+' Restock list</h3>'+low.map(i=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('supplies',18)+'</span><span style="flex:1;min-width:0">'+esc((i.brand?i.brand+' ':'')+i.name)+'</span>'+reorderLink(i)+'<button class="btn btn-sm" onclick="toggleLow(\''+i.id+'\')">Got it</button></div>').join('')+'</div>';
   // Filter tabs: all built-in + custom categories, plus any category present on an item (legacy).
   const presentCats = all.map(i=>i.category).filter(Boolean);
   const cats = ['all', ...new Set([...catOptions(), ...presentCats])];
@@ -3282,7 +3286,7 @@ function renderSupplies(){
       st==='Inventory' ? '<button class="btn btn-sm btn-accent" onclick="event.stopPropagation();startInv(\''+i.id+'\')" title="Start using this item — stamps today as the opened date">Start</button>'
       : st==='In use' ? '<button class="btn btn-sm" onclick="event.stopPropagation();finishInv(\''+i.id+'\')" title="Mark used up — stamps today as the finished date">Finish</button>'
       : '') : '';
-    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+action+'</div>';
+    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc((i.brand?i.brand+' — ':'')+i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+esc(i.category)+(i.qty?' · '+esc(i.qty)+' '+esc(i.unit||''):'')+(i.size?' · '+esc(i.size):'')+(i.purchaseDate?' · '+fmtDate(i.purchaseDate):'')+(i.store?' · '+esc(i.store):'')+(i.startDate?' · opened '+fmtDate(i.startDate):'')+(i.endDate?' · finished '+fmtDate(i.endDate):'')+(invDurationText(i)?' · '+invDurationText(i):'')+'</div></div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+reorderLink(i)+action+'</div>';
   }).join('')+'</div>';
   return html;
 }
@@ -3689,8 +3693,8 @@ function enterDemo(){
       { id:'rc5', petId:pid, type:'Test / Lab work', name:'Annual bloodwork', testedFor:'Heartworm (4Dx)', result:'Negative', date:dAgo(55), vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'55.00', nextDue:'', notes:'' },
     ],
     inventory: [
-      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', size:'30 lb', cost:'62.99', purchaseDate:dAgo(14), startDate:dAgo(12), store:'Chewy', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, trackCost:true, notes:'' },
-      { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), runningLow:true, notes:'' },
+      { id:'inv1', petId:pid, category:'Food', brand:'Purina Pro Plan', name:'Sensitive Skin & Stomach 30lb', qty:'1', unit:'bag', size:'30 lb', cost:'62.99', purchaseDate:dAgo(14), startDate:dAgo(12), store:'Chewy', reorderUrl:'https://www.chewy.com/', paidBy:'You', payMethod:'Credit card', ccBrand:'Visa', ccLast4:'4242', runningLow:false, trackCost:true, notes:'' },
+      { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), store:'Amazon', reorderUrl:'amazon.com', runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
       { id:'inv4', petId:pid, category:'Other', brand:'', name:'Engraved ID tag', qty:'1', unit:'', cost:'14.99', purchaseDate:dAgo(58), noLifecycle:true, notes:'On the collar' },
     ],
