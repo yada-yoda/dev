@@ -208,6 +208,32 @@ function subMonthsClamped(iso, months) {
 // Backfill an ESTIMATED start (flagged cdStartEst) for CDs recorded before the
 // start-date field existed — an estimate is presented as one, never as fact,
 // and editing the field in the modal replaces it with the real date.
+// Whole calendar months from start to maturity — the reverse of
+// subMonthsClamped, with the same clamp awareness: Jan 31 -> Feb 28 counts as
+// one month (Feb simply has no 31st), not zero.
+function monthsBetween(startIso, endIso) {
+  const a = /^(\d{4})-(\d{2})-(\d{2})/.exec(startIso || ''), b = /^(\d{4})-(\d{2})-(\d{2})/.exec(endIso || '');
+  if (!a || !b) return null;
+  let months = (+b[1] - +a[1]) * 12 + (+b[2] - +a[2]);
+  const d1 = +a[3], d2 = +b[3];
+  const endDim = new Date(+b[1], +b[2], 0).getDate();
+  if (d2 < d1 && d2 !== endDim) months -= 1;
+  return months >= 1 ? months : null;
+}
+// The mirror of migrateCdStarts: a CD with both dates but no recorded term gets
+// one CALCULATED from them, flagged cdTermEst so the UI can say it wasn't typed.
+function migrateCdTerms(accounts) {
+  let changed = false;
+  (accounts || []).forEach(a => {
+    if (a.type !== 'CD' || a.cdTerm || !a.cdStart || !a.cdMaturity) return;
+    const mo = monthsBetween(a.cdStart, a.cdMaturity);
+    if (!mo) return;
+    a.cdTerm = mo + ' months';
+    a.cdTermEst = true;
+    changed = true;
+  });
+  return changed;
+}
 function migrateCdStarts(accounts) {
   let changed = false;
   (accounts || []).forEach(a => {
@@ -221,7 +247,7 @@ function migrateCdStarts(accounts) {
   return changed;
 }
 
-const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy', 'balanceAsOf', 'cdPrincipalAsOf']);
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy', 'balanceAsOf', 'cdPrincipalAsOf', 'cdStartEst', 'cdTermEst']);
 const HISTORY_MAX = 25;
 function histSnap(v) {
   if (v == null || v === '') return '';
@@ -401,6 +427,7 @@ function apply(data) {
   state.accounts = s.accounts;
   if (migrateAccountApyDates(state.accounts)) scheduleSave();
   if (migrateCdStarts(state.accounts)) scheduleSave();
+  if (migrateCdTerms(state.accounts)) scheduleSave();
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;
   state.creditScores = s.creditScores || [];
@@ -477,7 +504,7 @@ window.cloverStore = {
     scheduleSave(); notify();
   },
   setGcal(patch) { state.settings.gcal = Object.assign({}, state.settings.gcal, patch); scheduleSave(); notify(); },
-  parseTermMonths, subMonthsClamped,
+  parseTermMonths, subMonthsClamped, monthsBetween,
   // Generic top-level settings flag (e.g. showFomc). Use for simple booleans that
   // don't warrant their own method; anything structured deserves a dedicated one.
   setSetting(key, val) { state.settings[key] = val; scheduleSave(); notify(); },

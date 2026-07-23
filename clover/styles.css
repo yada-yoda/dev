@@ -315,7 +315,14 @@ button { font-family: inherit; cursor: pointer; }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring);
 }
-.cd-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 18px; align-items: start; }
+/* auto-fit with a floor: a field (especially a date) never squeezes below
+   150px — the grid wraps to fewer columns instead of truncating values. */
+.cd-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 18px; align-items: start; }
+/* Date inputs need MM/DD/YYYY plus the picker icon — trim the side padding so
+   the full date always shows. */
+.field input[type="date"] { padding: 0 4px 0 8px; }
+/* "≈ this value was calculated, not typed" marker — tooltip explains how. */
+.est-mark { color: var(--warn); font-weight: 700; margin-left: 5px; cursor: help; font-size: 13px; }
 /* Reserve a consistent label height (≥ 2 lines) so inputs line up even when
    some labels wrap and others don't. */
 .cd-fields .field > span { min-height: 3em; display: block; }

@@ -45,6 +45,35 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.130 — Calculated CD terms, honest ≈ markers, weighted bars & wider fields
+
+**Terms calculate themselves too.** The reverse of the start-date estimate: a
+CD with both dates but no term gets one calculated (whole calendar months from
+start to maturity, clamp-aware — Jan 31 → Feb 28 counts as one month). Both
+directions now also happen immediately on save, not just at next load.
+
+**The ≈ marker.** Anywhere Clover *calculated* a value instead of you typing
+it — an estimated start date, a derived term — an **≈ symbol** now sits next
+to the field, and its tooltip says exactly how the number was computed and
+what to check if it looks wrong. Editing the value by hand clears the marker.
+An automatic assumption can never pass as something you entered. The marker
+also shows in the Renewals tab and the timeline tooltip.
+
+**Principal on the timeline bars.** Bars are now **thicker for bigger CDs**
+(scaled gently so one large CD doesn’t flatten the rest) and print the dollar
+amount inside when there’s room — you can see at a glance which CD is the
+heavyweight. CDs without a principal entered stay default thickness, implying
+nothing.
+
+**Fields fit their values now.** Date inputs were truncating (“12/23/202…”).
+Field grids now wrap to fewer columns rather than squeezing any field below a
+readable width, and date inputs got tighter padding so MM/DD/YYYY plus the
+picker icon always fit. This is now a standing design rule for every future
+form.
+
+**The ⧗ CD timeline moved to the tab row** — it now sits right next to
+Open/Closed where you switch views, so it can’t be missed.
+
 ### v1.0.129 — Principal column appears with the CD timeline
 
 While the CD maturity timeline is open, the accounts table below it now shows

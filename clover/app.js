@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.129';
+const VERSION = '1.0.130';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1151,7 +1151,7 @@ function cdTimelineData(store) {
     });
     if (a.cdMaturity) {
       const start = a.cdStart || (arch.length ? arch[arch.length - 1].maturity : est(a.cdMaturity, a.cdTerm));
-      if (start) cycles.push({ s: cdTms(start), e: cdTms(a.cdMaturity), apy: a.cdApy, term: a.cdTerm, last4: a.last4, principal: a.cdPrincipal, estStart: !!a.cdStartEst || !a.cdStart, idx: arch.length, current: true });
+      if (start) cycles.push({ s: cdTms(start), e: cdTms(a.cdMaturity), apy: a.cdApy, term: a.cdTerm, last4: a.last4, principal: a.cdPrincipal, estStart: !!a.cdStartEst || !a.cdStart, termEst: !!a.cdTermEst, idx: arch.length, current: true });
     }
     const dated = cycles.filter(c => c.s != null && c.e != null && c.e > c.s);
     if (!dated.length) return;
@@ -1278,7 +1278,7 @@ function cdTimelinePanel(store) {
   body.appendChild(names); body.appendChild(plot);
   card.appendChild(body);
 
-  const hint = el('div', 'sum-hint', 'Drag ↔ to pan · scroll to zoom at the cursor · double-click resets · arrow keys pan, + / − zoom · dashed edge = estimated start date');
+  const hint = el('div', 'sum-hint', 'Bar thickness = principal (where entered) · Drag ↔ to pan · scroll to zoom at the cursor · double-click resets · arrow keys pan, + / − zoom · dashed edge = estimated start date');
   card.appendChild(hint);
 
   // ---- maturing ladder (current terms only; money that becomes available) ----
@@ -1351,17 +1351,26 @@ function cdTimelinePanel(store) {
     }
     // future space gets a whisper of shading so past vs future reads at a glance
     if (nowT > view.s && nowT < view.e) out += '<rect x="' + x(nowT) + '" y="' + AXISH + '" width="' + (W - x(nowT)) + '" height="' + (H - AXISH) + '" class="cdtl-future"/>';
-    // segments
+    // segments -- bar THICKNESS scales with principal (sqrt, so one big CD
+    // doesn't flatten the rest); no principal entered = default thickness,
+    // implying nothing. The $ amount also prints in the bar when it fits.
+    const maxP = Math.max.apply(null, [0].concat(rows.flatMap(r => r.cycles.map(c => Number(c.principal) || 0))));
+    const kFmt = p => '$' + (p >= 1000 ? (p / 1000).toFixed(p >= 10000 ? 0 : 1) + 'k' : Math.round(p));
     rows.forEach((r, ri) => {
-      const y = AXISH + ri * ROWH + 7;
-      const h = ROWH - 14;
       r.cycles.forEach(c => {
         if (c.e < view.s || c.s > view.e) return;
+        const p = Number(c.principal) || 0;
+        const h = (p > 0 && maxP > 0) ? Math.round(12 + (ROWH - 14 - 12) * Math.sqrt(p / maxP)) : ROWH - 14;
+        const y = AXISH + ri * ROWH + Math.round((ROWH - h) / 2);
         const cls = CDTL_STATUS[c.current ? r.status : 'matured'];
         const x1 = Math.max(x(c.s), 0), x2 = Math.min(x(c.e), W);
         const wpx = Math.max(x2 - x1, 2);
         out += '<rect x="' + x1 + '" y="' + y + '" width="' + wpx + '" height="' + h + '" rx="4" fill="' + cls.fill + '" stroke="' + cls.stroke + '"' + (c.estStart ? ' stroke-dasharray="4 3"' : '') + ' class="cdtl-seg"/>';
-        if (wpx > 46 && c.apy !== '' && c.apy != null) out += '<text x="' + (x1 + 5) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-seg-lbl" fill="' + cls.text + '">' + Number(c.apy).toFixed(2) + '%' + (wpx > 110 && c.term ? ' · ' + c.term : '') + '</text>';
+        let lbl = '';
+        if (p > 0 && wpx > 64) lbl = kFmt(p);
+        if (wpx > 46 && c.apy !== '' && c.apy != null) lbl += (lbl ? ' · ' : '') + Number(c.apy).toFixed(2) + '%';
+        if (wpx > 150 && c.term) lbl += (lbl ? ' · ' : '') + c.term;
+        if (lbl) out += '<text x="' + (x1 + 5) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-seg-lbl" fill="' + cls.text + '">' + lbl + '</text>';
         if (!c.current) out += '<text x="' + (x2 - 4) + '" y="' + (y + h / 2 + 4) + '" text-anchor="end" class="cdtl-seg-lbl" fill="' + cls.text + '">↻</text>';
         if (x(c.s) < 0) out += '<text x="2" y="' + (y + h / 2 + 4) + '" class="cdtl-cont">‹</text>';
         if (x(c.e) > W) out += '<text x="' + (W - 8) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-cont">›</text>';
@@ -1419,7 +1428,7 @@ function cdTimelinePanel(store) {
       const elapsed = Math.max(0, Math.min(days, Math.round((t - c.s) / CDTL_DAY)));
       html += '<div class="cdtl-tip-name">' + (r.a.institution ? r.a.institution + ' · ' : '') + r.a.name + (c.last4 ? ' ••' + c.last4 : '') + '</div>' +
         '<div>' + (c.current ? (c.idx > 0 ? 'Renewal ' + c.idx : 'Current term') : c.idx === 0 ? 'Original term' : 'Renewal ' + c.idx) + (r.a.consolidatedIntoId ? ' · consolidated into ' + (store.accountName(r.a.consolidatedIntoId) || 'another CD') : '') + '</div>' +
-        '<div>' + fmtDate(cdTiso(c.s)) + (c.estStart ? ' (est.)' : '') + ' → ' + fmtDate(cdTiso(c.e)) + (c.term ? ' · ' + c.term : '') + '</div>' +
+        '<div>' + fmtDate(cdTiso(c.s)) + (c.estStart ? ' (est.)' : '') + ' → ' + fmtDate(cdTiso(c.e)) + (c.term ? ' · ' + c.term + (c.termEst ? ' ≈' : '') : '') + '</div>' +
         '<div>' + (c.apy !== '' && c.apy != null ? Number(c.apy).toFixed(2) + '% APY' : 'APY —') + (c.principal !== '' && c.principal != null ? ' · ' + money(Number(c.principal)) : '') + '</div>' +
         '<div class="muted">' + elapsed + 'd elapsed · ' + Math.max(0, days - elapsed) + 'd remaining at this point</div>';
     }
@@ -1464,21 +1473,6 @@ function renderAccounts(view) {
   left.appendChild(el('p', 'muted', s.accounts.length + ' account' + (s.accounts.length === 1 ? '' : 's')));
   head.appendChild(left);
   const acctActions = el('div', 'head-actions');
-  // The timeline also opens by clicking a CD type badge, but a filter click is
-  // not discoverable — this button makes the feature visible. Toggle semantics:
-  // it sets/clears the same type=CD filter the badge uses.
-  if (s.accounts.some(a => a.type === 'CD' && !a.closed)) {
-    const cdOn = accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
-    const cdBtn = el('button', 'btn-ghost' + (cdOn ? ' active-ghost' : ''), '⧗ CD timeline');
-    cdBtn.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
-      : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates; while it\u2019s open the table also shows a Principal column with each amount\u2019s as-of date (filters the table to CDs)';
-    cdBtn.addEventListener('click', () => {
-      accountsFilter = cdOn ? null : { key: 'type', value: 'CD' };
-      accountsTab = 'open';   // the timeline lives on the Open tab
-      renderView(currentRoute);
-    });
-    acctActions.appendChild(cdBtn);
-  }
   const add = el('button', 'btn-primary', '+ Add account'); add.addEventListener('click', () => accountModal(null));
   acctActions.appendChild(add);
   head.appendChild(acctActions);
@@ -1501,6 +1495,21 @@ function renderAccounts(view) {
     b.addEventListener('click', () => { accountsTab = t; renderView(currentRoute); });
     tabs.appendChild(b);
   });
+  // The timeline rides the tab row — next to Open/Closed, where views get
+  // switched, so it can't be missed. Toggle semantics: sets/clears the same
+  // type=CD filter that clicking a CD badge does.
+  if (s.accounts.some(a => a.type === 'CD' && !a.closed)) {
+    const cdOn = accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
+    const cdTab = el('button', 'tab' + (cdOn ? ' active' : ''), '⧗ CD timeline');
+    cdTab.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
+      : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates; the table also gains a Principal column with each amount\u2019s as-of date';
+    cdTab.addEventListener('click', () => {
+      accountsFilter = cdOn ? null : { key: 'type', value: 'CD' };
+      accountsTab = 'open';   // the timeline lives on the Open tab
+      renderView(currentRoute);
+    });
+    tabs.appendChild(cdTab);
+  }
   view.appendChild(tabs);
 
   const baseAccts = onClosed ? closedAccts : openAccts;
@@ -1625,7 +1634,7 @@ function cdRenewalsPanel(a) {
     if (sub) e.appendChild(el('div', 'muted', sub));
     return e;
   };
-  list.appendChild(rowFor('Current term', a.cdTerm, a.cdApy, a.cdMaturity, a.last4, '', a.cdStart, a.cdPrincipal, a.cdStartEst));
+  list.appendChild(rowFor('Current term', a.cdTerm ? a.cdTerm + (a.cdTermEst ? ' ≈' : '') : a.cdTerm, a.cdApy, a.cdMaturity, a.last4, '', a.cdStart, a.cdPrincipal, a.cdStartEst));
   (a.cdRenewals || []).slice().reverse().forEach((t, i, arr) => {
     const label = 'Previous term' + (arr.length > 1 ? ' · ' + (arr.length - i) : '');
     const e = rowFor(label, t.term, t.apy, t.maturity, t.last4, t.at ? 'renewed ' + fmtDate(t.at) : '', t.start || '', t.principal != null ? t.principal : '', false);
@@ -1681,9 +1690,20 @@ function accountModal(existing) {
   const fMat = input(a.cdMaturity || '', { type: 'date' });
   const fCdApyDate = input(a.apyAsOf || '', { type: 'date' });
   const cdWrap = el('div', 'cd-fields');
-  cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD. A number alone means months — 13 is 13 months — or write it out ("18 months", "1 year"). Used to estimate the start date when one isn’t recorded.'));
-  cdWrap.appendChild(field('Start date', fStart, 'When this CD term began (the day it was opened). If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.'));
-  if (a.cdStartEst && a.cdStart) cdWrap.appendChild(el('div', 'muted', 'This start date is estimated (maturity − term). Edit it to confirm the real date.'));
+  const termField = field('CD term', fTerm, 'The length of the CD. A number alone means months — 13 is 13 months — or write it out ("18 months", "1 year"). Left blank with both dates known, it’s calculated from start → maturity.');
+  if (a.cdTermEst && a.cdTerm) {
+    const m = el('span', 'est-mark', '≈');
+    m.title = 'Calculated, not entered by hand: whole months from the start date to the maturity date. If it looks wrong, one of those dates is — edit this field to type the real term and the marker goes away.';
+    termField.querySelector('span').appendChild(m);
+  }
+  cdWrap.appendChild(termField);
+  const startField = field('Start date', fStart, 'When this CD term began (the day it was opened). If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.');
+  if (a.cdStartEst && a.cdStart) {
+    const m = el('span', 'est-mark', '≈');
+    m.title = 'Estimated, not entered by hand: maturity date minus the CD term (' + (a.cdTerm || 'term') + '), real calendar months. If it looks wrong, the term or maturity is — edit this date to the real one and the marker goes away.';
+    startField.querySelector('span').appendChild(m);
+  }
+  cdWrap.appendChild(startField);
   cdWrap.appendChild(field('Principal $', fPrincipal, 'How much is in this CD — e.g. 10000.00. Optional, but it powers the timeline’s principal totals and the maturing-money ladder.'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('APY as of', fCdApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
@@ -1828,7 +1848,9 @@ function accountModal(existing) {
         active: cActive.__input.checked, usedForIncome: cIncome.__input.checked,
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
-        cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
+        cdTerm: fTerm.value.trim(),
+        cdTermEst: fTerm.value.trim() ? (fTerm.value.trim() === (a.cdTerm || '') ? !!a.cdTermEst : false) : false,
+        cdApy: fApy.value.trim(), cdMaturity: fMat.value,
         cdStart: fStart.value || '', cdStartEst: fStart.value ? (fStart.value === (a.cdStart || '') ? !!a.cdStartEst : false) : false,
         cdPrincipal: fPrincipal.value === '' ? '' : parseFloat(fPrincipal.value),
         cdPrincipalAsOf: fPrincipal.value === '' ? ''
@@ -1841,6 +1863,19 @@ function accountModal(existing) {
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
       });
+      // Fill whichever CD blank the other two values determine, right at save
+      // (the load-time migration would catch it next session anyway) — flagged
+      // as calculated so the ≈ marker shows.
+      if (fType.value === 'CD') {
+        if (!acc.cdStart && acc.cdMaturity) {
+          const mo = store.parseTermMonths(acc.cdTerm);
+          if (mo) { acc.cdStart = store.subMonthsClamped(acc.cdMaturity, mo); acc.cdStartEst = true; }
+        }
+        if (!acc.cdTerm && acc.cdStart && acc.cdMaturity) {
+          const mo = store.monthsBetween(acc.cdStart, acc.cdMaturity);
+          if (mo) { acc.cdTerm = mo + ' months'; acc.cdTermEst = true; }
+        }
+      }
       // Renewal: archive the term that just ended — the STORED values, not the
       // form's (the form may hold unsaved edits) — then swap in the new term.
       const didRenew = renewOpen && fType.value === 'CD';
@@ -3258,9 +3293,9 @@ const HELP_SECTIONS = [
     points: [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
-      'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term) and marks it estimated until you confirm it.',
+      'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Use the \u29d7 CD timeline button at the top of the page (or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },
