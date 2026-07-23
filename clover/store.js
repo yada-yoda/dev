@@ -182,7 +182,9 @@ function stampSaved(entry) {
 // Every save diffs the incoming record against the stored one and appends what
 // changed, so each item can show its own audit trail. Capped so a long-lived
 // record can't bloat its year doc.
-const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory']);
+// cdRenewals is its own structured log (the Renewals tab) — diffing it here
+// would double-report every renewal as a noisy "1 item -> 2 items" entry.
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals']);
 const HISTORY_MAX = 25;
 function histSnap(v) {
   if (v == null || v === '') return '';

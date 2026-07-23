@@ -578,6 +578,10 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .cal-event.purple { background: #efe9fb; color: #7c3aed; }
 .cal-dot.purple { background: #7c3aed; }
 .badge.purple { background: #efe9fb; color: #7c3aed; }
+/* CD renewal: the new-term fields get a soft amber frame so they read as one
+   pending action, and the Renew button warms up when maturity is close. */
+.renew-fields { border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
+.btn-ghost.renew-soon { color: var(--warn); border-color: var(--warn); }
 .cal-more { color: var(--text-faint); font-size: 10px; }
 .cal-month { font-weight: 600; font-size: 15px; padding: 0 6px; }
 

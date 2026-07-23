@@ -45,6 +45,22 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.124 — Renew a CD without losing its past terms
+
+When a CD matures, open it (Accounts → Edit) and hit **“↻ Renew CD…”** — the
+button turns amber and counts down once maturity is within 14 days. Fields
+appear for the renewed term: new APY, new maturity date, new length, and — only
+if the bank issued one — a new account number (blank keeps the old; same for
+length).
+
+The term that just ended isn’t overwritten, it’s **archived**: the account gets
+a **Renewals** tab showing every past term newest-first — its length, APY, the
+maturity date that ended it, the account number it lived under, and when you
+renewed. So “what was this CD paying two terms ago, and under what number?” is
+always answerable. It stays the same account record throughout, so anything
+linked to it (interest income, calendar events, the 7-day email reminder)
+follows along to the new dates automatically.
+
 ### v1.0.123 — Savings rates: bank dropdown + high/low range cards
 
 The same treatment the credit-score tab just got, now on **Savings rates**.

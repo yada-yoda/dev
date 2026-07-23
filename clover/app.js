@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.123';
+const VERSION = '1.0.124';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -408,7 +408,8 @@ const HIST_LABELS = {
   apy: 'APY', apyAsOf: 'APY as of', cdApy: 'CD APY', closed: 'Closed', closedDate: 'Date closed', active: 'Active',
   budgetEst: 'Budget placeholder', autoPay: 'Auto-pay', frequency: 'Frequency', renewalDate: 'Renewal date',
   priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #',
-  gallons: 'Gallons', pricePerGallon: 'Price / gallon'
+  gallons: 'Gallons', pricePerGallon: 'Price / gallon',
+  cdTerm: 'CD term', cdMaturity: 'CD maturity', last4: 'Last 4'
 };
 function prettyKey(k) { return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace(/\s*Id\b/, '').trim(); }
 function histFieldLabel(f) { return HIST_LABELS[f] || prettyKey(f); }
@@ -462,7 +463,7 @@ function historyPanel(store, item) {
 }
 // Wraps a modal body with Details | History tabs. Only for saved records —
 // a brand-new one has nothing to show yet.
-function withHistoryTab(bodyEl, existing) {
+function withHistoryTab(bodyEl, existing, extra) {
   const store = window.cloverStore;
   if (!existing || !existing.id) return bodyEl;
   const wrap = el('div');
@@ -472,20 +473,29 @@ function withHistoryTab(bodyEl, existing) {
   const hBtn = el('button', 'tab', 'History' + (n ? ' (' + n + ')' : ''));
   const panel = historyPanel(store, existing);
   panel.style.display = 'none';
-  const show = hist => {
-    // Switching to a short History list would otherwise collapse the modal —
-    // jarring when you're just peeking at a tab. Measure the form WHILE it's
-    // still on screen and floor the wrapper there (min-height, so Details can
-    // still grow when fields reveal themselves).
-    if (hist) { const h = wrap.offsetHeight; if (h > 0) wrap.style.minHeight = h + 'px'; }
-    dBtn.classList.toggle('active', !hist); hBtn.classList.toggle('active', hist);
-    bodyEl.style.display = hist ? 'none' : '';
-    panel.style.display = hist ? '' : 'none';
+  // Optional record-specific tab (e.g. a CD's Renewals) slots between Details
+  // and the generic edit History: extra = { label, panel }.
+  const xBtn = extra ? el('button', 'tab', extra.label) : null;
+  const xPanel = extra ? extra.panel : null;
+  if (xPanel) xPanel.style.display = 'none';
+  const show = which => {
+    // Switching to a short tab would otherwise collapse the modal — jarring
+    // when you're just peeking. Measure the form WHILE it's still on screen and
+    // floor the wrapper there (min-height, so Details can still grow when
+    // fields reveal themselves).
+    if (which !== 'details') { const h = wrap.offsetHeight; if (h > 0) wrap.style.minHeight = h + 'px'; }
+    dBtn.classList.toggle('active', which === 'details');
+    hBtn.classList.toggle('active', which === 'hist');
+    if (xBtn) xBtn.classList.toggle('active', which === 'extra');
+    bodyEl.style.display = which === 'details' ? '' : 'none';
+    panel.style.display = which === 'hist' ? '' : 'none';
+    if (xPanel) xPanel.style.display = which === 'extra' ? '' : 'none';
   };
-  dBtn.addEventListener('click', ev => { ev.preventDefault(); show(false); });
-  hBtn.addEventListener('click', ev => { ev.preventDefault(); show(true); });
-  tabs.appendChild(dBtn); tabs.appendChild(hBtn);
-  wrap.appendChild(tabs); wrap.appendChild(bodyEl); wrap.appendChild(panel);
+  dBtn.addEventListener('click', ev => { ev.preventDefault(); show('details'); });
+  hBtn.addEventListener('click', ev => { ev.preventDefault(); show('hist'); });
+  if (xBtn) xBtn.addEventListener('click', ev => { ev.preventDefault(); show('extra'); });
+  tabs.appendChild(dBtn); if (xBtn) tabs.appendChild(xBtn); tabs.appendChild(hBtn);
+  wrap.appendChild(tabs); wrap.appendChild(bodyEl); if (xPanel) wrap.appendChild(xPanel); wrap.appendChild(panel);
   return wrap;
 }
 // Dollar amounts always show 2 decimals (21.20, not 21.2; 21 becomes 21.00) —
@@ -1208,6 +1218,35 @@ function emptyState(title, msg, btnLabel, onClick) {
   return d;
 }
 
+// Past CD terms, newest first — what the CD was before each renewal: length,
+// APY, the maturity that ended the term, and the account number it lived under.
+function cdRenewalsPanel(a) {
+  const p = el('div', 'hist-panel');
+  const list = el('div', 'hist-list');
+  const rowFor = (title, term, apy, maturity, last4, sub) => {
+    const e = el('div', 'hist-entry');
+    e.appendChild(el('div', 'hist-when', title));
+    const bits = [];
+    if (term) bits.push(term);
+    bits.push(apy !== '' && apy != null ? Number(apy).toFixed(2) + '% APY' : 'APY —');
+    bits.push(maturity ? 'matures ' + fmtDate(maturity) : 'maturity —');
+    if (last4) bits.push('••' + last4);
+    const line = el('div', null, bits.join(' · '));
+    e.appendChild(line);
+    if (sub) e.appendChild(el('div', 'muted', sub));
+    return e;
+  };
+  list.appendChild(rowFor('Current term', a.cdTerm, a.cdApy, a.cdMaturity, a.last4, ''));
+  (a.cdRenewals || []).slice().reverse().forEach((t, i, arr) => {
+    const label = 'Previous term' + (arr.length > 1 ? ' · ' + (arr.length - i) : '');
+    const e = rowFor(label, t.term, t.apy, t.maturity, t.last4, t.at ? 'renewed ' + fmtDate(t.at) : '');
+    // past terms: "matures" reads wrong once it's over
+    e.childNodes[1].textContent = e.childNodes[1].textContent.replace('matures ', 'matured ');
+    list.appendChild(e);
+  });
+  p.appendChild(list);
+  return p;
+}
 function accountModal(existing) {
   const store = window.cloverStore, s = store.state;
   const dflt = store.accountDefaults();
@@ -1248,6 +1287,39 @@ function accountModal(existing) {
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('APY as of', fCdApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
   cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
+
+  // Renew flow — rolling a CD into its next term keeps the SAME account record
+  // (so everything linked to it stays linked) while the ending term's numbers
+  // are archived to the Renewals tab. Banks sometimes issue a new account
+  // number on renewal; entering one swaps it in, blank keeps the old.
+  let renewOpen = false;
+  const rApy = input('', { type: 'number', placeholder: 'e.g. 4.25' }); rApy.step = '0.01'; rApy.min = 0;
+  const rMat = input('', { type: 'date' });
+  const rTerm = input('', { placeholder: a.cdTerm ? 'e.g. ' + a.cdTerm : 'e.g. 12 months' });
+  const rLast4 = input('', { placeholder: a.last4 ? 'blank = keep ••' + a.last4 : 'optional' }); rLast4.maxLength = 4; rLast4.inputMode = 'numeric';
+  if (existing && existing.id) {
+    const renewWrap = el('div', 'cd-fields renew-fields');
+    renewWrap.style.display = 'none';
+    renewWrap.appendChild(field('New APY %', rApy, 'The rate the renewed CD earns — e.g. 4.25. Worth a call to the bank about current rates before the auto-renew window closes.'));
+    renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month renewal of a CD that matured Aug 1, 2026 runs to Aug 1, 2027.'));
+    renewWrap.appendChild(field('New CD length', rTerm, 'The renewed term — e.g. 12 months, 9 months. Blank keeps the current length.'));
+    renewWrap.appendChild(field('New account # (last 4)', rLast4, 'Only if the bank issued a NEW account number for the renewal — blank keeps the current one.'));
+    const du = daysUntil(a.cdMaturity);
+    const soon = du != null && du <= 14;
+    const renewLabel = '↻ Renew CD…' + (soon ? (du < 0 ? ' (matured ' + fmtDate(a.cdMaturity) + ')' : du === 0 ? ' (matures today)' : ' (matures in ' + du + 'd)') : '');
+    const renewBtn = el('button', 'btn-ghost' + (soon ? ' renew-soon' : ''), renewLabel);
+    renewBtn.title = 'Roll this CD into its next term: the current APY, maturity date, length, and account number move to the Renewals tab, and the new term takes their place.';
+    renewBtn.addEventListener('click', ev => {
+      ev.preventDefault();
+      renewOpen = !renewOpen;
+      renewWrap.style.display = renewOpen ? '' : 'none';
+      renewBtn.textContent = renewOpen ? '✕ Cancel renewal' : renewLabel;
+      if (renewOpen) rApy.focus();
+    });
+    const rbRow = el('div'); rbRow.appendChild(renewBtn);
+    cdWrap.appendChild(rbRow);
+    cdWrap.appendChild(renewWrap);
+  }
 
   const fCcOpen = dayField('Statement opens (day)', 'Day of month the statement period begins (optional; static cycle only).', a.statementStartDay);
   const fCcClose = dayField('Statement closes (day)', 'Day of month the statement closes/cuts. Used with the due day to estimate float.', a.statementCloseDay);
@@ -1305,7 +1377,10 @@ function accountModal(existing) {
   }
 
   openModal({
-    title: existing ? 'Edit account' : 'Add account', body: withHistoryTab(body, existing), confirmLabel: 'Save',
+    title: existing ? 'Edit account' : 'Add account',
+    body: withHistoryTab(body, existing, (existing && existing.id && existing.type === 'CD' && (existing.cdRenewals || []).length)
+      ? { label: 'Renewals (' + existing.cdRenewals.length + ')', panel: cdRenewalsPanel(existing) } : null),
+    confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
       if (!name) { fName.focus(); toast('Name is required', 'warn'); return false; }
@@ -1332,6 +1407,23 @@ function accountModal(existing) {
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
       });
+      // Renewal: archive the term that just ended — the STORED values, not the
+      // form's (the form may hold unsaved edits) — then swap in the new term.
+      const didRenew = renewOpen && fType.value === 'CD';
+      if (didRenew) {
+        if (!rMat.value) { rMat.focus(); toast('Enter the new maturity date', 'warn'); return false; }
+        if (rApy.value.trim() === '') { rApy.focus(); toast('Enter the new APY', 'warn'); return false; }
+        acc.cdRenewals = (existing.cdRenewals || []).concat([{
+          at: todayISO(), apy: existing.cdApy || '', maturity: existing.cdMaturity || '',
+          term: existing.cdTerm || '', last4: existing.last4 || ''
+        }]);
+        acc.cdApy = rApy.value.trim();
+        acc.cdMaturity = rMat.value;
+        if (rTerm.value.trim()) acc.cdTerm = rTerm.value.trim();
+        const nl4 = rLast4.value.replace(/\D/g, '').slice(0, 4);
+        if (nl4) acc.last4 = nl4;
+        acc.apyAsOf = todayISO();
+      }
       store.saveAccount(acc);
       // A rolled-over account's old number is closed — mark the predecessor inactive.
       if (prevId) {
@@ -1339,7 +1431,7 @@ function accountModal(existing) {
         if (prev && prev.active !== false) { prev.active = false; store.saveAccount(prev); toast('Marked “' + prev.name + '” as rolled over'); }
         else toast(existing ? 'Account updated' : 'Account added');
       } else {
-        toast(existing ? 'Account updated' : 'Account added');
+        toast(didRenew ? 'CD renewed — previous term saved to Renewals' : existing ? 'Account updated' : 'Account added');
       }
     }
   });
@@ -2714,6 +2806,7 @@ const HELP_SECTIONS = [
   { id: 'accounts', ico: '▦', title: 'Accounts', what: 'Your banks, cards, brokerages, and other financial accounts.',
     points: [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
+      'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },
