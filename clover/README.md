@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.142 — Interest rows expand to individual accounts
+
+Building on the last release: click the **CDs** row (or **Checking & Savings**,
+or **Other**) under Interest in the income grid and it now expands to show the
+individual accounts inside it — e.g. each CD on its own row with its monthly
+interest. Click again to collapse.
+
 ### v1.0.141 — Interest in the income grid, split by account type
 
 Expand **Interest** on the Income annual grid and it now breaks out by the type

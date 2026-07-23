@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.141';
+const VERSION = '1.0.142';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -83,6 +83,7 @@ let paycheckView = 'current';      // paychecks table: 'current' (+missing) | 'u
 let creditTab = 'credit';   // 'credit' | 'rates'
 const expandedIncomeGroups = new Set();
 const expandedPcEmployers = new Set();   // income grid: category ids whose Paychecks row shows per-employer detail
+const expandedInterestBuckets = new Set();   // income grid: '<catId>|<bucket>' whose Interest bucket shows per-account detail
 const expandedExpenseGroups = new Set();
 
 // ---------- boot ----------
@@ -2296,7 +2297,19 @@ function incomeGrid(data) {
         const bucketOf = e => { const a = store.account(e.accountId); return a && a.type === 'CD' ? 'CDs' : a && CS.has(a.type) ? 'Checking & Savings' : 'Other'; };
         const byB = new Map();
         gEntries.forEach(e => { const b = bucketOf(e); if (!byB.has(b)) byB.set(b, []); byB.get(b).push(e); });
-        ['CDs', 'Checking & Savings', 'Other'].filter(b => byB.has(b)).forEach(b => tb.appendChild(addRow('sub-row drill-row', b, monthsFor(byB.get(b)))));
+        ['CDs', 'Checking & Savings', 'Other'].filter(b => byB.has(b)).forEach(b => {
+          const bKey = g.id + '|' + b, bOpen = expandedInterestBuckets.has(bKey), bEntries = byB.get(b);
+          tb.appendChild(addRow('sub-row', b, monthsFor(bEntries),
+            () => { bOpen ? expandedInterestBuckets.delete(bKey) : expandedInterestBuckets.add(bKey); renderView(currentRoute); },
+            bOpen ? '▾' : '▸'));
+          if (bOpen) {
+            // one row per account within the bucket (Ally CD ••1234, etc.); an
+            // entry with no linked account groups by its note, else "(no account)".
+            const byAcct = new Map();
+            bEntries.forEach(e => { const a = store.account(e.accountId); const k = a ? (a.name + (a.last4 ? ' ••' + a.last4 : '')) : ((e.notes || '').trim() || '(no account)'); if (!byAcct.has(k)) byAcct.set(k, []); byAcct.get(k).push(e); });
+            [...byAcct.keys()].sort((x, y) => x.localeCompare(y)).forEach(k => tb.appendChild(addRow('sub-row drill-row acct2-row', '↳ ' + k, monthsFor(byAcct.get(k)))));
+          }
+        });
       } else if (rewardCat || dividendCat || otherCat) {
         // Break the group down by reward source (Rewards), bank (Interest),
         // account→broker (Dividends: each M1 account and Schwab on its own

@@ -497,6 +497,8 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }
+/* Per-account rows under an expanded Interest bucket — one level deeper. */
+.grid-table .acct2-row td.sub-name { padding-left: 46px; }
 /* Collapsible settings cards: header click hides everything below it. */
 .card.set-collapsed > :not(.section-head) { display: none !important; }
 .section-head.collapsible { cursor: pointer; user-select: none; }
