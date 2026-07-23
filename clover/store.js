@@ -184,7 +184,41 @@ function stampSaved(entry) {
 // record can't bloat its year doc.
 // cdRenewals is its own structured log (the Renewals tab) — diffing it here
 // would double-report every renewal as a noisy "1 item -> 2 items" entry.
-const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals']);
+// ---- CD start dates ----
+// A CD's start is derivable: maturity minus its term. parseTermMonths reads the
+// free-text term ("12 months", "1 year"); subMonthsClamped does REAL calendar
+// math with the day clamped (May 31 minus 3 months is Feb 28/29, not Mar 3).
+function parseTermMonths(t) {
+  const m = /([\d.]+)[\s-]*(year|yr|month|mo)/i.exec(String(t || ''));   // "12 months", "18-month", "1yr"
+  if (!m) return null;
+  const n = parseFloat(m[1]); if (!n) return null;
+  const u = m[2].toLowerCase();
+  return (u === 'yr' || u.indexOf('year') === 0) ? Math.round(n * 12) : Math.round(n);
+}
+function subMonthsClamped(iso, months) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || ''); if (!m) return '';
+  let y = +m[1], mo = +m[2] - 1 - months; const d = +m[3];
+  y += Math.floor(mo / 12); mo = ((mo % 12) + 12) % 12;
+  const dim = new Date(y, mo + 1, 0).getDate();
+  return y + '-' + String(mo + 1).padStart(2, '0') + '-' + String(Math.min(d, dim)).padStart(2, '0');
+}
+// Backfill an ESTIMATED start (flagged cdStartEst) for CDs recorded before the
+// start-date field existed — an estimate is presented as one, never as fact,
+// and editing the field in the modal replaces it with the real date.
+function migrateCdStarts(accounts) {
+  let changed = false;
+  (accounts || []).forEach(a => {
+    if (a.type !== 'CD' || a.cdStart || !a.cdMaturity) return;
+    const mo = parseTermMonths(a.cdTerm);
+    if (!mo) return;
+    a.cdStart = subMonthsClamped(a.cdMaturity, mo);
+    a.cdStartEst = true;
+    changed = true;
+  });
+  return changed;
+}
+
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy']);
 const HISTORY_MAX = 25;
 function histSnap(v) {
   if (v == null || v === '') return '';
@@ -359,6 +393,7 @@ function apply(data) {
   if (migrateAccountApyCols(state.settings)) scheduleSave();
   state.accounts = s.accounts;
   if (migrateAccountApyDates(state.accounts)) scheduleSave();
+  if (migrateCdStarts(state.accounts)) scheduleSave();
   state.recurring = s.recurring || [];
   state.catalog = s.catalog;
   state.creditScores = s.creditScores || [];
@@ -435,6 +470,7 @@ window.cloverStore = {
     scheduleSave(); notify();
   },
   setGcal(patch) { state.settings.gcal = Object.assign({}, state.settings.gcal, patch); scheduleSave(); notify(); },
+  parseTermMonths, subMonthsClamped,
   // Generic top-level settings flag (e.g. showFomc). Use for simple booleans that
   // don't warrant their own method; anything structured deserves a dedicated one.
   setSetting(key, val) { state.settings[key] = val; scheduleSave(); notify(); },

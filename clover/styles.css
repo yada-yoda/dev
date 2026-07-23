@@ -582,6 +582,49 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
    pending action, and the Renew button warms up when maturity is close. */
 .renew-fields { border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
 .btn-ghost.renew-soon { color: var(--warn); border-color: var(--warn); }
+
+/* ---- CD maturity timeline ---- */
+.cdtl-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 10px; }
+.cdtl-controls .btn-ghost { padding: 4px 10px; font-size: 12.5px; }
+.cdtl-body { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.cdtl-names { flex: 0 0 200px; max-width: 200px; border-right: 1px solid var(--border); background: var(--surface-2); }
+.cdtl-name { padding: 5px 10px; border-top: 1px solid var(--border); overflow: hidden; }
+.cdtl-name.hl { background: var(--accent-soft); }
+.cdtl-name-1 { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cdtl-name-2 { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cdtl-status { font-weight: 600; }
+.cdtl-status.s-active { color: #16a34a; }
+.cdtl-status.s-soon90 { color: #d97706; }
+.cdtl-status.s-soon30 { color: #dc2626; }
+.cdtl-status.s-matured, .cdtl-status.s-closed, .cdtl-status.s-consolidated { color: var(--text-faint); }
+.cdtl-plot { flex: 1; min-width: 0; position: relative; cursor: grab; touch-action: pan-y; outline: none; }
+.cdtl-plot.dragging { cursor: grabbing; }
+.cdtl-plot:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+.cdtl-svg { display: block; width: 100%; height: 100%; user-select: none; }
+.cdtl-grid { stroke: var(--border); stroke-width: 1; }
+.cdtl-grid.major { stroke: #cbd5e1; }
+.cdtl-axis { font-size: 10.5px; fill: var(--text-muted); }
+.cdtl-future { fill: rgba(148, 163, 184, 0.07); }
+.cdtl-seg { stroke-width: 1.4; }
+.cdtl-seg-lbl { font-size: 10.5px; font-weight: 600; }
+.cdtl-cont { font-size: 13px; fill: var(--text-muted); }
+.cdtl-today { stroke: #7c3aed; stroke-width: 1.5; stroke-dasharray: 3 3; }
+.cdtl-today-lbl { font-size: 10px; fill: #7c3aed; font-weight: 700; }
+.cdtl-link { fill: none; stroke: #7c3aed; stroke-width: 1.4; opacity: 0.75; }
+.cdtl-link-arrow { fill: #7c3aed; opacity: 0.75; }
+.cdtl-tip { position: absolute; z-index: 5; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); padding: 8px 10px; font-size: 12px; pointer-events: none; max-width: 300px; }
+.cdtl-tip-date { font-weight: 700; margin-bottom: 3px; }
+.cdtl-tip-name { font-weight: 600; }
+.cdtl-ladder { margin-top: 12px; }
+.cdtl-ladder-title { font-weight: 600; font-size: 13px; margin-bottom: 6px; }
+.cdtl-ladder-row { display: flex; gap: 8px; align-items: flex-end; flex-wrap: wrap; }
+.cdtl-q { border: 1px solid var(--border); background: var(--surface-2); border-radius: 8px; padding: 6px 8px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; min-width: 64px; }
+.cdtl-q:hover { border-color: var(--accent); }
+.cdtl-q.hl { border-color: var(--accent); background: var(--accent-soft); }
+.cdtl-q-bar { width: 26px; background: var(--accent); border-radius: 3px 3px 0 0; opacity: 0.8; }
+.cdtl-q-amt { font-size: 11.5px; font-weight: 700; }
+.cdtl-q-lbl { font-size: 10.5px; color: var(--text-muted); }
+@media (max-width: 640px) { .cdtl-names { flex-basis: 130px; max-width: 130px; } .cdtl-name-2 { display: none; } }
 .cal-more { color: var(--text-faint); font-size: 10px; }
 .cal-month { font-weight: 600; font-size: 15px; padding: 0 6px; }
 

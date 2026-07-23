@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.124';
+const VERSION = '1.0.125';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -409,12 +409,13 @@ const HIST_LABELS = {
   budgetEst: 'Budget placeholder', autoPay: 'Auto-pay', frequency: 'Frequency', renewalDate: 'Renewal date',
   priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #',
   gallons: 'Gallons', pricePerGallon: 'Price / gallon',
-  cdTerm: 'CD term', cdMaturity: 'CD maturity', last4: 'Last 4'
+  cdTerm: 'CD term', cdMaturity: 'CD maturity', last4: 'Last 4',
+  cdStart: 'CD start', cdStartEst: 'Start estimated', cdPrincipal: 'CD principal', consolidatedIntoId: 'Consolidated into'
 };
 function prettyKey(k) { return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace(/\s*Id\b/, '').trim(); }
 function histFieldLabel(f) { return HIST_LABELS[f] || prettyKey(f); }
 // Dollar-valued fields, so history reads "$42.80 → $51.25" and not "42.8".
-const HIST_MONEY = new Set(['amount', 'gross', 'net', 'prevAmount', 'yearGross', 'yearNet', 'fedAmount', 'stateAmount', 'prepCost', 'orderPrice', 'earnings', 'costPrice', 'expectedAmount', 'fedWithheld', 'stateWithheld', 'price']);
+const HIST_MONEY = new Set(['amount', 'gross', 'net', 'prevAmount', 'yearGross', 'yearNet', 'fedAmount', 'stateAmount', 'prepCost', 'orderPrice', 'earnings', 'costPrice', 'expectedAmount', 'fedWithheld', 'stateWithheld', 'price', 'cdPrincipal']);
 // Stored history holds raw values (ids, booleans) — resolve them to names.
 function histValueText(store, field, v) {
   if (v === '' || v == null) return '—';
@@ -1101,6 +1102,352 @@ function closeAccountModal(acc) {
   });
 }
 
+
+// ============================================================
+// CD maturity timeline -- a multi-row duration chart of every CD: each term
+// and renewal is its own segment positioned by REAL dates, consolidations are
+// drawn as connectors, and the viewport pans/zooms like a trading chart.
+//
+// How positioning works: the viewport is a pair of timestamps (view.s, view.e).
+// A date's x-pixel is (t - view.s) / (view.e - view.s) * plotWidth -- so bar
+// widths fall out of actual date spans, never a hardcoded month width. Panning
+// shifts both timestamps by the dragged pixel span converted back to ms;
+// wheel-zoom scales the span around the timestamp under the cursor (so the
+// date you point at stays put); clipping just clamps x to the plot box while
+// the stored dates stay untouched. Redraws ride requestAnimationFrame.
+// Shown when the Accounts table is filtered to type = CD (click the CD badge).
+// ============================================================
+let cdTLView = null;   // { s, e } in ms -- survives re-renders within a session
+let cdTLopts = { rel: true, matured: true, sort: 'maturity', hlQ: null };
+const CDTL_DAY = 86400000;
+function cdTms(iso) { const t = Date.parse(String(iso || '').slice(0, 10)); return isNaN(t) ? null : t; }
+function cdTiso(t) { return new Date(t).toISOString().slice(0, 10); }
+
+// One row per CD account (a lineage); cycles = archived terms + the current
+// one, chained so each renewal starts the day the previous term matured.
+function cdTimelineData(store) {
+  const rows = [];
+  const links = [];
+  const est = (mat, term) => {
+    const mo = store.parseTermMonths(term);
+    return mo ? store.subMonthsClamped(mat, mo) : '';
+  };
+  store.state.accounts.filter(a => a.type === 'CD' && (a.cdMaturity || (a.cdRenewals || []).length)).forEach(a => {
+    const cycles = [];
+    const arch = a.cdRenewals || [];
+    arch.forEach((t, i) => {
+      const start = t.start || (i > 0 ? arch[i - 1].maturity : est(t.maturity, t.term));
+      if (!start || !t.maturity) return;
+      cycles.push({ s: cdTms(start), e: cdTms(t.maturity), apy: t.apy, term: t.term, last4: t.last4, principal: t.principal, estStart: !t.start && i === 0, idx: i, current: false });
+    });
+    if (a.cdMaturity) {
+      const start = a.cdStart || (arch.length ? arch[arch.length - 1].maturity : est(a.cdMaturity, a.cdTerm));
+      if (start) cycles.push({ s: cdTms(start), e: cdTms(a.cdMaturity), apy: a.cdApy, term: a.cdTerm, last4: a.last4, principal: a.cdPrincipal, estStart: !!a.cdStartEst || !a.cdStart, idx: arch.length, current: true });
+    }
+    const dated = cycles.filter(c => c.s != null && c.e != null && c.e > c.s);
+    if (!dated.length) return;
+    const du = daysUntil(a.cdMaturity);
+    const status = a.consolidatedIntoId ? 'consolidated' : a.closed ? 'closed'
+      : du == null ? 'active' : du < 0 ? 'matured' : du <= 30 ? 'soon30' : du <= 90 ? 'soon90' : 'active';
+    rows.push({ a, cycles: dated, status, du });
+    (a.cdFundedBy || []).forEach(fb => (fb.sources || []).forEach(sc => links.push({ fromId: sc.id, toId: a.id, at: fb.at })));
+  });
+  return { rows, links };
+}
+
+const CDTL_STATUS = {
+  active:       { fill: '#dcefe2', stroke: '#16a34a', text: '#166534', label: 'Active' },
+  soon90:       { fill: '#fdf0d9', stroke: '#d97706', text: '#92400e', label: '≤ 90 days' },
+  soon30:       { fill: '#fbe3e3', stroke: '#dc2626', text: '#991b1b', label: '≤ 30 days' },
+  matured:      { fill: '#ececef', stroke: '#9ca3af', text: '#4b5563', label: 'Matured' },
+  closed:       { fill: '#ececef', stroke: '#9ca3af', text: '#4b5563', label: 'Closed' },
+  consolidated: { fill: '#ececef', stroke: '#9ca3af', text: '#4b5563', label: 'Consolidated' }
+};
+
+function cdTimelinePanel(store) {
+  const card = el('div', 'card cdtl-card');
+  const data = cdTimelineData(store);
+  const head = el('div', 'view-head');
+  const hl = el('div');
+  hl.appendChild(el('h3', 'strip-title', 'CD maturity timeline'));
+  hl.appendChild(el('p', 'muted', 'Each bar is one CD term, placed by its real dates · renewals sit side-by-side on the same row · drag to pan, scroll to zoom, double-click to reset'));
+  head.appendChild(hl);
+  card.appendChild(head);
+  if (!data.rows.length) {
+    card.appendChild(el('div', 'muted', 'No CD has enough dates to draw yet — give a CD a maturity date (and ideally a term or start date) in its Edit form.'));
+    return card;
+  }
+
+  // ---- summary cards (open CDs only; principal where entered) ----
+  const open = data.rows.filter(r => !r.a.closed && !r.a.consolidatedIntoId);
+  const withP = open.filter(r => r.a.cdPrincipal != null && r.a.cdPrincipal !== '');
+  const totalP = withP.reduce((s2, r) => s2 + Number(r.a.cdPrincipal), 0);
+  const apyRows = open.filter(r => r.a.cdApy !== '' && r.a.cdApy != null);
+  const wRows = apyRows.filter(r => r.a.cdPrincipal != null && r.a.cdPrincipal !== '');
+  const wapy = wRows.length ? wRows.reduce((s2, r) => s2 + Number(r.a.cdPrincipal) * Number(r.a.cdApy), 0) / wRows.reduce((s2, r) => s2 + Number(r.a.cdPrincipal), 0)
+    : apyRows.length ? apyRows.reduce((s2, r) => s2 + Number(r.a.cdApy), 0) / apyRows.length : null;
+  const nowT = Date.now();
+  const future = open.filter(r => cdTms(r.a.cdMaturity) != null && cdTms(r.a.cdMaturity) >= nowT - CDTL_DAY)
+    .sort((x, y) => cdTms(x.a.cdMaturity) - cdTms(y.a.cdMaturity));
+  const next = future[0];
+  const in12 = future.filter(r => cdTms(r.a.cdMaturity) <= nowT + 365 * CDTL_DAY);
+  const in12P = in12.filter(r => r.a.cdPrincipal != null && r.a.cdPrincipal !== '').reduce((s2, r) => s2 + Number(r.a.cdPrincipal), 0);
+  const sum = el('div', 'sub-summary');
+  sum.appendChild(sumCard('CD principal', withP.length ? money(totalP) : '—', 'income', withP.length < open.length ? withP.length + ' of ' + open.length + ' CDs have a principal entered' : open.length + ' open CD' + (open.length === 1 ? '' : 's')));
+  sum.appendChild(sumCard('Weighted avg APY', wapy != null ? wapy.toFixed(2) + '%' : '—', '', wRows.length ? 'weighted by principal' : apyRows.length ? 'simple average — add principals to weight it' : ''));
+  sum.appendChild(sumCard('Next maturity', next ? fmtDate(next.a.cdMaturity) : '—', next && next.du != null && next.du <= 30 ? 'expense' : '', next ? next.a.name + (next.a.last4 ? ' ••' + next.a.last4 : '') : 'no upcoming maturities'));
+  sum.appendChild(sumCard('Maturing ≤ 12 mo', in12.length ? (in12P ? money(in12P) : in12.length + ' CD' + (in12.length === 1 ? '' : 's')) : '—', '', in12.length && in12P ? in12.length + ' CD' + (in12.length === 1 ? '' : 's') : 'principal totals need Principal $ entered'));
+  card.appendChild(sum);
+
+  // ---- data range + default viewport (5% pad back, 10% forward) ----
+  const allT = [];
+  data.rows.forEach(r => r.cycles.forEach(c => { allT.push(c.s); allT.push(c.e); }));
+  const dMin = Math.min.apply(null, allT), dMax = Math.max.apply(null, allT);
+  const span0 = Math.max(dMax - dMin, 180 * CDTL_DAY);
+  const defView = () => ({ s: dMin - span0 * 0.05, e: dMax + span0 * 0.10 });
+  if (!cdTLView) cdTLView = defView();
+  const view = cdTLView;
+
+  // ---- controls ----
+  const bar = el('div', 'cdtl-controls');
+  const preset = (label, fn, title) => { const b = el('button', 'btn-ghost', label); if (title) b.title = title; b.addEventListener('click', () => { fn(); redraw(); }); bar.appendChild(b); };
+  preset('View all', () => { Object.assign(view, defView()); }, 'Earliest opening through latest maturity, with padding');
+  preset('1y', () => { const c = nowT; view.s = c - 90 * CDTL_DAY; view.e = c + 275 * CDTL_DAY; });
+  preset('3y', () => { const c = nowT; view.s = c - 270 * CDTL_DAY; view.e = c + 825 * CDTL_DAY; });
+  preset('5y', () => { const c = nowT; view.s = c - 450 * CDTL_DAY; view.e = c + 1375 * CDTL_DAY; });
+  preset('Today → last', () => { view.s = nowT - 30 * CDTL_DAY; view.e = dMax + (dMax - nowT) * 0.1 + 60 * CDTL_DAY; });
+  preset('⦿ Today', () => { const half = (view.e - view.s) / 2; view.s = nowT - half; view.e = nowT + half; }, 'Center on today, keeping the current zoom');
+  const sortSel = select([
+    { value: 'maturity', label: 'Sort: maturity' }, { value: 'start', label: 'Sort: opening' },
+    { value: 'principal', label: 'Sort: principal' }, { value: 'apy', label: 'Sort: APY' },
+    { value: 'bank', label: 'Sort: bank' }
+  ], cdTLopts.sort);
+  sortSel.addEventListener('change', () => { cdTLopts.sort = sortSel.value; renderView(currentRoute); });
+  bar.appendChild(sortSel);
+  const cRel = checkbox('Relationships', cdTLopts.rel, 'Draw the merge arrows for consolidated CDs.');
+  cRel.__input.addEventListener('change', () => { cdTLopts.rel = cRel.__input.checked; redraw(); });
+  bar.appendChild(cRel);
+  const cMat = checkbox('Show matured', cdTLopts.matured, 'Include matured, closed, and consolidated CDs.');
+  cMat.__input.addEventListener('change', () => { cdTLopts.matured = cMat.__input.checked; renderView(currentRoute); });
+  bar.appendChild(cMat);
+  card.appendChild(bar);
+
+  // ---- rows (sorted; sorting changes vertical order only) ----
+  let rows = data.rows.slice();
+  if (!cdTLopts.matured) rows = rows.filter(r => r.status === 'active' || r.status === 'soon30' || r.status === 'soon90');
+  const keyOf = r => cdTLopts.sort === 'start' ? (r.cycles[0] ? r.cycles[0].s : 0)
+    : cdTLopts.sort === 'principal' ? -(Number(r.a.cdPrincipal) || 0)
+    : cdTLopts.sort === 'apy' ? -(Number(r.a.cdApy) || 0)
+    : cdTLopts.sort === 'bank' ? (r.a.institution || '￿')
+    : (cdTms(r.a.cdMaturity) || 8e15);
+  rows.sort((x, y) => { const kx = keyOf(x), ky = keyOf(y); return kx < ky ? -1 : kx > ky ? 1 : 0; });
+  const rowIdx = {}; rows.forEach((r, i) => { rowIdx[r.a.id] = i; });
+
+  const ROWH = 40, AXISH = 26;
+  const body = el('div', 'cdtl-body');
+  const names = el('div', 'cdtl-names');
+  const axPad = el('div', 'cdtl-axis-pad'); axPad.style.height = AXISH + 'px'; names.appendChild(axPad);
+  rows.forEach(r => {
+    const n = el('div', 'cdtl-name'); n.style.height = ROWH + 'px';
+    const badge2 = CDTL_STATUS[r.status];
+    const l1 = el('div', 'cdtl-name-1', r.a.name + (r.a.last4 ? ' ••' + r.a.last4 : ''));
+    const l2 = el('div', 'cdtl-name-2');
+    const stat = el('span', 'cdtl-status s-' + r.status, badge2.label + (r.du != null && r.du >= 0 && r.du <= 90 ? ' · ' + r.du + 'd' : ''));
+    l2.appendChild(document.createTextNode((r.a.institution ? r.a.institution + ' · ' : '') + (r.a.cdPrincipal != null && r.a.cdPrincipal !== '' ? money(Number(r.a.cdPrincipal)) + ' · ' : '')));
+    l2.appendChild(stat);
+    n.appendChild(l1); n.appendChild(l2);
+    n.__acctId = r.a.id;
+    names.appendChild(n);
+  });
+  const plot = el('div', 'cdtl-plot');
+  plot.style.height = (rows.length * ROWH + AXISH) + 'px';
+  plot.tabIndex = 0;
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('class', 'cdtl-svg');
+  plot.appendChild(svg);
+  const tip = el('div', 'cdtl-tip'); tip.style.display = 'none'; plot.appendChild(tip);
+  body.appendChild(names); body.appendChild(plot);
+  card.appendChild(body);
+
+  const hint = el('div', 'sum-hint', 'Drag ↔ to pan · scroll to zoom at the cursor · double-click resets · arrow keys pan, + / − zoom · dashed edge = estimated start date');
+  card.appendChild(hint);
+
+  // ---- maturing ladder (current terms only; money that becomes available) ----
+  const ladder = el('div', 'cdtl-ladder');
+  const lTitle = el('div', 'cdtl-ladder-title', 'Maturing principal by quarter');
+  ladder.appendChild(lTitle);
+  const qKey = t => { const d = new Date(t); return d.getFullYear() + '-Q' + (Math.floor(d.getMonth() / 3) + 1); };
+  const qMap = {};
+  open.forEach(r => { const t = cdTms(r.a.cdMaturity); if (t == null) return; const k = qKey(t);
+    (qMap[k] = qMap[k] || { total: 0, n: 0, known: 0 }).n++;
+    if (r.a.cdPrincipal != null && r.a.cdPrincipal !== '') { qMap[k].total += Number(r.a.cdPrincipal); qMap[k].known++; } });
+  const qKeys = Object.keys(qMap).sort();
+  if (qKeys.length) {
+    const maxQ = Math.max.apply(null, qKeys.map(k => qMap[k].total || 0)) || 1;
+    const lrow = el('div', 'cdtl-ladder-row');
+    qKeys.forEach(k => {
+      const q = qMap[k];
+      const cell = el('button', 'cdtl-q' + (cdTLopts.hlQ === k ? ' hl' : ''));
+      cell.title = q.n + ' CD' + (q.n === 1 ? '' : 's') + ' maturing · ' + (q.known ? money(q.total) + (q.known < q.n ? ' (from ' + q.known + ' with principal entered)' : '') : 'no principals entered') + ' — click to highlight those rows';
+      const barEl = el('div', 'cdtl-q-bar'); barEl.style.height = Math.max(4, Math.round(q.total / maxQ * 36)) + 'px';
+      cell.appendChild(barEl);
+      cell.appendChild(el('div', 'cdtl-q-amt', q.known ? money(q.total) : q.n + '×'));
+      cell.appendChild(el('div', 'cdtl-q-lbl', k.replace('-', ' ')));
+      cell.addEventListener('click', () => { cdTLopts.hlQ = cdTLopts.hlQ === k ? null : k; renderView(currentRoute); });
+      lrow.appendChild(cell);
+    });
+    ladder.appendChild(lrow);
+    ladder.appendChild(el('div', 'sum-hint', 'Current terms only — a term already renewed into a new one isn’t counted twice, and consolidated CDs count once under the combined CD.'));
+    card.appendChild(ladder);
+  }
+  if (cdTLopts.hlQ) rows.forEach(r => { const t = cdTms(r.a.cdMaturity); if (t != null && qKey(t) === cdTLopts.hlQ) { const n = [...names.children].find(x => x.__acctId === r.a.id); if (n) n.classList.add('hl'); } });
+
+  // ---- drawing ----
+  let hits = [];
+  const fmtShort = t => { const d = new Date(t); return MONTHS[d.getMonth()] + ' ' + d.getDate(); };
+  function gridUnit(pxPerDay) { return pxPerDay > 16 ? 'day' : pxPerDay > 2.0 ? 'month' : pxPerDay > 0.55 ? 'quarter' : 'year'; }
+  function redraw() {
+    const W = plot.clientWidth || 600;
+    const H = rows.length * ROWH + AXISH;
+    const x = t => (t - view.s) / (view.e - view.s) * W;
+    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+    svg.setAttribute('width', W); svg.setAttribute('height', H);
+    hits = [];
+    let out = '';
+    // gridlines + axis labels
+    const pxPerDay = W / ((view.e - view.s) / CDTL_DAY);
+    const unit = gridUnit(pxPerDay);
+    const d0 = new Date(view.s);
+    let cur = unit === 'day' ? new Date(d0.getFullYear(), d0.getMonth(), d0.getDate())
+      : unit === 'month' ? new Date(d0.getFullYear(), d0.getMonth(), 1)
+      : unit === 'quarter' ? new Date(d0.getFullYear(), Math.floor(d0.getMonth() / 3) * 3, 1)
+      : new Date(d0.getFullYear(), 0, 1);
+    let guard = 0;
+    while (cur.getTime() < view.e && guard++ < 400) {
+      const t = cur.getTime();
+      if (t >= view.s) {
+        const gx = x(t);
+        const isYear = cur.getMonth() === 0 && cur.getDate() === 1;
+        out += '<line x1="' + gx + '" y1="' + AXISH + '" x2="' + gx + '" y2="' + H + '" class="cdtl-grid' + (isYear ? ' major' : '') + '"/>';
+        const lbl = unit === 'day' ? fmtShort(t)
+          : unit === 'month' ? MONTHS[cur.getMonth()] + ' ' + String(cur.getFullYear()).slice(2)
+          : unit === 'quarter' ? 'Q' + (Math.floor(cur.getMonth() / 3) + 1) + ' ' + String(cur.getFullYear()).slice(2)
+          : String(cur.getFullYear());
+        out += '<text x="' + (gx + 3) + '" y="16" class="cdtl-axis">' + lbl + '</text>';
+      }
+      if (unit === 'day') cur = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+      else if (unit === 'month') cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+      else if (unit === 'quarter') cur = new Date(cur.getFullYear(), cur.getMonth() + 3, 1);
+      else cur = new Date(cur.getFullYear() + 1, 0, 1);
+    }
+    // future space gets a whisper of shading so past vs future reads at a glance
+    if (nowT > view.s && nowT < view.e) out += '<rect x="' + x(nowT) + '" y="' + AXISH + '" width="' + (W - x(nowT)) + '" height="' + (H - AXISH) + '" class="cdtl-future"/>';
+    // segments
+    rows.forEach((r, ri) => {
+      const y = AXISH + ri * ROWH + 7;
+      const h = ROWH - 14;
+      r.cycles.forEach(c => {
+        if (c.e < view.s || c.s > view.e) return;
+        const cls = CDTL_STATUS[c.current ? r.status : 'matured'];
+        const x1 = Math.max(x(c.s), 0), x2 = Math.min(x(c.e), W);
+        const wpx = Math.max(x2 - x1, 2);
+        out += '<rect x="' + x1 + '" y="' + y + '" width="' + wpx + '" height="' + h + '" rx="4" fill="' + cls.fill + '" stroke="' + cls.stroke + '"' + (c.estStart ? ' stroke-dasharray="4 3"' : '') + ' class="cdtl-seg"/>';
+        if (wpx > 46 && c.apy !== '' && c.apy != null) out += '<text x="' + (x1 + 5) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-seg-lbl" fill="' + cls.text + '">' + Number(c.apy).toFixed(2) + '%' + (wpx > 110 && c.term ? ' · ' + c.term : '') + '</text>';
+        if (!c.current) out += '<text x="' + (x2 - 4) + '" y="' + (y + h / 2 + 4) + '" text-anchor="end" class="cdtl-seg-lbl" fill="' + cls.text + '">↻</text>';
+        if (x(c.s) < 0) out += '<text x="2" y="' + (y + h / 2 + 4) + '" class="cdtl-cont">‹</text>';
+        if (x(c.e) > W) out += '<text x="' + (W - 8) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-cont">›</text>';
+        hits.push({ x1, x2, y1: y, y2: y + h, c, r });
+      });
+    });
+    // consolidation connectors
+    if (cdTLopts.rel) data.links.forEach(lk => {
+      const fi = rowIdx[lk.fromId], ti = rowIdx[lk.toId];
+      if (fi == null || ti == null) return;
+      const fr = rows[fi], tr = rows[ti];
+      const fc = fr.cycles[fr.cycles.length - 1], tc = tr.cycles[0];
+      if (!fc || !tc) return;
+      const xa = x(fc.e), ya = AXISH + fi * ROWH + ROWH / 2;
+      const xb = x(tc.s), yb = AXISH + ti * ROWH + ROWH / 2;
+      if ((xa < 0 && xb < 0) || (xa > W && xb > W)) return;
+      const mid = xa + Math.max(12, (xb - xa) / 2);
+      out += '<path d="M' + xa + ',' + ya + ' C' + mid + ',' + ya + ' ' + (xb - 14) + ',' + yb + ' ' + (xb - 3) + ',' + yb + '" class="cdtl-link"/>';
+      out += '<path d="M' + (xb - 3) + ',' + yb + ' l-6,-4 l0,8 z" class="cdtl-link-arrow"/>';
+    });
+    // today marker on top
+    if (nowT > view.s && nowT < view.e) {
+      out += '<line x1="' + x(nowT) + '" y1="' + AXISH + '" x2="' + x(nowT) + '" y2="' + H + '" class="cdtl-today"/>';
+      out += '<text x="' + (x(nowT) + 4) + '" y="' + (AXISH - 3) + '" class="cdtl-today-lbl">Today</text>';
+    }
+    svg.innerHTML = out;
+  }
+
+  // ---- interactions ----
+  let raf = 0;
+  const queue = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; redraw(); }); };
+  let drag = null;
+  plot.addEventListener('pointerdown', ev => { drag = { x0: ev.clientX, s0: view.s, e0: view.e }; plot.setPointerCapture(ev.pointerId); plot.classList.add('dragging'); });
+  plot.addEventListener('pointerup', ev => { drag = null; plot.classList.remove('dragging'); });
+  plot.addEventListener('pointercancel', () => { drag = null; plot.classList.remove('dragging'); });
+  plot.addEventListener('pointermove', ev => {
+    const rect = plot.getBoundingClientRect();
+    if (drag) {
+      const dx = ev.clientX - drag.x0;
+      const span = drag.e0 - drag.s0;
+      const dt = dx / rect.width * span;
+      view.s = drag.s0 - dt; view.e = drag.e0 - dt;
+      tip.style.display = 'none';
+      queue();
+      return;
+    }
+    // crosshair + tooltip
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    const t = view.s + mx / rect.width * (view.e - view.s);
+    const hit = hits.find(hh => mx >= hh.x1 && mx <= hh.x2 && my >= hh.y1 && my <= hh.y2);
+    let html = '<div class="cdtl-tip-date">' + fmtDate(cdTiso(t)) + '</div>';
+    if (hit) {
+      const c = hit.c, r = hit.r;
+      const days = Math.round((c.e - c.s) / CDTL_DAY);
+      const elapsed = Math.max(0, Math.min(days, Math.round((t - c.s) / CDTL_DAY)));
+      html += '<div class="cdtl-tip-name">' + (r.a.institution ? r.a.institution + ' · ' : '') + r.a.name + (c.last4 ? ' ••' + c.last4 : '') + '</div>' +
+        '<div>' + (c.current ? (c.idx > 0 ? 'Renewal ' + c.idx : 'Current term') : c.idx === 0 ? 'Original term' : 'Renewal ' + c.idx) + (r.a.consolidatedIntoId ? ' · consolidated into ' + (store.accountName(r.a.consolidatedIntoId) || 'another CD') : '') + '</div>' +
+        '<div>' + fmtDate(cdTiso(c.s)) + (c.estStart ? ' (est.)' : '') + ' → ' + fmtDate(cdTiso(c.e)) + (c.term ? ' · ' + c.term : '') + '</div>' +
+        '<div>' + (c.apy !== '' && c.apy != null ? Number(c.apy).toFixed(2) + '% APY' : 'APY —') + (c.principal !== '' && c.principal != null ? ' · ' + money(Number(c.principal)) : '') + '</div>' +
+        '<div class="muted">' + elapsed + 'd elapsed · ' + Math.max(0, days - elapsed) + 'd remaining at this point</div>';
+    }
+    tip.innerHTML = html;
+    tip.style.display = '';
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.min(Math.max(4, mx + 14), rect.width - tw - 4) + 'px';
+    tip.style.top = Math.min(my + 12, rect.height - tip.offsetHeight - 4) + 'px';
+  });
+  plot.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+  plot.addEventListener('wheel', ev => {
+    ev.preventDefault();
+    const rect = plot.getBoundingClientRect();
+    const t0 = view.s + (ev.clientX - rect.left) / rect.width * (view.e - view.s);
+    const f = ev.deltaY < 0 ? 0.85 : 1.18;
+    let ns = t0 - (t0 - view.s) * f, ne = t0 + (view.e - t0) * f;
+    const span = ne - ns;
+    if (span < 21 * CDTL_DAY || span > 22000 * CDTL_DAY) return;
+    view.s = ns; view.e = ne;
+    queue();
+  }, { passive: false });
+  plot.addEventListener('dblclick', () => { Object.assign(view, defView()); queue(); });
+  plot.addEventListener('keydown', ev => {
+    const span = view.e - view.s;
+    if (ev.key === 'ArrowLeft') { view.s -= span * 0.1; view.e -= span * 0.1; }
+    else if (ev.key === 'ArrowRight') { view.s += span * 0.1; view.e += span * 0.1; }
+    else if (ev.key === '+' || ev.key === '=') { view.s += span * 0.1; view.e -= span * 0.1; }
+    else if (ev.key === '-') { view.s -= span * 0.125; view.e += span * 0.125; }
+    else if (ev.key === 'Home') { view.s = dMin - span * 0.05; view.e = dMin + span * 0.95; }
+    else if (ev.key === 'End') { view.s = dMax - span * 0.95; view.e = dMax + span * 0.05; }
+    else return;
+    ev.preventDefault(); queue();
+  });
+  requestAnimationFrame(redraw);
+  return card;
+}
+
 function renderAccounts(view) {
   const store = window.cloverStore, s = store.state;
   const head = el('div', 'view-head');
@@ -1154,14 +1501,22 @@ function renderAccounts(view) {
     const f = accountsFilter;
     const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? (a.beneficiaries || '').trim() : (a[f.key] || '');
     acctRows = baseAccts.filter(a => valOf(a) === f.value);
-    const bar = el('div', 'filter-bar');
-    bar.appendChild(el('span', 'muted', 'Showing ' + acctRows.length + ' account' + (acctRows.length === 1 ? '' : 's') + ' where ' + (ACCT_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+  }
+  // Filtering to CDs reveals the maturity timeline above the table.
+  if (accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD' && !onClosed) view.appendChild(cdTimelinePanel(store));
+  // The active-filter chip shares the ⚙ Columns row — a filter shouldn't cost
+  // a whole row of empty space. Same pattern as the other filtered tables.
+  const acctTools = el('div', 'table-tools');
+  if (accountsFilter) {
+    const f = accountsFilter;
+    const info = el('span', 'muted', 'Showing ' + acctRows.length + ' account' + (acctRows.length === 1 ? '' : 's') + ' where ' + (ACCT_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”');
+    info.style.marginRight = 'auto';
     const clear = el('button', 'btn-ghost', '✕ Clear filter');
     clear.addEventListener('click', () => { accountsFilter = null; renderView(currentRoute); });
-    bar.appendChild(clear);
-    view.appendChild(bar);
+    acctTools.appendChild(info); acctTools.appendChild(clear);
   }
-  if (!onClosed) view.appendChild(tableTools(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns')));
+  if (!onClosed) acctTools.appendChild(columnsButton('accounts', ACCT_ALL_COLS, ACCT_DEFAULT_COLS, ACCT_COL_LABELS, 'Account columns'));
+  if (acctTools.childNodes.length) view.appendChild(acctTools);
   const card = el('div', 'card table-card');
   card.appendChild(sortableTable(cols, acctRows, accountsSort, ns => { accountsSort = ns || { key: 'name', dir: 'asc' }; renderView(currentRoute); }, a => a.active === false ? 'inactive-row' : ''));
   view.appendChild(card);
@@ -1223,23 +1578,25 @@ function emptyState(title, msg, btnLabel, onClick) {
 function cdRenewalsPanel(a) {
   const p = el('div', 'hist-panel');
   const list = el('div', 'hist-list');
-  const rowFor = (title, term, apy, maturity, last4, sub) => {
+  const rowFor = (title, term, apy, maturity, last4, sub, start, principal, startEst) => {
     const e = el('div', 'hist-entry');
     e.appendChild(el('div', 'hist-when', title));
     const bits = [];
+    if (start) bits.push('opened ' + fmtDate(start) + (startEst ? ' (est.)' : ''));
     if (term) bits.push(term);
     bits.push(apy !== '' && apy != null ? Number(apy).toFixed(2) + '% APY' : 'APY —');
     bits.push(maturity ? 'matures ' + fmtDate(maturity) : 'maturity —');
+    if (principal !== '' && principal != null) bits.push(money(Number(principal)));
     if (last4) bits.push('••' + last4);
     const line = el('div', null, bits.join(' · '));
     e.appendChild(line);
     if (sub) e.appendChild(el('div', 'muted', sub));
     return e;
   };
-  list.appendChild(rowFor('Current term', a.cdTerm, a.cdApy, a.cdMaturity, a.last4, ''));
+  list.appendChild(rowFor('Current term', a.cdTerm, a.cdApy, a.cdMaturity, a.last4, '', a.cdStart, a.cdPrincipal, a.cdStartEst));
   (a.cdRenewals || []).slice().reverse().forEach((t, i, arr) => {
     const label = 'Previous term' + (arr.length > 1 ? ' · ' + (arr.length - i) : '');
-    const e = rowFor(label, t.term, t.apy, t.maturity, t.last4, t.at ? 'renewed ' + fmtDate(t.at) : '');
+    const e = rowFor(label, t.term, t.apy, t.maturity, t.last4, t.at ? 'renewed ' + fmtDate(t.at) : '', t.start || '', t.principal != null ? t.principal : '', false);
     // past terms: "matures" reads wrong once it's over
     e.childNodes[1].textContent = e.childNodes[1].textContent.replace('matures ', 'matured ');
     list.appendChild(e);
@@ -1279,11 +1636,16 @@ function accountModal(existing) {
   const fBenef = document.createElement('textarea'); fBenef.value = a.beneficiaries || ''; fBenef.rows = 2; fBenef.placeholder = 'e.g. names and any % split';
 
   const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 12 months' });
+  const fStart = input(a.cdStart || '', { type: 'date' });
+  const fPrincipal = moneyInput(a.cdPrincipal != null && a.cdPrincipal !== '' ? a.cdPrincipal : '', { placeholder: 'optional' });
   const fApy = input(a.cdApy || '', { placeholder: 'e.g. 4.00' });
   const fMat = input(a.cdMaturity || '', { type: 'date' });
   const fCdApyDate = input(a.apyAsOf || '', { type: 'date' });
   const cdWrap = el('div', 'cd-fields');
   cdWrap.appendChild(field('CD term', fTerm, 'The length of the CD — e.g. "12 months".'));
+  cdWrap.appendChild(field('Start / opened date', fStart, 'When this CD term began. If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.'));
+  if (a.cdStartEst && a.cdStart) cdWrap.appendChild(el('div', 'muted', 'This start date is estimated (maturity − term). Edit it to confirm the real date.'));
+  cdWrap.appendChild(field('Principal $', fPrincipal, 'How much is in this CD — e.g. 10000.00. Optional, but it powers the timeline’s principal totals and the maturing-money ladder.'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('APY as of', fCdApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
   cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
@@ -1297,6 +1659,8 @@ function accountModal(existing) {
   const rMat = input('', { type: 'date' });
   const rTerm = input('', { placeholder: a.cdTerm ? 'e.g. ' + a.cdTerm : 'e.g. 12 months' });
   const rLast4 = input('', { placeholder: a.last4 ? 'blank = keep ••' + a.last4 : 'optional' }); rLast4.maxLength = 4; rLast4.inputMode = 'numeric';
+  const rPrincipal = moneyInput('', { placeholder: a.cdPrincipal ? 'blank = keep ' + money(Number(a.cdPrincipal)) : 'optional' });
+  const consolChecks = [];
   if (existing && existing.id) {
     const renewWrap = el('div', 'cd-fields renew-fields');
     renewWrap.style.display = 'none';
@@ -1304,6 +1668,18 @@ function accountModal(existing) {
     renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month renewal of a CD that matured Aug 1, 2026 runs to Aug 1, 2027.'));
     renewWrap.appendChild(field('New CD length', rTerm, 'The renewed term — e.g. 12 months, 9 months. Blank keeps the current length.'));
     renewWrap.appendChild(field('New account # (last 4)', rLast4, 'Only if the bank issued a NEW account number for the renewal — blank keeps the current one.'));
+    renewWrap.appendChild(field('New principal $', rPrincipal, 'The renewed balance — usually old principal plus the interest it earned, plus anything you added. Blank keeps the current figure.'));
+    // Consolidation: other CDs whose money rolled INTO this renewal. Sources get
+    // closed (and point here), so nothing is double-counted going forward.
+    const consolCandidates = s.accounts.filter(x => x.type === 'CD' && x.id !== a.id && !x.closed);
+    if (consolCandidates.length) {
+      const cwrap = el('div', 'check-col');
+      consolCandidates.forEach(o => {
+        const cb = checkbox(o.name + (o.last4 ? ' ••' + o.last4 : '') + (o.cdPrincipal ? ' · ' + money(Number(o.cdPrincipal)) : ''), false);
+        consolChecks.push({ cb, o }); cwrap.appendChild(cb);
+      });
+      renewWrap.appendChild(field('Also consolidate these CDs into this one', cwrap, 'Tick any CD whose money was combined into this renewal. Each one is marked closed (dated today) and linked here, and the timeline draws the merge — so the money is never counted twice.'));
+    }
     const du = daysUntil(a.cdMaturity);
     const soon = du != null && du <= 14;
     const renewLabel = '↻ Renew CD…' + (soon ? (du < 0 ? ' (matured ' + fmtDate(a.cdMaturity) + ')' : du === 0 ? ' (matures today)' : ' (matures in ' + du + 'd)') : '');
@@ -1403,6 +1779,8 @@ function accountModal(existing) {
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
+        cdStart: fStart.value || '', cdStartEst: fStart.value ? (fStart.value === (a.cdStart || '') ? !!a.cdStartEst : false) : false,
+        cdPrincipal: fPrincipal.value === '' ? '' : parseFloat(fPrincipal.value),
         apy: fAcctApy.value === '' ? null : parseFloat(fAcctApy.value), apyAsOf,
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
@@ -1415,7 +1793,16 @@ function accountModal(existing) {
         if (rApy.value.trim() === '') { rApy.focus(); toast('Enter the new APY', 'warn'); return false; }
         acc.cdRenewals = (existing.cdRenewals || []).concat([{
           at: todayISO(), apy: existing.cdApy || '', maturity: existing.cdMaturity || '',
-          term: existing.cdTerm || '', last4: existing.last4 || ''
+          term: existing.cdTerm || '', last4: existing.last4 || '',
+          start: existing.cdStart || '', principal: existing.cdPrincipal != null ? existing.cdPrincipal : ''
+        }]);
+        // The new term starts the day the old one matured — exact, not estimated.
+        acc.cdStart = existing.cdMaturity || '';
+        acc.cdStartEst = false;
+        if (rPrincipal.value !== '') acc.cdPrincipal = parseFloat(rPrincipal.value);
+        const consolPicked = consolChecks.filter(x => x.cb.__input.checked);
+        if (consolPicked.length) acc.cdFundedBy = (existing.cdFundedBy || []).concat([{
+          at: todayISO(), sources: consolPicked.map(x => ({ id: x.o.id, name: x.o.name, last4: x.o.last4 || '', principal: x.o.cdPrincipal != null ? x.o.cdPrincipal : '' }))
         }]);
         acc.cdApy = rApy.value.trim();
         acc.cdMaturity = rMat.value;
@@ -1425,6 +1812,10 @@ function accountModal(existing) {
         acc.apyAsOf = todayISO();
       }
       store.saveAccount(acc);
+      // Consolidated sources close today and point at the CD they merged into.
+      if (didRenew) consolChecks.filter(x => x.cb.__input.checked).forEach(x => {
+        store.saveAccount(Object.assign({}, store.account(x.o.id) || x.o, { closed: true, closedDate: todayISO(), active: false, consolidatedIntoId: acc.id }));
+      });
       // A rolled-over account's old number is closed — mark the predecessor inactive.
       if (prevId) {
         const prev = store.account(prevId);
@@ -2231,8 +2622,9 @@ function renderSubscriptions(view) {
     if (n2) { n2.focus(); const L = n2.value.length; try { n2.setSelectionRange(L, L); } catch (e) {} }
   });
   bar.appendChild(labelWrap('Search', searchIn));
+  // Active-filter chip rides the same row as the controls + ⚙ Columns.
+  if (chipBar) { [...chipBar.childNodes].forEach(n => bar.appendChild(n)); }
   view.appendChild(bar);
-  if (chipBar) view.appendChild(chipBar);
 
   if (!rows.length) {
     view.appendChild(emptyState('No subscriptions yet',
@@ -2623,19 +3015,17 @@ function renderSettlements(view) {
     const n = document.getElementById('settle-search'); if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (e) {} }
   });
   bar.appendChild(labelWrap('Search', searchIn));
+  // Active-filter chip shares this row, before the right-aligned ⚙ Columns.
+  if (settleBadgeFilter) {
+    const f = settleBadgeFilter;
+    bar.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (SETTLE_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+    const clear = el('button', 'btn-ghost', '✕ Clear filter');
+    clear.addEventListener('click', () => { settleBadgeFilter = null; renderView(currentRoute); });
+    bar.appendChild(clear);
+  }
   const colsBtn = columnsButton('settlements', SETTLE_ALL_COLS, SETTLE_DEFAULT_COLS, SETTLE_COL_LABELS, 'Class Action columns'); colsBtn.style.marginLeft = 'auto';
   bar.appendChild(colsBtn);
   view.appendChild(bar);
-
-  if (settleBadgeFilter) {
-    const f = settleBadgeFilter;
-    const chip = el('div', 'filter-bar');
-    chip.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (SETTLE_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
-    const clear = el('button', 'btn-ghost', '✕ Clear filter');
-    clear.addEventListener('click', () => { settleBadgeFilter = null; renderView(currentRoute); });
-    chip.appendChild(clear);
-    view.appendChild(chip);
-  }
 
   if (!all.length) { view.appendChild(emptyState('No settlements tracked yet', 'Track the class-action claims you’ve submitted to — so you can see their status and never submit to the same one twice. Add one, or import your existing list.', '+ Add settlement', () => settlementModal(null))); return; }
   if (!rows.length) { view.appendChild(el('div', 'card muted', 'No settlements match your search.')); return; }
@@ -2807,6 +3197,8 @@ const HELP_SECTIONS = [
     points: [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
+      'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term) and marks it estimated until you confirm it.',
+      'Click the CD type badge in the table to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },
@@ -3357,13 +3749,12 @@ function expenseList(data) {
   wrap.appendChild(bar);
 
   if (expenseBadgeFilter) {
+    // Chip joins the filter row, before the right-aligned ⚙ Columns.
     const f = expenseBadgeFilter;
-    const chip = el('div', 'filter-bar');
-    chip.appendChild(el('span', 'muted', 'Showing ' + rows.length + ' where ' + (EXPLIST_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”'));
+    const info = el('span', 'muted', 'Showing ' + rows.length + ' where ' + (EXPLIST_COL_LABELS[f.key] || f.key) + ' = “' + f.value + '”');
     const clear = el('button', 'btn-ghost', '✕ Clear filter');
     clear.addEventListener('click', () => { expenseBadgeFilter = null; renderView(currentRoute); });
-    chip.appendChild(clear);
-    wrap.appendChild(chip);
+    bar.insertBefore(info, colsBtn); bar.insertBefore(clear, colsBtn);
   }
 
   if (!rows.length) {

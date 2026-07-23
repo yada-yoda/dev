@@ -45,6 +45,38 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.125 — CD maturity timeline, consolidation, start dates & tidier filter rows
+
+**Click the CD badge in the Accounts table** (the type column) and a timeline
+opens above it: every CD on its own row, every term and renewal drawn as a bar
+placed by its **real dates** — not a guessed width — with a Today line, purple
+merge arrows for consolidated CDs, and a dashed edge wherever a start date is
+estimated. It navigates like a trading chart: drag to pan, scroll to zoom at
+the cursor, double-click to reset, arrow keys pan, `+`/`−` zoom. Presets (View
+all, 1y/3y/5y, Today → last, center on Today), sort options, and toggles for
+merge arrows and matured CDs. Above it: total CD principal, weighted-average
+APY, next maturity, and principal maturing within 12 months. Below it: a
+**maturing-by-quarter ladder** — click a quarter to highlight those CDs. A
+term that already renewed, or a CD consolidated into another, is never counted
+twice.
+
+**Start dates.** CDs now carry a start/opened date. Existing CDs get one
+estimated automatically (maturity minus term, real calendar months — May 31
+minus 3 months is Feb 28, not a fake 90 days) and it’s clearly marked
+*estimated* until you edit it to the real date. Renewals record the exact
+start: the day the old term matured.
+
+**Consolidation.** The renew flow can now merge CDs: tick the other CDs whose
+money rolled into the renewal, and they’re closed (dated today) and linked to
+the combined CD — the timeline draws the merge, and nothing is double-counted.
+CDs also gained an optional **Principal $** (it powers the timeline’s totals
+and ladder) and the renew flow takes the new principal.
+
+**Layout fix:** when a table filter is active, the “Showing N where…” chip and
+✕ Clear filter now share the row with the ⚙ Columns button instead of wasting
+a row — on Accounts, Bills & Subscriptions, Class Actions, and the Expenses
+list.
+
 ### v1.0.124 — Renew a CD without losing its past terms
 
 When a CD matures, open it (Accounts → Edit) and hit **“↻ Renew CD…”** — the
