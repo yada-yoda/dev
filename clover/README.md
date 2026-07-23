@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.141 — Interest in the income grid, split by account type
+
+Expand **Interest** on the Income annual grid and it now breaks out by the type
+of account it came from: a **CDs** row and a **Checking & Savings** row (plus an
+**Other** row for anything else, like brokerage cash or interest not linked to
+an account). It was grouped by individual bank name before. Each interest entry
+lands in the right row automatically based on the account it’s linked to — so
+existing CD and savings interest is grouped correctly with no re-entry. (Any
+interest entry not linked to an account shows under Other; link it to a bank in
+its Edit form to file it.)
+
 ### v1.0.140 — Matured CDs: a notification bell + dashboard reminder
 
 Clover has never auto-closed a CD, and it never will — a CD that passes its

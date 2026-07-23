@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.140';
+const VERSION = '1.0.141';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2287,7 +2287,17 @@ function incomeGrid(data) {
       open ? '▾' : '▸'));
     if (open) {
       const rewardCat = /reward/i.test(g.name), interestCat = /interest/i.test(g.name), dividendCat = /dividend/i.test(g.name), otherCat = /other/i.test(g.name);
-      if (rewardCat || interestCat || dividendCat || otherCat) {
+      if (interestCat) {
+        // Interest split by the linked account's TYPE: CDs, then Checking &
+        // Savings (deposit accounts), then anything else. Each entry's accountId
+        // decides its row, so existing entries land in the right place; interest
+        // with no linked account falls under "Other".
+        const CS = new Set(['Checking', 'Savings', 'Money Market', 'Cash / Sweep']);
+        const bucketOf = e => { const a = store.account(e.accountId); return a && a.type === 'CD' ? 'CDs' : a && CS.has(a.type) ? 'Checking & Savings' : 'Other'; };
+        const byB = new Map();
+        gEntries.forEach(e => { const b = bucketOf(e); if (!byB.has(b)) byB.set(b, []); byB.get(b).push(e); });
+        ['CDs', 'Checking & Savings', 'Other'].filter(b => byB.has(b)).forEach(b => tb.appendChild(addRow('sub-row drill-row', b, monthsFor(byB.get(b)))));
+      } else if (rewardCat || dividendCat || otherCat) {
         // Break the group down by reward source (Rewards), bank (Interest),
         // account→broker (Dividends: each M1 account and Schwab on its own
         // row), or what it was (Other: lawsuit/gift/rebate + description).
