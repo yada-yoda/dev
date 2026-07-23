@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.128 — A visible button for the CD maturity timeline
+
+The timeline was only reachable by clicking a CD type badge in the table —
+easy to never discover. The Accounts page header now has a **⧗ CD timeline**
+button (shown whenever you have open CDs) that toggles it: click to filter to
+CDs and open the timeline, click again to clear. It highlights while active,
+and it brings you back to the Open tab if you were viewing Closed. The badge
+click still works too.
+
 ### v1.0.127 — Balances with an as-of date, and history that names the account number
 
 **Balance $ on any account.** Every non-CD account can now carry an optional

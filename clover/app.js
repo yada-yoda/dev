@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.127';
+const VERSION = '1.0.128';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1464,6 +1464,21 @@ function renderAccounts(view) {
   left.appendChild(el('p', 'muted', s.accounts.length + ' account' + (s.accounts.length === 1 ? '' : 's')));
   head.appendChild(left);
   const acctActions = el('div', 'head-actions');
+  // The timeline also opens by clicking a CD type badge, but a filter click is
+  // not discoverable — this button makes the feature visible. Toggle semantics:
+  // it sets/clears the same type=CD filter the badge uses.
+  if (s.accounts.some(a => a.type === 'CD' && !a.closed)) {
+    const cdOn = accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
+    const cdBtn = el('button', 'btn-ghost' + (cdOn ? ' active-ghost' : ''), '⧗ CD timeline');
+    cdBtn.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
+      : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates (filters the table to CDs)';
+    cdBtn.addEventListener('click', () => {
+      accountsFilter = cdOn ? null : { key: 'type', value: 'CD' };
+      accountsTab = 'open';   // the timeline lives on the Open tab
+      renderView(currentRoute);
+    });
+    acctActions.appendChild(cdBtn);
+  }
   const add = el('button', 'btn-primary', '+ Add account'); add.addEventListener('click', () => accountModal(null));
   acctActions.appendChild(add);
   head.appendChild(acctActions);
@@ -3237,7 +3252,7 @@ const HELP_SECTIONS = [
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term) and marks it estimated until you confirm it.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Click the CD type badge in the table to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline button at the top of the page (or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },

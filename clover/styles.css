@@ -585,6 +585,8 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
    pending action, and the Renew button warms up when maturity is close. */
 .renew-fields { border: 1px solid var(--warn); border-radius: 8px; padding: 10px 12px; margin-top: 6px; }
 .btn-ghost.renew-soon { color: var(--warn); border-color: var(--warn); }
+/* A ghost button in its toggled-on state (e.g. CD timeline showing). */
+.btn-ghost.active-ghost { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
 
 /* ---- CD maturity timeline ---- */
 .cdtl-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 10px; }
