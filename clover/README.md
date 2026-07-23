@@ -45,6 +45,26 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.132 — Account form tidy-up, CD term column, structured beneficiaries
+
+**Account fields pair up sensibly.** In the CD section the fields were wrapping
+so a rate sat apart from its “as of” date. They’re reordered now so related
+fields share a row: term and principal, then start and maturity, then APY and
+its as-of date.
+
+**As-of dates fill in as you type.** Enter an APY (or a balance) and its “as
+of” date now stamps to today immediately if it was blank — you can see the
+freshness before saving, instead of only at save.
+
+**CD term column.** “CD term” is now an available column in the accounts table
+(⚙ Columns), and it shows automatically whenever the CD timeline is open,
+alongside Principal. A calculated term carries the ≈ marker.
+
+**Beneficiaries are now a proper list.** Instead of one free-text box,
+beneficiaries are name + % rows you can add and remove — cleaner and
+consistent. Anything you’d typed before is preserved as a first entry until you
+tidy it.
+
 ### v1.0.131 — Principal shown in the bar, and estimated CD interest
 
 **Principal moved into the bar.** It was showing next to the institution in the

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.131';
+const VERSION = '1.0.132';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -965,9 +965,20 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
-const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', balance: 'Balance', cdMaturity: 'CD maturity', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
-const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'balance', 'cdMaturity', 'beneficiaries', 'closedDate', 'notes'];
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', balance: 'Balance', cdTerm: 'CD term', cdMaturity: 'CD maturity', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'balance', 'cdTerm', 'cdMaturity', 'beneficiaries', 'closedDate', 'notes'];
 const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'apy', 'flags'];
+// Beneficiaries: an array of {name, pct}. Legacy free-text strings still read
+// (as one entry) so nothing is lost before an account is next edited.
+function beneficiaryList(a) {
+  const b = a && a.beneficiaries;
+  if (Array.isArray(b)) return b.filter(x => x && ((x.name || '').trim() || (x.pct !== '' && x.pct != null)));
+  if (typeof b === 'string' && b.trim()) return [{ name: b.trim(), pct: '' }];
+  return [];
+}
+function beneficiaryText(a) {
+  return beneficiaryList(a).map(b => (b.name || '').trim() + (b.pct !== '' && b.pct != null ? ' (' + b.pct + '%)' : '')).filter(s => s).join(', ');
+}
 // Unified APY for the single "APY" account column. Uses the account's own rate
 // (a CD's cdApy, or a.apy for everything else) with its "as of" date; falls back
 // to the latest recorded rate from Credit & Rates when no rate is set on the
@@ -1041,9 +1052,9 @@ function buildAcctCol(store, key) {
         if (a.rewardsCard) flags.appendChild(badge('Rewards', 'green'));
         const fl = ccFloatToday(a);
         if (fl != null) { const b = badge('~' + fl + 'd float'); b.title = 'Days until a purchase made today would be due'; flags.appendChild(b); }
-        if (BENEFICIARY_TYPES.includes(a.type) && !(a.beneficiaries || '').trim()) flags.appendChild(badge('No beneficiary', 'amber'));
+        if (BENEFICIARY_TYPES.includes(a.type) && !beneficiaryList(a).length) flags.appendChild(badge('No beneficiary', 'amber'));
         td.appendChild(flags); return td; } };
-    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => a.beneficiaries || '', cell: a => { const td = el('td'); td.appendChild(valueBadge('accounts', 'beneficiaries', (a.beneficiaries || '').trim())); return td; } };
+    case 'beneficiaries': return { label: 'Beneficiaries', key: 'beneficiaries', value: a => beneficiaryText(a), cell: a => { const td = el('td'); const t = beneficiaryText(a); if (t) td.appendChild(valueBadge('accounts', 'beneficiaries', t)); else td.textContent = '—'; return td; } };
     case 'apy': return { label: 'APY', key: 'apy', num: true,
         value: a => { const x = accountApy(store, a); return x ? x.pct : -1; },
         cell: a => {
@@ -1061,6 +1072,13 @@ function buildAcctCol(store, key) {
         td.textContent = money(Number(v));
         const asOf = a.type === 'CD' ? a.cdPrincipalAsOf : a.balanceAsOf;
         if (asOf) { const s2 = el('div', 'acct-sub', 'as of ' + fmtDate(asOf)); s2.title = 'When this balance was last entered or updated'; td.appendChild(s2); }
+        return td; } };
+    case 'cdTerm': return { label: 'CD term', key: 'cdTerm', value: a => a.cdTerm || '', cell: a => {
+        const td = el('td');
+        if (a.type === 'CD' && a.cdTerm) {
+          td.appendChild(document.createTextNode(a.cdTerm));
+          if (a.cdTermEst) { const m = el('span', 'est-mark', '≈'); m.title = 'Calculated from the start and maturity dates, not entered by hand.'; td.appendChild(m); }
+        } else td.textContent = '—';
         return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
     case 'closedDate': return { label: 'Closed on', key: 'closedDate', value: a => a.closedDate || '', cell: a => el('td', null, a.closedDate ? fmtDate(a.closedDate) : '—') };
@@ -1546,6 +1564,10 @@ function renderAccounts(view) {
     const pc = buildAcctCol(store, 'balance');
     if (pc) { pc.label = 'Principal'; dataCols.push(pc); }
   }
+  if (cdFilterOn && !dataCols.some(c => c && c.key === 'cdTerm')) {
+    const tc = buildAcctCol(store, 'cdTerm');
+    if (tc) dataCols.push(tc);
+  }
   const cols = [
     ...dataCols,
     { label: '', sortable: false, cell: a => {
@@ -1562,7 +1584,7 @@ function renderAccounts(view) {
   let acctRows = baseAccts;
   if (accountsFilter) {
     const f = accountsFilter;
-    const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? (a.beneficiaries || '').trim() : (a[f.key] || '');
+    const valOf = a => f.key === 'owner' ? store.personName(a.personId) : f.key === 'beneficiaries' ? beneficiaryText(a) : (a[f.key] || '');
     acctRows = baseAccts.filter(a => valOf(a) === f.value);
   }
   // Filtering to CDs reveals the maturity timeline above the table.
@@ -1674,6 +1696,27 @@ function cdRenewalsPanel(a) {
   p.appendChild(list);
   return p;
 }
+// Repeatable name + % rows (each beneficiary on one line), value() -> array.
+function beneficiaryEditor(list) {
+  const wrap = el('div', 'benef-editor');
+  const head = el('div', 'benef-row benef-head');
+  head.appendChild(el('span', 'muted', 'Name')); head.appendChild(el('span', 'muted', '%')); head.appendChild(el('span'));
+  const rowsBox = el('div');
+  const addRow = (name, pct) => {
+    const row = el('div', 'benef-row');
+    const nm = input(name || '', { placeholder: 'e.g. Jane Doe' });
+    const pc = input(pct != null && pct !== '' ? pct : '', { type: 'number', placeholder: '%' }); pc.min = 0; pc.max = 100; pc.step = '0.01';
+    const rm = el('button', 'icon-btn danger', '✕'); rm.title = 'Remove this beneficiary'; rm.addEventListener('click', ev => { ev.preventDefault(); row.remove(); });
+    row.appendChild(nm); row.appendChild(pc); row.appendChild(rm);
+    row.__get = () => ({ name: nm.value.trim(), pct: pc.value === '' ? '' : (parseFloat(pc.value) || 0) });
+    rowsBox.appendChild(row);
+  };
+  (list && list.length ? list : [{ name: '', pct: '' }]).forEach(b => addRow(b.name, b.pct));
+  const add = el('button', 'btn-ghost', '＋ Add beneficiary'); add.addEventListener('click', ev => { ev.preventDefault(); addRow('', ''); });
+  wrap.appendChild(head); wrap.appendChild(rowsBox); wrap.appendChild(add);
+  wrap.__value = () => [...rowsBox.querySelectorAll('.benef-row')].map(r => r.__get()).filter(b => b.name || (b.pct !== '' && b.pct != null));
+  return wrap;
+}
 function accountModal(existing) {
   const store = window.cloverStore, s = store.state;
   const dflt = store.accountDefaults();
@@ -1703,7 +1746,7 @@ function accountModal(existing) {
   const cAuto = checkbox('Used for auto-pay', a.usedForAutopay, 'This account has automatic payments set up on it.');
   const cRewards = checkbox('Rewards card', a.rewardsCard, 'This card earns cash back, points, or rewards.');
   const fNotes = document.createElement('textarea'); fNotes.value = a.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Optional';
-  const fBenef = document.createElement('textarea'); fBenef.value = a.beneficiaries || ''; fBenef.rows = 2; fBenef.placeholder = 'e.g. names and any % split';
+  const fBenef = beneficiaryEditor(beneficiaryList(a));
 
   const fTerm = input(a.cdTerm || '', { placeholder: 'e.g. 13 or 12 months' });
   const fStart = input(a.cdStart || '', { type: 'date' });
@@ -1718,18 +1761,20 @@ function accountModal(existing) {
     m.title = 'Calculated, not entered by hand: whole months from the start date to the maturity date. If it looks wrong, one of those dates is — edit this field to type the real term and the marker goes away.';
     termField.querySelector('span').appendChild(m);
   }
-  cdWrap.appendChild(termField);
   const startField = field('Start date', fStart, 'When this CD term began (the day it was opened). If left blank, Clover estimates it as maturity minus the term (real calendar months) and marks it estimated — enter the real date any time to make it exact.');
   if (a.cdStartEst && a.cdStart) {
     const m = el('span', 'est-mark', '≈');
     m.title = 'Estimated, not entered by hand: maturity date minus the CD term (' + (a.cdTerm || 'term') + '), real calendar months. If it looks wrong, the term or maturity is — edit this date to the real one and the marker goes away.';
     startField.querySelector('span').appendChild(m);
   }
-  cdWrap.appendChild(startField);
+  // Order so related fields pair up on the same row in the 2-col grid:
+  // term | principal, then start | maturity (the span), then APY | APY-as-of.
+  cdWrap.appendChild(termField);
   cdWrap.appendChild(field('Principal $', fPrincipal, 'How much is in this CD — e.g. 10000.00. Optional, but it powers the timeline’s principal totals and the maturing-money ladder.'));
+  cdWrap.appendChild(startField);
+  cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
   cdWrap.appendChild(field('APY %', fApy, 'The annual percentage yield this CD earns.'));
   cdWrap.appendChild(field('APY as of', fCdApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
-  cdWrap.appendChild(field('Maturity date', fMat, 'When the CD matures. Will show on the calendar and in renewal warnings.'));
 
   // Renew flow — rolling a CD into its next term keeps the SAME account record
   // (so everything linked to it stays linked) while the ending term's numbers
@@ -1800,6 +1845,10 @@ function accountModal(existing) {
   const balWrap = el('div', 'cd-fields');
   balWrap.appendChild(field('Balance $', fBal, 'What’s in (or owed on) this account — e.g. 5200.00. Optional. Changing it stamps the as-of date, and each change lands in the History tab.'));
   balWrap.appendChild(field('Balance as of', fBalDate, 'The date this balance was accurate. Defaults to today whenever you change the balance.'));
+  // Typing a rate or balance stamps its "as of" date to today right away (only
+  // when the date is still blank) so the freshness is visible before you save.
+  const autoAsOf = (v, d) => v.addEventListener('input', () => { if (v.value.trim() !== '' && !d.value) d.value = todayISO(); });
+  autoAsOf(fApy, fCdApyDate); autoAsOf(fAcctApy, fApyDate); autoAsOf(fBal, fBalDate);
 
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
@@ -1866,7 +1915,7 @@ function accountModal(existing) {
       const acc = Object.assign(a, {
         name, institution: fInst.value.trim(), type: fType.value,
         last4: fLast4.value.replace(/\D/g, '').slice(0, 4), personId: fOwner.value,
-        beneficiaries: fBenef.value.trim(),
+        beneficiaries: fBenef.__value(),
         active: cActive.__input.checked, usedForIncome: cIncome.__input.checked,
         usedForExpenses: cExpense.__input.checked, usedForAutopay: cAuto.__input.checked,
         rewardsCard: cRewards.__input.checked, notes: fNotes.value.trim(),
@@ -7486,7 +7535,7 @@ function renderImport(view) {
   exp('Accounts', 'clover-accounts.csv', store.state.accounts, [
     { label: 'Name', get: r => r.name }, { label: 'Institution', get: r => r.institution }, { label: 'Type', get: r => r.type },
     { label: 'Last 4', get: r => r.last4 }, { label: 'Owner', get: r => store.personName(r.personId) }, { label: 'Active', get: r => r.active === false ? 'no' : 'yes' },
-    { label: 'Beneficiaries', get: r => r.beneficiaries }
+    { label: 'Beneficiaries', get: r => beneficiaryText(r) }
   ]);
   csv.appendChild(grid);
   view.appendChild(csv);

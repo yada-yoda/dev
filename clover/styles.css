@@ -323,6 +323,11 @@ button { font-family: inherit; cursor: pointer; }
 .field input[type="date"] { padding: 0 4px 0 8px; }
 /* "≈ this value was calculated, not typed" marker — tooltip explains how. */
 .est-mark { color: var(--warn); font-weight: 700; margin-left: 5px; cursor: help; font-size: 13px; }
+/* Beneficiaries: name + % + remove on one row, repeatable. */
+.benef-editor { display: flex; flex-direction: column; gap: 6px; }
+.benef-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px 30px; gap: 8px; align-items: center; }
+.benef-head span { font-size: 11px; }
+.benef-editor > .btn-ghost { align-self: flex-start; padding: 4px 10px; }
 /* Reserve a consistent label height (≥ 2 lines) so inputs line up even when
    some labels wrap and others don't. */
 .cd-fields .field > span { min-height: 3em; display: block; }
