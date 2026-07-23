@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.130';
+const VERSION = '1.0.131';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1201,11 +1201,27 @@ function cdTimelinePanel(store) {
   const next = future[0];
   const in12 = future.filter(r => cdTms(r.a.cdMaturity) <= nowT + 365 * CDTL_DAY);
   const in12P = in12.filter(r => r.a.cdPrincipal != null && r.a.cdPrincipal !== '').reduce((s2, r) => s2 + Number(r.a.cdPrincipal), 0);
+  // Estimated interest — CDs only, shown on this timeline and NEVER written to
+  // the Income page. Simple interest off APY (which already reflects a year's
+  // compounding): annual = principal x APY; YTD accrues each term's principal x
+  // APY across the days of THIS calendar year it was open. Per cycle, so a CD
+  // renewed mid-year counts both terms. Estimates, always labeled as such.
+  const yStart = new Date(new Date(nowT).getFullYear(), 0, 1).getTime();
+  const estRows = open.filter(r => r.a.cdPrincipal !== '' && r.a.cdPrincipal != null && r.a.cdApy !== '' && r.a.cdApy != null);
+  const estAnnual = estRows.reduce((s2, r) => s2 + Number(r.a.cdPrincipal) * Number(r.a.cdApy) / 100, 0);
+  const estYtd = open.reduce((s2, r) => s2 + r.cycles.reduce((cs, c) => {
+    const p = Number(c.principal), apy = Number(c.apy);
+    if (c.principal === '' || c.principal == null || c.apy === '' || c.apy == null || isNaN(p) || isNaN(apy)) return cs;
+    const s = Math.max(c.s, yStart), e = Math.min(c.e, nowT);
+    return cs + (e > s ? p * apy / 100 * ((e - s) / CDTL_DAY) / 365 : 0);
+  }, 0), 0);
   const sum = el('div', 'sub-summary');
   sum.appendChild(sumCard('CD principal', withP.length ? money(totalP) : '—', 'income', withP.length < open.length ? withP.length + ' of ' + open.length + ' CDs have a principal entered' : open.length + ' open CD' + (open.length === 1 ? '' : 's')));
   sum.appendChild(sumCard('Weighted avg APY', wapy != null ? wapy.toFixed(2) + '%' : '—', '', wRows.length ? 'weighted by principal' : apyRows.length ? 'simple average — add principals to weight it' : ''));
   sum.appendChild(sumCard('Next maturity', next ? fmtDate(next.a.cdMaturity) : '—', next && next.du != null && next.du <= 30 ? 'expense' : '', next ? next.a.name + (next.a.last4 ? ' ••' + next.a.last4 : '') : 'no upcoming maturities'));
   sum.appendChild(sumCard('Maturing ≤ 12 mo', in12.length ? (in12P ? money(in12P) : in12.length + ' CD' + (in12.length === 1 ? '' : 's')) : '—', '', in12.length && in12P ? in12.length + ' CD' + (in12.length === 1 ? '' : 's') : 'principal totals need Principal $ entered'));
+  sum.appendChild(sumCard('Est. interest / yr', estRows.length ? money(estAnnual) : '—', 'income', estRows.length ? (estRows.length < open.length ? estRows.length + ' of ' + open.length + ' CDs · principal × APY' : 'principal × APY, simple') : 'needs Principal $ + APY'));
+  sum.appendChild(sumCard('Est. interest YTD', estRows.length ? money(estYtd) : '—', 'income', estRows.length ? 'accrued this year · estimate only, not on the Income page' : 'needs Principal $ + APY'));
   card.appendChild(sum);
 
   // ---- data range + default viewport (5% pad back, 10% forward) ----
@@ -1262,7 +1278,7 @@ function cdTimelinePanel(store) {
     const l1 = el('div', 'cdtl-name-1', r.a.name + (r.a.last4 ? ' ••' + r.a.last4 : ''));
     const l2 = el('div', 'cdtl-name-2');
     const stat = el('span', 'cdtl-status s-' + r.status, badge2.label + (r.du != null && r.du >= 0 && r.du <= 90 ? ' · ' + r.du + 'd' : ''));
-    l2.appendChild(document.createTextNode((r.a.institution ? r.a.institution + ' · ' : '') + (r.a.cdPrincipal != null && r.a.cdPrincipal !== '' ? money(Number(r.a.cdPrincipal)) + ' · ' : '')));
+    l2.appendChild(document.createTextNode(r.a.institution ? r.a.institution + ' · ' : ''));
     l2.appendChild(stat);
     n.appendChild(l1); n.appendChild(l2);
     n.__acctId = r.a.id;
@@ -1366,10 +1382,12 @@ function cdTimelinePanel(store) {
         const x1 = Math.max(x(c.s), 0), x2 = Math.min(x(c.e), W);
         const wpx = Math.max(x2 - x1, 2);
         out += '<rect x="' + x1 + '" y="' + y + '" width="' + wpx + '" height="' + h + '" rx="4" fill="' + cls.fill + '" stroke="' + cls.stroke + '"' + (c.estStart ? ' stroke-dasharray="4 3"' : '') + ' class="cdtl-seg"/>';
+        // Principal first (it's what "how heavy is this CD" asks) and from a
+        // narrow width; APY and term fill in only when there's real room.
         let lbl = '';
-        if (p > 0 && wpx > 64) lbl = kFmt(p);
-        if (wpx > 46 && c.apy !== '' && c.apy != null) lbl += (lbl ? ' · ' : '') + Number(c.apy).toFixed(2) + '%';
-        if (wpx > 150 && c.term) lbl += (lbl ? ' · ' : '') + c.term;
+        if (p > 0 && wpx > 40) lbl = kFmt(p);
+        if (c.apy !== '' && c.apy != null && wpx > (lbl ? 96 : 46)) lbl += (lbl ? ' · ' : '') + Number(c.apy).toFixed(2) + '%';
+        if (c.term && wpx > (lbl ? 150 : 62)) lbl += (lbl ? ' · ' : '') + c.term;
         if (lbl) out += '<text x="' + (x1 + 5) + '" y="' + (y + h / 2 + 4) + '" class="cdtl-seg-lbl" fill="' + cls.text + '">' + lbl + '</text>';
         if (!c.current) out += '<text x="' + (x2 - 4) + '" y="' + (y + h / 2 + 4) + '" text-anchor="end" class="cdtl-seg-lbl" fill="' + cls.text + '">↻</text>';
         if (x(c.s) < 0) out += '<text x="2" y="' + (y + h / 2 + 4) + '" class="cdtl-cont">‹</text>';
@@ -1431,6 +1449,10 @@ function cdTimelinePanel(store) {
         '<div>' + fmtDate(cdTiso(c.s)) + (c.estStart ? ' (est.)' : '') + ' → ' + fmtDate(cdTiso(c.e)) + (c.term ? ' · ' + c.term + (c.termEst ? ' ≈' : '') : '') + '</div>' +
         '<div>' + (c.apy !== '' && c.apy != null ? Number(c.apy).toFixed(2) + '% APY' : 'APY —') + (c.principal !== '' && c.principal != null ? ' · ' + money(Number(c.principal)) : '') + '</div>' +
         '<div class="muted">' + elapsed + 'd elapsed · ' + Math.max(0, days - elapsed) + 'd remaining at this point</div>';
+      if (c.apy !== '' && c.apy != null && c.principal !== '' && c.principal != null) {
+        const pr = Number(c.principal), ap = Number(c.apy);
+        html += '<div class="muted">Est. interest: ' + money(pr * ap / 100 * (elapsed / 365)) + ' to here · ' + money(pr * ap / 100 * (days / 365)) + ' full term</div>';
+      }
     }
     tip.innerHTML = html;
     tip.style.display = '';
@@ -3295,7 +3317,7 @@ const HELP_SECTIONS = [
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, and estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },

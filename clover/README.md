@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.131 — Principal shown in the bar, and estimated CD interest
+
+**Principal moved into the bar.** It was showing next to the institution in the
+left column, which was ambiguous — a lineage has several terms, each with its
+own balance. The amount now lives **inside each timeline bar, for the term that
+principal belonged to**, and shows even on fairly narrow bars (the balance is
+what “which is heavier?” is really asking, so it leads the in-bar label). The
+left column keeps the institution and status; the bar carries the money.
+
+**Estimated CD interest.** Two new summary cards on the timeline: **Est.
+interest / yr** (principal × APY across your open CDs) and **Est. interest
+YTD** (accrued so far this year, computed per term — so a CD renewed mid-year
+counts both the old and new term correctly). Hover any bar to see that term’s
+estimated interest to the point under your cursor and for the full term. These
+are **estimates only, shown solely on the CD timeline — nothing is ever added
+to your Income page.** They need a CD’s Principal $ and APY to compute.
+
 ### v1.0.130 — Calculated CD terms, honest ≈ markers, weighted bars & wider fields
 
 **Terms calculate themselves too.** The reverse of the start-date estimate: a
