@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.138';
+const VERSION = '1.0.139';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1091,7 +1091,7 @@ function buildAcctCol(store, key) {
         const asOf = a.type === 'CD' ? a.cdPrincipalAsOf : a.balanceAsOf;
         if (asOf) { const s2 = el('div', 'acct-sub', 'as of ' + fmtDate(asOf)); s2.title = 'When this balance was last entered or updated'; td.appendChild(s2); }
         return td; } };
-    case 'cdTerm': return { label: 'CD term', key: 'cdTerm', num: true, value: a => (a.type === 'CD' ? store.parseTermMonths(a.cdTerm) : 0) || 0, cell: a => {
+    case 'cdTerm': return { label: 'CD term', key: 'cdTerm', value: a => (a.type === 'CD' ? store.parseTermMonths(a.cdTerm) : 0) || 0, cell: a => {
         const td = el('td');
         const mo = a.type === 'CD' && a.cdTerm ? store.parseTermMonths(a.cdTerm) : null;
         if (a.type === 'CD' && a.cdTerm) {

@@ -45,6 +45,12 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.139 — CD term column alignment fix
+
+The CD term column header was right-aligned (a leftover from making it sort by
+duration) while the values were left-aligned, so they didn’t line up. The header
+now left-aligns to match the values — and it still sorts by actual length.
+
 ### v1.0.138 — CD term field holds just the number, with a “months” label
 
 The CD term field was showing “9 months” inside the editable box (because a
