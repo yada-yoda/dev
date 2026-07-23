@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.132';
+const VERSION = '1.0.133';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1589,6 +1589,7 @@ function renderAccounts(view) {
   }
   // Filtering to CDs reveals the maturity timeline above the table.
   if (cdFilterOn) view.appendChild(cdTimelinePanel(store));
+  if (cdFilterOn) { const g = cdPrincipalGrowthCard(store); if (g) view.appendChild(g); }
   // The active-filter chip shares the ⚙ Columns row — a filter shouldn't cost
   // a whole row of empty space. Same pattern as the other filtered tables.
   const acctTools = el('div', 'table-tools');
@@ -1697,6 +1698,52 @@ function cdRenewalsPanel(a) {
   return p;
 }
 // Repeatable name + % rows (each beneficiary on one line), value() -> array.
+// Every principal figure we know for the CDs, with the date it applied, drawn
+// from three sources: the account History (each cdPrincipal change carries the
+// day it was made), the renewal archive (each ended term's principal), and the
+// current value with its as-of date. Deduped per CD by date. Returns the
+// distinct dates and, at each, the TOTAL across CDs = sum of each CD's latest
+// known principal at-or-before that date (a step function — growth as money is
+// added or balances are updated). Pure — no DOM.
+function cdPrincipalSnapshots(store) {
+  const series = [];
+  store.state.accounts.filter(a => a.type === 'CD').forEach(a => {
+    const byDate = {};
+    const add = (iso, val) => {
+      const d = String(iso || '').slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      if (val === '' || val == null || isNaN(Number(val))) return;
+      byDate[d] = Number(val);   // last write for a given day wins
+    };
+    (a.cdRenewals || []).forEach(t => add(t.at || t.start, t.principal));
+    (a.history || []).forEach(h => (h.changes || []).forEach(c => { if (c.f === 'cdPrincipal') add(h.at, c.to); }));
+    add(a.cdPrincipalAsOf || a.updatedAt || a.createdAt, a.cdPrincipal);
+    const dates = Object.keys(byDate).sort();
+    if (dates.length) series.push({ a, pts: dates.map(d => ({ d, v: byDate[d] })) });
+  });
+  const allDates = [...new Set(series.flatMap(s => s.pts.map(p => p.d)))].sort();
+  const totalAt = d => series.reduce((sum, s) => {
+    let v = 0; for (const p of s.pts) { if (p.d <= d) v = p.v; else break; } return sum + v;
+  }, 0);
+  return { series, allDates, totals: allDates.map(totalAt) };
+}
+function cdPrincipalGrowthCard(store) {
+  const snap = cdPrincipalSnapshots(store);
+  if (!snap.series.length) return null;   // no principals entered anywhere
+  const card = el('div', 'card');
+  card.appendChild(el('h3', 'strip-title', 'CD principal over time'));
+  card.appendChild(el('p', 'muted', 'Total across all CDs — it steps up each time you enter or update a principal, so you can watch the pile grow.'));
+  if (snap.allDates.length < 2) {
+    card.appendChild(el('div', 'muted', 'Not enough dated principal entries yet to chart growth — this fills in as you enter or update CD principals on different days.'));
+    return card;
+  }
+  const wrap = el('div', 'card chart-wrap'); const cv = document.createElement('canvas'); wrap.appendChild(cv); card.appendChild(wrap);
+  buildLineChart(cv, { labels: snap.allDates.map(fmtDateShort), yTitle: '$ total', datasets: [{
+    label: 'Total CD principal', data: snap.totals,
+    borderColor: '#16a34a', backgroundColor: 'rgba(22,163,74,0.12)', fill: true, stepped: true, pointRadius: 3, tension: 0
+  }] });
+  return card;
+}
 function beneficiaryEditor(list) {
   const wrap = el('div', 'benef-editor');
   const head = el('div', 'benef-row benef-head');
@@ -3366,7 +3413,7 @@ const HELP_SECTIONS = [
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, and estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },

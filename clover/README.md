@@ -45,6 +45,17 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.133 — CD principal over time
+
+A new **“CD principal over time”** chart appears under the CD maturity timeline
+(when you’re viewing CDs). It’s the **total principal across all your CDs**,
+drawn as a step line that jumps up each time you enter or update a principal —
+so you can watch the pile grow. It reconstructs the history from three places:
+the account History log (every principal change is dated), the renewal archive,
+and the current value with its as-of date. With only one dated entry so far it
+shows a short note instead; it fills in as you record principals on different
+days.
+
 ### v1.0.132 — Account form tidy-up, CD term column, structured beneficiaries
 
 **Account fields pair up sensibly.** In the CD section the fields were wrapping
