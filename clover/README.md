@@ -45,6 +45,29 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.127 — Balances with an as-of date, and history that names the account number
+
+**Balance $ on any account.** Every non-CD account can now carry an optional
+balance (what’s in it — or owed on a card), and it’s **stamped with an as-of
+date** automatically whenever you change the amount, so a stale number can’t
+pass as current. A CD’s balance is its Principal $, which now gets the same
+automatic stamp. There’s a new optional **Balance** column in the accounts
+table (⚙ Columns) showing the amount with its freshness date, and every
+balance change lands in the account’s **History** tab like any other edit.
+
+**History entries now name the account number.** Each entry in an account’s
+History tab shows the **••last-4 that was in effect when that edit was made** —
+so after a CD renews under a new number, the old entries still read correctly
+under the old number.
+
+**History across renewals and consolidations.** A renewal keeps the same
+account record, so its full history simply continues — nothing to carry.
+A consolidation is genuinely a different account, so instead of jumbling three
+edit trails into one, the combined CD gets a **“Consolidated in: …”** history
+entry naming each source and its number, the Renewals tab lists the merge with
+amounts, and each source CD keeps its own complete history under Accounts →
+Closed.
+
 ### v1.0.126 — CD terms entered as plain numbers now work everywhere
 
 The timeline showed “no CD has enough dates to draw” and start dates weren’t

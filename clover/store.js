@@ -221,7 +221,7 @@ function migrateCdStarts(accounts) {
   return changed;
 }
 
-const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy']);
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy', 'balanceAsOf', 'cdPrincipalAsOf']);
 const HISTORY_MAX = 25;
 function histSnap(v) {
   if (v == null || v === '') return '';
@@ -245,7 +245,11 @@ function pushHistory(entry, before) {
   const changes = diffRecord(before, entry);
   if (!changes.length) return;
   const hist = Array.isArray(before.history) ? before.history.slice() : [];
-  hist.push({ at: new Date().toISOString(), changes });
+  const h = { at: new Date().toISOString(), changes };
+  // Which account number this record carried WHEN the edit was made -- so a
+  // renewed CD's log stays attributable across number changes.
+  if (before.last4 || entry.last4) h.l4 = before.last4 || entry.last4 || '';
+  hist.push(h);
   entry.history = hist.slice(-HISTORY_MAX);
 }
 
@@ -586,6 +590,16 @@ window.cloverStore = {
     return acc;
   },
   removeAccount(id) { state.accounts = state.accounts.filter(a => a.id !== id); scheduleSave(); notify(); },
+  // Append a labeled event to an account's edit history (e.g. "Consolidated
+  // in: ..."), outside the normal save-diff path. Same shape the History tab
+  // renders, same cap.
+  logAccountEvent(id, field, text) {
+    const a = state.accounts.find(x => x.id === id); if (!a) return;
+    const hist = Array.isArray(a.history) ? a.history.slice() : [];
+    hist.push({ at: new Date().toISOString(), l4: a.last4 || '', changes: [{ f: field, from: '', to: text }] });
+    a.history = hist.slice(-HISTORY_MAX);
+    scheduleSave(); notify();
+  },
 
   // --- per-year documents (income, paychecks, expensePayments, importBatches) ---
   isYearLoaded(y) { return !!state.years[String(y)]; },

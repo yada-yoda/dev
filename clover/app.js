@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.126';
+const VERSION = '1.0.127';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -410,17 +410,18 @@ const HIST_LABELS = {
   priority: 'Priority', taxable: 'Taxable', method: 'Method', employer: 'Employer', claimNumber: 'Claim #',
   gallons: 'Gallons', pricePerGallon: 'Price / gallon',
   cdTerm: 'CD term', cdMaturity: 'CD maturity', last4: 'Last 4',
-  cdStart: 'CD start', cdStartEst: 'Start estimated', cdPrincipal: 'CD principal', consolidatedIntoId: 'Consolidated into'
+  cdStart: 'CD start', cdStartEst: 'Start estimated', cdPrincipal: 'CD principal', consolidatedIntoId: 'Consolidated into',
+  balance: 'Balance', consolidatedIn: 'Consolidated in'
 };
 function prettyKey(k) { return k.replace(/([A-Z])/g, ' $1').replace(/^./, c => c.toUpperCase()).replace(/\s*Id\b/, '').trim(); }
 function histFieldLabel(f) { return HIST_LABELS[f] || prettyKey(f); }
 // Dollar-valued fields, so history reads "$42.80 → $51.25" and not "42.8".
-const HIST_MONEY = new Set(['amount', 'gross', 'net', 'prevAmount', 'yearGross', 'yearNet', 'fedAmount', 'stateAmount', 'prepCost', 'orderPrice', 'earnings', 'costPrice', 'expectedAmount', 'fedWithheld', 'stateWithheld', 'price', 'cdPrincipal']);
+const HIST_MONEY = new Set(['amount', 'gross', 'net', 'prevAmount', 'yearGross', 'yearNet', 'fedAmount', 'stateAmount', 'prepCost', 'orderPrice', 'earnings', 'costPrice', 'expectedAmount', 'fedWithheld', 'stateWithheld', 'price', 'cdPrincipal', 'balance']);
 // Stored history holds raw values (ids, booleans) — resolve them to names.
 function histValueText(store, field, v) {
   if (v === '' || v == null) return '—';
   if (HIST_MONEY.has(field) && v !== '' && !isNaN(parseFloat(v))) return '$' + Number(v).toFixed(2);
-  if (/^(accountId|toAccountId|fromAccountId|backupAccountId)$/.test(field)) return store.accountName(v) || String(v);
+  if (/^(accountId|toAccountId|fromAccountId|backupAccountId|consolidatedIntoId)$/.test(field)) return store.accountName(v) || String(v);
   if (field === 'personId') return store.personName(v) || String(v);
   if (field === 'recurringId') { const r = (store.state.recurring || []).find(x => x.id === v); return r ? r.name : String(v); }
   if (field === 'categoryId' || field === 'incomeCategoryId') {
@@ -448,7 +449,7 @@ function historyPanel(store, item) {
   const list = el('div', 'hist-list');
   hist.forEach(h => {
     const card = el('div', 'hist-entry');
-    card.appendChild(el('div', 'hist-when', fmtDateTimeLocal(h.at)));
+    card.appendChild(el('div', 'hist-when', fmtDateTimeLocal(h.at) + (h.l4 ? ' · ••' + h.l4 : '')));
     (h.changes || []).forEach(c => {
       const row = el('div', 'hist-change');
       row.appendChild(el('span', 'hist-field', histFieldLabel(c.f)));
@@ -964,8 +965,8 @@ function categoryCard(kind, groups) {
 // ============================================================
 // Accounts view
 // ============================================================
-const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', cdMaturity: 'CD maturity', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
-const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'cdMaturity', 'beneficiaries', 'closedDate', 'notes'];
+const ACCT_COL_LABELS = { name: 'Name', institution: 'Institution', type: 'Type', last4: 'Last 4', owner: 'Owner', flags: 'Flags', apy: 'APY', balance: 'Balance', cdMaturity: 'CD maturity', beneficiaries: 'Beneficiaries', closedDate: 'Closed on', notes: 'Notes' };
+const ACCT_ALL_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'flags', 'apy', 'balance', 'cdMaturity', 'beneficiaries', 'closedDate', 'notes'];
 const ACCT_DEFAULT_COLS = ['name', 'institution', 'type', 'last4', 'owner', 'apy', 'flags'];
 // Unified APY for the single "APY" account column. Uses the account's own rate
 // (a CD's cdApy, or a.apy for everything else) with its "as of" date; falls back
@@ -1053,6 +1054,14 @@ function buildAcctCol(store, key) {
           // Just the date (keeps the column narrow); the full phrasing is in the tooltip.
           if (x.date) { const sub = el('div', 'acct-sub', fmtDate(x.date)); sub.title = x.as + ' ' + fmtDate(x.date); td.appendChild(sub); }
           return td; } };
+    case 'balance': return { label: 'Balance', key: 'balance', num: true, value: a => Number(a.type === 'CD' ? a.cdPrincipal : a.balance) || 0, cell: a => {
+        const v = a.type === 'CD' ? a.cdPrincipal : a.balance;
+        const td = el('td', 'num');
+        if (v === '' || v == null) { td.textContent = '—'; return td; }
+        td.textContent = money(Number(v));
+        const asOf = a.type === 'CD' ? a.cdPrincipalAsOf : a.balanceAsOf;
+        if (asOf) { const s2 = el('div', 'acct-sub', 'as of ' + fmtDate(asOf)); s2.title = 'When this balance was last entered or updated'; td.appendChild(s2); }
+        return td; } };
     case 'cdMaturity': return { label: 'CD maturity', key: 'cdMaturity', value: a => a.cdMaturity || '', cell: a => el('td', null, a.cdMaturity ? fmtDate(a.cdMaturity) : '—') };
     case 'closedDate': return { label: 'Closed on', key: 'closedDate', value: a => a.closedDate || '', cell: a => el('td', null, a.closedDate ? fmtDate(a.closedDate) : '—') };
     case 'notes': return { label: 'Notes', key: 'notes', value: a => a.notes || '', cell: a => { const td = el('td', 'muted'); td.textContent = a.notes || '—'; return td; } };
@@ -1601,6 +1610,13 @@ function cdRenewalsPanel(a) {
     e.childNodes[1].textContent = e.childNodes[1].textContent.replace('matures ', 'matured ');
     list.appendChild(e);
   });
+  (a.cdFundedBy || []).slice().reverse().forEach(fb => {
+    const e = el('div', 'hist-entry');
+    e.appendChild(el('div', 'hist-when', 'Consolidated in' + (fb.at ? ' · ' + fmtDate(fb.at) : '')));
+    (fb.sources || []).forEach(sc => e.appendChild(el('div', null, sc.name + (sc.last4 ? ' ••' + sc.last4 : '') + (sc.principal !== '' && sc.principal != null ? ' · ' + money(Number(sc.principal)) : ''))));
+    e.appendChild(el('div', 'muted', 'Each source CD keeps its own full history — find it under Accounts → Closed.'));
+    list.appendChild(e);
+  });
   p.appendChild(list);
   return p;
 }
@@ -1712,11 +1728,19 @@ function accountModal(existing) {
   const apyWrap = el('div', 'cd-fields');
   apyWrap.appendChild(field('Current APY %', fAcctApy, 'The annual percentage yield this account currently earns — for savings, checking, money-market, sweep, brokerage cash, and similar accounts.'));
   apyWrap.appendChild(field('APY as of', fApyDate, 'The date this APY was accurate — shown under the rate in the APY column. Defaults to today when you set a rate.'));
+  // Balance snapshot for any non-CD account (a CD's balance is its Principal $).
+  // Stamped with an as-of date so a stale number can't masquerade as current.
+  const fBal = moneyInput(a.balance != null && a.balance !== '' ? a.balance : '', { placeholder: 'optional' });
+  const fBalDate = input(a.balanceAsOf || '', { type: 'date' });
+  const balWrap = el('div', 'cd-fields');
+  balWrap.appendChild(field('Balance $', fBal, 'What’s in (or owed on) this account — e.g. 5200.00. Optional. Changing it stamps the as-of date, and each change lands in the History tab.'));
+  balWrap.appendChild(field('Balance as of', fBalDate, 'The date this balance was accurate. Defaults to today whenever you change the balance.'));
 
   const syncTypeFields = () => {
     cdWrap.style.display = fType.value === 'CD' ? '' : 'none';
     ccWrap.style.display = fType.value === 'Credit Card' ? '' : 'none';
     apyWrap.style.display = (fType.value === 'CD' || fType.value === 'Credit Card') ? 'none' : '';
+    balWrap.style.display = fType.value === 'CD' ? 'none' : '';
   };
   fType.addEventListener('change', syncTypeFields);
 
@@ -1732,6 +1756,7 @@ function accountModal(existing) {
   body.appendChild(cdWrap);
   body.appendChild(ccWrap);
   body.appendChild(apyWrap);
+  body.appendChild(balWrap);
   const flags = el('div', 'check-row'); [cActive, cIncome, cExpense, cAuto, cRewards].forEach(c => flags.appendChild(c));
   body.appendChild(field('Flags', flags));
   body.appendChild(field('Notes', fNotes));
@@ -1756,8 +1781,8 @@ function accountModal(existing) {
 
   openModal({
     title: existing ? 'Edit account' : 'Add account',
-    body: withHistoryTab(body, existing, (existing && existing.id && existing.type === 'CD' && (existing.cdRenewals || []).length)
-      ? { label: 'Renewals (' + existing.cdRenewals.length + ')', panel: cdRenewalsPanel(existing) } : null),
+    body: withHistoryTab(body, existing, (existing && existing.id && existing.type === 'CD' && ((existing.cdRenewals || []).length || (existing.cdFundedBy || []).length))
+      ? { label: 'Renewals (' + (existing.cdRenewals || []).length + ')', panel: cdRenewalsPanel(existing) } : null),
     confirmLabel: 'Save',
     onConfirm: () => {
       const name = fName.value.trim();
@@ -1783,6 +1808,12 @@ function accountModal(existing) {
         cdTerm: fTerm.value.trim(), cdApy: fApy.value.trim(), cdMaturity: fMat.value,
         cdStart: fStart.value || '', cdStartEst: fStart.value ? (fStart.value === (a.cdStart || '') ? !!a.cdStartEst : false) : false,
         cdPrincipal: fPrincipal.value === '' ? '' : parseFloat(fPrincipal.value),
+        cdPrincipalAsOf: fPrincipal.value === '' ? ''
+          : (String(parseFloat(fPrincipal.value)) !== String(a.cdPrincipal != null ? a.cdPrincipal : '') || !a.cdPrincipalAsOf) ? todayISO() : a.cdPrincipalAsOf,
+        balance: fBal.value === '' ? '' : parseFloat(fBal.value),
+        balanceAsOf: fBal.value === '' ? ''
+          : (fBalDate.value && fBalDate.value !== (a.balanceAsOf || '')) ? fBalDate.value
+          : (String(parseFloat(fBal.value)) !== String(a.balance != null ? a.balance : '') || !a.balanceAsOf) ? todayISO() : a.balanceAsOf,
         apy: fAcctApy.value === '' ? null : parseFloat(fAcctApy.value), apyAsOf,
         statementStartDay: fCcOpen.__value(), statementCloseDay: fCcClose.__value(), dueDay: fCcDue.__value(),
         previousAccountId: prevId
@@ -1801,7 +1832,7 @@ function accountModal(existing) {
         // The new term starts the day the old one matured — exact, not estimated.
         acc.cdStart = existing.cdMaturity || '';
         acc.cdStartEst = false;
-        if (rPrincipal.value !== '') acc.cdPrincipal = parseFloat(rPrincipal.value);
+        if (rPrincipal.value !== '') { acc.cdPrincipal = parseFloat(rPrincipal.value); acc.cdPrincipalAsOf = todayISO(); }
         const consolPicked = consolChecks.filter(x => x.cb.__input.checked);
         if (consolPicked.length) acc.cdFundedBy = (existing.cdFundedBy || []).concat([{
           at: todayISO(), sources: consolPicked.map(x => ({ id: x.o.id, name: x.o.name, last4: x.o.last4 || '', principal: x.o.cdPrincipal != null ? x.o.cdPrincipal : '' }))
@@ -1814,10 +1845,15 @@ function accountModal(existing) {
         acc.apyAsOf = todayISO();
       }
       store.saveAccount(acc);
-      // Consolidated sources close today and point at the CD they merged into.
-      if (didRenew) consolChecks.filter(x => x.cb.__input.checked).forEach(x => {
-        store.saveAccount(Object.assign({}, store.account(x.o.id) || x.o, { closed: true, closedDate: todayISO(), active: false, consolidatedIntoId: acc.id }));
-      });
+      // Consolidated sources close today and point at the CD they merged into;
+      // the target's History logs the merge with each source's name and number.
+      if (didRenew) {
+        const picked = consolChecks.filter(x => x.cb.__input.checked);
+        picked.forEach(x => {
+          store.saveAccount(Object.assign({}, store.account(x.o.id) || x.o, { closed: true, closedDate: todayISO(), active: false, consolidatedIntoId: acc.id }));
+        });
+        if (picked.length) store.logAccountEvent(acc.id, 'consolidatedIn', picked.map(x => x.o.name + (x.o.last4 ? ' ••' + x.o.last4 : '') + (x.o.cdPrincipal != null && x.o.cdPrincipal !== '' ? ' (' + money(Number(x.o.cdPrincipal)) + ')' : '')).join(', '));
+      }
       // A rolled-over account's old number is closed — mark the predecessor inactive.
       if (prevId) {
         const prev = store.account(prevId);
@@ -3200,6 +3236,7 @@ const HELP_SECTIONS = [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term) and marks it estimated until you confirm it.',
+      'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
       'Click the CD type badge in the table to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, and a maturing-by-quarter ladder. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
