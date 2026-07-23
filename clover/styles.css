@@ -323,6 +323,19 @@ button { font-family: inherit; cursor: pointer; }
 .field input[type="date"] { padding: 0 4px 0 8px; }
 /* "≈ this value was calculated, not typed" marker — tooltip explains how. */
 .est-mark { color: var(--warn); font-weight: 700; margin-left: 5px; cursor: help; font-size: 13px; }
+/* Top-right notification bell + dropdown (matured CDs awaiting action). */
+.notif-wrap { position: relative; display: flex; align-items: center; }
+.notif-bell { position: relative; background: none; border: none; cursor: pointer; font-size: 18px; line-height: 1; padding: 5px 7px; border-radius: 8px; filter: grayscale(0.5); }
+.notif-bell:hover { background: var(--surface-2); }
+.notif-bell.has-notif { filter: none; }
+.notif-count { position: absolute; top: -1px; right: -1px; min-width: 16px; height: 16px; padding: 0 4px; box-sizing: border-box; border-radius: 8px; background: #dc2626; color: #fff; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.notif-panel { position: absolute; right: 0; top: calc(100% + 6px); width: 310px; max-width: 84vw; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 12px 34px rgba(0,0,0,0.18); z-index: 60; padding: 10px 12px; max-height: 64vh; overflow-y: auto; }
+.notif-head { font-weight: 700; font-size: 13px; }
+.notif-sub { font-size: 11px; margin: 4px 0 6px; }
+.notif-empty { font-size: 12px; padding: 6px 0; }
+.notif-item { border-top: 1px solid var(--border); padding: 8px 0 6px; }
+.notif-item-t { font-weight: 600; font-size: 13px; }
+.notif-item .btn-ghost { margin-top: 5px; padding: 3px 9px; font-size: 12px; }
 /* An input with a static unit label attached (e.g. CD term + "months"). */
 .unit-input { display: flex; align-items: stretch; }
 .unit-input > input { flex: 1; min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }

@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.140 — Matured CDs: a notification bell + dashboard reminder
+
+Clover has never auto-closed a CD, and it never will — a CD that passes its
+maturity date **stays open until you renew or update it.** To make sure one
+doesn’t slip by unnoticed, there’s now a **bell in the top-right** that counts
+any CD past maturity; click it for the list, each with a **Renew / update**
+button. Matured CDs also show in the dashboard’s **⚠ Attention** panel with a
+link straight to the CD timeline. Both spell out that nothing is closed on your
+behalf — the money just waits for your decision.
+
 ### v1.0.139 — CD term column alignment fix
 
 The CD term column header was right-aligned (a leftover from making it sort by

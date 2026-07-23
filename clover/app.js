@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.139';
+const VERSION = '1.0.140';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -177,9 +177,46 @@ function ownerState() {
   return 'denied';
 }
 
+// CDs sitting past their maturity date, still open (not closed/consolidated).
+// Clover NEVER auto-closes these — they wait here until you renew or update them.
+function maturedCds(store) {
+  return store.state.accounts
+    .filter(a => a.type === 'CD' && !a.closed && !a.consolidatedIntoId && a.cdMaturity && daysUntil(a.cdMaturity) < 0)
+    .sort((x, y) => (x.cdMaturity || '').localeCompare(y.cdMaturity || ''));
+}
+// Top-right bell: count + dropdown of CDs needing attention. Recomputed on every
+// render (renderView runs on data change + navigation).
+function renderNotifications() {
+  const bell = document.getElementById('notif-bell');
+  const countEl = document.getElementById('notif-count');
+  const panel = document.getElementById('notif-panel');
+  if (!bell || !panel) return;
+  const store = window.cloverStore;
+  const loaded = store && store.isLoaded && store.isLoaded() && ownerState() === 'owner';
+  const matured = loaded ? maturedCds(store) : [];
+  const n = matured.length;
+  countEl.textContent = n > 9 ? '9+' : String(n);
+  countEl.classList.toggle('hidden', n === 0);
+  bell.classList.toggle('has-notif', n > 0);
+  panel.innerHTML = '';
+  panel.appendChild(el('div', 'notif-head', 'Notifications'));
+  if (!n) { panel.appendChild(el('div', 'notif-empty muted', loaded ? 'All caught up \u2014 nothing needs attention.' : 'Nothing yet.')); return; }
+  panel.appendChild(el('div', 'notif-sub muted', 'A matured CD stays open until you act \u2014 Clover never closes it or assumes it\u2019s closed.'));
+  matured.forEach(a => {
+    const row = el('div', 'notif-item');
+    row.appendChild(el('div', 'notif-item-t', a.name + (a.last4 ? ' \u2022\u2022' + a.last4 : '')));
+    const d = -daysUntil(a.cdMaturity);
+    row.appendChild(el('div', 'muted', 'Matured ' + fmtDate(a.cdMaturity) + ' \u00b7 ' + d + ' day' + (d === 1 ? '' : 's') + ' ago'));
+    const btn = el('button', 'btn-ghost', '\u21bb Renew / update');
+    btn.addEventListener('click', () => { panel.classList.add('hidden'); accountModal(a); });
+    row.appendChild(btn);
+    panel.appendChild(row);
+  });
+}
 function renderView(route) {
   const view = document.getElementById('view');
   view.innerHTML = '';
+  renderNotifications();
   const state = ownerState();
   if (state === 'denied') { view.appendChild(deniedPanel()); return; }
   if (state === 'setup') view.appendChild(setupBanner());
@@ -356,6 +393,11 @@ function wireChrome() {
   document.getElementById('sidebar-backdrop').addEventListener('click', closeDrawer);
   document.getElementById('sel-year').addEventListener('change', onPeriodChange);
   document.getElementById('sel-month').addEventListener('change', onPeriodChange);
+  const bell = document.getElementById('notif-bell');
+  if (bell) {
+    bell.addEventListener('click', ev => { ev.stopPropagation(); document.getElementById('notif-panel').classList.toggle('hidden'); });
+    document.addEventListener('click', ev => { const w = document.getElementById('notif-wrap'); if (w && !w.contains(ev.target)) document.getElementById('notif-panel').classList.add('hidden'); });
+  }
 }
 
 function toggleDrawer() {
@@ -3409,7 +3451,7 @@ const HELP_SECTIONS = [
     points: [
       'Key numbers for the selected month: income in, money spent, and what’s left (net).',
       'Projected annual income and expenses based on your trend so far.',
-      '“⚠ Attention” collects things that need you — bills renewing soon, late or missing paychecks, and budget placeholders waiting on last month’s actuals.',
+      '“⚠ Attention” collects things that need you — bills renewing soon, late or missing paychecks, and budget placeholders waiting on last month’s actuals, and any CD that has passed its maturity date. A bell in the top-right also counts matured CDs — Clover never closes a CD on its own; it waits for you to renew or update it.',
       'Donut charts break down income and spending by category. “Expenses by category (YTD)” counts only the months that have already happened, so a yearly premium isn’t weighed against a few months of groceries.',
       '“Where your take-home goes (YTD)” asks a different question: what share of the money you actually brought home does each category use? The unspent remainder is a slice of its own, so the shares add up to 100% of take-home. If you’ve spent more than you’ve earned so far there’s no remainder to chart, so it lists the shares instead.',
       'Every panel can be moved, resized, hidden, or restored in edit mode.'
@@ -6108,9 +6150,19 @@ function buildWarnings(store, data, s) {
       return !used && !budgetMonthSkipped(b, pym);
     });
   }
-  if (!renewSoon.length && !overdue.length && !budgetDue.length) return null;
+  const maturedCd = maturedCds(store);
+  if (!renewSoon.length && !overdue.length && !budgetDue.length && !maturedCd.length) return null;
   const strip = el('div', 'card warn-strip');
   const list = el('div', 'warn-list');
+  if (maturedCd.length) {
+    const w = el('div', 'warn-item');
+    w.appendChild(badge('Matured', 'red'));
+    w.appendChild(el('span', null, maturedCd.length + ' CD' + (maturedCd.length === 1 ? ' has' : 's have') + ' passed maturity \u2014 renew or update ' + (maturedCd.length === 1 ? 'it' : 'them') + ' (Clover won\u2019t close ' + (maturedCd.length === 1 ? 'it' : 'them') + ' for you)'));
+    const go = el('button', 'btn-ghost', 'Review \u2192');
+    go.addEventListener('click', () => { accountsCdTimeline = true; accountsTab = 'open'; location.hash = 'accounts'; });
+    w.appendChild(go);
+    list.appendChild(w);
+  }
   if (budgetDue.length) {
     const w = el('div', 'warn-item');
     w.appendChild(badge('Budget', 'amber'));
