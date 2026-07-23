@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.136 — Renewing a CD asks for the new term’s start date
+
+The renew form no longer assumes the new term begins the day you click Renew.
+It now has a **New start date** field, pre-filled with the old maturity date
+(the usual case) but editable — so an **early renewal**, or a term that doesn’t
+start until a week or two after maturity, lands in the right place on the
+timeline. Everything else about the renewed CD (APY, maturity, length, account
+number, principal) is still captured in the same form.
+
 ### v1.0.135 — Filter the CD timeline by institution, owner, or beneficiary
 
 With the CD timeline open, clicking an **institution, owner, or beneficiary**

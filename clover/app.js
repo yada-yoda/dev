@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.135';
+const VERSION = '1.0.136';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1865,6 +1865,7 @@ function accountModal(existing) {
   // number on renewal; entering one swaps it in, blank keeps the old.
   let renewOpen = false;
   const rApy = input('', { type: 'number', placeholder: 'e.g. 4.25' }); rApy.step = '0.01'; rApy.min = 0;
+  const rStart = input(a.cdMaturity || '', { type: 'date' });
   const rMat = input('', { type: 'date' });
   const rTerm = input('', { placeholder: a.cdTerm ? 'e.g. ' + a.cdTerm : 'e.g. 12 months' });
   const rLast4 = input('', { placeholder: a.last4 ? 'blank = keep ••' + a.last4 : 'optional' }); rLast4.maxLength = 4; rLast4.inputMode = 'numeric';
@@ -1873,8 +1874,9 @@ function accountModal(existing) {
   if (existing && existing.id) {
     const renewWrap = el('div', 'cd-fields renew-fields');
     renewWrap.style.display = 'none';
+    renewWrap.appendChild(field('New start date', rStart, 'When the renewed term actually begins. Defaults to the old maturity date, but change it if this renewed early or the new term doesn’t start until days after maturity — it drives where the new bar sits on the timeline.'));
     renewWrap.appendChild(field('New APY %', rApy, 'The rate the renewed CD earns — e.g. 4.25. Worth a call to the bank about current rates before the auto-renew window closes.'));
-    renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month renewal of a CD that matured Aug 1, 2026 runs to Aug 1, 2027.'));
+    renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month, Aug 1 2026 start runs to Aug 1, 2027.'));
     renewWrap.appendChild(field('New CD length', rTerm, 'The renewed term — e.g. 12 months, 9 months. Blank keeps the current length.'));
     renewWrap.appendChild(field('New account # (last 4)', rLast4, 'Only if the bank issued a NEW account number for the renewal — blank keeps the current one.'));
     renewWrap.appendChild(field('New principal $', rPrincipal, 'The renewed balance — usually old principal plus the interest it earned, plus anything you added. Blank keeps the current figure.'));
@@ -2041,8 +2043,9 @@ function accountModal(existing) {
           term: existing.cdTerm || '', last4: existing.last4 || '',
           start: existing.cdStart || '', principal: existing.cdPrincipal != null ? existing.cdPrincipal : ''
         }]);
-        // The new term starts the day the old one matured — exact, not estimated.
-        acc.cdStart = existing.cdMaturity || '';
+        // Start comes from the field (pre-filled with the old maturity but the
+        // user can change it — early renewal, or a term that starts days later).
+        acc.cdStart = rStart.value || existing.cdMaturity || '';
         acc.cdStartEst = false;
         if (rPrincipal.value !== '') { acc.cdPrincipal = parseFloat(rPrincipal.value); acc.cdPrincipalAsOf = todayISO(); }
         const consolPicked = consolChecks.filter(x => x.cb.__input.checked);
