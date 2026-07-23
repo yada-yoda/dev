@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.129 — Principal column appears with the CD timeline
+
+While the CD maturity timeline is open, the accounts table below it now shows
+a **Principal** column automatically — each CD’s principal with the date it
+was last entered or updated underneath. No need to add the Balance column by
+hand for that view (though if you already have it in your layout, it isn’t
+duplicated).
+
 ### v1.0.128 — A visible button for the CD maturity timeline
 
 The timeline was only reachable by clicking a CD type badge in the table —

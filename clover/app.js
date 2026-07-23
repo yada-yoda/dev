@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.128';
+const VERSION = '1.0.129';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1471,7 +1471,7 @@ function renderAccounts(view) {
     const cdOn = accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
     const cdBtn = el('button', 'btn-ghost' + (cdOn ? ' active-ghost' : ''), '⧗ CD timeline');
     cdBtn.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
-      : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates (filters the table to CDs)';
+      : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates; while it\u2019s open the table also shows a Principal column with each amount\u2019s as-of date (filters the table to CDs)';
     cdBtn.addEventListener('click', () => {
       accountsFilter = cdOn ? null : { key: 'type', value: 'CD' };
       accountsTab = 'open';   // the timeline lives on the Open tab
@@ -1507,6 +1507,14 @@ function renderAccounts(view) {
   const dataCols = onClosed
     ? ['name', 'type', 'institution', 'last4', 'owner', 'closedDate'].map(k => buildAcctCol(store, k)).filter(Boolean)
     : tableColKeys(store, 'accounts', ACCT_COL_LABELS, ACCT_DEFAULT_COLS).map(k => buildAcctCol(store, k)).filter(Boolean);
+  // With the CD timeline open, principal is the number that matters — surface
+  // it as its own column (with the as-of date under each amount) even when the
+  // user hasn't added the Balance column to their saved layout.
+  const cdFilterOn = !onClosed && accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD';
+  if (cdFilterOn && !dataCols.some(c => c && c.key === 'balance')) {
+    const pc = buildAcctCol(store, 'balance');
+    if (pc) { pc.label = 'Principal'; dataCols.push(pc); }
+  }
   const cols = [
     ...dataCols,
     { label: '', sortable: false, cell: a => {
@@ -1527,7 +1535,7 @@ function renderAccounts(view) {
     acctRows = baseAccts.filter(a => valOf(a) === f.value);
   }
   // Filtering to CDs reveals the maturity timeline above the table.
-  if (accountsFilter && accountsFilter.key === 'type' && accountsFilter.value === 'CD' && !onClosed) view.appendChild(cdTimelinePanel(store));
+  if (cdFilterOn) view.appendChild(cdTimelinePanel(store));
   // The active-filter chip shares the ⚙ Columns row — a filter shouldn't cost
   // a whole row of empty space. Same pattern as the other filtered tables.
   const acctTools = el('div', 'table-tools');
