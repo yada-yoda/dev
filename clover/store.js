@@ -329,7 +329,10 @@ function defaults() {
       taxForms: seedList(SEED_TAX_FORMS),
       // Paycheck method + check-type dropdowns — user-extensible in Settings.
       payMethods: seedList(SEED_PAY_METHODS),
-      checkTypes: seedList(SEED_CHECK_TYPES)
+      checkTypes: seedList(SEED_CHECK_TYPES),
+      // Named beneficiaries to pick from per account (empty by default). Only in
+      // the defaults, so older saved docs inherit the empty list automatically.
+      beneficiaries: []
     },
     creditScores: [],   // {id, date, score, provider}
     rateHistory: [],    // {id, date, accountId, apy}

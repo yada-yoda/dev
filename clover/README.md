@@ -45,6 +45,18 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.134 — Managed beneficiary list, % total, and clearer current-term bars
+
+**Beneficiaries you can pick from.** Settings now has a **Beneficiaries** list
+(under Lists & categories). On an account, each beneficiary’s name is a dropdown
+of that list — pick a person and set their **%** next to it — and you can still
+type a one-off name. A running **Total: N%** shows under the rows and turns
+amber if it isn’t 100%, so splits are easy to get right.
+
+**Current CD term stands out.** On the maturity timeline, a CD’s past (renewed)
+terms are now drawn slightly faded, so the current term reads as the live one at
+a glance.
+
 ### v1.0.133 — CD principal over time
 
 A new **“CD principal over time”** chart appears under the CD maturity timeline

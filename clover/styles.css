@@ -328,6 +328,8 @@ button { font-family: inherit; cursor: pointer; }
 .benef-row { display: grid; grid-template-columns: minmax(0, 1fr) 88px 30px; gap: 8px; align-items: center; }
 .benef-head span { font-size: 11px; }
 .benef-editor > .btn-ghost { align-self: flex-start; padding: 4px 10px; }
+.benef-total { font-size: 12px; }
+.benef-total.off100 { color: var(--warn); font-weight: 600; }
 /* Reserve a consistent label height (≥ 2 lines) so inputs line up even when
    some labels wrap and others don't. */
 .cd-fields .field > span { min-height: 3em; display: block; }

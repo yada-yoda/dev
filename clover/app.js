@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.133';
+const VERSION = '1.0.134';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -766,6 +766,8 @@ function renderSettings(view) {
   const listCards = [
     ['people', simpleListCard('People', 'Who money belongs to — you, joint, or others. Click a name to rename.', s.persons,
       { addLabel: 'Add person', onAdd: v => store.addPerson(v), onRemove: id => store.removePerson(id), onRename: (id, v) => store.renamePerson(id, v) })],
+    ['beneficiaries', simpleListCard('Beneficiaries', 'People you name as account beneficiaries (POD/TOD, retirement, life insurance). Manage the list here; on each account, pick from it and set that person’s %.', s.catalog.beneficiaries || [],
+      { addLabel: 'Add beneficiary', onAdd: v => store.addCatalog('beneficiaries', v), onRemove: id => store.removeCatalog('beneficiaries', id), onRename: (id, v) => store.renameCatalog('beneficiaries', id, v) })],
     ['incomeCats', categoryCard('income', s.incomeCategories)],
     ['expenseCats', categoryCard('expense', s.expenseCategories)],
     ['institutions', simpleListCard('Institutions', 'Banks, brokers & card issuers used by accounts', s.catalog.institutions,
@@ -1312,7 +1314,7 @@ function cdTimelinePanel(store) {
   body.appendChild(names); body.appendChild(plot);
   card.appendChild(body);
 
-  const hint = el('div', 'sum-hint', 'Bar thickness = principal (where entered) · Drag ↔ to pan · scroll to zoom at the cursor · double-click resets · arrow keys pan, + / − zoom · dashed edge = estimated start date');
+  const hint = el('div', 'sum-hint', 'Bar thickness = principal (where entered) · Drag ↔ to pan · scroll to zoom at the cursor · double-click resets · arrow keys pan, + / − zoom · dashed edge = estimated start · faded bar = a past renewed term');
   card.appendChild(hint);
 
   // ---- maturing ladder (current terms only; money that becomes available) ----
@@ -1399,7 +1401,9 @@ function cdTimelinePanel(store) {
         const cls = CDTL_STATUS[c.current ? r.status : 'matured'];
         const x1 = Math.max(x(c.s), 0), x2 = Math.min(x(c.e), W);
         const wpx = Math.max(x2 - x1, 2);
-        out += '<rect x="' + x1 + '" y="' + y + '" width="' + wpx + '" height="' + h + '" rx="4" fill="' + cls.fill + '" stroke="' + cls.stroke + '"' + (c.estStart ? ' stroke-dasharray="4 3"' : '') + ' class="cdtl-seg"/>';
+        // A past renewed term is drawn faded so the current term reads as the
+        // live one at a glance (they sit adjacent on the same row).
+        out += '<rect x="' + x1 + '" y="' + y + '" width="' + wpx + '" height="' + h + '" rx="4" fill="' + cls.fill + '" stroke="' + cls.stroke + '"' + (c.current ? '' : ' fill-opacity="0.42"') + (c.estStart ? ' stroke-dasharray="4 3"' : '') + ' class="cdtl-seg"/>';
         // Principal first (it's what "how heavy is this CD" asks) and from a
         // narrow width; APY and term fill in only when there's real room.
         let lbl = '';
@@ -1744,24 +1748,39 @@ function cdPrincipalGrowthCard(store) {
   }] });
   return card;
 }
-function beneficiaryEditor(list) {
+function beneficiaryEditor(existing) {
+  const store = window.cloverStore;
   const wrap = el('div', 'benef-editor');
+  // Names come from the Settings-managed list (a dropdown), but you can still
+  // type a one-off — the datalist suggests without restricting.
+  const dl = el('datalist'); dl.id = 'benef-name-list';
+  (store.state.catalog.beneficiaries || []).slice().sort((a, b) => a.name.localeCompare(b.name)).forEach(x => { const o = el('option'); o.value = x.name; dl.appendChild(o); });
+  wrap.appendChild(dl);
   const head = el('div', 'benef-row benef-head');
   head.appendChild(el('span', 'muted', 'Name')); head.appendChild(el('span', 'muted', '%')); head.appendChild(el('span'));
   const rowsBox = el('div');
+  const total = el('div', 'muted benef-total');
+  const recalc = () => {
+    let sum = 0, any = false;
+    rowsBox.querySelectorAll('.benef-pct').forEach(p => { const v = parseFloat(p.value); if (!isNaN(v)) { sum += v; any = true; } });
+    total.textContent = any ? 'Total: ' + (Number.isInteger(sum) ? sum : sum.toFixed(2)) + '%' + (sum > 100.0001 ? ' — over 100%' : sum < 99.9999 ? ' — under 100%' : '') : '';
+    total.classList.toggle('off100', any && Math.abs(sum - 100) > 0.001);
+  };
   const addRow = (name, pct) => {
     const row = el('div', 'benef-row');
-    const nm = input(name || '', { placeholder: 'e.g. Jane Doe' });
-    const pc = input(pct != null && pct !== '' ? pct : '', { type: 'number', placeholder: '%' }); pc.min = 0; pc.max = 100; pc.step = '0.01';
-    const rm = el('button', 'icon-btn danger', '✕'); rm.title = 'Remove this beneficiary'; rm.addEventListener('click', ev => { ev.preventDefault(); row.remove(); });
+    const nm = input(name || '', { placeholder: 'pick or type a name', list: 'benef-name-list' });
+    const pc = input(pct != null && pct !== '' ? pct : '', { type: 'number', placeholder: '%' }); pc.min = 0; pc.max = 100; pc.step = '0.01'; pc.className = 'benef-pct';
+    pc.addEventListener('input', recalc);
+    const rm = el('button', 'icon-btn danger', '✕'); rm.title = 'Remove this beneficiary'; rm.addEventListener('click', ev => { ev.preventDefault(); row.remove(); recalc(); });
     row.appendChild(nm); row.appendChild(pc); row.appendChild(rm);
     row.__get = () => ({ name: nm.value.trim(), pct: pc.value === '' ? '' : (parseFloat(pc.value) || 0) });
     rowsBox.appendChild(row);
   };
-  (list && list.length ? list : [{ name: '', pct: '' }]).forEach(b => addRow(b.name, b.pct));
-  const add = el('button', 'btn-ghost', '＋ Add beneficiary'); add.addEventListener('click', ev => { ev.preventDefault(); addRow('', ''); });
-  wrap.appendChild(head); wrap.appendChild(rowsBox); wrap.appendChild(add);
+  (existing && existing.length ? existing : [{ name: '', pct: '' }]).forEach(b => addRow(b.name, b.pct));
+  const add = el('button', 'btn-ghost', '＋ Add beneficiary'); add.addEventListener('click', ev => { ev.preventDefault(); addRow('', ''); recalc(); });
+  wrap.appendChild(head); wrap.appendChild(rowsBox); wrap.appendChild(total); wrap.appendChild(add);
   wrap.__value = () => [...rowsBox.querySelectorAll('.benef-row')].map(r => r.__get()).filter(b => b.name || (b.pct !== '' && b.pct != null));
+  recalc();
   return wrap;
 }
 function accountModal(existing) {
