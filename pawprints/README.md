@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.55.1**
+**Current Version: v0.55.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.55.2** — **Supply cost-per-day now starts when the item does** — the per-day cost breakdown no
+  longer counts from the purchase date for unopened stock; it only begins once you set a **Started**
+  date (and runs to Finished, or today if still in use). An item sitting in inventory shows its
+  cost-per-unit but no per-day rate until it's opened. (Cost-per-unit is unchanged.)
 - **v0.55.1** — Insights food/treats cards polish: the cards are now grouped (all Food cards, then all
   Treats cards) instead of interleaved, and the unit on "Food/day" (e.g. "cups") is smaller so it
   doesn't dominate the number.

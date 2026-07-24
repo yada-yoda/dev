@@ -238,7 +238,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.55.1';
+const APP_VERSION = 'v0.55.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2277,7 +2277,7 @@ function invModal(id, pre){
     +'<div id="iv-lifecycle-wrap"><div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
     +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open (or since purchase). Handy for comparing value between brands or pack sizes.')+'</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open — it only starts once you set a Started date, so unopened stock has no per-day cost yet. Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="saveInv('+(editing?"'"+id+"'":'null')+')">Save</button>'
     +(editing?'<button class="btn" onclick="dupInv(\''+id+'\')" title="Add another of this same item">Duplicate</button><button class="btn btn-danger" onclick="deleteInv(\''+id+'\')">Delete</button>':'')
@@ -3292,10 +3292,9 @@ function invCostBreakdown(i){
   // per-unit: cost ÷ (qty × package size) → per oz/ct/lb; else ÷ qty → per count
   if(sz && qty>0){ out.perUnit = cost/(qty*sz.n); out.perUnitLabel = '/'+(sz.unit||'unit'); }
   else if(qty>0){ out.perUnit = cost/qty; out.perUnitLabel = '/'+(i.unit||'ea'); }
-  // per-day: cost ÷ days opened→finished (or today); else since purchase
-  const start = i.startDate || i.purchaseDate, end = i.endDate || todayISO();
-  let days = daysBetween(start, end);
-  if(days!=null){ out.perDay = cost/Math.max(1,days); }
+  // per-day: only once the item is actually in use — cost ÷ days from Started to Finished (or today).
+  // Unopened inventory (no Started date) has no per-day cost yet, so it's omitted.
+  if(i.startDate){ const days = daysBetween(i.startDate, i.endDate || todayISO()); if(days!=null) out.perDay = cost/Math.max(1,days); }
   return (out.perUnit!=null || out.perDay!=null) ? out : null;
 }
 function renderSupplies(){
