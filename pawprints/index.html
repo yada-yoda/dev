@@ -268,7 +268,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.57.0';
+const APP_VERSION = 'v0.57.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2752,7 +2752,7 @@ function setSuppliesSort(key){
   else { const s = SUP_SORTS.find(x=>x.k===key); suppliesSort = { key, dir:(s && (s.t==='num'||s.t==='date'))?'desc':'asc' }; }
   render();
 }
-const SUP_STATUS_RANK = { 'In use':0, 'Inventory':1, 'Item':2, 'Finished':3 };
+const SUP_STATUS_RANK = { 'In use':0, 'Inventory':1, 'One-time':2, 'Finished':3 };
 function suppliesCompare(a, b){
   const s = SUP_SORTS.find(x=>x.k===suppliesSort.key) || SUP_SORTS[5];
   let av, bv, r;
@@ -3325,7 +3325,7 @@ function renderIllnessTab(){
 
 // ── SUPPLIES ──
 // Lifecycle from the date fields: no start = on-hand inventory, start = in use, end = finished.
-function invStatus(i){ if(i.noLifecycle) return 'Item'; return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
+function invStatus(i){ if(i.noLifecycle) return 'One-time'; return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
 // Only allow http(s) reorder links (reject javascript:/data:/etc.); bare domains get https:// prefixed.
 function safeUrl(u){ u=(u||'').trim(); if(!u) return ''; if(/^https?:\/\//i.test(u)) return u; if(/^[a-z][a-z0-9+.\-]*:/i.test(u)) return ''; return 'https://'+u; }
 function reorderLink(i){ const u = safeUrl(i && i.reorderUrl); return u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Reorder this item — opens the product page">↗ Reorder</a>' : ''; }
@@ -3338,7 +3338,7 @@ function invDurationText(i){
 }
 function invStatusChip(i){
   const s = invStatus(i);
-  if(s==='Item') return ''; // one-time item — no lifecycle status
+  if(s==='One-time') return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">One-time</span>';
   if(s==='In use') return '<span class="chip-2" style="font-size:10px">In use</span>';
   if(s==='Finished') return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Finished</span>';
   return '<span class="chip" style="background:var(--bg-tertiary);color:var(--text-secondary);font-size:10px">Inventory</span>';

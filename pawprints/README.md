@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.57.0**
+**Current Version: v0.57.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,8 @@ covers both.
 
 ## Version History
 
+- **v0.57.1** — One-time supply items now show a **"One-time"** status in the Status column (and in the
+  spreadsheet/PDF exports), instead of showing no status.
 - **v0.57.0** — **Supplies is now a real table** — the supply list is a sortable table with column
   headers (Item · Brand · Where · Category · Cost · Status); click a header to sort (↕ / ↑ / ↓). Brand,
   Where, and Category show as colored pills in their columns, and tapping a pill filters the list to
