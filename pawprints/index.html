@@ -93,6 +93,9 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .range-seg button{padding:5px 12px;border-radius:8px;font-size:12px;line-height:1.1;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap}
 .range-seg button:hover{color:var(--text-primary);border-color:var(--accent)}
 .range-seg button.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));border-color:transparent;color:#08231f;font-weight:700}
+.sup-tag{cursor:pointer}
+.sup-tag:hover{outline:1px solid var(--accent)}
+.sup-tag.active{outline:2px solid var(--accent);outline-offset:1px}
 .range-span{font-size:11px;color:var(--text-secondary);margin:-4px 0 12px;font-variant-numeric:tabular-nums}
 .panel-cam{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
 .panel-cam:hover{color:var(--accent);border-color:var(--accent)}
@@ -238,7 +241,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.56.0';
+const APP_VERSION = 'v0.56.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -303,6 +306,7 @@ let recordSortAsc = false; // Records tab: false = newest first, true = oldest f
 let vetSortAsc = false, groomSortAsc = false, illnessSortAsc = false; // Care lists: same date-sort toggle
 let suppliesCat = 'all';
 let suppliesSort = { key:'purchaseDate', dir:'desc' }; // Supplies list column sort
+let suppliesFilter = null; // {field,value} — click a Brand/Where tag to show only matching items
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
 let currentUser = null;
@@ -2713,7 +2717,7 @@ function promptAddDog(){
 }
 function setLogSubtab(t){ logSubtab = t; render(); }
 function setCareSubtab(t){ careSubtab = t; render(); }
-function setSuppliesCat(c){ suppliesCat = c; render(); }
+function setSuppliesCat(c, enc){ suppliesCat = enc ? decodeURIComponent(c) : c; render(); }
 // Supplies column sort — text sorts ascending first, cost/date descending first; same column toggles direction.
 const SUP_SORTS = [{k:'name',l:'Item',t:'text'},{k:'brand',l:'Brand',t:'text'},{k:'store',l:'Where',t:'text'},{k:'category',l:'Category',t:'text'},{k:'cost',l:'Cost',t:'num'},{k:'purchaseDate',l:'Purchased',t:'date'},{k:'status',l:'Status',t:'status'}];
 function setSuppliesSort(key){
@@ -2731,6 +2735,14 @@ function suppliesCompare(a, b){
   if(r===0) r=(b.purchaseDate||'').localeCompare(a.purchaseDate||''); // tiebreak: newest purchase first
   return suppliesSort.dir==='asc' ? r : -r;
 }
+// Click a Brand/Where tag on a row to show only items sharing that value; click it (or Clear) to undo.
+function filterSupplies(field, encVal){
+  const value = decodeURIComponent(encVal);
+  suppliesFilter = (suppliesFilter && suppliesFilter.field===field && suppliesFilter.value===value) ? null : { field, value };
+  render();
+}
+function clearSuppliesFilter(){ suppliesFilter = null; render(); }
+function supFieldLabel(f){ return f==='store' ? 'Where' : (f==='brand' ? 'Brand' : f.charAt(0).toUpperCase()+f.slice(1)); }
 function suppliesSortBar(){
   return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Sort</span><div class="range-seg">'
     + SUP_SORTS.map(s=>{ const on=suppliesSort.key===s.k; return '<button class="'+(on?'active':'')+'" onclick="setSuppliesSort(\''+s.k+'\')">'+s.l+(on?(suppliesSort.dir==='asc'?' ↑':' ↓'):'')+'</button>'; }).join('')
@@ -3336,8 +3348,11 @@ function renderSupplies(){
   const presentCats = all.map(i=>i.category).filter(Boolean);
   const cats = ['all', ...new Set([...catOptions(), ...presentCats])];
   html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
-  const shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice().sort(suppliesCompare);
-  if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.</p></div>';
+  let shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice();
+  if(suppliesFilter) shown = shown.filter(i => (i[suppliesFilter.field]||'') === suppliesFilter.value);
+  shown = shown.sort(suppliesCompare);
+  if(suppliesFilter) html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px"><span style="color:var(--text-secondary)">Showing only</span><span class="chip-2" style="font-size:11px">'+esc(supFieldLabel(suppliesFilter.field))+': '+esc(suppliesFilter.value)+'</span><button class="btn btn-sm" onclick="clearSuppliesFilter()">✕ Clear filter</button></div>';
+  if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">'+(suppliesFilter?'No items match this filter.':('No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.'))+'</p></div>';
   html += suppliesSortBar();
   html += '<div class="card">'+shown.map(i=>{
     const bd = invCostBreakdown(i);
@@ -3351,10 +3366,11 @@ function renderSupplies(){
       : st==='In use' ? '<button class="btn btn-sm" onclick="event.stopPropagation();finishInv(\''+i.id+'\')" title="Mark used up — stamps today as the finished date">Finish</button>'
       : '') : '';
     const nchip = 'font-size:10px;background:var(--bg-tertiary);color:var(--text-secondary)';
+    const fActive = (f,v)=> (suppliesFilter && suppliesFilter.field===f && suppliesFilter.value===v) ? ' active' : '';
     const tags = [
-      (i.brand?'<span class="chip-2" style="font-size:10px" title="Brand">'+esc(i.brand)+'</span>':''),
-      '<span class="chip" style="'+nchip+'" title="Category">'+esc(i.category||'—')+'</span>',
-      (i.store?'<span class="chip" style="'+nchip+'" title="Where purchased">'+svgIcon('supplies',11)+' '+esc(i.store)+'</span>':'')
+      (i.brand?'<span class="chip-2 sup-tag'+fActive('brand',i.brand)+'" style="font-size:10px" onclick="event.stopPropagation();filterSupplies(\'brand\',\''+encArg(i.brand)+'\')" title="Show only '+esc(i.brand)+' items">'+esc(i.brand)+'</span>':''),
+      (i.category?'<span class="chip sup-tag" style="'+nchip+'" onclick="event.stopPropagation();setSuppliesCat(\''+encArg(i.category)+'\',1)" title="Filter to '+esc(i.category)+'">'+esc(i.category)+'</span>':''),
+      (i.store?'<span class="chip sup-tag'+fActive('store',i.store)+'" style="'+nchip+'" onclick="event.stopPropagation();filterSupplies(\'store\',\''+encArg(i.store)+'\')" title="Show only items bought at '+esc(i.store)+'">'+svgIcon('supplies',11)+' '+esc(i.store)+'</span>':'')
     ].filter(Boolean).join(' ');
     const meta = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
     return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0">'

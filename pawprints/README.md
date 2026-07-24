@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.56.0**
+**Current Version: v0.56.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.56.1** — **Tap a supply tag to filter** — the Brand and Where-purchased tags on each supply are
+  now clickable: tap "Amazon" and the list shows only Amazon purchases; tap a Brand to see just that
+  brand; tap a Category tag to jump to that category. A "Showing only …" bar with a Clear button shows
+  the active filter (tap the tag again to toggle it off). Combines with the sort columns.
 - **v0.56.0** — **Sortable, scannable Supplies list** — each item now shows its **Brand** and **Where
   purchased** as tags (chips) alongside the category, so the list is easier to scan. A new **Sort**
   bar lets you sort by Item, Brand, Where, Category, Cost, Purchased, or Status — click a column to
