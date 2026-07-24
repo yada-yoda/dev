@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.55.2**
+**Current Version: v0.56.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.56.0** — **Sortable, scannable Supplies list** — each item now shows its **Brand** and **Where
+  purchased** as tags (chips) alongside the category, so the list is easier to scan. A new **Sort**
+  bar lets you sort by Item, Brand, Where, Category, Cost, Purchased, or Status — click a column to
+  sort, click again to reverse (caret shows the direction).
 - **v0.55.2** — **Supply cost-per-day now starts when the item does** — the per-day cost breakdown no
   longer counts from the purchase date for unopened stock; it only begins once you set a **Started**
   date (and runs to Finished, or today if still in use). An item sitting in inventory shows its
