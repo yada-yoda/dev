@@ -89,9 +89,10 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .btn-sm{padding:6px 14px;border-radius:8px;font-size:12px}.btn-danger{color:var(--danger)}.btn-accent{color:var(--accent)}
 .date-clear{background:none;border:none;color:var(--accent);font-size:11px;padding:4px 0 0;cursor:pointer;display:inline-flex;align-items:center;gap:3px}.date-clear:hover{text-decoration:underline}
 .section-head-row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
-.range-seg{display:inline-flex;gap:4px;flex-shrink:0}
-.range-seg button{padding:4px 10px;border-radius:8px;font-size:12px;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer}
-.range-seg button.active{background:var(--accent);border-color:var(--accent);color:#0d1117;font-weight:600}
+.range-seg{display:inline-flex;flex-wrap:wrap;gap:5px;flex-shrink:0}
+.range-seg button{padding:5px 12px;border-radius:8px;font-size:12px;line-height:1.1;background:var(--bg-tertiary);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-family:inherit;white-space:nowrap}
+.range-seg button:hover{color:var(--text-primary);border-color:var(--accent)}
+.range-seg button.active{background:linear-gradient(135deg,var(--accent),var(--accent-2));border-color:transparent;color:#08231f;font-weight:700}
 .range-span{font-size:11px;color:var(--text-secondary);margin:-4px 0 12px;font-variant-numeric:tabular-nums}
 .panel-cam{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
 .panel-cam:hover{color:var(--accent);border-color:var(--accent)}
@@ -140,7 +141,9 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(-10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 @keyframes prestigeGlow{0%,100%{box-shadow:0 0 var(--pglow,8px) var(--pcol,#f4a261)}50%{box-shadow:0 0 calc(var(--pglow,8px) * 2.1) var(--pcol,#f4a261)}}
 .prestige-pulse{animation:prestigeGlow 2.6s ease-in-out infinite}
-@media(prefers-reduced-motion:reduce){.prestige-pulse{animation:none}}
+@keyframes celebratePop{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
+.celebrate-medal{animation:celebratePop .55s cubic-bezier(.2,.9,.3,1.5) both}
+@media(prefers-reduced-motion:reduce){.prestige-pulse{animation:none}.celebrate-medal{animation:none}}
 .hidden{display:none !important}
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px;animation:fadeIn .2s ease}
@@ -235,7 +238,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.54.1';
+const APP_VERSION = 'v0.55.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -381,21 +384,49 @@ const PRESTIGE_COLORS = ['#b5793f','#9fb0c0','#f4a261','#2dd4bf','#a371f7'];
 function prestigeLevel(mi){ return Math.floor((mi||0) / 1000); }
 function prestigeColor(P){ return PRESTIGE_COLORS[((P-1) % PRESTIGE_COLORS.length + PRESTIGE_COLORS.length) % PRESTIGE_COLORS.length]; }
 function prestigeFx(P){ if(P<1) return null; return { col:prestigeColor(P), glow:Math.min(6+P*4, 26), pulse:P>=3, aura:P>=5 }; }
-let badgeToastFired = false; // set by checkWalkBadges so log-confirmation toasts don't clobber a badge/prestige toast
 function checkWalkBadges(announce){
-  badgeToastFired = false;
   const p = activePet(); if(!p) return;
   const mi = totalWalkMiles(), P = prestigeLevel(mi);
   if(!p.badgesSeen){ p.badgesSeen = walkBadgesEarned(mi).map(b=>b.mi); p.prestige = P; save(false); return; }
   const newly = walkBadgesEarned(mi).filter(b=> p.badgesSeen.indexOf(b.mi) < 0);
   const prevP = p.prestige || 0;
-  let msg = '';
-  if(P > prevP) msg = '🌟 Prestige '+P+' reached — '+fmtMi(mi)+' miles walked!';
-  else if(newly.length){ const top = newly[newly.length-1]; msg = '🎉 Badge unlocked — '+top.name+' ('+fmtMi(top.mi)+' mi)'; }
+  const gotPrestige = P > prevP;
   if(newly.length) newly.forEach(b=> p.badgesSeen.push(b.mi));
-  if(P > prevP) p.prestige = P;
-  if(newly.length || P > prevP) save(false);
-  if(announce && msg){ showToast(msg); badgeToastFired = true; }
+  if(gotPrestige) p.prestige = P;
+  if(newly.length || gotPrestige) save(false);
+  // Full-screen celebration (waits for dismissal) instead of a fleeting toast — deferred so the
+  // walk form's own closeModal() doesn't immediately close it. Prestige takes precedence.
+  if(announce && (gotPrestige || newly.length)){
+    const payload = gotPrestige ? { kind:'prestige', P, mi } : { kind:'badge', badge:newly[newly.length-1], more:newly.length-1, mi };
+    setTimeout(()=>showBadgeCelebration(payload), 0);
+  }
+}
+// Celebratory modal shown when a walking badge or prestige is earned — stays until dismissed.
+function showBadgeCelebration(pl){
+  const pet = activePet(), name = (pet && pet.name) ? pet.name : 'your pup';
+  const wrap = inner => '<div style="text-align:center;padding:6px 4px 2px">'+inner
+    + '<button class="btn-primary" style="margin-top:20px;max-width:230px" onclick="closeModal()">🎉 Awesome!</button></div>';
+  if(pl.kind === 'prestige'){
+    const P = pl.P, col = prestigeColor(P), fx = prestigeFx(P), star = (fx && fx.aura) ? '🌟' : '⭐';
+    openModal(wrap(
+        '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:'+col+';font-weight:800;margin-bottom:12px">✨ Prestige reached ✨</div>'
+      + '<div class="celebrate-medal" style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:52px;background:radial-gradient(circle at 50% 38%,'+col+'55,'+col+'11);border:3px solid '+col+';box-shadow:0 0 0 6px '+col+'22,0 0 36px '+col+'99">'+star+'</div>'
+      + '<div style="font-size:25px;font-weight:800;margin-bottom:4px;color:'+col+'">Prestige '+P+'</div>'
+      + '<div style="font-family:JetBrains Mono,monospace;font-weight:700;margin-bottom:12px">'+fmtMi(pl.mi)+' miles walked</div>'
+      + '<div style="font-size:13px;color:var(--text-secondary)">Every 1,000 miles earns a prestige — '+esc(name)+'\'s badges now shine even brighter.</div>'
+    ));
+  } else {
+    const b = pl.badge, tc = BADGE_TIERS[b.tier] || 'var(--accent)';
+    openModal(wrap(
+        '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800;margin-bottom:12px">🎉 Badge unlocked 🎉</div>'
+      + '<div class="celebrate-medal" style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:52px;background:radial-gradient(circle at 50% 38%,'+tc+'55,'+tc+'11);border:3px solid '+tc+';box-shadow:0 0 0 6px '+tc+'22,0 0 32px '+tc+'88">'+b.icon+'</div>'
+      + '<div style="font-size:25px;font-weight:800;margin-bottom:4px">'+esc(b.name)+'</div>'
+      + '<div style="font-family:JetBrains Mono,monospace;font-weight:700;color:'+tc+';margin-bottom:12px">'+fmtMi(b.mi)+' miles</div>'
+      + '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:6px">'+esc(b.blurb)+'</div>'
+      + (pl.more>0 ? '<div style="font-size:12px;color:'+tc+';font-weight:700;margin-bottom:6px">+ '+pl.more+' more milestone'+(pl.more===1?'':'s')+' earned!</div>' : '')
+      + '<div style="font-size:12px;color:var(--text-secondary)">'+fmtMi(pl.mi)+' miles walked with '+esc(name)+' so far</div>'
+    ));
+  }
 }
 // Seed each pet's badgesSeen once (silently) at load, so the FIRST logged walk isn't swallowed
 // by the lazy seeding above. Existing miles are marked already-seen; only crossings from here
@@ -527,6 +558,8 @@ function showToast(msg){
 function activePet(){ return data.pets.find(p => p.id === data.activePetId) || data.pets[0] || null; }
 function petLogs(type){ const pid = data.activePetId; return data.logs.filter(l => l.petId === pid && (!type || l.type === type)); }
 function lastLog(type){ const ls = petLogs(type).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
+// Most recent feeding of a specific food that had an amount — powers the per-food amount default.
+function lastFeedFor(foodType){ if(!foodType) return null; const ls = petLogs('feed').filter(l=>l.dateTime && l.foodType===foodType && l.amount!=='' && l.amount!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
 // "Last potty" skips trips where the dog did nothing — those shouldn't reset the timer.
 function lastRealPotty(){ return petLogs('potty').filter(l=>l.dateTime && (l.result||'') !== 'Nothing').sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0] || null; }
 function latestWeight(){ const ws = petLogs('weight').filter(l=>num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ws[0] || null; }
@@ -1526,14 +1559,23 @@ function quickFeed(){
   const last = lastLog('feed');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   const foods = feedFoodOptions();
+  const initFood = last ? last.foodType : (foods.includes('Dry kibble')?'Dry kibble':foods[0]);
+  const initFed = lastFeedFor(initFood) || last; // default the amount/unit to what was last used for the pre-selected food
   openModal('<h3>🍖 Log feeding</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">Food'+tip('Your Food & Treats from the Supplies tab show up here automatically, plus the generic types.')+'</label><select class="select" id="q-food">'+sel(foods, last?last.foodType:(foods.includes('Dry kibble')?'Dry kibble':foods[0]))+'</select>'
-    +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(last?esc(last.amount||''):'')+'" placeholder="1"></div>'
-    +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, last?last.unit:'cups')+'</select></div></div>'
+    +'<label class="label">Food'+tip('Your Food & Treats from the Supplies tab show up here automatically, plus the generic types. Amount fills in with what you last gave for the chosen food.')+'</label><select class="select" id="q-food" onchange="onFeedFoodChange()">'+sel(foods, initFood)+'</select>'
+    +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(initFed?esc(initFed.amount||''):'')+'" placeholder="1"></div>'
+    +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, initFed?(initFed.unit||'cups'):'cups')+'</select></div></div>'
     +'<label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+}
+// When the food dropdown changes, refill amount/unit with what was last given for that food.
+function onFeedFoodChange(){
+  const prev = lastFeedFor(fv('q-food')); if(!prev) return; // no prior feeding of this food → leave current values
+  const a = document.getElementById('q-amt'), u = document.getElementById('q-unit');
+  if(a) a.value = prev.amount || '';
+  if(u && prev.unit) u.value = prev.unit;
 }
 function quickPotty(){
   if(denyLog()) return;
@@ -1593,8 +1635,7 @@ function saveWalk(){
   if(saveFav) addWalkFavorite(entry.from, entry.to);
   const id = addLog(entry);
   closeModal();
-  // addLog → checkWalkBadges may have just shown a badge/prestige toast — don't clobber it.
-  if(!badgeToastFired) showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
+  showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
   if(id && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
 }
 // ── Weather for walks (zip → Open-Meteo, no API key) ──
@@ -3459,6 +3500,32 @@ function renderInsights(){
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'walktime7\')"><div class="stat-value" style="color:var(--accent-2)">'+walkMins+'<span style="font-size:14px">m</span></div><div class="stat-label">Walk time (7d)</div></div>'
     + '<div class="card stat-card" style="cursor:pointer" title="View these entries" onclick="insightStat(\'avgwalk\')"><div class="stat-value" style="color:var(--accent-purple)">'+(avgWalk!=null?avgWalk+'m':'—')+'</div><div class="stat-label">Avg walk (7d)</div></div>'
     + '</div>';
+  // Food & treats spend row (YTD cost + per-day rate + avg amount fed/day)
+  const yearStart = new Date().getFullYear()+'-01-01';
+  const daysThisYear = Math.max(1, (daysBetween(yearStart, today)||0) + 1);
+  const catYtd = cat => petArr('inventory').filter(i=>i.category===cat && i.purchaseDate && i.purchaseDate>=yearStart).reduce((s,i)=>s+(num(i.cost)||0),0);
+  const foodYtd = catYtd('Food'), treatsYtd = catYtd('Treats');
+  const hasFoodTreats = petArr('inventory').some(i=>i.category==='Food'||i.category==='Treats') || feeds.length;
+  if(hasFoodTreats){
+    // Average amount fed per feeding-day over the last 30 days, in the most-used unit.
+    const feeds30 = feeds.filter(f=>f.dateTime && (Date.now()-new Date(f.dateTime).getTime())<30*86400000 && num(f.amount)!=null);
+    let amtStr = '—';
+    if(feeds30.length){
+      const uc={}; feeds30.forEach(f=>{ const u=(f.unit||'cups'); uc[u]=(uc[u]||0)+1; });
+      const domU = Object.keys(uc).sort((a,b)=>uc[b]-uc[a])[0];
+      const inU = feeds30.filter(f=>(f.unit||'cups')===domU);
+      const dcount = new Set(inU.map(f=>f.dateTime.slice(0,10))).size;
+      if(dcount) amtStr = (Math.round(inU.reduce((s,f)=>s+num(f.amount),0)/dcount*100)/100)+' '+domU;
+    }
+    const sc = (val,label,color,t)=>'<div class="card stat-card"'+(t?' title="'+esc(t)+'"':'')+'><div class="stat-value" style="color:'+color+'">'+val+'</div><div class="stat-label">'+label+'</div></div>';
+    html += '<div class="stats-grid">'
+      + sc(money(foodYtd/daysThisYear), 'Food $/day', 'var(--success)', 'This year\'s food spend spread over days so far ('+money(foodYtd)+' ÷ '+daysThisYear+' days)')
+      + sc(amtStr, 'Food/day', 'var(--accent)', 'Average amount fed per feeding-day over the last 30 days (most-used unit)')
+      + sc(money(treatsYtd/daysThisYear), 'Treats $/day', 'var(--accent-2)', 'This year\'s treats spend spread over days so far ('+money(treatsYtd)+' ÷ '+daysThisYear+' days)')
+      + sc(money(foodYtd), 'Food YTD', 'var(--success)', 'Total spent on Food-category supplies this year')
+      + sc(money(treatsYtd), 'Treats YTD', 'var(--accent-2)', 'Total spent on Treats-category supplies this year')
+      + '</div>';
+  }
   // Walking milestone badges
   html += renderBadgesCard();
   // Weight trend — the original dedicated chart, kept above the selectable Trends chart
@@ -3574,13 +3641,13 @@ function maybeDrawWeightChart(){
 // ── Insights "Trends" chart (selectable metric / style / range) ──
 function trendControlsHTML(){
   const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
-  const seg = (kind,val,label)=>'<button class="btn btn-sm'+(String((kind==='style'?trendStyle:trendRange))===String(val)?' btn-primary':'')+'" style="padding:5px 10px" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
+  const seg = (kind,val,label)=>'<button class="'+(String((kind==='style'?trendStyle:trendRange))===String(val)?'active':'')+'" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
   const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
   const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d'],['all','Lifetime']].map(([v,l])=>seg('range',v,l)).join('');
   const days = trendSpanDays();
   const spanLine = '<div class="range-span" style="margin:0 0 10px">'+fmtSpan(Date.now()-(days-1)*86400000, Date.now())+'</div>';
   return '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:14px;margin-bottom:8px"><div style="display:flex;gap:5px;flex-wrap:wrap">'+styleBtns+'</div><div style="display:flex;gap:5px;flex-wrap:wrap;margin-left:auto">'+rangeBtns+'</div></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px"><div class="range-seg">'+styleBtns+'</div><div class="range-seg" style="margin-left:auto">'+rangeBtns+'</div></div>'
     + spanLine;
 }
 // Resolve trendRange to a day count — 'all' spans from the first entry OF THE CHARTED METRIC to

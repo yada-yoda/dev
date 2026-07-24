@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.54.1**
+**Current Version: v0.55.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,19 @@ covers both.
 
 ## Version History
 
+- **v0.55.0** — **Badge celebration, feeding-amount memory, food-cost stats & a control-sizing fix:**
+  - **Badge celebration pop-up** — earning a walking badge or a prestige now shows a full-screen
+    celebration (medal, name, mileage) that **stays until you dismiss it**, instead of a toast that
+    could flash by unseen. (Badge alerts were only ever a brief toast, never a bell item — this makes
+    them impossible to miss.)
+  - **Feeding amount remembers what you last gave** — the Log-feeding form pre-fills the amount and
+    unit with the last amount used **for the selected food**, and updates when you change the food
+    (kibble → your usual scoop, wet food → your usual can). Regular meals become a one-tap Save.
+  - **Food & treats cost row on Insights** — a new row of stat cards: Food $/day, Food/day (avg amount
+    fed), Treats $/day, Food YTD, Treats YTD.
+  - **Fixed the range/style buttons** — the selected chip no longer stretches full-width; all the
+    Insights selectors (Trends style/range, Spending, Potty) are now consistently sized with the
+    gradient highlight on the active one.
 - **v0.54.1** — **Reorder link on supplies** — a new "Reorder link" field on each supply item. Paste
   the product page URL and a **↗ Reorder** button appears on the item and — most usefully — right in
   the **Restock list** when it's running low, so you can re-buy the exact item in one tap. Included in
