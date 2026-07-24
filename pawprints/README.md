@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.56.1**
+**Current Version: v0.57.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.57.0** — **Supplies is now a real table** — the supply list is a sortable table with column
+  headers (Item · Brand · Where · Category · Cost · Status); click a header to sort (↕ / ↑ / ↓). Brand,
+  Where, and Category show as colored pills in their columns, and tapping a pill filters the list to
+  that value (with a Clear bar). On phones the table restacks into cards (no sideways scrolling). The
+  **Reorder** button now appears only when an item is marked running low.
 - **v0.56.1** — **Tap a supply tag to filter** — the Brand and Where-purchased tags on each supply are
   now clickable: tap "Amazon" and the list shows only Amazon purchases; tap a Brand to see just that
   brand; tap a Category tag to jump to that category. A "Showing only …" bar with a Clear button shows

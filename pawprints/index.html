@@ -96,6 +96,33 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .sup-tag{cursor:pointer}
 .sup-tag:hover{outline:1px solid var(--accent)}
 .sup-tag.active{outline:2px solid var(--accent);outline-offset:1px}
+.pill{display:inline-block;padding:3px 11px;border-radius:20px;font-size:12px;font-weight:600;line-height:1.3;white-space:nowrap}
+.pill-brand{background:rgba(88,166,255,.16);color:#79b8ff}
+.pill-where{background:rgba(163,113,247,.16);color:#b98bff}
+.pill-cat{background:rgba(45,212,191,.15);color:#2dd4bf}
+.sup-table{width:100%;border-collapse:collapse;font-size:13px}
+.sup-table th,.sup-table td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);vertical-align:middle}
+.sup-table tbody tr:last-child td{border-bottom:none}
+.sup-table th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);cursor:pointer;white-space:nowrap;user-select:none}
+.sup-table th:hover{color:var(--text-primary)}
+.sup-table th .car{font-size:10px;margin-left:3px;opacity:.4}
+.sup-table th.sorted{color:var(--text-primary)}.sup-table th.sorted .car{opacity:1;color:var(--accent)}
+.sup-table tbody tr{cursor:pointer}
+.sup-table tbody tr:hover{background:var(--bg-tertiary)}
+.sup-table td.sup-mono{font-family:'JetBrains Mono',monospace;color:var(--success);white-space:nowrap}
+.sup-table td.sup-act{white-space:nowrap;text-align:right}
+.sup-sortbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+@media(min-width:721px){.sup-sortbar{display:none}}
+@media(max-width:720px){
+  .sup-table thead{display:none}
+  .sup-table,.sup-table tbody,.sup-table tr,.sup-table td{display:block;width:100%}
+  .sup-table tr{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;padding:8px 12px;background:var(--bg-tertiary)}
+  .sup-table td{border:none;padding:4px 0;display:flex;justify-content:space-between;gap:14px;align-items:center;text-align:right}
+  .sup-table td::before{content:attr(data-label);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--text-secondary);flex-shrink:0;text-align:left}
+  .sup-table td.sup-item{font-weight:700;font-size:15px;justify-content:flex-start;padding-bottom:4px}
+  .sup-table td.sup-item::before{content:''}
+  .sup-table td.sup-act{justify-content:flex-end}.sup-table td.sup-act::before{content:''}
+}
 .range-span{font-size:11px;color:var(--text-secondary);margin:-4px 0 12px;font-variant-numeric:tabular-nums}
 .panel-cam{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;flex-shrink:0}
 .panel-cam:hover{color:var(--accent);border-color:var(--accent)}
@@ -241,7 +268,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.56.1';
+const APP_VERSION = 'v0.57.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -2743,8 +2770,9 @@ function filterSupplies(field, encVal){
 }
 function clearSuppliesFilter(){ suppliesFilter = null; render(); }
 function supFieldLabel(f){ return f==='store' ? 'Where' : (f==='brand' ? 'Brand' : f.charAt(0).toUpperCase()+f.slice(1)); }
+// Mobile-only sort control (the table headers handle sorting on wider screens, where this is hidden).
 function suppliesSortBar(){
-  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px"><span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Sort</span><div class="range-seg">'
+  return '<div class="sup-sortbar"><span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Sort</span><div class="range-seg">'
     + SUP_SORTS.map(s=>{ const on=suppliesSort.key===s.k; return '<button class="'+(on?'active':'')+'" onclick="setSuppliesSort(\''+s.k+'\')">'+s.l+(on?(suppliesSort.dir==='asc'?' ↑':' ↓'):'')+'</button>'; }).join('')
     + '</div></div>';
 }
@@ -3354,31 +3382,36 @@ function renderSupplies(){
   if(suppliesFilter) html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px"><span style="color:var(--text-secondary)">Showing only</span><span class="chip-2" style="font-size:11px">'+esc(supFieldLabel(suppliesFilter.field))+': '+esc(suppliesFilter.value)+'</span><button class="btn btn-sm" onclick="clearSuppliesFilter()">✕ Clear filter</button></div>';
   if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">'+(suppliesFilter?'No items match this filter.':('No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.'))+'</p></div>';
   html += suppliesSortBar();
-  html += '<div class="card">'+shown.map(i=>{
-    const bd = invCostBreakdown(i);
-    const bdCol = bd ? '<div style="text-align:right;flex-shrink:0;font-family:JetBrains Mono,monospace;line-height:1.35" title="Cost breakdown">'
-      + (bd.perDay!=null?'<div style="font-size:12px;color:var(--accent)">'+moneyRate(bd.perDay)+'<span style="color:var(--text-secondary);font-size:10px">/day</span></div>':'')
-      + (bd.perUnit!=null?'<div style="font-size:11px;color:var(--text-secondary)">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>':'')
-      + '</div>' : '';
-    const st = invStatus(i);
+  const fActive = (f,v)=> (suppliesFilter && suppliesFilter.field===f && suppliesFilter.value===v) ? ' active' : '';
+  const cols = [['name','Item'],['brand','Brand'],['store','Where'],['category','Category'],['cost','Cost'],['status','Status']];
+  const thead = '<thead><tr>'+cols.map(([k,l])=>{ const on=suppliesSort.key===k; const car=on?(suppliesSort.dir==='asc'?'↑':'↓'):'↕'; return '<th class="'+(on?'sorted':'')+'" onclick="setSuppliesSort(\''+k+'\')" title="Sort by '+l+'">'+l+'<span class="car">'+car+'</span></th>'; }).join('')+'<th></th></tr></thead>';
+  const dash = '<span style="color:var(--text-secondary)">—</span>';
+  const rows = shown.map(i=>{
+    const bd = invCostBreakdown(i), st = invStatus(i);
     const action = canManage() ? (
-      st==='Inventory' ? '<button class="btn btn-sm btn-accent" onclick="event.stopPropagation();startInv(\''+i.id+'\')" title="Start using this item — stamps today as the opened date">Start</button>'
-      : st==='In use' ? '<button class="btn btn-sm" onclick="event.stopPropagation();finishInv(\''+i.id+'\')" title="Mark used up — stamps today as the finished date">Finish</button>'
+      st==='Inventory' ? '<button class="btn btn-sm btn-accent" onclick="event.stopPropagation();startInv(\''+i.id+'\')" title="Start using — stamps today as opened">Start</button>'
+      : st==='In use' ? '<button class="btn btn-sm" onclick="event.stopPropagation();finishInv(\''+i.id+'\')" title="Mark used up — stamps today as finished">Finish</button>'
       : '') : '';
-    const nchip = 'font-size:10px;background:var(--bg-tertiary);color:var(--text-secondary)';
-    const fActive = (f,v)=> (suppliesFilter && suppliesFilter.field===f && suppliesFilter.value===v) ? ' active' : '';
-    const tags = [
-      (i.brand?'<span class="chip-2 sup-tag'+fActive('brand',i.brand)+'" style="font-size:10px" onclick="event.stopPropagation();filterSupplies(\'brand\',\''+encArg(i.brand)+'\')" title="Show only '+esc(i.brand)+' items">'+esc(i.brand)+'</span>':''),
-      (i.category?'<span class="chip sup-tag" style="'+nchip+'" onclick="event.stopPropagation();setSuppliesCat(\''+encArg(i.category)+'\',1)" title="Filter to '+esc(i.category)+'">'+esc(i.category)+'</span>':''),
-      (i.store?'<span class="chip sup-tag'+fActive('store',i.store)+'" style="'+nchip+'" onclick="event.stopPropagation();filterSupplies(\'store\',\''+encArg(i.store)+'\')" title="Show only items bought at '+esc(i.store)+'">'+svgIcon('supplies',11)+' '+esc(i.store)+'</span>':'')
-    ].filter(Boolean).join(' ');
-    const meta = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
-    return '<div class="entry-row clickable" onclick="invModal(\''+i.id+'\')"><div style="flex:1;min-width:0">'
-      + '<div style="font-weight:600">'+esc(i.name)+' '+invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'')+'</div>'
-      + '<div style="display:flex;flex-wrap:wrap;gap:4px;margin:5px 0 3px">'+tags+'</div>'
-      + (meta?'<div style="font-size:12px;color:var(--text-secondary)">'+meta+'</div>':'')
-      + '</div>'+bdCol+(i.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(i.cost)+'</div>':'')+reorderLink(i)+action+'</div>';
-  }).join('')+'</div>';
+    const reorder = i.runningLow ? reorderLink(i) : ''; // reorder button shows only when running low
+    const brandCell = i.brand ? '<span class="pill pill-brand sup-tag'+fActive('brand',i.brand)+'" onclick="event.stopPropagation();filterSupplies(\'brand\',\''+encArg(i.brand)+'\')" title="Show only '+esc(i.brand)+'">'+esc(i.brand)+'</span>' : dash;
+    const whereCell = i.store ? '<span class="pill pill-where sup-tag'+fActive('store',i.store)+'" onclick="event.stopPropagation();filterSupplies(\'store\',\''+encArg(i.store)+'\')" title="Show only items from '+esc(i.store)+'">'+esc(i.store)+'</span>' : dash;
+    const catCell = i.category ? '<span class="pill pill-cat sup-tag" onclick="event.stopPropagation();setSuppliesCat(\''+encArg(i.category)+'\',1)" title="Filter to '+esc(i.category)+'">'+esc(i.category)+'</span>' : dash;
+    const costCell = '<div>'+(i.cost?money(i.cost):dash)
+      + (bd && bd.perDay!=null ? '<div style="font-size:10px;color:var(--accent);font-weight:400">'+moneyRate(bd.perDay)+'/day</div>' : '')
+      + (bd && bd.perUnit!=null ? '<div style="font-size:10px;color:var(--text-secondary);font-weight:400">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>' : '')+'</div>';
+    const statusCell = invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'');
+    const sub = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
+    return '<tr onclick="invModal(\''+i.id+'\')">'
+      + '<td class="sup-item" data-label="Item">'+esc(i.name)+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>'
+      + '<td data-label="Brand">'+brandCell+'</td>'
+      + '<td data-label="Where">'+whereCell+'</td>'
+      + '<td data-label="Category">'+catCell+'</td>'
+      + '<td class="sup-mono" data-label="Cost">'+costCell+'</td>'
+      + '<td data-label="Status">'+statusCell+'</td>'
+      + '<td class="sup-act" data-label="">'+reorder+(reorder&&action?' ':'')+action+'</td>'
+      + '</tr>';
+  }).join('');
+  html += '<div class="card" style="padding:2px 14px;overflow-x:auto"><table class="sup-table">'+thead+'<tbody>'+rows+'</tbody></table></div>';
   return html;
 }
 
