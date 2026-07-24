@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.55.0**
+**Current Version: v0.55.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,9 @@ covers both.
 
 ## Version History
 
+- **v0.55.1** — Insights food/treats cards polish: the cards are now grouped (all Food cards, then all
+  Treats cards) instead of interleaved, and the unit on "Food/day" (e.g. "cups") is smaller so it
+  doesn't dominate the number.
 - **v0.55.0** — **Badge celebration, feeding-amount memory, food-cost stats & a control-sizing fix:**
   - **Badge celebration pop-up** — earning a walking badge or a prestige now shows a full-screen
     celebration (medal, name, mileage) that **stays until you dismiss it**, instead of a toast that

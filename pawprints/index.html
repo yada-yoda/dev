@@ -238,7 +238,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.55.0';
+const APP_VERSION = 'v0.55.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3515,15 +3515,15 @@ function renderInsights(){
       const domU = Object.keys(uc).sort((a,b)=>uc[b]-uc[a])[0];
       const inU = feeds30.filter(f=>(f.unit||'cups')===domU);
       const dcount = new Set(inU.map(f=>f.dateTime.slice(0,10))).size;
-      if(dcount) amtStr = (Math.round(inU.reduce((s,f)=>s+num(f.amount),0)/dcount*100)/100)+' '+domU;
+      if(dcount) amtStr = (Math.round(inU.reduce((s,f)=>s+num(f.amount),0)/dcount*100)/100)+' <span style="font-size:13px;font-weight:400">'+esc(domU)+'</span>';
     }
     const sc = (val,label,color,t)=>'<div class="card stat-card"'+(t?' title="'+esc(t)+'"':'')+'><div class="stat-value" style="color:'+color+'">'+val+'</div><div class="stat-label">'+label+'</div></div>';
     html += '<div class="stats-grid">'
+      + sc(money(foodYtd), 'Food YTD', 'var(--success)', 'Total spent on Food-category supplies this year')
       + sc(money(foodYtd/daysThisYear), 'Food $/day', 'var(--success)', 'This year\'s food spend spread over days so far ('+money(foodYtd)+' ÷ '+daysThisYear+' days)')
       + sc(amtStr, 'Food/day', 'var(--accent)', 'Average amount fed per feeding-day over the last 30 days (most-used unit)')
-      + sc(money(treatsYtd/daysThisYear), 'Treats $/day', 'var(--accent-2)', 'This year\'s treats spend spread over days so far ('+money(treatsYtd)+' ÷ '+daysThisYear+' days)')
-      + sc(money(foodYtd), 'Food YTD', 'var(--success)', 'Total spent on Food-category supplies this year')
       + sc(money(treatsYtd), 'Treats YTD', 'var(--accent-2)', 'Total spent on Treats-category supplies this year')
+      + sc(money(treatsYtd/daysThisYear), 'Treats $/day', 'var(--accent-2)', 'This year\'s treats spend spread over days so far ('+money(treatsYtd)+' ÷ '+daysThisYear+' days)')
       + '</div>';
   }
   // Walking milestone badges
