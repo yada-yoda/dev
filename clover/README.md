@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.145 — Matured-CD email is on by default
+
+The “Email me when a CD has matured” reminder (added in v1.0.144) now defaults
+**on** for the owner, so a matured CD reaches you even if you never open Settings.
+It’s still one tick away from off under **Settings → Calendar**. Nothing else
+changed — same once-per-CD, re-arm-on-renewal behaviour.
+
 ### v1.0.144 — Email reminder when a CD has matured
 
 Clover now sends its own email — from `notify.rizzo.cc`, the same mail service

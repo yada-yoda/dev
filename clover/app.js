@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.144';
+const VERSION = '1.0.145';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -228,7 +228,7 @@ async function syncCdReminders(force) {
   const user = window.cloverAuth && window.cloverAuth.currentUser();
   if (!user || typeof user.getIdToken !== 'function') return;
   const g = store.state.settings.gcal || {};
-  const enabled = g.cdMaturedEmail === true;   // opt-in; needs clover-worker deployed
+  const enabled = g.cdMaturedEmail !== false;   // default on; needs clover-worker deployed
   const email = user.email || '';
   const items = (enabled ? maturedCds(store) : []).map(a => ({
     key: a.id + '|' + (a.cdMaturity || ''),
@@ -909,7 +909,7 @@ function calendarRemindersCard() {
   // worker (notify.rizzo.cc, the same sender PawPrints and Usage use), not Google.
   // Where the reminder above fires 7 days AHEAD, this one nags about CDs that have
   // already matured and are still waiting on you.
-  const em = g.cdMaturedEmail === true;   // opt-in, default off
+  const em = g.cdMaturedEmail !== false;   // default on
   const ce = checkbox('Email me when a CD has matured', em, 'A once-per-CD email when a CD passes its maturity date and is still open — because Clover never closes or renews a CD for you. Sent from notify.rizzo.cc (Clover’s own mail, not Google), so it works even with Google Calendar not connected. You’ll get one reminder per matured CD; renewing it re-arms the next maturity.');
   ce.__input.addEventListener('change', () => {
     store.setGcal({ cdMaturedEmail: ce.__input.checked });
