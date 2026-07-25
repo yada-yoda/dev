@@ -268,7 +268,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.57.1';
+const APP_VERSION = 'v0.58.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -721,7 +721,7 @@ function initFirebase(){
       currentUser = user; updateAuthUI();
       if(user){
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
-        ensureFirestore().then(() => loadFromFirestore()).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
+        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
       else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; }
     });
@@ -896,7 +896,7 @@ function exitSharedProfile(silent){
 function saveLocal(){ if(demoMode || sharedOwnerUid) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
 function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); } } catch(e){} }
 function persist(){ saveLocal(); saveToFirestore(); }
-function save(rerender){ persist(); if(rerender !== false) render(); }
+function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(rerender !== false) render(); }
 
 function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-backup-' + todayISO() + '.json'); showToast('💾 Backup saved'); }
 function dl(blob,name){ const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u); }
@@ -1127,6 +1127,15 @@ function settingsListsHTML(){
     + '<select class="select" id="water-rem-mode" style="margin-bottom:0;flex:1;min-width:150px"><option value="off"'+(wMode==='off'?' selected':'')+'>Off</option><option value="overall"'+(wMode==='overall'?' selected':'')+'>Overall (last refill)</option><option value="perLocation"'+(wMode==='perLocation'?' selected':'')+'>Per bowl / location</option></select>'
     + '<div style="display:flex;align-items:center;gap:6px"><input class="input" type="number" min="1" step="1" id="water-rem-hours" value="'+esc(s.waterReminderHours||'24')+'" style="margin-bottom:0;width:76px"><span style="font-size:13px;color:var(--text-secondary)">hours</span></div>'
     + '<button class="btn" onclick="saveWaterReminder()">Save</button></div></div>';
+  const reOn = !!s.reorderEmailOn, reEmail = esc(s.reorderEmail || (currentUser && currentUser.email) || '');
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Reorder reminder emails'+tip('When a supply is marked "running low", PawPrints emails you a restock reminder with its reorder link. You\'re emailed once per item — it won\'t nag repeatedly — and it re-reminds only if an item goes low again after being restocked. Checked once a day.')+'</label>';
+  if(!currentUser){
+    h += '<p style="font-size:12px;color:var(--text-secondary);margin:0">Sign in (top of the page) to get restock reminders by email.</p></div>';
+  } else {
+    h += '<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="reorder-email-on" '+(reOn?'checked':'')+'> Email me when supplies run low</label>'
+      + '<div style="display:flex;gap:8px"><input class="input" type="email" id="reorder-email" placeholder="you@example.com" value="'+reEmail+'" style="margin-bottom:0"><button class="btn" onclick="saveReorderEmail()">Save</button></div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px">Sent from PawPrints (notify.rizzo.cc). At most one email a day, one line per item.</div></div>';
+  }
   h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
   if((s.homeZip||'').trim()){
     const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
@@ -1193,6 +1202,18 @@ function saveWaterReminder(){
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
   if(typeof updateRemindersPill==='function') updateRemindersPill();
   showToast(data.settings.waterReminderMode==='off'?'💧 Water reminder off':'💧 Water reminder saved');
+}
+function saveReorderEmail(){
+  if(denyManage()) return;
+  data.settings = data.settings || {};
+  const on = !!(document.getElementById('reorder-email-on')||{}).checked;
+  const email = (fv('reorder-email')||'').trim();
+  if(on && email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showToast('⚠️ Enter a valid email address'); return; }
+  data.settings.reorderEmail = email;
+  data.settings.reorderEmailOn = on && !!email;
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  syncReorderPrefs(true);
+  showToast(data.settings.reorderEmailOn ? '📧 Reorder reminders on' : 'Reorder reminders off');
 }
 function saveHomeZip(){
   if(denyManage()) return;
@@ -3328,6 +3349,31 @@ function renderIllnessTab(){
 function invStatus(i){ if(i.noLifecycle) return 'One-time'; return i.endDate ? 'Finished' : (i.startDate ? 'In use' : 'Inventory'); }
 // Only allow http(s) reorder links (reject javascript:/data:/etc.); bare domains get https:// prefixed.
 function safeUrl(u){ u=(u||'').trim(); if(!u) return ''; if(/^https?:\/\//i.test(u)) return u; if(/^[a-z][a-z0-9+.\-]*:/i.test(u)) return ''; return 'https://'+u; }
+
+// ── Reorder reminder emails ──
+// Push the owner's running-low supplies (+ reorder links) and email prefs to the
+// worker, which mails them once a day. Sig-gated so save() can call it freely — it
+// only POSTs when the prefs or the low-item set actually changed. See pawprints-worker.
+let _lastReorderSig = null;
+function reorderItemsForEmail(){
+  return (data.inventory||[]).filter(i => i && i.runningLow).map(i => ({
+    name: ((i.brand?i.brand+' ':'')+(i.name||'')).trim(),
+    url: safeUrl(i.reorderUrl) || '',
+  })).filter(i => i.name);
+}
+async function syncReorderPrefs(force){
+  try {
+    if(!currentUser || demoMode || sharedOwnerUid) return; // only the signed-in owner syncs their own prefs
+    const s = data.settings || {};
+    const enabled = !!s.reorderEmailOn;
+    const email = (s.reorderEmail||'').trim();
+    const items = (enabled && email) ? reorderItemsForEmail() : [];
+    const sig = JSON.stringify({ enabled, email, items });
+    if(!force && sig === _lastReorderSig) return;
+    _lastReorderSig = sig;
+    await workerFetch('/reorder/sync', { method:'POST', body: JSON.stringify({ enabled, email, items }) });
+  } catch(e){ _lastReorderSig = null; /* leave dirty so the next change retries */ }
+}
 function reorderLink(i){ const u = safeUrl(i && i.reorderUrl); return u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Reorder this item — opens the product page">↗ Reorder</a>' : ''; }
 function daysBetween(a, b){ if(!a||!b) return null; const d1 = new Date(a+'T00:00'), d2 = new Date(b+'T00:00'); if(isNaN(d1)||isNaN(d2)) return null; return Math.round((d2-d1)/86400000); }
 // "5 days in use" while open, or "used 20 days" once finished.

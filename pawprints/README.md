@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.57.1**
+**Current Version: v0.58.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,13 @@ covers both.
 
 ## Version History
 
+- **v0.58.0** — **Reorder reminder emails.** When a supply is marked "running low," PawPrints can now
+  email you a restock reminder — with the item's reorder link right in the message — so a low bag of
+  food doesn't quietly run out. Turn it on in **Settings → Lists & preferences → Reorder reminder
+  emails** (a toggle plus the address to send to; defaults to your sign-in email). You're emailed
+  **once per item** so it never nags, and an item only re-reminds if it goes low again after you've
+  restocked it. The daily check and the sending are handled server-side by `pawprints-worker`, and the
+  mail comes from PawPrints (`notify.rizzo.cc`). Requires being signed in.
 - **v0.57.1** — One-time supply items now show a **"One-time"** status in the Status column (and in the
   spreadsheet/PDF exports), instead of showing no status.
 - **v0.57.0** — **Supplies is now a real table** — the supply list is a sortable table with column
