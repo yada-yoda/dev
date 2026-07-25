@@ -145,6 +145,31 @@ collections:
               - { label: "Quote line 1", name: "quote_line_1", widget: "string", required: false, hint: "First line of the overlaid quote. Leave blank for slides where the visual speaks for itself." }
               - { label: "Quote line 2", name: "quote_line_2", widget: "string", required: false, hint: "Second line of the overlaid quote." }
 
+  # ============ HEADSHOTS ============
+  - name: "headshots"
+    label: "Headshots"
+    description: "The large profile photo + the thumbnail row under the social links. First entry is the one that loads by default."
+    files:
+      - file: "acting/data/headshots.yml"
+        label: "Headshot gallery"
+        name: "headshots"
+        fields:
+          - label: "Looks"
+            name: "entries"
+            widget: "list"
+            label_singular: "Headshot"
+            summary: "{{fields.label}}"
+            hint: "The FIRST entry loads as the large photo. Every entry also shows as a 65px thumbnail — clicking one swaps it into the large slot. Drag to reorder; drag a different look to the top to change the default. Upload square-ish images at 800x800 or larger."
+            fields:
+              - label: "Photo"
+                name: "image"
+                widget: "image"
+                media_folder: "/acting/assets/headshots"
+                public_folder: "assets/headshots"
+                hint: "Upload a new look or pick an existing one from assets/headshots/."
+              - { label: "Label", name: "label", widget: "string", hint: "Short name for this look, e.g. 'Suit and tie', 'Casual quarter-zip', 'Dramatic B&W'. Shown as the thumbnail's accessible name and in the list summary above." }
+              - { label: "Alt text", name: "alt", widget: "string", hint: "Describes the photo for screen readers and search engines. Include wardrobe + backdrop, e.g. 'Frank Rizzo, Chicago-based actor — smiling color headshot, gray quarter-zip, white backdrop'." }
+
   # ============ BIO ============
   - name: "bio"
     label: "Bio"

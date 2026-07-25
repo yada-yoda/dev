@@ -9,6 +9,7 @@ as a separate clickable entry):
   data/bio.md             — bio paragraph (with optional front-matter)
   data/hero.yml           — hero slideshow (paired image + 2-line quote per slide)
   data/about.yml          — RIZZO definition + pronunciation audio + pull quotes
+  data/headshots.yml      — profile photo + gallery thumbnails (entries:)
   data/training.yml       — training entries
 
   Credits collection:
@@ -54,6 +55,8 @@ Updates these EDIT-marked blocks in index.html (and only these):
   EDIT: credits-tabs          ← from data/credits-tabs.yml (tabs)
   EDIT: hero-slides           ← from data/hero.yml
   EDIT: hero-quotes           ← from data/hero.yml
+  EDIT: headshot-main         ← from data/headshots.yml (first entry)
+  EDIT: headshot-gallery      ← from data/headshots.yml (all entries)
   EDIT: rizzo-definition      ← from data/about.yml
   EDIT: pull-quote            ← from data/about.yml
   EDIT: physical              ← from data/physical.yml
@@ -101,7 +104,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.7.33"
+SITE_VERSION = "v0.8.0"
 
 
 # ---------- helpers ----------
@@ -180,6 +183,55 @@ TRAINING_ICONS = {
     "Revue":        '<circle cx="9" cy="11" r="5"/><circle cx="15" cy="13" r="5"/>',
     "Coaching":     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
 }
+
+
+def gen_headshot_main(headshots):
+    """The large 280x280 headshot. Uses the FIRST entry in headshots.yml
+    as the default; the gallery JS swaps its src on thumbnail clicks."""
+    entries = headshots.get("entries") or []
+    if not entries:
+        # No headshots configured — fall back to the legacy single file so
+        # the profile block never renders a broken image.
+        src, alt = "assets/headshot.jpg", "Headshot"
+    else:
+        src = entries[0].get("image", "assets/headshot.jpg")
+        alt = entries[0].get("alt", "Headshot")
+    return (
+        "\n      <img class=\"headshot\"\n"
+        f'           src="{esc(src)}"\n'
+        f'           alt="{esc(alt)}"\n'
+        '           width="280" height="280"\n'
+        '           fetchpriority="high"\n'
+        '           decoding="async">\n      '
+    )
+
+
+def gen_headshot_gallery(headshots):
+    """65px thumbnail row. Each button carries data-src, which the gallery
+    JS swaps into the main headshot. First entry starts active."""
+    entries = headshots.get("entries") or []
+    if not entries:
+        return "\n        "
+    buttons = []
+    for i, e in enumerate(entries):
+        src = e.get("image", "")
+        if not src:
+            continue
+        label = e.get("label") or f"Headshot {i + 1}"
+        active = ' class="active"' if i == 0 else ""
+        buttons.append(
+            f'          <button type="button"{active} data-src="{esc(src)}" '
+            f'aria-label="{esc(label)}">\n'
+            f'            <img src="{esc(src)}" alt="{esc(label)}" loading="lazy">\n'
+            f'          </button>'
+        )
+    if not buttons:
+        return "\n        "
+    return (
+        '\n        <div class="headshot-gallery" aria-label="Headshot gallery">\n'
+        + "\n".join(buttons)
+        + "\n        </div>\n        "
+    )
 
 
 def kind_badge(kind, leading_space=False):
@@ -797,11 +849,17 @@ def gen_print_stats(panels):
 
 # SVG icons for the supported social platforms.
 SOCIAL_ICONS = {
-    "Instagram": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.2c3.2 0 3.6 0 4.8.1 1.2.1 1.8.2 2.2.4.6.2 1 .5 1.4.9.4.4.7.8.9 1.4.2.4.4 1 .4 2.2.1 1.2.1 1.6.1 4.8s0 3.6-.1 4.8c-.1 1.2-.2 1.8-.4 2.2-.2.6-.5 1-.9 1.4-.4.4-.8.7-1.4.9-.4.2-1 .4-2.2.4-1.2.1-1.6.1-4.8.1s-3.6 0-4.8-.1c-1.2-.1-1.8-.2-2.2-.4-.6-.2-1-.5-1.4-.9-.4-.4-.7-.8-.9-1.4-.2-.4-.4-1-.4-2.2C2.2 15.6 2.2 15.2 2.2 12s0-3.6.1-4.8c.1-1.2.2-1.8.4-2.2.2-.6.5-1 .9-1.4.4-.4.8-.7 1.4-.9.4-.2 1-.4 2.2-.4C8.4 2.2 8.8 2.2 12 2.2zm0 2c-3.1 0-3.5 0-4.7.1-1.1.1-1.6.2-1.9.3-.5.2-.8.4-1.1.7-.3.3-.5.6-.7 1.1-.1.3-.3.8-.3 1.9-.1 1.2-.1 1.6-.1 4.7s0 3.5.1 4.7c.1 1.1.2 1.6.3 1.9.2.5.4.8.7 1.1.3.3.6.5 1.1.7.3.1.8.3 1.9.3 1.2.1 1.6.1 4.7.1s3.5 0 4.7-.1c1.1-.1 1.6-.2 1.9-.3.5-.2.8-.4 1.1-.7.3-.3.5-.6.7-1.1.1-.3.3-.8.3-1.9.1-1.2.1-1.6.1-4.7s0-3.5-.1-4.7c-.1-1.1-.2-1.6-.3-1.9-.2-.5-.4-.8-.7-1.1-.3-.3-.6-.5-1.1-.7-.3-.1-.8-.3-1.9-.3-1.2-.1-1.6-.1-4.7-.1zm0 3.2a4.6 4.6 0 1 1 0 9.2 4.6 4.6 0 0 1 0-9.2zm0 1.9a2.7 2.7 0 1 0 0 5.4 2.7 2.7 0 0 0 0-5.4zm5.9-2.2a1.1 1.1 0 1 1 0 2.2 1.1 1.1 0 0 1 0-2.2z"/></svg>',
-    "Letterboxd": '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="12" r="3.2"/><circle cx="12" cy="12" r="3.2" opacity=".6"/><circle cx="18" cy="12" r="3.2"/></svg>',
-    "IMDb": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="7" font-weight="900" fill="currentColor" font-family="Montserrat">IMDb</text></svg>',
-    "Actors Access": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 6h20v12H2z" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" font-size="8" font-weight="900" fill="currentColor" font-family="Montserrat">AA</text></svg>',
-    "Email": '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18v12H3z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 7l9 6 9-6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>',
+    # Stroke-based Instagram glyph (rounded square + lens + flash dot),
+    # inset to x=3..21 so it doesn't crowd the pill's inner edge the way
+    # the old edge-to-edge filled path did.
+    "Instagram": '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><line x1="16.9" y1="7.1" x2="17" y2="7.1"/></svg>',
+    "Letterboxd": '<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><circle cx="6" cy="12" r="3.2"/><circle cx="12" cy="12" r="3.2" opacity=".6"/><circle cx="18" cy="12" r="3.2"/></svg>',
+    # Boxed wordmarks: the border rect is inset to x=2.5..21.5 and the
+    # label uses textLength so 4-char "IMDb" is scaled to fit instead of
+    # overflowing past the right border (the old font-size=7 clipped the b).
+    "IMDb": '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="14.9" text-anchor="middle" textLength="14" lengthAdjust="spacingAndGlyphs" font-size="7" font-weight="900" fill="currentColor" font-family="Montserrat, sans-serif">IMDb</text></svg>',
+    "Actors Access": '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="6.5" width="19" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="12" y="15" text-anchor="middle" textLength="9" lengthAdjust="spacingAndGlyphs" font-size="8" font-weight="900" fill="currentColor" font-family="Montserrat, sans-serif">AA</text></svg>',
+    "Email": '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="19" height="14" rx="2"/><path d="m3 6.5 9 6 9-6"/></svg>',
 }
 
 
@@ -1048,6 +1106,7 @@ def main():
     training = yaml.safe_load((DATA / "training.yml").read_text(encoding="utf-8"))
     hero = yaml.safe_load((DATA / "hero.yml").read_text(encoding="utf-8"))
     about = yaml.safe_load((DATA / "about.yml").read_text(encoding="utf-8"))
+    headshots = _load_obj(DATA / "headshots.yml")
     html = INDEX.read_text(encoding="utf-8")
 
     # Head: SEO meta, OG, GA4
@@ -1059,6 +1118,10 @@ def main():
     html = replace_block(html, "menu", gen_menu(site))
     html = replace_block(html, "footer", gen_footer(site))
     html = replace_block(html, "section-visibility", gen_section_visibility(site))
+
+    # Profile: headshot + gallery thumbnails
+    html = replace_block(html, "headshot-main", gen_headshot_main(headshots))
+    html = replace_block(html, "headshot-gallery", gen_headshot_gallery(headshots))
 
     # Bio + Credits + Training
     html = replace_block(html, "bio", gen_bio())

@@ -1,0 +1,17 @@
+# Headshot gallery — edited via Decap CMS at /acting/admin/.
+#
+# The FIRST entry is the large headshot shown when the page loads.
+# Every entry also renders as a 65px thumbnail under the social links;
+# clicking a thumbnail swaps it into the large slot.
+#
+# Upload square-ish images (800x800 or larger). The large slot renders
+# at 280x280 and thumbnails at 65x65, both cropped to fill, so anything
+# close to square works. Very wide or very tall photos get cropped hard.
+
+entries:
+  - image: "assets/headshots/01-main.jpg"
+    alt: "Frank Rizzo, Chicago-based actor — front-facing color headshot, blue backdrop"
+    label: "Suit and tie"
+  - image: "assets/headshots/09172024.jpg"
+    alt: "Frank Rizzo, Chicago-based actor — smiling color headshot, gray quarter-zip, white backdrop"
+    label: "Casual quarter-zip"
