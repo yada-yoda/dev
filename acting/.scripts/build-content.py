@@ -105,7 +105,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.8.0"
+SITE_VERSION = "v0.8.1"
 
 
 # ---------- helpers ----------
@@ -184,6 +184,226 @@ TRAINING_ICONS = {
     "Revue":        '<circle cx="9" cy="11" r="5"/><circle cx="15" cy="13" r="5"/>',
     "Coaching":     '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m16 11 2 2 4-4"/>',
 }
+
+
+# ---------- printed resume: one-page density enforcement ----------
+#
+# HARD RULE: the printed PDF resume is always ONE letter page.
+#
+# Rather than hoping hand-tuned margins keep holding as credits get added,
+# the build estimates the sheet's rendered height and picks the least
+# aggressive density tier that still fits. Each tier spends a specific
+# space-saving lever:
+#
+#   Tier 1  baseline — today's comfortable layout, nothing spent
+#   Tier 2  tighter leading, row padding, and section headings
+#   Tier 3  Tier 2 + drop the footer rizzo.cc/email block and move the
+#           QR code up beside the headshot (free — the header row is
+#           already 1.5in tall for the headshot, so the QR rides along)
+#   Tier 4  Tier 3 + step every font down
+#
+# The estimate is a heuristic over row counts and wrap math, not a real
+# measurement — a credit with a long sketch list costs more than a short
+# one, which is modelled, but font metrics are approximated. Thresholds
+# are therefore deliberately conservative. If content ever exceeds even
+# Tier 4, the build prints a loud warning rather than silently shipping
+# a two-page resume.
+#
+# Letter portrait is 11in tall; @page margin is 0.3in top and bottom,
+# leaving 10.4in of printable height. 1in = 72pt.
+PRINT_BUDGET_PT = 10.4 * 72       # 748.8pt
+
+# Slack held back from the budget so a tier is only chosen if it fits with
+# room to spare. The estimator approximates font metrics, so this absorbs
+# the error rather than padding every constant below (which would make the
+# model itself wrong and harder to reason about). 24pt = 1/3 inch.
+PRINT_SAFETY_PT = 24.0
+
+# Per-element height estimates in points, computed from the @media print
+# CSS (font-size x line-height + padding + borders + margins, at 1px =
+# 0.75pt). Calibrated against a real generated PDF: these produce ~669pt
+# for the tier-1 content as of v0.8.1, matching the measured sheet.
+# Recalibrate if the print typography changes.
+_PT = {
+    "header":         115.0,   # 1.5in headshot (108) + padding/border/margin
+    "stats":           30.0,   # 6-col grid, label+value, + border + margin
+    "section_chrome":  21.0,   # h2 (11) + underline + section margin-bottom
+    "table_row":       12.6,   # 8.5pt x 1.22 + 1.5px padding top/bottom
+    "row_wrap":         9.8,   # each ADDITIONAL wrapped line (8-8.5pt mix)
+    "theater_foot":    13.0,   # the asterisk footnote under the theater table
+    "training_row":    21.0,   # title line (10.4) + sub line (9) + margin
+    "training_wrap":    9.0,   # each additional wrapped line in a training sub
+    "text_line":       10.0,   # one line of a Languages/Skills/Licensing blob
+    "footer":          65.0,   # QR 0.7in (50.4) + label + border + margin
+}
+
+# Approximate characters per line for each column, derived from the
+# column widths in the print CSS against a 7.9in content width.
+_CPL = {
+    "title":      43,   # td.t  32% @ 8.5pt bold
+    "role":       60,   # td.r  38% @ 8.5pt
+    "role_thin":  64,   # td.r  38% @ 8pt (theater uses the smaller size)
+    "detail":     45,   # td.d  30% @ 8.5pt italic
+    "train_ttl":  60,   # training entry title, 2-column @ 8.5pt bold
+    "train_sub":  74,   # training entry sub-line, 2-column @ 7.5pt
+    "blob":      155,   # full-width Languages / Skills / Licensing @ 8pt
+}
+
+
+def _lines(text, chars_per_line):
+    """How many rendered lines a string needs at a given wrap width."""
+    n = len(str(text or ""))
+    if n == 0:
+        return 1
+    return max(1, -(-n // chars_per_line))     # ceil division
+
+
+def _table_block_pt(rows, cols, scale=1.0):
+    """Height of one credit table's rows. `cols` maps each row dict key to
+    its chars-per-line budget; a row is as tall as its tallest cell."""
+    total = 0.0
+    for r in rows:
+        tallest = 1
+        for key, cpl in cols.items():
+            tallest = max(tallest, _lines(r.get(key, ""), cpl))
+        total += _PT["table_row"] * scale
+        total += _PT["row_wrap"] * scale * (tallest - 1)
+    return total
+
+
+def estimate_print_height_pt(credits, training, panels, tier):
+    """Estimated rendered height of the printed sheet, in points, for a
+    given density tier. Tier effects mirror what the .rs-d{n} CSS does."""
+    # Tier multipliers: (variable content scale, section chrome scale,
+    #                    header scale, footer included?)
+    variable, chrome, header, footer_on = {
+        1: (1.00, 1.00, 1.00, True),
+        2: (0.93, 0.85, 1.00, True),
+        3: (0.93, 0.85, 1.00, False),
+        4: (0.84, 0.78, 0.92, False),
+    }[tier]
+
+    total = _PT["header"] * header + _PT["stats"] * variable
+
+    sections = 0
+
+    film = credits.get("film") or []
+    if film:
+        sections += 1
+        total += _table_block_pt(
+            film,
+            {"title": _CPL["title"], "role": _CPL["role"], "director": _CPL["detail"]},
+            variable,
+        )
+
+    tv = credits.get("tv") or []
+    if tv:
+        sections += 1
+        total += _table_block_pt(
+            tv,
+            {"title": _CPL["title"], "role": _CPL["role"], "network": _CPL["detail"]},
+            variable,
+        )
+
+    theater = credits.get("theater") or []
+    if theater:
+        sections += 1
+        total += _table_block_pt(
+            theater,
+            {"production": _CPL["title"], "role": _CPL["role_thin"], "venue": _CPL["detail"]},
+            variable,
+        )
+        # Footnote line renders only when a marker is actually in use.
+        _, active_notes = _theater_resolve(theater, credits.get("theater_footnotes") or {})
+        if active_notes:
+            total += _PT["theater_foot"] * variable
+
+    entries = (training or {}).get("entries") or []
+    if entries:
+        sections += 1
+        # Two columns, so the section is only as tall as the taller column.
+        per_entry = []
+        for e in entries:
+            sub = " · ".join(p for p in (e.get("teachers"), e.get("school")) if p)
+            h = _PT["training_row"] * variable
+            h += _PT["training_wrap"] * variable * (_lines(sub, _CPL["train_sub"]) - 1)
+            h += _PT["training_wrap"] * variable * (_lines(e.get("title"), _CPL["train_ttl"]) - 1)
+            per_entry.append(h)
+        # CSS multi-column fills column 1 then column 2, balancing by
+        # height. Simulate that greedily (tallest-first into whichever
+        # column is currently shorter) and take the taller column — a flat
+        # total/2 under-counts, and total/2 + max/2 over-counts.
+        col_a = col_b = 0.0
+        for h in sorted(per_entry, reverse=True):
+            if col_a <= col_b:
+                col_a += h
+            else:
+                col_b += h
+        total += max(col_a, col_b)
+
+    # Full-width text blobs
+    langs = panels.get("languages") or []
+    if langs:
+        sections += 1
+        blob = " · ".join(f'{l.get("name","")} ({l.get("level","")})' for l in langs)
+        total += _PT["text_line"] * variable * _lines(blob, _CPL["blob"])
+
+    skills = panels.get("skills") or ""
+    if skills:
+        sections += 1
+        total += _PT["text_line"] * variable * _lines(skills, _CPL["blob"])
+
+    lic = panels.get("licensing") or {}
+    lic_parts = list(lic.get("documents") or [])
+    if lic.get("union"):
+        lic_parts.append(lic["union"])
+    if lic.get("local_hire"):
+        lic_parts.append(f'Local Hire: {lic["local_hire"]}')
+    if lic_parts:
+        sections += 1
+        total += _PT["text_line"] * variable * _lines(" · ".join(lic_parts), _CPL["blob"])
+
+    total += _PT["section_chrome"] * chrome * sections
+
+    if footer_on:
+        total += _PT["footer"]
+
+    return total
+
+
+def resolve_print_density(credits, training, panels, print_cfg):
+    """Pick the least aggressive density tier that fits on one page.
+    An explicit tier in print-resume.yml overrides the automatic choice.
+    Returns (tier, estimate_pt, was_forced)."""
+    mode = str((print_cfg or {}).get("density_mode", "auto")).strip().lower()
+
+    if mode in {"1", "2", "3", "4"}:
+        tier = int(mode)
+        return tier, estimate_print_height_pt(credits, training, panels, tier), True
+
+    usable = PRINT_BUDGET_PT - PRINT_SAFETY_PT
+    for tier in (1, 2, 3, 4):
+        est = estimate_print_height_pt(credits, training, panels, tier)
+        if est <= usable:
+            return tier, est, False
+
+    # Nothing fits — return the tightest tier and let main() warn loudly.
+    return 4, estimate_print_height_pt(credits, training, panels, 4), False
+
+
+def apply_print_density_class(html, tier):
+    """Stamp rs-d{tier} onto the .resume-sheet root so the tier CSS
+    applies. Replaces any previously stamped tier."""
+    def _sub(m):
+        classes = [c for c in m.group(1).split() if not c.startswith("rs-d")]
+        classes.append(f"rs-d{tier}")
+        return f'<div class="{" ".join(classes)}"'
+    return re.sub(
+        r'<div class="(resume-sheet[^"]*)"',
+        _sub,
+        html,
+        count=1,
+    )
 
 
 def gen_headshot_main(headshots):
@@ -1126,6 +1346,7 @@ def main():
     hero = yaml.safe_load((DATA / "hero.yml").read_text(encoding="utf-8"))
     about = yaml.safe_load((DATA / "about.yml").read_text(encoding="utf-8"))
     headshots = _load_obj(DATA / "headshots.yml")
+    print_cfg = _load_obj(DATA / "print-resume.yml")
     html = INDEX.read_text(encoding="utf-8")
 
     # Head: SEO meta, OG, GA4
@@ -1199,8 +1420,39 @@ def main():
     html = replace_block(html, "reel", gen_reel(contact))
     html = replace_block(html, "contact-section", gen_contact_section(contact))
 
+    # Printed resume: pick the density tier that keeps it on ONE page.
+    tier, est_pt, forced = resolve_print_density(credits, training, panels, print_cfg)
+    html = apply_print_density_class(html, tier)
+
     INDEX.write_text(html, encoding="utf-8")
     print(f"Wrote {INDEX.relative_to(ROOT)}")
+
+    # Report the one-page budget so growth is visible in the build log.
+    pct = est_pt / PRINT_BUDGET_PT * 100
+    how = "forced via print-resume.yml" if forced else "auto"
+    # ASCII only in build output - the Windows console codepage mangles
+    # em dashes and box-drawing characters.
+    print(
+        f"Print resume: density tier {tier} ({how}) - "
+        f"est. {est_pt:.0f}pt of {PRINT_BUDGET_PT:.0f}pt available ({pct:.0f}% full)"
+    )
+    if est_pt > PRINT_BUDGET_PT:
+        over = est_pt - PRINT_BUDGET_PT
+        print(
+            "\n"
+            "  !! ONE-PAGE BUDGET EXCEEDED !!\n"
+            f"  The printed resume is an estimated {over:.0f}pt "
+            f"({over / 72:.2f}in) too tall even at the tightest tier.\n"
+            "  It will likely spill onto a second page. To fix, trim content\n"
+            "  (Special Skills is usually the easiest - aim for 8-12 items),\n"
+            "  or add another density lever to the .rs-d4 CSS block.\n"
+        )
+    elif not forced and tier >= 3:
+        print(
+            f"  Note: tier {tier} is in effect, so the footer rizzo.cc/email "
+            "block is hidden and\n  the QR code has moved into the header. "
+            "Trim content to get back to tier 1-2."
+        )
 
 
 if __name__ == "__main__":

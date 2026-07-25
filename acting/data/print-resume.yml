@@ -1,0 +1,19 @@
+# Printed PDF resume density.
+#
+# HARD RULE: the printed resume is always ONE letter page.
+#
+# On "auto" the build script estimates the sheet's rendered height and
+# picks the least aggressive tier that still fits, spending space-saving
+# levers only as content grows:
+#
+#   1  Baseline - comfortable spacing, footer + QR in their normal spots
+#   2  Tighter leading, row padding, and section headings
+#   3  Tier 2 + footer rizzo.cc/email block hidden, QR moves up beside
+#      the headshot (free: the header row is already 1.5in tall)
+#   4  Tier 3 + every font stepped down
+#
+# Leave this on "auto" unless you want to preview a specific tier or
+# override the estimate. Every build prints the current tier and how
+# full the page is, so growth is visible in the build log.
+
+density_mode: "auto"

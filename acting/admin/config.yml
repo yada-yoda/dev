@@ -100,6 +100,22 @@ collections:
             hint: "Use {{year}} for the current year (filled at runtime). Use {{version}} to control where the version chip lands - or just leave it out and toggle 'Show version' below to append it automatically."
           - { label: "Show version chip", name: "show_version", widget: "boolean", default: true, hint: "Tick to display the current site version (e.g. v0.7.3) in the footer." }
 
+      - file: "acting/data/print-resume.yml"
+        label: "Printed Resume PDF"
+        name: "print_resume"
+        fields:
+          - label: "Density"
+            name: "density_mode"
+            widget: "select"
+            default: "auto"
+            hint: "The printed resume is always kept to ONE page. On Automatic the build measures your content and only tightens things as far as it needs to. Pick a specific tier to preview or override it."
+            options:
+              - { label: "Automatic (recommended)",                      value: "auto" }
+              - { label: "Tier 1 — Comfortable",                         value: "1" }
+              - { label: "Tier 2 — Tighter spacing",                     value: "2" }
+              - { label: "Tier 3 — Tighter + QR in header, no footer",   value: "3" }
+              - { label: "Tier 4 — Tightest (smaller fonts)",            value: "4" }
+
       - file: "acting/data/sections.yml"
         label: "Section Visibility (Show / Hide)"
         name: "sections"
