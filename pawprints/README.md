@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.58.0**
+**Current Version: v0.59.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,13 @@ covers both.
 
 ## Version History
 
+- **v0.59.0** — **Restock emails now show each item's purchase context, and match the app's
+  notification style.** The reorder reminder email was restyled into the same clean card layout as
+  the other PawPrints/Usage notifications (a white card with a teal header band and a card per item),
+  and each low supply now carries the details you'd want before re-buying: **how long it's been in
+  use so far, what it cost, where you bought it, and the purchase date** — pulled straight from the
+  supply's record (any field left blank is simply omitted). No change to when or how often you're
+  emailed.
 - **v0.58.0** — **Reorder reminder emails.** When a supply is marked "running low," PawPrints can now
   email you a restock reminder — with the item's reorder link right in the message — so a low bag of
   food doesn't quietly run out. Turn it on in **Settings → Lists & preferences → Reorder reminder

@@ -268,7 +268,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.58.0';
+const APP_VERSION = 'v0.59.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3356,9 +3356,16 @@ function safeUrl(u){ u=(u||'').trim(); if(!u) return ''; if(/^https?:\/\//i.test
 // only POSTs when the prefs or the low-item set actually changed. See pawprints-worker.
 let _lastReorderSig = null;
 function reorderItemsForEmail(){
+  // Pre-format the purchase context here (same helpers the Supplies view uses)
+  // so the worker stays a dumb renderer: how long it's been in use so far,
+  // its cost, where it was bought, and the purchase date. Blanks are dropped.
   return (data.inventory||[]).filter(i => i && i.runningLow).map(i => ({
     name: ((i.brand?i.brand+' ':'')+(i.name||'')).trim(),
     url: safeUrl(i.reorderUrl) || '',
+    duration: invDurationText(i) || '',
+    purchased: i.purchaseDate ? fmtDate(i.purchaseDate) : '',
+    cost: i.cost ? money(i.cost) : '',
+    store: (i.store||'').trim(),
   })).filter(i => i.name);
 }
 async function syncReorderPrefs(force){
