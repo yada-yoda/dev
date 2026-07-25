@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.145';
+const VERSION = '1.0.146';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -191,8 +191,14 @@ function renderNotifications() {
   const bell = document.getElementById('notif-bell');
   const countEl = document.getElementById('notif-count');
   const panel = document.getElementById('notif-panel');
+  const wrapEl = document.getElementById('notif-wrap');
   if (!bell || !panel) return;
   const store = window.cloverStore;
+  // Bell can be turned off entirely under Settings → Notifications (default on).
+  const settings = (store && store.state && store.state.settings) || {};
+  const bellOn = settings.showNotifBell !== false;
+  if (wrapEl) wrapEl.classList.toggle('hidden', !bellOn);
+  if (!bellOn) { panel.classList.add('hidden'); return; }
   const loaded = store && store.isLoaded && store.isLoaded() && ownerState() === 'owner';
   const matured = loaded ? maturedCds(store) : [];
   const n = matured.length;
@@ -875,16 +881,68 @@ function renderSettings(view) {
   grid.appendChild(collapsibleCard(accountDefaultsCard(), 'set-acctDefaults'));
   grid.appendChild(collapsibleCard(yearsCard(), 'set-years'));
   grid.appendChild(collapsibleCard(timeZoneCard(), 'set-timezone'));
+  grid.appendChild(collapsibleCard(notificationsCard(), 'set-notifications'));
   grid.appendChild(collapsibleCard(calendarRemindersCard(), 'set-calReminders'));
   view.appendChild(grid);
 }
 
-// The one notification Clover sends. It rides the Google Calendar you connect on
-// the Calendar page — Clover has no mail server — so the toggle only bites once
-// you've connected, and changes apply on the next sync.
-function calendarRemindersCard() {
+// Every way Clover can nudge you, in one place: the in-app bell (top-right) plus
+// the two CD-maturity emails. The matured-CD email is sent by Clover's own mail
+// worker (notify.rizzo.cc — the sender PawPrints and Usage share), so it works
+// with or without Google. The 7-days-AHEAD email rides the Google Calendar you
+// connect on the Calendar page, so that one only bites once you've connected and
+// applies on the next sync.
+function notificationsCard() {
   const store = window.cloverStore;
   const g = store.state.settings.gcal || {};
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Notifications', 'The in-app bell and the CD-maturity email reminders'));
+  const wrap = el('div', 'check-col');
+
+  // In-app bell (top-right). Governs whether #notif-wrap renders at all.
+  const bellOn = store.state.settings.showNotifBell !== false;   // default on
+  const cb = checkbox('Show the notification bell', bellOn, 'The 🔔 at the top right — it lists CDs that have matured and are still waiting on you. Untick to hide it entirely; the Dashboard still flags matured CDs.');
+  cb.__input.addEventListener('change', () => {
+    store.setSetting('showNotifBell', cb.__input.checked);
+    toast(cb.__input.checked ? 'Notification bell shown' : 'Notification bell hidden');
+    renderView(currentRoute);
+  });
+  wrap.appendChild(cb);
+
+  // Matured-CD email — Clover's own mail worker, independent of Google.
+  const em = g.cdMaturedEmail !== false;   // default on
+  const ce = checkbox('Email me when a CD has matured', em, 'A once-per-CD email when a CD passes its maturity date and is still open — because Clover never closes or renews a CD for you. Sent from notify.rizzo.cc (Clover’s own mail, not Google), so it works even without Google Calendar connected. One reminder per matured CD; renewing it re-arms the next maturity.');
+  ce.__input.addEventListener('change', () => {
+    store.setGcal({ cdMaturedEmail: ce.__input.checked });
+    toast(ce.__input.checked ? 'Matured-CD emails on' : 'Matured-CD emails off');
+    syncCdReminders(true);   // push the new preference immediately
+    renderView(currentRoute);
+  });
+  wrap.appendChild(ce);
+
+  // 7-days-ahead email — rides the connected Google Calendar.
+  const on = g.cdEmailReminder !== false;   // default on
+  const c = checkbox('Email me 7 days before a CD matures', on, 'When Google Calendar is connected, each CD maturity carries an email reminder 7 days ahead — time to decide on rollover or call for new rates. Untick to stop them; the reminders come off your calendar on the next sync.');
+  c.__input.addEventListener('change', () => {
+    store.setGcal({ cdEmailReminder: c.__input.checked });
+    toast(c.__input.checked ? 'CD email reminders on — sync to apply' : 'CD email reminders off — sync to remove');
+    renderView(currentRoute);
+  });
+  wrap.appendChild(c);
+
+  card.appendChild(wrap);
+  const note = el('p', 'muted'); note.style.marginTop = '10px';
+  note.textContent = g.calendarId
+    ? 'The matured-CD email and the bell work on their own — no Google needed. The 7-days-ahead email rides Google Calendar and applies on your next “↻ Sync to Google” (Calendar page).'
+    : 'The matured-CD email and the bell work on their own — nothing to set up. The 7-days-ahead email needs Google Calendar connected first (Calendar page); until then it stays inactive.';
+  card.appendChild(note);
+  return card;
+}
+
+// Calendar card now covers only what shows ON the calendar; the reminder toggles
+// moved to Notifications above.
+function calendarRemindersCard() {
+  const store = window.cloverStore;
   const card = el('div', 'card');
   card.appendChild(sectionHead('Calendar', 'What Clover shows on the Calendar and pushes to Google'));
   const wrap = el('div', 'check-col');
@@ -897,32 +955,9 @@ function calendarRemindersCard() {
     renderView(currentRoute);
   });
   wrap.appendChild(cf);
-  const on = g.cdEmailReminder !== false;   // default on, matching the shipped behavior
-  const c = checkbox('Email me 7 days before a CD matures', on, 'When Google Calendar is connected, each CD maturity carries an email reminder 7 days ahead — time to decide on rollover or call for new rates. Untick to stop them; the reminders come off your calendar on the next sync.');
-  c.__input.addEventListener('change', () => {
-    store.setGcal({ cdEmailReminder: c.__input.checked });
-    toast(c.__input.checked ? 'CD email reminders on — sync to apply' : 'CD email reminders off — sync to remove');
-    renderView(currentRoute);
-  });
-  wrap.appendChild(c);
-  // Matured-CD email — independent of Google Calendar. Sent by Clover's own mail
-  // worker (notify.rizzo.cc, the same sender PawPrints and Usage use), not Google.
-  // Where the reminder above fires 7 days AHEAD, this one nags about CDs that have
-  // already matured and are still waiting on you.
-  const em = g.cdMaturedEmail !== false;   // default on
-  const ce = checkbox('Email me when a CD has matured', em, 'A once-per-CD email when a CD passes its maturity date and is still open — because Clover never closes or renews a CD for you. Sent from notify.rizzo.cc (Clover’s own mail, not Google), so it works even with Google Calendar not connected. You’ll get one reminder per matured CD; renewing it re-arms the next maturity.');
-  ce.__input.addEventListener('change', () => {
-    store.setGcal({ cdMaturedEmail: ce.__input.checked });
-    toast(ce.__input.checked ? 'Matured-CD emails on' : 'Matured-CD emails off');
-    syncCdReminders(true);   // push the new preference immediately
-    renderView(currentRoute);
-  });
-  wrap.appendChild(ce);
   card.appendChild(wrap);
   const note = el('p', 'muted'); note.style.marginTop = '10px';
-  note.textContent = g.calendarId
-    ? 'The 7-days-ahead reminder applies the next time you push to Google Calendar (Calendar page → “↻ Sync to Google”). The matured-CD email is separate and needs no Google connection.'
-    : 'The 7-days-ahead reminder needs Google Calendar connected first (Calendar page) — Google sends it. The matured-CD email below is separate: Clover sends it from its own mail service, no Google needed.';
+  note.textContent = 'CD maturity reminders (bell + emails) live under Notifications.';
   card.appendChild(note);
   return card;
 }
@@ -3629,6 +3664,7 @@ const HELP_SECTIONS = [
     points: [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
+      'Once a CD passes its maturity date Clover never closes or renews it for you — it waits. A 🔔 bell (top right) and a Dashboard flag list any matured CDs, and an email (from notify.rizzo.cc, no Google needed) reminds you once per matured CD. Manage all of this under Settings → Notifications — the bell, the matured-CD email, and the 7-days-ahead calendar email.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
       'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. With it open, click an institution, owner, or beneficiary label in the table to narrow the timeline and its charts to just that group. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
@@ -3648,7 +3684,7 @@ const HELP_SECTIONS = [
   { id: 'calendar', ico: '▣', title: 'Calendar', what: 'A month view of money events.',
     points: [
       'Shows expected pay dates, bill renewals, CD maturities (with a 7-day heads-up), and FOMC rate-decision dates. Click any day for the full detail.',
-      'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Turn this off under Settings → Calendar. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.',
+      'Optionally push these events one-way into a dedicated Google Calendar. Once connected, each CD maturity carries an email reminder 7 days ahead — Google emails you in time to decide on rollover or call for new rates. Turn this off under Settings → Notifications. Sync while the maturity is within about three months (the push window) so the reminder is set; a CD already inside 7 days won’t email, but still shows on the calendar.',
       'FOMC meeting dates (when the Fed sets interest rates) are built in and shown on the Calendar and the Credit & Rates page — dates only, no minutes. They push to Google too. Hide them under Settings → Calendar. The dates keep themselves current — a scheduled job re-reads the Fed’s official calendar every month, so nothing manual is needed.'
     ] },
   { id: 'import', ico: '⇅', title: 'Import / Export', what: 'Get data in and out.',

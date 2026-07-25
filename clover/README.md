@@ -45,6 +45,21 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.146 — A dedicated Notifications section in Settings
+
+All the ways Clover can nudge you now live in one place — **Settings →
+Notifications**:
+
+- **Show the notification bell** — a new switch for the 🔔 at the top right (the
+  one listing matured CDs). It had no off switch before; now you can hide it
+  entirely if you’d rather rely on the Dashboard flag.
+- **Email me when a CD has matured** — moved here from the Calendar section.
+- **Email me 7 days before a CD matures** — moved here too (still rides Google
+  Calendar).
+
+The Calendar section keeps just what it’s about — showing FOMC dates and pushing
+events to Google. All three notification toggles default on.
+
 ### v1.0.145 — Matured-CD email is on by default
 
 The “Email me when a CD has matured” reminder (added in v1.0.144) now defaults
