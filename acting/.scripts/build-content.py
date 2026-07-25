@@ -90,6 +90,7 @@ Idempotent: running with unchanged data files produces unchanged output.
 from pathlib import Path
 import re
 import html as html_lib
+import urllib.parse
 
 try:
     import yaml
@@ -863,11 +864,28 @@ SOCIAL_ICONS = {
 }
 
 
-def gen_socials(socials):
+def mailto_url(email, subject=""):
+    """Build a mailto: URL with an optional prefilled Subject so inbound
+    mail from the site is instantly identifiable. Returns a bare mailto:
+    when no subject is configured."""
+    email = (email or "").strip()
+    # Accept either "frank@x.cc" or an already-prefixed "mailto:frank@x.cc"
+    addr = email[7:] if email.lower().startswith("mailto:") else email
+    subject = (subject or "").strip()
+    if not subject:
+        return f"mailto:{addr}"
+    return f"mailto:{addr}?subject={urllib.parse.quote(subject)}"
+
+
+def gen_socials(socials, email_subject=""):
     items = []
     for s in socials:
         platform = s["platform"]
         url = s["url"]
+        # Stamp the configured Subject onto the Email pill. Skip if the
+        # author already hand-wrote their own query string.
+        if url.lower().startswith("mailto:") and "?" not in url:
+            url = mailto_url(url, email_subject)
         icon = SOCIAL_ICONS.get(platform, "")
         external = "" if url.startswith("mailto:") else ' target="_blank" rel="noopener"'
         items.append(
@@ -908,11 +926,12 @@ def gen_contact_section(contact):
     heading = cs.get("heading", "Let's Work")
     body = cs.get("body", "")
     email = contact["email"]
+    href = mailto_url(email, contact.get("email_subject", ""))
     return (
         '\n    <span class="kicker" style="font-family:\'Montserrat\',sans-serif;font-size:11px;color:var(--accent);letter-spacing:.3em;text-transform:uppercase">04 &mdash; Contact</span>\n'
         f'    <h2 style="margin-top:8px">{esc(heading)}</h2>\n'
         f'    <p style="color:var(--muted);max-width:520px;margin:14px auto 0">\n      {esc(body)}\n    </p>\n'
-        f'    <a class="email" href="mailto:{esc(email)}">{esc(email)}</a>\n  '
+        f'    <a class="email" href="{esc(href)}">{esc(email)}</a>\n  '
     )
 
 
@@ -1175,7 +1194,8 @@ def main():
     html = replace_block(html, "print-stats", gen_print_stats(panels))
 
     # Contact / socials / reel
-    html = replace_block(html, "socials", gen_socials(contact["socials"]))
+    html = replace_block(html, "socials",
+                         gen_socials(contact["socials"], contact.get("email_subject", "")))
     html = replace_block(html, "reel", gen_reel(contact))
     html = replace_block(html, "contact-section", gen_contact_section(contact))
 

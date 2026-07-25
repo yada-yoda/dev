@@ -484,6 +484,7 @@ collections:
         name: "contact"
         fields:
           - { label: "Email", name: "email", widget: "string", hint: "Public-facing contact address." }
+          - { label: "Email subject line", name: "email_subject", widget: "string", required: false, default: "Inquiry via Rizzo.cc", hint: "Prefills the Subject when someone clicks your email anywhere on the site, so you can spot and filter website mail instantly. Leave blank for no subject. Ideas: 'Inquiry via Rizzo.cc' · 'Booking inquiry - Rizzo.cc' · 'Casting inquiry via Rizzo.cc'." }
           - label: "Contact Section"
             name: "contact_section"
             widget: "object"

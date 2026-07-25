@@ -3,6 +3,12 @@
 
 email: "frank@rizzo.cc"
 
+# Prefilled Subject line on every mailto link (the Email pill in the
+# profile block and the address in the bottom Contact section). Makes
+# inbound mail from the site instantly identifiable and filterable.
+# Leave blank for a plain mailto with no subject.
+email_subject: "Inquiry via Rizzo.cc"
+
 # Bottom Contact section copy ("Let's Work" / "For bookings, sides, or just to say hi.")
 contact_section:
   heading: "Let's Work"
