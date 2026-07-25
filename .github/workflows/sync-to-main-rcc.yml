@@ -1,0 +1,103 @@
+# Sync the built acting/ output to yada-yoda/main-rcc (production repo
+# for rizzo.cc). Fires after build-acting.yml regenerates HTML from
+# data/ edits, and also fires on any direct edit to the deployable
+# content. Copies files, excludes source/build/dev-only stuff, rewrites
+# /acting/ paths to /, commits + pushes to main-rcc.
+#
+# Requires secret: SYNC_PAT
+#   Fine-grained PAT with Repository access = yada-yoda/main-rcc,
+#   Permissions = Contents: Read and write. Stored in
+#   yada-yoda/dev > Settings > Secrets and variables > Actions > SYNC_PAT.
+
+name: Sync acting/ to main-rcc
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'acting/index.html'
+      - 'acting/404.html'
+      - 'acting/assets/**'
+      - 'acting/agencies/**'
+      - 'acting/humans.txt'
+      - 'acting/llms.txt'
+      - 'acting/robots.txt'
+      - 'acting/sitemap.xml'
+      - 'acting/site.webmanifest'
+  workflow_dispatch: {}     # allow manual runs from the Actions tab
+
+# Serialize sync runs so back-to-back pushes don't fight over the main-rcc
+# ref. cancel-in-progress:false means each run finishes before the next.
+concurrency:
+  group: sync-main-rcc
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    # Don't sync on commits that were themselves the sync bot writing back
+    # (defense-in-depth; we don't push back to dev, but harmless)
+    if: "!contains(github.event.head_commit.message, '[skip-sync]')"
+    steps:
+      - name: Check out dev
+        uses: actions/checkout@v4
+        with:
+          path: dev
+
+      - name: Check out main-rcc
+        uses: actions/checkout@v4
+        with:
+          repository: yada-yoda/main-rcc
+          token: ${{ secrets.SYNC_PAT }}
+          path: main-rcc
+
+      - name: rsync acting/ into main-rcc/ (excluding source + build folders)
+        run: |
+          # --delete removes files in main-rcc that are no longer in dev/acting,
+          # but the --exclude list means CNAME, README.md, and .git are safe.
+          rsync -av --delete \
+            --exclude='admin/' \
+            --exclude='data/' \
+            --exclude='.scripts/' \
+            --exclude='source/' \
+            --exclude='DECAP-SETUP.md' \
+            --exclude='EDITING.md' \
+            --exclude='README.md' \
+            --exclude='CNAME' \
+            --exclude='Thumbs.db' \
+            --exclude='.git/' \
+            --exclude='.gitignore' \
+            dev/acting/ main-rcc/
+
+      - name: Rewrite /acting/ path prefixes to /
+        working-directory: main-rcc
+        run: |
+          # The dev copy lives at dev.rizzo.cc/acting/ so its HTML uses
+          # /acting/... absolute paths. At rizzo.cc/ those need to be /...
+          # Also collapse any absolute dev URLs to production URLs.
+          find . -type f \
+            \( -name '*.html' -o -name '*.css' -o -name '*.js' \
+               -o -name '*.xml' -o -name '*.txt' \
+               -o -name '*.webmanifest' -o -name '*.json' \) \
+            ! -name 'README.md' \
+            ! -path './.git/*' \
+            -exec sed -i \
+              -e 's|https://dev\.rizzo\.cc/acting/|https://rizzo.cc/|g' \
+              -e 's|dev\.rizzo\.cc/acting/|rizzo.cc/|g' \
+              -e 's|/acting/|/|g' \
+              {} +
+
+      - name: Commit and push if changed
+        working-directory: main-rcc
+        run: |
+          git config user.name "rizzo-cc sync bot"
+          git config user.email "sync-bot@users.noreply.github.com"
+          if [ -n "$(git status --porcelain)" ]; then
+            git add -A
+            git commit -m "Sync from dev@${GITHUB_SHA::7}" \
+              -m "Automated mirror of yada-yoda/dev acting/ (source commit ${GITHUB_SHA})."
+            git push
+            echo "SYNCED=1" >> "$GITHUB_ENV"
+          else
+            echo "No changes to sync."
+          fi
