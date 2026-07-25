@@ -4,10 +4,10 @@
 # content. Copies files, excludes source/build/dev-only stuff, rewrites
 # /acting/ paths to /, commits + pushes to main-rcc.
 #
-# Requires secret: SYNC_PAT
-#   Fine-grained PAT with Repository access = yada-yoda/main-rcc,
-#   Permissions = Contents: Read and write. Stored in
-#   yada-yoda/dev > Settings > Secrets and variables > Actions > SYNC_PAT.
+# Requires secret: SYNC_SSH_KEY
+#   Private half of an ed25519 keypair whose public half is installed as
+#   a Deploy Key with write access on yada-yoda/main-rcc (title:
+#   "sync-from-dev"). Scoped to just main-rcc, no PAT rotation risk.
 
 name: Sync acting/ to main-rcc
 
@@ -48,7 +48,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: yada-yoda/main-rcc
-          token: ${{ secrets.SYNC_PAT }}
+          ssh-key: ${{ secrets.SYNC_SSH_KEY }}
           path: main-rcc
 
       - name: rsync acting/ into main-rcc/ (excluding source + build folders)
