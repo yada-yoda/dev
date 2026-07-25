@@ -1,5 +1,4 @@
 # acting
 
-Staging source for [rizzo.cc](https://rizzo.cc). Deployed to
-[dev.rizzo.cc/acting](https://dev.rizzo.cc/acting/) for CMS editing and
-mirrored to production via the sync-to-main-rcc workflow.
+Static site source, edited via a self-hosted CMS and mirrored to a
+production repo for deployment.
