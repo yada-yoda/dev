@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.143';
+const VERSION = '1.0.144';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -214,10 +214,46 @@ function renderNotifications() {
     panel.appendChild(row);
   });
 }
+// clover-worker: emails a reminder about CDs that have already matured and are
+// waiting on you (complements the Google-Calendar 7-days-ahead reminder). The
+// browser is the only reader of Firestore; it pushes just this minimal payload,
+// keyed by uid and Firebase-ID-token authenticated. Opt-in via Settings →
+// Calendar. Guarded by a signature so a POST only fires when the matured set or
+// the toggle actually changes; silently no-ops if the Worker isn't reachable.
+const CLOVER_WORKER = 'https://clover-worker.sevendwarfs.workers.dev';
+let _cdSyncSig = null;
+async function syncCdReminders(force) {
+  const store = window.cloverStore;
+  if (!store || !store.isLoaded || !store.isLoaded() || ownerState() !== 'owner') return;
+  const user = window.cloverAuth && window.cloverAuth.currentUser();
+  if (!user || typeof user.getIdToken !== 'function') return;
+  const g = store.state.settings.gcal || {};
+  const enabled = g.cdMaturedEmail === true;   // opt-in; needs clover-worker deployed
+  const email = user.email || '';
+  const items = (enabled ? maturedCds(store) : []).map(a => ({
+    key: a.id + '|' + (a.cdMaturity || ''),
+    name: a.name + (a.last4 ? ' ••' + a.last4 : ''),
+    maturity: a.cdMaturity ? fmtDate(a.cdMaturity) : '',
+    principal: (a.cdPrincipal != null && a.cdPrincipal !== '') ? money(Number(a.cdPrincipal)) : ''
+  }));
+  const sig = (enabled ? '1' : '0') + '|' + email + '|' + items.map(i => i.key).join(',');
+  if (!force && sig === _cdSyncSig) return;
+  _cdSyncSig = sig;
+  try {
+    const token = await user.getIdToken();
+    await fetch(CLOVER_WORKER + '/cd/sync', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, email, items })
+    });
+  } catch (e) { _cdSyncSig = null; /* network error — let the next render retry */ }
+}
+
 function renderView(route) {
   const view = document.getElementById('view');
   view.innerHTML = '';
   renderNotifications();
+  syncCdReminders();
   const state = ownerState();
   if (state === 'denied') { view.appendChild(deniedPanel()); return; }
   if (state === 'setup') view.appendChild(setupBanner());
@@ -869,11 +905,24 @@ function calendarRemindersCard() {
     renderView(currentRoute);
   });
   wrap.appendChild(c);
+  // Matured-CD email — independent of Google Calendar. Sent by Clover's own mail
+  // worker (notify.rizzo.cc, the same sender PawPrints and Usage use), not Google.
+  // Where the reminder above fires 7 days AHEAD, this one nags about CDs that have
+  // already matured and are still waiting on you.
+  const em = g.cdMaturedEmail === true;   // opt-in, default off
+  const ce = checkbox('Email me when a CD has matured', em, 'A once-per-CD email when a CD passes its maturity date and is still open — because Clover never closes or renews a CD for you. Sent from notify.rizzo.cc (Clover’s own mail, not Google), so it works even with Google Calendar not connected. You’ll get one reminder per matured CD; renewing it re-arms the next maturity.');
+  ce.__input.addEventListener('change', () => {
+    store.setGcal({ cdMaturedEmail: ce.__input.checked });
+    toast(ce.__input.checked ? 'Matured-CD emails on' : 'Matured-CD emails off');
+    syncCdReminders(true);   // push the new preference immediately
+    renderView(currentRoute);
+  });
+  wrap.appendChild(ce);
   card.appendChild(wrap);
   const note = el('p', 'muted'); note.style.marginTop = '10px';
   note.textContent = g.calendarId
-    ? 'Applies the next time you push to Google Calendar (Calendar page → “↻ Sync to Google”).'
-    : 'Needs Google Calendar connected first — set it up on the Calendar page. Google sends the reminder; Clover has no email server of its own.';
+    ? 'The 7-days-ahead reminder applies the next time you push to Google Calendar (Calendar page → “↻ Sync to Google”). The matured-CD email is separate and needs no Google connection.'
+    : 'The 7-days-ahead reminder needs Google Calendar connected first (Calendar page) — Google sends it. The matured-CD email below is separate: Clover sends it from its own mail service, no Google needed.';
   card.appendChild(note);
   return card;
 }

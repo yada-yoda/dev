@@ -45,6 +45,25 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.144 — Email reminder when a CD has matured
+
+Clover now sends its own email — from `notify.rizzo.cc`, the same mail service
+PawPrints and Usage use — when one of your CDs passes its maturity date and is
+still open. It complements the existing Google Calendar reminder, which fires
+*seven days ahead*: this new one nags about CDs that have **already** matured and
+are still waiting on you, since Clover never closes or renews a CD on its own.
+
+Turn it on under **Settings → Calendar → “Email me when a CD has matured.”** It’s
+off by default and needs no Google connection — the email is sent by a small
+Cloudflare Worker (`clover-worker`), not by Google. You get one reminder per
+matured CD; renewing a CD re-arms the reminder for its next maturity. The browser
+only ever hands the Worker the CD’s label, maturity date, and principal — nothing
+else leaves your account.
+
+_Setup note (one-time, owner only): deploy `clover-worker` and set its Resend key
+and daily trigger — see `clover-worker/README.md`. Until then the toggle is safe
+to leave on or off; the app just no-ops the push if the Worker isn’t reachable._
+
 ### v1.0.143 — Click a quarter to see exactly which CDs are in it
 
 On the CD timeline’s **Maturing principal by quarter** ladder, clicking a
