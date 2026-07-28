@@ -39,13 +39,16 @@ import {
   browserLocalPersistence
 } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-auth.js";
 
+// Public web config for the dedicated remodelhq project. These values are
+// public by design and safe to commit — the security boundary is
+// firestore.rules, not this file.
 const firebaseConfig = {
-  apiKey:            "PASTE_API_KEY",
-  authDomain:        "PASTE_PROJECT.firebaseapp.com",
-  projectId:         "PASTE_PROJECT",
-  storageBucket:     "PASTE_PROJECT.firebasestorage.app",
-  messagingSenderId: "PASTE_SENDER_ID",
-  appId:             "PASTE_APP_ID"
+  apiKey:            "AIzaSyArlIVfq0JrO-5Ggst0KMwBTQ17-2W7y8Q",
+  authDomain:        "remodelhq-78a8a.firebaseapp.com",
+  projectId:         "remodelhq-78a8a",
+  storageBucket:     "remodelhq-78a8a.firebasestorage.app",
+  messagingSenderId: "894337092701",
+  appId:             "1:894337092701:web:ae6e8fdde77774750851b4"
 };
 
 // ---------- local emulator mode (development only) ----------
