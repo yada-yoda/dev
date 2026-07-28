@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.3.0 — Milestone 3 (photos and ideas).** Sign-in, workspaces,
+**Status: v0.3.1 — Milestone 3 (photos and ideas).** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -164,6 +164,13 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.3.1
+
+Adds a storage meter in Settings. The whole point of this app is that it
+costs nothing to run, which means the free plan's 1 GB is a real ceiling —
+better to show it, with an estimate of how many more photos will fit at the
+size yours are averaging, than to let someone discover it the hard way.
 
 ### 0.3.0
 

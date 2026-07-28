@@ -8,11 +8,11 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.3.0";
-import * as store from "./store.js?v=0.3.0";
-import * as media from "./media.js?v=0.3.0";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.3.1";
+import * as store from "./store.js?v=0.3.1";
+import * as media from "./media.js?v=0.3.1";
 
-export const VERSION = "0.3.0";
+export const VERSION = "0.3.1";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -2278,12 +2278,17 @@ async function viewSettings(host) {
     </div>
 
     <div class="section">
+      <div class="section-head"><h2>Storage</h2></div>
+      <div class="card" id="storage-card"><p class="muted">Checking…</p></div>
+    </div>
+
+    <div class="section">
       <div class="section-head"><h2>About</h2></div>
       <div class="card">
-        <p class="muted">RemodelHQ v${VERSION} — foundation release.</p>
+        <p class="muted">RemodelHQ v${VERSION}.</p>
         <p class="muted">Your data lives in your own Firebase project and is visible only
-           to the people invited here. Photo storage, budgets and contractor sharing
-           arrive in later releases.</p>
+           to the people invited here. Budgets, the product registry and scoped
+           contractor sharing arrive in later releases.</p>
       </div>
     </div>
 
@@ -2303,6 +2308,31 @@ async function viewSettings(host) {
         `}
       </div>
     </div>`;
+
+  // Storage meter: this app is meant to cost nothing, so the free tier's
+  // 1 GiB is a real limit worth showing rather than hiding.
+  store.loadMedia(ws.id).then((items) => {
+    const card = $("#storage-card");
+    if (!card) return;
+    const used = store.totalMediaBytes(items);
+    const pct = Math.min(100, (used / media.STORAGE_BUDGET_BYTES) * 100);
+    const avg = items.length ? used / items.length : 0;
+    const room = avg ? Math.max(0, Math.floor((media.STORAGE_BUDGET_BYTES - used) / avg)) : null;
+    card.innerHTML = `
+      <div class="progress-lbl">
+        <span>${items.length} photo${items.length === 1 ? "" : "s"} · ${esc(media.formatBytes(used))} used</span>
+        <span class="num">${pct < 0.1 && used > 0 ? "<0.1" : pct.toFixed(1)}%</span>
+      </div>
+      <div class="progress"><i style="width:${Math.max(pct, used ? 1 : 0)}%"></i></div>
+      <p class="muted" style="margin-top:10px">
+        The free Firebase plan allows 1 GB.${room !== null && items.length
+          ? ` At the average size so far, there is room for roughly ${room.toLocaleString("en-US")} more.`
+          : ""}
+      </p>`;
+  }).catch(() => {
+    const card = $("#storage-card");
+    if (card) card.innerHTML = `<p class="muted">Storage usage unavailable.</p>`;
+  });
 
   $("#btn-rename")?.addEventListener("click", async () => {
     const name = $("#set-ws-name").value.trim();
