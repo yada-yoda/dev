@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RemodelHQ v0.1.0 — Remodel planner</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Plan, budget and document a home remodel: rooms, projects, photos, costs and contractors in one place.">
+<meta name="theme-color" content="#14171b">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="site.webmanifest">
+<!-- Social preview (private app, but renders a clean card if a link is shared) -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="RemodelHQ">
+<meta property="og:description" content="Plan, budget and document a home remodel.">
+<meta property="og:image" content="https://dev.rizzo.cc/remodel/og-image.png">
+<meta property="og:url" content="https://dev.rizzo.cc/remodel/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="RemodelHQ">
+<meta name="twitter:description" content="Plan, budget and document a home remodel.">
+<meta name="twitter:image" content="https://dev.rizzo.cc/remodel/og-image.png">
+<!-- Google Analytics (GA4). Owner devices opt out via ?ga=off (persists per
+     device); the official ga-disable flag also blocks the script from loading. -->
+<script>
+(function () {
+  var GA_ID = 'G-PASTE_MEASUREMENT_ID';
+  try {
+    var p = new URLSearchParams(location.search);
+    if (p.get('ga') === 'off') localStorage.setItem('rhq_ga_optout', '1');
+    if (p.get('ga') === 'on')  localStorage.removeItem('rhq_ga_optout');
+  } catch (e) {}
+  var optedOut = false;
+  try { optedOut = localStorage.getItem('rhq_ga_optout') === '1'; } catch (e) {}
+  window['ga-disable-' + GA_ID] = optedOut;
+  if (optedOut || GA_ID.indexOf('PASTE_') !== -1) return;
+  var s = document.createElement('script');
+  s.async = true;
+  s.src = 'https://www.googletagmanager.com/gtag/js?id=' + GA_ID;
+  document.head.appendChild(s);
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { dataLayer.push(arguments); };
+  gtag('js', new Date());
+  gtag('config', GA_ID);
+})();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;650;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=0.1.0">
+</head>
+<body>
+
+<!-- ============ Sign-in gate ============ -->
+<div id="gate" class="gate hidden">
+  <div class="gate-card">
+    <svg class="gate-mark" viewBox="0 0 32 32" aria-hidden="true">
+      <rect x="1" y="1" width="30" height="30" rx="7" fill="#14171b"/>
+      <path d="M8 17.5 16 10l8 7.5" fill="none" stroke="#ffffff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M10.5 16.5V23h11v-6.5" fill="none" stroke="#ffffff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="16" cy="20" r="1.6" fill="#2545d3"/>
+    </svg>
+    <h1>Remodel<span style="color:#2545d3">HQ</span></h1>
+    <p class="tagline">Plan it, price it, photograph it.</p>
+
+    <button id="btn-signin" class="btn-google">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5h-1.9V20H24v8h11.3C33.7 32.9 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35 26.7 36 24 36c-5.3 0-9.7-3.1-11.3-7.5l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.6l6.2 5.2C41.1 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>
+      Sign in with Google
+    </button>
+
+    <p class="gate-error hidden" id="gate-error"></p>
+
+    <div class="notice hidden" id="gate-setup" style="text-align:left;margin-top:22px">
+      <h3>One-time setup needed</h3>
+      <p class="muted">This copy is not connected to a Firebase project yet.</p>
+      <ol>
+        <li>Create a free Firebase project (Spark plan, no card).</li>
+        <li>Enable <strong>Google</strong> sign-in and create a Firestore database.</li>
+        <li>Paste the web config into <code>firebase-config.js</code>.</li>
+        <li>Deploy the rules: <code>npx firebase deploy --only firestore:rules</code></li>
+      </ol>
+    </div>
+
+    <p class="gate-foot">Private by default. Only people you invite can see your remodel.</p>
+  </div>
+</div>
+
+<!-- ============ Workspace picker ============ -->
+<div id="picker" class="picker hidden"></div>
+
+<!-- ============ App shell ============ -->
+<div id="shell" class="shell hidden">
+  <aside class="sidebar">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="7" fill="#14171b"/>
+        <path d="M8 17.5 16 10l8 7.5" fill="none" stroke="#ffffff" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M10.5 16.5V23h11v-6.5" fill="none" stroke="#ffffff" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="16" cy="20" r="1.6" fill="#2545d3"/>
+      </svg>
+      <span>Remodel<span class="hq">HQ</span></span>
+    </div>
+
+    <div class="ws-switch">
+      <button id="btn-ws-switch" type="button" title="Current workspace">
+        <span style="min-width:0;flex:1">
+          <span class="ws-name" id="ws-name"></span>
+          <span class="ws-role" id="ws-role"></span>
+        </span>
+      </button>
+    </div>
+
+    <nav class="nav" id="nav" aria-label="Sections"></nav>
+
+    <div class="side-foot">
+      <div class="side-user" id="side-user"></div>
+      <div><span id="app-version"></span> &middot; <span id="year"></span></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <h2 id="topbar-title" class="wrap-any"></h2>
+      <span class="chip chip-out" id="topbar-role"></span>
+    </header>
+    <main class="view" id="view"></main>
+    <nav class="bottom-nav" id="bottom-nav" aria-label="Sections"></nav>
+  </div>
+</div>
+
+<!-- ============ Shared modal + toast hosts ============ -->
+<div class="modal-host hidden" id="modal-host">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-head">
+      <h3 id="modal-title"></h3>
+      <button class="modal-x" id="modal-x" aria-label="Close" type="button">&#10005;</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-foot">
+      <button class="btn btn-sec" id="modal-cancel" type="button">Cancel</button>
+      <button class="btn" id="modal-confirm" type="button">Save</button>
+    </div>
+  </div>
+</div>
+<div class="toast-host" id="toast-host" aria-live="polite"></div>
+
+<!-- ?v bump each release so returning visitors get fresh modules after a deploy. -->
+<script type="module" src="firebase-config.js?v=0.1.0"></script>
+<script type="module" src="app.js?v=0.1.0"></script>
+</body>
+</html>

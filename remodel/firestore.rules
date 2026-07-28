@@ -1,0 +1,259 @@
+rules_version = '2';
+
+// ============================================================
+// RemodelHQ — Firestore security rules, v1 (Milestone 1)
+//
+// Model
+//   users/{uid}                              pointer index (NOT authoritative)
+//   workspaces/{wsId}                        one remodel workspace
+//   workspaces/{wsId}/members/{uid}          authoritative membership + role
+//   workspaces/{wsId}/rooms/{roomId}         rooms / areas
+//   invites/{inviteId}                       pending collaborator invites
+//
+// Principles
+//   * Membership is proven by the existence of a members/{uid} document.
+//     users/{uid} is only a convenience index so a signed-in user can list
+//     the workspaces they belong to; forging it grants nothing.
+//   * Ownership is never tied to an email address. The account that creates
+//     a workspace writes its own owner row in the same batch, verified with
+//     getAfter() against the workspace being created.
+//   * The owner row can never be demoted, removed, or duplicated.
+//   * Nobody can change their own role.
+//   * Anything not matched below is denied by default.
+//
+// Later milestones add: privateNotes/ and financials/ as physically separate
+// collections (so contractor grants can never select them), and accessGrants.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------- identity ----------
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Lower-cased verified email, or '' when the provider supplied none.
+    // Invites are matched on this, so it must never fall back to a wildcard.
+    function authEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email.lower()
+        : '';
+    }
+
+    // ---------- membership ----------
+    function memberRef(wsId) {
+      return /databases/$(database)/documents/workspaces/$(wsId)/members/$(request.auth.uid);
+    }
+    function isMember(wsId) {
+      return signedIn() && exists(memberRef(wsId));
+    }
+    function hasAnyRole(wsId, roles) {
+      return isMember(wsId) && (get(memberRef(wsId)).data.role in roles);
+    }
+    function isOwner(wsId)  { return hasAnyRole(wsId, ['owner']); }
+    function canManage(wsId) { return hasAnyRole(wsId, ['owner', 'admin']); }
+    function canEdit(wsId)   { return hasAnyRole(wsId, ['owner', 'admin', 'editor']); }
+
+    function allRoles() {
+      return ['owner', 'admin', 'editor', 'viewer', 'accountant'];
+    }
+    // Roles an invite may confer. 'owner' is deliberately absent: a second
+    // owner can only ever appear through an explicit transfer flow.
+    function invitableRoles() {
+      return ['admin', 'editor', 'viewer', 'accountant'];
+    }
+
+    // ---------- audit stamps ----------
+    // createdAt/updatedAt must be the server's clock, not a client value.
+    function createStamped() {
+      return request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdAt == request.time;
+    }
+    function updateStamped() {
+      return request.resource.data.updatedAt == request.time;
+    }
+    function creationImmutable() {
+      return request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    // ---------- invites ----------
+    function inviteRef(inviteId) {
+      return /databases/$(database)/documents/invites/$(inviteId);
+    }
+    function inviteUsable(inv, wsId, role) {
+      return inv.workspaceId == wsId
+        && inv.email == authEmail()
+        && inv.role == role
+        && inv.status == 'pending'
+        && request.time < inv.expiresAt;
+    }
+    // Re-verified server-side at accept time; the client cannot vouch for
+    // its own invite by simply naming one.
+    function validInvite(wsId, inviteId, role) {
+      return inviteId is string
+        && authEmail() != ''
+        && exists(inviteRef(inviteId))
+        && inviteUsable(get(inviteRef(inviteId)).data, wsId, role);
+    }
+    function inviteCoreUnchanged() {
+      return request.resource.data.workspaceId == resource.data.workspaceId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    // ============================================================
+    // users/{uid} — pointer index of "workspaces I belong to".
+    // Convenience only. Access is always re-checked against members/.
+    // ============================================================
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // ============================================================
+    // workspaces/{wsId}
+    // ============================================================
+    match /workspaces/{wsId} {
+      allow get: if isMember(wsId);
+      // No workspace directory: a user reaches a workspace by id, and only
+      // if they hold a membership row in it.
+      allow list: if false;
+
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == request.auth.uid
+        && createStamped()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80
+        && request.resource.data.schemaVersion == 1;
+
+      // Renames and settings. Ownership transfer is a separate flow (later
+      // milestone), so ownerUid is pinned here.
+      allow update: if canManage(wsId)
+        && request.resource.data.ownerUid == resource.data.ownerUid
+        && creationImmutable()
+        && updateStamped()
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 80;
+
+      allow delete: if isOwner(wsId);
+
+      // ---------- members ----------
+      match /members/{memberUid} {
+        allow read: if isMember(wsId);
+
+        // Exactly two legitimate ways a membership row appears, and in both
+        // the writer is the person joining:
+        //   (a) bootstrap  — the workspace creator's own owner row, written
+        //       in the same batch as the workspace (getAfter sees it);
+        //   (b) acceptance — an invitee's row, re-verified against the
+        //       invite document server-side.
+        allow create: if signedIn()
+          && memberUid == request.auth.uid
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.role in allRoles()
+          && request.resource.data.joinedAt == request.time
+          && (
+            (
+              request.resource.data.role == 'owner'
+              && getAfter(/databases/$(database)/documents/workspaces/$(wsId)).data.ownerUid == request.auth.uid
+            )
+            || (
+              request.resource.data.role in invitableRoles()
+              && validInvite(wsId, request.resource.data.inviteId, request.resource.data.role)
+            )
+          );
+
+        // Role changes: managers only, never on yourself, never touching the
+        // owner row, and never minting a second owner.
+        allow update: if canManage(wsId)
+          && memberUid != request.auth.uid
+          && resource.data.role != 'owner'
+          && request.resource.data.role in invitableRoles()
+          && request.resource.data.uid == resource.data.uid
+          && request.resource.data.joinedAt == resource.data.joinedAt;
+
+        // Managers remove members; anyone may remove themselves. The owner
+        // row is never removable while the workspace exists, so a workspace
+        // can never be left ownerless. Once the owner has deleted the
+        // workspace itself, they may clear their own leftover row.
+        allow delete: if signedIn() && (
+          (
+            resource.data.role != 'owner'
+            && (canManage(wsId) || memberUid == request.auth.uid)
+          )
+          || (
+            resource.data.role == 'owner'
+            && memberUid == request.auth.uid
+            && !exists(/databases/$(database)/documents/workspaces/$(wsId))
+          )
+        );
+      }
+
+      // ---------- rooms ----------
+      function roomValid() {
+        return request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 80
+          && request.resource.data.type is string
+          && request.resource.data.type.size() <= 40
+          && request.resource.data.sortOrder is number
+          && (!('notes' in request.resource.data) || request.resource.data.notes.size() <= 4000)
+          && (!('description' in request.resource.data) || request.resource.data.description.size() <= 2000);
+      }
+
+      match /rooms/{roomId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped() && roomValid();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && roomValid();
+        allow delete: if canEdit(wsId);
+      }
+    }
+
+    // ============================================================
+    // invites/{inviteId} — top-level so an invitee can find theirs before
+    // holding any membership.
+    // ============================================================
+    match /invites/{inviteId} {
+      // Invitees see their own (queried by email); managers see their
+      // workspace's. A query that would return anything else fails.
+      allow read: if signedIn() && (
+           (authEmail() != '' && resource.data.email == authEmail())
+        || canManage(resource.data.workspaceId)
+      );
+
+      allow create: if signedIn()
+        && canManage(request.resource.data.workspaceId)
+        && request.resource.data.email is string
+        && request.resource.data.email == request.resource.data.email.lower()
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() <= 200
+        && request.resource.data.role in invitableRoles()
+        && request.resource.data.status == 'pending'
+        && createStamped()
+        && request.resource.data.expiresAt > request.time;
+
+      // The invitee accepts; a manager revokes. Nothing else may change.
+      allow update: if signedIn() && inviteCoreUnchanged() && (
+          (
+            authEmail() != ''
+            && resource.data.email == authEmail()
+            && resource.data.status == 'pending'
+            && request.time < resource.data.expiresAt
+            && request.resource.data.status == 'accepted'
+            && request.resource.data.acceptedBy == request.auth.uid
+          )
+          || (
+            canManage(resource.data.workspaceId)
+            && request.resource.data.status == 'revoked'
+          )
+        );
+
+      allow delete: if signedIn() && canManage(resource.data.workspaceId);
+    }
+  }
+}

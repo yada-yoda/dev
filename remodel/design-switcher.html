@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>RemodelHQ — Gallery Refinements (round 3)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { max-width: 100%; overflow-x: hidden; }
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 14px;
+  }
+
+  /* Shared Gallery base: near-monochrome, hairline borders, no heavy shadows,
+     generous whitespace, photos as the hero. Variants change type + one accent. */
+
+  /* ===== 1 · INK — pure monochrome, Inter ===== */
+  body[data-theme="a"] {
+    --font-head: "Inter", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --head-weight: 650; --head-size: 30px; --head-spacing: -.025em;
+    --bg: #fbfbfb; --card: #ffffff; --panel: #f1f2f3;
+    --ink: #101317; --muted: #6d7278;
+    --accent: #101317; --accent-ink: #ffffff; --link: #101317;
+    --good: #2c7a52; --warn: #a06a10; --bad: #a03a2a;
+    --border: #e6e7ea; --radius: 6px;
+  }
+  /* ===== 2 · EDITORIAL — Fraunces headings, warm paper ===== */
+  body[data-theme="b"] {
+    --font-head: "Fraunces", Georgia, serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --head-weight: 500; --head-size: 34px; --head-spacing: -.015em;
+    --bg: #faf9f6; --card: #fffefc; --panel: #f0eee8;
+    --ink: #191611; --muted: #7c776c;
+    --accent: #191611; --accent-ink: #fbfaf7; --link: #191611;
+    --good: #47663f; --warn: #96701e; --bad: #96422a;
+    --border: #e8e5dd; --radius: 4px;
+  }
+  /* ===== 3 · STUDIO (FINAL) — Ink's Inter type + cobalt detail ===== */
+  body[data-theme="c"] {
+    --font-head: "Inter", system-ui, sans-serif;
+    --font-body: "Inter", system-ui, sans-serif;
+    --head-weight: 650; --head-size: 30px; --head-spacing: -.025em;
+    --bg: #ffffff; --card: #ffffff; --panel: #f2f3f5;
+    --ink: #14171b; --muted: #6d7278;
+    --accent: #14171b; --accent-ink: #ffffff; --link: #2545d3;
+    --good: #2c7a52; --warn: #a06a10; --bad: #a03a2a;
+    --border: #e4e6e9; --radius: 8px;
+  }
+  body[data-theme="c"] .progress i, body[data-theme="c"] .mini i { background: var(--link); }
+  body[data-theme="c"] .logo .hq { color: var(--link); }
+  /* ===== 4 · SOFT — Manrope, warm grays, muted brass ===== */
+  body[data-theme="d"] {
+    --font-head: "Manrope", system-ui, sans-serif;
+    --font-body: "Manrope", system-ui, sans-serif;
+    --head-weight: 700; --head-size: 30px; --head-spacing: -.02em;
+    --bg: #fafaf8; --card: #ffffff; --panel: #f1f0ec;
+    --ink: #1d1f22; --muted: #75746e;
+    --accent: #8a6a34; --accent-ink: #ffffff; --link: #8a6a34;
+    --good: #4c7a50; --warn: #a06a10; --bad: #a04a32;
+    --border: #e8e7e2; --radius: 10px;
+  }
+
+  /* ---------- Switcher chrome ---------- */
+  .switchbar {
+    position: sticky; top: 0; z-index: 50;
+    background: #101216; color: #e8eaee;
+    padding: 10px 16px; display: flex; flex-wrap: wrap;
+    align-items: center; gap: 8px;
+    font-family: "Inter", system-ui, sans-serif;
+  }
+  .switchbar .sb-title { font-weight: 700; margin-right: 4px; font-size: 14px; }
+  .switchbar .sb-hint { font-size: 11.5px; color: #8d93a1; margin-left: auto; }
+  .swbtn {
+    border: 1px solid #34383f; background: #1b1e24; color: #e8eaee;
+    padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    font-size: 12.5px; font-family: inherit;
+  }
+  .swbtn.active { background: #e8eaee; color: #101216; border-color: #e8eaee; font-weight: 700; }
+  .descbar {
+    background: #1b1e24; color: #c2c8d0; font-size: 12.5px; line-height: 1.55;
+    padding: 8px 16px 11px; font-family: "Inter", system-ui, sans-serif;
+  }
+  .descbar b { color: #fff; }
+  .descbar .fonts { color: #8d93a1; }
+
+  /* ---------- Type specimen ---------- */
+  .specimen {
+    margin: 22px 0 4px; padding: 16px 18px;
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 24px;
+  }
+  .specimen .sp-head { font-family: var(--font-head); font-weight: var(--head-weight); letter-spacing: var(--head-spacing); font-size: 27px; }
+  .specimen .sp-body { font-size: 14px; color: var(--muted); }
+  .specimen .sp-num { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* ---------- Shared mock ---------- */
+  .num { font-variant-numeric: tabular-nums; }
+  .mock { max-width: 1060px; margin: 0 auto; padding: 0 18px 64px; }
+  h1, h2, h3, .logo {
+    font-family: var(--font-head);
+    letter-spacing: var(--head-spacing);
+    font-weight: var(--head-weight);
+  }
+  .mock-appbar {
+    display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+    padding: 16px 0; border-bottom: 1px solid var(--border);
+  }
+  .logo { font-size: 20px; }
+  .logo .hq { color: var(--muted); }
+  .mock-nav { display: flex; gap: 2px; flex-wrap: wrap; }
+  .mock-nav a {
+    text-decoration: none; color: var(--muted); font-size: 13.5px; font-weight: 500;
+    padding: 7px 12px; border-radius: 999px;
+  }
+  .mock-nav a.on { background: var(--accent); color: var(--accent-ink); }
+  .avatar {
+    margin-left: auto; width: 32px; height: 32px; border-radius: 50%;
+    background: var(--panel); color: var(--ink); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700;
+  }
+  .mock-hero { padding: 30px 0 6px; }
+  .mock-hero h1 { font-size: var(--head-size); margin-bottom: 6px; }
+  .mock-hero p { color: var(--muted); font-size: 14px; }
+  .progress-wrap { margin: 18px 0 6px; max-width: 460px; }
+  .progress-lbl { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+  .progress { height: 6px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 38%; background: var(--accent); border-radius: 99px; }
+
+  .grid-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px; margin: 20px 0;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px;
+  }
+  .stat span { display: block; font-size: 11.5px; color: var(--muted); margin-bottom: 8px; font-weight: 500; letter-spacing: .02em; }
+  .stat b { font-size: 22px; font-weight: 600; }
+  .stat .sub { font-size: 12px; margin-top: 5px; color: var(--good); font-weight: 500; display: block; }
+  .stat .sub.bad { color: var(--bad); }
+  .stat .sub.warn { color: var(--warn); }
+
+  h2 { font-size: 16px; margin: 30px 0 12px; }
+  .grid-projects { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+  .proj h3 { font-size: 15.5px; margin-bottom: 2px; }
+  .proj .room { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip {
+    font-size: 11.5px; font-weight: 500; padding: 3px 9px; border-radius: 999px;
+    background: var(--panel); color: var(--ink);
+  }
+  .chip.status { background: var(--accent); color: var(--accent-ink); }
+  .chip.good { background: transparent; color: var(--good); border: 1px solid var(--good); }
+  .chip.warn { background: transparent; color: var(--warn); border: 1px solid var(--warn); }
+  .chip.bad  { background: transparent; color: var(--bad);  border: 1px solid var(--bad); }
+  .proj .meta { font-size: 12.5px; color: var(--muted); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .mini { height: 5px; background: var(--panel); border-radius: 99px; overflow: hidden; margin: 10px 0 8px; }
+  .mini i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+
+  /* Photos get more room — this direction is photo-forward */
+  .gallery { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .ph {
+    border-radius: var(--radius); height: 132px; position: relative; overflow: hidden;
+    display: flex; align-items: flex-end;
+  }
+  .ph em {
+    font-style: normal; font-size: 10.5px; letter-spacing: .06em; font-weight: 600;
+    background: rgba(0,0,0,.55); color: #fff; padding: 3px 8px;
+    border-top-right-radius: 6px;
+  }
+  .ph.p1 { background: linear-gradient(135deg, #8d7b66, #574a3c); }
+  .ph.p2 { background: linear-gradient(135deg, #b7a894, #7d7263); }
+  .ph.p3 { background: linear-gradient(135deg, #7c8fa0, #46586a); }
+  .ph.p4 { background: linear-gradient(135deg, #a9b6a0, #66755e); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th { text-align: left; color: var(--muted); font-weight: 600; font-size: 11.5px; letter-spacing: .03em; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px; border-bottom: 1px solid var(--border); }
+  tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; }
+  .tbl-card { padding: 6px 10px; }
+  .paid { color: var(--good); font-weight: 600; }
+  .due { color: var(--warn); font-weight: 600; }
+
+  .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 18px; }
+  .btn {
+    font-family: var(--font-body); font-weight: 600; font-size: 14px; cursor: pointer;
+    padding: 9px 18px; border-radius: calc(var(--radius) + 2px);
+    border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink);
+  }
+  .btn.sec { background: transparent; color: var(--ink); border-color: var(--ink); }
+  select {
+    font-family: var(--font-body); font-size: 13.5px; color: var(--ink);
+    background: var(--card); padding: 8px 10px;
+    border-radius: calc(var(--radius) + 2px);
+    border: 1px solid #d9a62a;
+    box-shadow: 0 0 0 3px rgba(217, 166, 42, .22);
+  }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 28px; }
+  .sw { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--border); }
+
+  @media (max-width: 640px) {
+    .mock-appbar { gap: 10px; }
+    .mock-nav a { padding: 6px 9px; font-size: 13px; }
+    .mock-hero h1 { font-size: 25px; }
+    thead { display: none; }
+    table, tbody, tr, td { display: block; width: 100%; }
+    tr { border-bottom: 1px solid var(--border); padding: 8px 0; }
+    td { border: none; padding: 3px 10px; }
+    td.num { text-align: left; }
+    td[data-l]::before { content: attr(data-l) ": "; color: var(--muted); font-size: 12px; }
+  }
+</style>
+</head>
+<body data-theme="a">
+
+<div class="switchbar">
+  <span class="sb-title">RemodelHQ — Gallery direction, 4 refinements</span>
+  <button class="swbtn active" data-t="a" onclick="setTheme('a')">1 · Ink</button>
+  <button class="swbtn" data-t="b" onclick="setTheme('b')">2 · Editorial</button>
+  <button class="swbtn" data-t="c" onclick="setTheme('c')">3 · Studio (final pick)</button>
+  <button class="swbtn" data-t="d" onclick="setTheme('d')">4 · Soft</button>
+  <span class="sb-hint">keys 1–4 · same minimal Gallery base, different type &amp; detail</span>
+</div>
+<div class="descbar" id="desc"></div>
+
+<div class="mock">
+  <div class="mock-appbar">
+    <div class="logo">Remodel<span class="hq">HQ</span></div>
+    <nav class="mock-nav">
+      <a class="on" href="#">Dashboard</a><a href="#">Projects</a><a href="#">Photos</a><a href="#">Budget</a><a href="#">More</a>
+    </nav>
+    <div class="avatar">O</div>
+  </div>
+
+  <div class="specimen">
+    <span class="sp-head">Kitchen remodel Aa</span>
+    <span class="sp-body">Body text: planned vs actual, contractor notes, photo captions.</span>
+    <span class="sp-num num">$14,206.42 · 07/27</span>
+  </div>
+
+  <div class="mock-hero">
+    <h1>Condo remodel</h1>
+    <p>2 bed · 2 bath &nbsp;·&nbsp; 4 active projects &nbsp;·&nbsp; 1 contractor share expiring soon</p>
+    <div class="progress-wrap">
+      <div class="progress-lbl"><span>Overall completion</span><span class="num">38%</span></div>
+      <div class="progress"><i></i></div>
+    </div>
+  </div>
+
+  <div class="grid-stats">
+    <div class="card stat"><span>Budget remaining</span><b class="num">$12,450.00</b><span class="sub">of $48,000.00 approved</span></div>
+    <div class="card stat"><span>Paid to date</span><b class="num">$27,860.00</b><span class="sub warn">$4,200.00 due this month</span></div>
+    <div class="card stat"><span>Active projects</span><b class="num">4</b><span class="sub bad">1 blocked</span></div>
+    <div class="card stat"><span>Overdue tasks</span><b class="num">2</b><span class="sub">6 due this week</span></div>
+  </div>
+
+  <h2>Photos — Kitchen</h2>
+  <div class="gallery">
+    <div class="ph p1"><em>BEFORE · May 4</em></div>
+    <div class="ph p2"><em>IN PROGRESS · Jul 18</em></div>
+    <div class="ph p3"><em>IN PROGRESS · Jul 24</em></div>
+    <div class="ph p4"><em>INSPIRATION</em></div>
+  </div>
+
+  <h2>Projects</h2>
+  <div class="grid-projects">
+    <div class="card proj">
+      <h3>Cabinet replacement</h3>
+      <div class="room">Kitchen · Sanchez Custom Carpentry</div>
+      <div class="chips"><span class="chip status">In Progress</span><span class="chip bad">High</span><span class="chip">Phase 2 of 3</span></div>
+      <div class="mini"><i style="width:62%"></i></div>
+      <div class="meta"><span>Jun 10 – Aug 22</span><span class="num">$14,200.00 / $16,000.00</span></div>
+    </div>
+    <div class="card proj">
+      <h3>Shower tile &amp; glass</h3>
+      <div class="room">Primary bath · Awaiting bids (2 received)</div>
+      <div class="chips"><span class="chip status">Awaiting Bid</span><span class="chip warn">Medium</span><span class="chip">3 ideas saved</span></div>
+      <div class="mini"><i style="width:8%"></i></div>
+      <div class="meta"><span>Target: Sep</span><span class="num">est. $9,500.00</span></div>
+    </div>
+    <div class="card proj">
+      <h3>Flooring — LVP throughout</h3>
+      <div class="room">Whole property · Blocked on cabinet install</div>
+      <div class="chips"><span class="chip status">Blocked</span><span class="chip bad">Critical</span><span class="chip">Materials purchased</span></div>
+      <div class="mini"><i style="width:30%"></i></div>
+      <div class="meta"><span>Jul 01 – Sep 15</span><span class="num">$6,880.00 / $8,000.00</span></div>
+    </div>
+  </div>
+
+  <h2>Recent expenses</h2>
+  <div class="card tbl-card">
+    <table>
+      <thead><tr><th>Description</th><th>Project</th><th>Vendor</th><th class="num">Total</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Cabinet hardware (24 pulls)</td><td data-l="Project">Cabinets</td><td data-l="Vendor">Home Depot</td><td class="num" data-l="Total">$186.42</td><td data-l="Status"><span class="paid">Paid</span></td></tr>
+        <tr><td>Progress payment #2</td><td data-l="Project">Cabinets</td><td data-l="Vendor">Sanchez Custom</td><td class="num" data-l="Total">$4,200.00</td><td data-l="Status"><span class="due">Due Aug 1</span></td></tr>
+        <tr><td>LVP flooring — 62 boxes</td><td data-l="Project">Flooring</td><td data-l="Vendor">Floor &amp; Decor</td><td class="num" data-l="Total">$3,411.90</td><td data-l="Status"><span class="paid">Paid</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="controls">
+    <button class="btn">Add expense</button>
+    <button class="btn sec">Scan receipt</button>
+    <select><option>Decision needed: countertop material…</option><option>Quartz</option><option>Butcher block</option><option>Granite</option></select>
+  </div>
+
+  <div class="swatches">
+    <div class="sw" style="background:var(--bg)"></div>
+    <div class="sw" style="background:var(--card)"></div>
+    <div class="sw" style="background:var(--panel)"></div>
+    <div class="sw" style="background:var(--accent)"></div>
+    <div class="sw" style="background:var(--good)"></div>
+    <div class="sw" style="background:var(--warn)"></div>
+    <div class="sw" style="background:var(--bad)"></div>
+    <div class="sw" style="background:var(--ink)"></div>
+  </div>
+</div>
+
+<script>
+  var DESCS = {
+    a: "<b>Ink</b> — the round-1 Gallery, refined: pure monochrome, hairline borders, black pill buttons. <span class='fonts'>Font: Inter throughout — the cleanest neutral grotesque.</span>",
+    b: "<b>Editorial</b> — same minimal base on slightly warm paper, with Fraunces serif headings for a design-magazine voice. <span class='fonts'>Fonts: Fraunces headings, Inter body.</span>",
+    c: "<b>Studio — FINAL PICK</b> — monochrome with a single cobalt detail (links, progress), now with Ink's Inter typography throughout per owner preference. This is what gets built.",
+    d: "<b>Soft</b> — warm grays, rounder corners, and one muted brass accent for primary actions. <span class='fonts'>Font: Manrope throughout — rounder and friendlier than Inter.</span>"
+  };
+  function setTheme(t) {
+    document.body.dataset.theme = t;
+    document.getElementById("desc").innerHTML = DESCS[t];
+    var btns = document.querySelectorAll(".swbtn");
+    for (var i = 0; i < btns.length; i++) btns[i].classList.toggle("active", btns[i].dataset.t === t);
+  }
+  document.addEventListener("keydown", function (e) {
+    var map = { "1": "a", "2": "b", "3": "c", "4": "d" };
+    if (map[e.key]) setTheme(map[e.key]);
+  });
+  setTheme("a");
+</script>
+</body>
+</html>

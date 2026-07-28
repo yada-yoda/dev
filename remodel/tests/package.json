@@ -1,0 +1,15 @@
+{
+  "name": "remodelhq-rules-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Firestore security-rules tests for RemodelHQ. Dev-only; not part of the deployed site.",
+  "scripts": {
+    "test": "firebase emulators:exec --only firestore --project demo-remodelhq --config ../firebase.json \"node --test rules.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.0.0",
+    "firebase-tools": "^14.0.0"
+  }
+}
