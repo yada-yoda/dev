@@ -430,6 +430,104 @@ select.needs-choice {
 .row-actions { display: flex; gap: 4px; flex-wrap: wrap; }
 
 /* ============================================================
+   Projects toolbar, board and tasks
+   ============================================================ */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.toolbar select { width: auto; min-width: 130px; max-width: 100%; }
+.toolbar-search { flex: 1 1 200px; min-width: 0; max-width: 320px; }
+.toolbar-right { display: flex; gap: 8px; align-items: center; margin-left: auto; }
+
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.seg button {
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer;
+  background: transparent; border: none; color: var(--muted); padding: 7px 14px;
+}
+.seg button.on { background: var(--ink); color: #fff; }
+
+.result-count { font-size: 12.5px; margin-bottom: 12px; }
+
+/* Five lanes, each free to shrink — a board that never scrolls sideways. */
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.lane { background: var(--panel); border-radius: var(--radius); padding: 10px; min-width: 0; }
+.lane-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.lane-head h3 { font-size: 12.5px; flex: 1; min-width: 0; }
+.lane-count { font-size: 11.5px; color: var(--muted); }
+.lane-empty { font-size: 12px; padding: 6px 2px; }
+
+.board-card {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  margin-bottom: 8px;
+  padding: 12px;
+}
+.board-card:hover { border-color: var(--ink); }
+.board-card strong { display: block; font-size: 13.5px; margin-bottom: 3px; }
+.board-room { display: block; font-size: 12px; margin-bottom: 8px; }
+.board-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.mini { display: block; height: 4px; background: var(--panel); border-radius: 99px; overflow: hidden; }
+.mini i { display: block; height: 100%; background: var(--link); border-radius: 99px; }
+.mini-inline { display: inline-block; width: 54px; vertical-align: middle; margin-left: 6px; background: var(--border); }
+.board .mini { background: var(--border); }
+
+.crumbs { font-size: 12.5px; margin-bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+.crumbs a { text-decoration: none; }
+.crumbs a:hover { text-decoration: underline; }
+
+.phase { margin-bottom: 18px; }
+.phase-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+.phase-head h3 { font-size: 14px; }
+.phase-empty { font-size: 12.5px; padding-bottom: 6px; }
+
+.tasks { list-style: none; border: 1px solid var(--border); border-radius: var(--radius); }
+.task {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.task:last-child { border-bottom: none; }
+.task-check { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 0; cursor: pointer; }
+.task-check input { margin-top: 3px; flex: 0 0 auto; width: 15px; height: 15px; accent-color: var(--ink); }
+.task-title { min-width: 0; }
+.task.is-done .task-title { text-decoration: line-through; color: var(--muted); }
+.task-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-meta .date { font-size: 12px; white-space: nowrap; }
+.is-overdue { color: var(--bad); font-weight: 600; }
+
+.activity { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.activity li { display: flex; gap: 10px; flex-wrap: wrap; align-items: baseline; font-size: 13.5px; }
+.act-when { font-size: 12px; margin-left: auto; white-space: nowrap; }
+
+.plain-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.plain-list li { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+.check-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; cursor: pointer; }
+.check-row input { width: 15px; height: 15px; accent-color: var(--ink); }
+
+.stat .stat-date { font-size: 15px; font-weight: 600; }
+.stat .sub.is-warn { color: var(--warn); }
+.progress-wrap { margin-bottom: 20px; max-width: 460px; }
+.progress-lbl { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+
+@media (max-width: 860px) {
+  /* Lanes stack into sections rather than shrinking into unreadable columns. */
+  .board { grid-template-columns: minmax(0, 1fr); }
+  .toolbar-right { margin-left: 0; width: 100%; justify-content: space-between; }
+  .toolbar-search { max-width: none; }
+  .toolbar select { flex: 1 1 140px; }
+}
+
+/* ============================================================
    Tables — card-stacked below 640px (house rule)
    ============================================================ */
 .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); }

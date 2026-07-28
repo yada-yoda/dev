@@ -212,6 +212,110 @@ service cloud.firestore {
         allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && roomValid();
         allow delete: if canEdit(wsId);
       }
+
+      // ---------- projects, phases, tasks (M2) ----------
+      // Money deliberately does NOT live on the project document. Costs and
+      // budgets arrive in M4 in a separate financials collection so a
+      // contractor grant can expose scope and schedule without amounts.
+      function projectStatuses() {
+        return ['idea', 'researching', 'planned', 'awaiting_bid', 'awaiting_approval',
+                'approved', 'scheduled', 'in_progress', 'blocked', 'on_hold',
+                'complete', 'cancelled'];
+      }
+      function priorities() {
+        return ['low', 'medium', 'high', 'critical'];
+      }
+      function textWithin(field, max) {
+        return !(field in request.resource.data)
+          || request.resource.data[field] == null
+          || (request.resource.data[field] is string && request.resource.data[field].size() <= max);
+      }
+      function projectValid() {
+        return request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 120
+          && request.resource.data.status in projectStatuses()
+          && request.resource.data.priority in priorities()
+          && request.resource.data.completionPct is number
+          && request.resource.data.completionPct >= 0
+          && request.resource.data.completionPct <= 100
+          && request.resource.data.tags is list
+          && request.resource.data.tags.size() <= 20
+          && textWithin('description', 4000)
+          && textWithin('roomId', 64);
+      }
+
+      match /projects/{projectId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped() && projectValid();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && projectValid();
+        allow delete: if canEdit(wsId);
+      }
+
+      match /phases/{phaseId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped()
+          && request.resource.data.projectId is string
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 120
+          && request.resource.data.sortOrder is number;
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped()
+          && request.resource.data.projectId == resource.data.projectId
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.name.size() <= 120;
+        allow delete: if canEdit(wsId);
+      }
+
+      match /tasks/{taskId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped()
+          && request.resource.data.projectId is string
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.done is bool
+          && request.resource.data.priority in priorities();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped()
+          && request.resource.data.projectId == resource.data.projectId
+          && request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 200
+          && request.resource.data.done is bool
+          && request.resource.data.priority in priorities();
+        allow delete: if canEdit(wsId);
+      }
+
+      // ---------- private notes ----------
+      // Physically separate from the records they annotate, so a scoped
+      // contractor grant (M5) cannot select them even by guessing an id, and
+      // the accountant role never sees them. Not a hidden field, a separate
+      // document with its own rule.
+      match /privateNotes/{noteId} {
+        allow read: if hasAnyRole(wsId, ['owner', 'admin', 'editor', 'viewer']);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped()
+          && request.resource.data.body is string
+          && request.resource.data.body.size() <= 8000;
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped()
+          && request.resource.data.body is string
+          && request.resource.data.body.size() <= 8000;
+        allow delete: if canEdit(wsId);
+      }
+
+      // ---------- activity log ----------
+      // Append-only: nobody may rewrite or erase history, including the owner.
+      match /activity/{eventId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId)
+          && request.resource.data.byUid == request.auth.uid
+          && request.resource.data.at == request.time
+          && request.resource.data.kind is string
+          && request.resource.data.kind.size() <= 40
+          && request.resource.data.summary is string
+          && request.resource.data.summary.size() <= 300;
+        allow update, delete: if false;
+      }
     }
 
     // ============================================================

@@ -6,10 +6,12 @@
 // here shape the interface, they do not protect the data.
 // ============================================================
 
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js";
-import * as store from "./store.js";
+// The ?v on these imports must match the one in index.html: it is what stops a
+// browser pairing a fresh app.js with a cached store.js after a deploy.
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.2.0";
+import * as store from "./store.js?v=0.2.0";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -39,15 +41,54 @@ const state = {
   invites: [],
   wsId: localStorage.getItem("rhq_ws") || null,
   ws: null,
-  route: "dashboard"
+  route: "dashboard",
+  routeId: null,
+  rooms: []
 };
 
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: iconGrid },
+  { id: "projects",  label: "Projects",  icon: iconList },
   { id: "rooms",     label: "Rooms",     icon: iconRooms },
   { id: "people",    label: "People",    icon: iconPeople },
   { id: "settings",  label: "Settings",  icon: iconGear }
 ];
+
+// Projects view state: filters, list-or-board, sort, and which optional
+// columns are shown. The column choice is saved per workspace.
+const projectUI = {
+  mode: localStorage.getItem("rhq_proj_mode") || "list",
+  q: "",
+  room: "",
+  status: "",
+  priority: "",
+  tag: "",
+  sort: { key: "title", dir: "asc" }
+};
+
+const ALL_COLUMNS = [
+  { key: "room",       label: "Room" },
+  { key: "status",     label: "Status" },
+  { key: "priority",   label: "Priority" },
+  { key: "planned",    label: "Planned dates" },
+  { key: "completion", label: "Complete" },
+  { key: "tags",       label: "Tags" }
+];
+const DEFAULT_COLUMNS = ["room", "status", "priority", "planned", "completion"];
+
+function columnKey() {
+  return `rhq_cols_${state.wsId || "none"}`;
+}
+function visibleColumns() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(columnKey()) || "null");
+    if (Array.isArray(saved)) return saved.filter((k) => ALL_COLUMNS.some((c) => c.key === k));
+  } catch { /* fall through to defaults */ }
+  return DEFAULT_COLUMNS;
+}
+function saveColumns(keys) {
+  localStorage.setItem(columnKey(), JSON.stringify(keys));
+}
 
 // ============================================================
 // Toasts — top-center, passive confirmations only
@@ -316,6 +357,7 @@ function renderRoute() {
   track("view_section", { section: state.route });
 
   switch (state.route) {
+    case "projects": return state.routeId ? viewProject(view, state.routeId) : viewProjects(view);
     case "rooms":    return viewRooms(view);
     case "people":   return viewPeople(view);
     case "settings": return viewSettings(view);
@@ -339,10 +381,192 @@ async function viewDashboard(host) {
 
   let rooms = [];
   let members = [];
+  let projects = [];
+  let openTasks = [];
   try {
-    [rooms, members] = await Promise.all([
+    [rooms, members, projects, openTasks] = await Promise.all([
       store.loadRooms(ws.id),
-      store.loadMembers(ws.id)
+      store.loadMembers(ws.id),
+      store.loadProjects(ws.id),
+      store.loadOpenTasks(ws.id)
+    ]);
+  } catch (err) {
+    host.querySelector(".loading").outerHTML =
+      `<div class="error-box">${esc(store.describeError(err))}</div>`;
+    return;
+  }
+  state.rooms = rooms;
+
+  const canAdd = store.canEdit(ws.myRole);
+  const live = projects.filter((p) => !store.isClosedStatus(p.status));
+  const active = projects.filter((p) => p.status === "in_progress");
+  const stalled = projects.filter((p) => p.status === "blocked" || p.status === "on_hold");
+  const done = projects.filter((p) => p.status === "complete");
+
+  const today = new Date(new Date().toDateString());
+  const overdue = openTasks.filter((t) => t.dueDate && t.dueDate < today);
+
+  // Overall completion is averaged across everything not cancelled, so a
+  // finished project keeps counting toward the total.
+  const counted = projects.filter((p) => p.status !== "cancelled");
+  const overall = counted.length
+    ? Math.round(counted.reduce((sum, p) =>
+        sum + (p.status === "complete" ? 100 : (p.completionPct || 0)), 0) / counted.length)
+    : 0;
+
+  host.querySelector(".loading").outerHTML = `
+    ${counted.length ? `
+      <div class="progress-wrap">
+        <div class="progress-lbl"><span>Overall completion</span><span class="num">${overall}%</span></div>
+        <div class="progress"><i style="width:${overall}%"></i></div>
+      </div>` : ""}
+
+    <div class="grid-stats">
+      <div class="card stat"><span>Active projects</span><b class="num">${active.length}</b>
+        <span class="sub ${stalled.length ? "is-warn" : ""}">${
+          stalled.length ? `${stalled.length} blocked or on hold` : `${live.length} open in total`}</span></div>
+      <div class="card stat"><span>Overdue tasks</span><b class="num">${overdue.length}</b>
+        <span class="sub">${openTasks.length} open in total</span></div>
+      <div class="card stat"><span>Rooms</span><b class="num">${rooms.length}</b>
+        <span class="sub">${done.length} project${done.length === 1 ? "" : "s"} complete</span></div>
+      <div class="card stat"><span>People</span><b class="num">${members.length}</b>
+        <span class="sub">${members.length === 1 ? "Just you so far" : "with access"}</span></div>
+    </div>
+
+    ${projects.length === 0 ? `
+      <div class="section">
+        <div class="empty">
+          <h3>${rooms.length ? "Add your first project" : "Start with the rooms"}</h3>
+          <p>${rooms.length
+            ? "A project is one piece of work — replacing the cabinets, retiling the shower. Everything else hangs off projects."
+            : "Rooms are what everything else hangs off — projects, photos, budgets and contractor access are all organized by room."}</p>
+          ${canAdd ? `<a class="btn" href="#/${rooms.length ? "projects" : "rooms"}">${rooms.length ? "Go to projects" : "Add rooms"}</a>` : ""}
+        </div>
+      </div>` : `
+      <div class="section">
+        <div class="section-head">
+          <h2>${active.length ? "In progress" : "Projects"}</h2>
+          <a href="#/projects">View all</a>
+        </div>
+        <div class="grid">
+          ${(active.length ? active : live.slice(0, 6)).slice(0, 6).map((p) => `
+            <a class="card board-card" href="#/projects/${esc(p.id)}">
+              <strong class="wrap-any">${esc(p.title)}</strong>
+              ${p.roomId ? `<span class="muted board-room">${esc(roomName(p.roomId))}</span>` : ""}
+              <span class="board-chips">${statusChip(p.status)}${priorityChip(p.priority)}</span>
+              <span class="mini"><i style="width:${p.completionPct || 0}%"></i></span>
+            </a>`).join("")}
+        </div>
+      </div>`}
+
+    ${stalled.length ? `
+      <div class="section">
+        <div class="section-head"><h2>Needs attention</h2></div>
+        <div class="card">
+          <ul class="plain-list">
+            ${stalled.map((p) => `<li>
+              <a href="#/projects/${esc(p.id)}" class="wrap-any">${esc(p.title)}</a>
+              ${statusChip(p.status)}</li>`).join("")}
+          </ul>
+        </div>
+      </div>` : ""}
+
+    <div class="section">
+      <div class="section-head"><h2>Recent activity</h2></div>
+      <div class="card" id="dash-activity"><p class="muted">Loading…</p></div>
+    </div>`;
+
+  store.loadActivity(ws.id, 8).then((events) => {
+    const box = $("#dash-activity");
+    if (!box) return;
+    box.innerHTML = events.length
+      ? `<ul class="activity">${events.map((e) => `
+          <li><span class="wrap-any">${esc(e.summary)}</span>
+            <span class="muted act-when">${esc(e.byName || "")} · ${esc(fmtDate(e.at))}</span></li>`).join("")}</ul>`
+      : `<p class="muted">Nothing yet. Project changes will show up here.</p>`;
+  }).catch(() => {
+    const box = $("#dash-activity");
+    if (box) box.innerHTML = `<p class="muted">History unavailable.</p>`;
+  });
+}
+
+// ============================================================
+// View — Projects (list + board)
+// ============================================================
+function roomName(roomId) {
+  if (!roomId) return "";
+  return state.rooms.find((r) => r.id === roomId)?.name || "";
+}
+
+function statusChip(status) {
+  const closed = store.isClosedStatus(status);
+  const attention = status === "blocked" || status === "on_hold";
+  const cls = closed ? "chip chip-out" : attention ? "chip chip-warn" : "chip chip-solid";
+  return `<span class="${cls}">${esc(store.statusLabel(status))}</span>`;
+}
+
+function priorityChip(priority) {
+  const cls = priority === "critical" ? "chip chip-bad"
+    : priority === "high" ? "chip chip-warn"
+    : "chip chip-out";
+  return `<span class="${cls}">${esc(store.priorityLabel(priority))}</span>`;
+}
+
+function applyFilters(projects) {
+  const q = projectUI.q.trim().toLowerCase();
+  return projects.filter((p) => {
+    if (projectUI.room && p.roomId !== projectUI.room) return false;
+    if (projectUI.status && p.status !== projectUI.status) return false;
+    if (projectUI.priority && p.priority !== projectUI.priority) return false;
+    if (projectUI.tag && !(p.tags || []).includes(projectUI.tag)) return false;
+    if (q) {
+      const hay = `${p.title} ${p.description || ""} ${roomName(p.roomId)} ${(p.tags || []).join(" ")}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+function sortProjects(projects) {
+  const { key, dir } = projectUI.sort;
+  const mul = dir === "desc" ? -1 : 1;
+  const statusOrder = store.PROJECT_STATUSES.map((s) => s.value);
+  const priorityOrder = store.PRIORITIES.map((p) => p.value);
+  return [...projects].sort((a, b) => {
+    let cmp = 0;
+    switch (key) {
+      case "room":       cmp = roomName(a.roomId).localeCompare(roomName(b.roomId)); break;
+      case "status":     cmp = statusOrder.indexOf(a.status) - statusOrder.indexOf(b.status); break;
+      case "priority":   cmp = priorityOrder.indexOf(a.priority) - priorityOrder.indexOf(b.priority); break;
+      case "planned":    cmp = (a.plannedStart?.getTime() || 0) - (b.plannedStart?.getTime() || 0); break;
+      case "completion": cmp = (a.completionPct || 0) - (b.completionPct || 0); break;
+      default:           cmp = (a.title || "").localeCompare(b.title || "");
+    }
+    return cmp * mul;
+  });
+}
+
+async function viewProjects(host) {
+  const ws = state.ws;
+  const mayEdit = store.canEdit(ws.myRole);
+
+  host.innerHTML = `
+    <div class="view-head">
+      <div class="grow">
+        <h1>Projects</h1>
+        <p>Every piece of work in this remodel, from a first idea to a finished room.</p>
+      </div>
+      ${mayEdit ? `<button class="btn" id="btn-new-project">New project</button>` : ""}
+    </div>
+    <div class="loading">Loading projects…</div>`;
+
+  $("#btn-new-project")?.addEventListener("click", () => promptProject(null));
+
+  let projects = [];
+  try {
+    [projects, state.rooms] = await Promise.all([
+      store.loadProjects(ws.id),
+      store.loadRooms(ws.id)
     ]);
   } catch (err) {
     host.querySelector(".loading").outerHTML =
@@ -350,51 +574,624 @@ async function viewDashboard(host) {
     return;
   }
 
-  const area = rooms.reduce((sum, r) => sum + (store.roomArea(r) || 0), 0);
-  const canAdd = store.canEdit(ws.myRole);
+  if (!projects.length) {
+    host.querySelector(".loading").outerHTML = `
+      <div class="empty">
+        <h3>No projects yet</h3>
+        <p>A project is one piece of work — "replace the kitchen cabinets", "retile
+           the shower". Give it a room, a status and a priority, then break it into
+           phases and tasks as it firms up.</p>
+        ${mayEdit ? `<button class="btn" id="btn-first-project">Add the first project</button>` : ""}
+      </div>`;
+    $("#btn-first-project")?.addEventListener("click", () => promptProject(null));
+    return;
+  }
+
+  const allTags = [...new Set(projects.flatMap((p) => p.tags || []))].sort();
+  const filtered = applyFilters(projects);
 
   host.querySelector(".loading").outerHTML = `
-    <div class="grid-stats">
-      <div class="card stat"><span>Rooms</span><b class="num">${rooms.length}</b>
-        <span class="sub">${area ? area.toLocaleString("en-US") + " sq ft measured" : "No dimensions yet"}</span></div>
-      <div class="card stat"><span>People</span><b class="num">${members.length}</b>
-        <span class="sub">${members.length === 1 ? "Just you so far" : "with access"}</span></div>
-      <div class="card stat"><span>Your role</span><b>${esc(store.ROLES[ws.myRole]?.label || ws.myRole)}</b>
-        <span class="sub">${esc(store.ROLES[ws.myRole]?.description || "")}</span></div>
-      <div class="card stat"><span>Started</span><b>${esc(fmtDate(ws.createdAt))}</b>
-        <span class="sub">Workspace created</span></div>
+    <div class="toolbar">
+      <input type="search" id="pf-q" class="toolbar-search" placeholder="Search projects…"
+             value="${esc(projectUI.q)}" aria-label="Search projects">
+      <select id="pf-room" aria-label="Filter by room">
+        <option value="">All rooms</option>
+        ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${projectUI.room === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+      </select>
+      <select id="pf-status" aria-label="Filter by status">
+        <option value="">Any status</option>
+        ${store.PROJECT_STATUSES.map((s) => `<option value="${s.value}" ${projectUI.status === s.value ? "selected" : ""}>${s.label}</option>`).join("")}
+      </select>
+      <select id="pf-priority" aria-label="Filter by priority">
+        <option value="">Any priority</option>
+        ${store.PRIORITIES.map((p) => `<option value="${p.value}" ${projectUI.priority === p.value ? "selected" : ""}>${p.label}</option>`).join("")}
+      </select>
+      ${allTags.length ? `<select id="pf-tag" aria-label="Filter by tag">
+        <option value="">Any tag</option>
+        ${allTags.map((t) => `<option value="${esc(t)}" ${projectUI.tag === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
+      </select>` : ""}
+      <div class="toolbar-right">
+        <div class="seg" role="group" aria-label="View">
+          <button class="${projectUI.mode === "list" ? "on" : ""}" data-mode="list" type="button">List</button>
+          <button class="${projectUI.mode === "board" ? "on" : ""}" data-mode="board" type="button">Board</button>
+        </div>
+        ${projectUI.mode === "list" ? `<button class="btn btn-ghost btn-sm" id="btn-columns">Columns</button>` : ""}
+      </div>
     </div>
 
-    ${rooms.length === 0 ? `
+    <p class="muted result-count">${filtered.length} of ${projects.length} shown${
+      filtered.length !== projects.length ? ` · <button class="btn-link" id="btn-clear-filters">Clear filters</button>` : ""}</p>
+
+    <div id="projects-body">${
+      filtered.length
+        ? (projectUI.mode === "board" ? boardHtml(filtered) : listHtml(filtered))
+        : `<div class="empty"><h3>Nothing matches</h3><p>No project matches those filters.</p></div>`
+    }</div>`;
+
+  wireProjectToolbar();
+}
+
+function listHtml(projects) {
+  const cols = visibleColumns();
+  const shown = ALL_COLUMNS.filter((c) => cols.includes(c.key));
+  const sorted = sortProjects(projects);
+  const arrow = (key) => projectUI.sort.key === key
+    ? (projectUI.sort.dir === "asc" ? " ↑" : " ↓") : "";
+
+  return `
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th><button class="btn-link" data-sort="title">Project${arrow("title")}</button></th>
+            ${shown.map((c) => `<th class="${c.key === "planned" ? "date" : ""}">
+              <button class="btn-link" data-sort="${c.key}">${c.label}${arrow(c.key)}</button></th>`).join("")}
+          </tr>
+        </thead>
+        <tbody>
+          ${sorted.map((p) => `
+            <tr>
+              <td data-label="Project" class="wrap-any">
+                <a href="#/projects/${esc(p.id)}">${esc(p.title)}</a>
+              </td>
+              ${shown.map((c) => `<td data-label="${c.label}" class="${c.key === "planned" ? "date" : ""}">${cellHtml(p, c.key)}</td>`).join("")}
+            </tr>`).join("")}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+function cellHtml(p, key) {
+  switch (key) {
+    case "room":     return esc(roomName(p.roomId)) || `<span class="muted">—</span>`;
+    case "status":   return statusChip(p.status);
+    case "priority": return priorityChip(p.priority);
+    case "planned":  return p.plannedStart || p.plannedEnd
+      ? `${esc(fmtDate(p.plannedStart))} – ${esc(fmtDate(p.plannedEnd))}`
+      : `<span class="muted">—</span>`;
+    case "completion": return `<span class="num">${p.completionPct || 0}%</span>
+      <span class="mini mini-inline"><i style="width:${p.completionPct || 0}%"></i></span>`;
+    case "tags":     return (p.tags || []).length
+      ? (p.tags || []).map((t) => `<span class="chip">${esc(t)}</span>`).join(" ")
+      : `<span class="muted">—</span>`;
+    default: return "";
+  }
+}
+
+function boardHtml(projects) {
+  return `<div class="board">${store.BOARD_LANES.map((lane) => {
+    const inLane = projects.filter((p) => store.statusLane(p.status) === lane.id);
+    return `
+      <section class="lane" aria-label="${lane.label}">
+        <header class="lane-head">
+          <h3>${lane.label}</h3><span class="lane-count num">${inLane.length}</span>
+        </header>
+        ${inLane.length ? inLane.map((p) => `
+          <a class="card board-card" href="#/projects/${esc(p.id)}">
+            <strong class="wrap-any">${esc(p.title)}</strong>
+            ${p.roomId ? `<span class="muted board-room">${esc(roomName(p.roomId))}</span>` : ""}
+            <span class="board-chips">${statusChip(p.status)}${priorityChip(p.priority)}</span>
+            ${p.completionPct ? `<span class="mini"><i style="width:${p.completionPct}%"></i></span>` : ""}
+          </a>`).join("") : `<p class="lane-empty muted">Nothing here</p>`}
+      </section>`;
+  }).join("")}</div>`;
+}
+
+function wireProjectToolbar() {
+  const rerender = () => renderRoute();
+
+  const q = $("#pf-q");
+  if (q) {
+    let timer = null;
+    q.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        projectUI.q = q.value;
+        rerender();
+        const again = $("#pf-q");
+        if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      }, 250);
+    });
+  }
+
+  const bind = (sel, prop) => {
+    const el = $(sel);
+    el?.addEventListener("change", () => { projectUI[prop] = el.value; rerender(); });
+  };
+  bind("#pf-room", "room");
+  bind("#pf-status", "status");
+  bind("#pf-priority", "priority");
+  bind("#pf-tag", "tag");
+
+  $("#btn-clear-filters")?.addEventListener("click", () => {
+    projectUI.q = ""; projectUI.room = ""; projectUI.status = "";
+    projectUI.priority = ""; projectUI.tag = "";
+    rerender();
+  });
+
+  document.querySelectorAll("[data-mode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      projectUI.mode = btn.dataset.mode;
+      localStorage.setItem("rhq_proj_mode", projectUI.mode);
+      rerender();
+    });
+  });
+
+  // Sort cycles ascending, descending, then back to the default.
+  document.querySelectorAll("[data-sort]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const key = btn.dataset.sort;
+      if (projectUI.sort.key !== key) projectUI.sort = { key, dir: "asc" };
+      else if (projectUI.sort.dir === "asc") projectUI.sort.dir = "desc";
+      else projectUI.sort = { key: "title", dir: "asc" };
+      rerender();
+    });
+  });
+
+  $("#btn-columns")?.addEventListener("click", promptColumns);
+}
+
+function promptColumns() {
+  const current = visibleColumns();
+  openModal({
+    title: "Columns",
+    confirmText: "Save",
+    body: `
+      <p class="muted" style="margin-bottom:12px">Choose what the list shows. Saved for
+         this workspace on this device.</p>
+      ${ALL_COLUMNS.map((c) => `
+        <label class="check-row">
+          <input type="checkbox" value="${c.key}" ${current.includes(c.key) ? "checked" : ""}>
+          <span>${c.label}</span>
+        </label>`).join("")}`,
+    onConfirm: async () => {
+      const picked = [...document.querySelectorAll("#modal-body input:checked")].map((i) => i.value);
+      saveColumns(picked);
+      toast("Columns saved.");
+      renderRoute();
+    }
+  });
+}
+
+function promptProject(project) {
+  const editing = !!project;
+  const iso = (d) => (d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "");
+
+  openModal({
+    title: editing ? "Edit project" : "New project",
+    confirmText: editing ? "Save changes" : "Create project",
+    body: `
+      <div class="field">
+        <label for="pr-title">Title</label>
+        <input type="text" id="pr-title" maxlength="120" value="${esc(project?.title || "")}"
+               placeholder="Replace kitchen cabinets" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pr-room">Room
+            <span class="info" title="Which area this work belongs to. Photos, costs and contractor access all roll up by room.">i</span>
+          </label>
+          <select id="pr-room">
+            <option value="">Not room-specific</option>
+            ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${project?.roomId === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pr-status">Status
+            <span class="info" title="Where this sits in the remodel: from a loose idea through to complete.">i</span>
+          </label>
+          <select id="pr-status" ${editing ? "" : 'class="needs-choice"'}>
+            ${store.PROJECT_STATUSES.map((s) => `<option value="${s.value}" ${(project?.status || "idea") === s.value ? "selected" : ""}>${s.label}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pr-priority">Priority</label>
+          <select id="pr-priority">
+            ${store.PRIORITIES.map((p) => `<option value="${p.value}" ${(project?.priority || "medium") === p.value ? "selected" : ""}>${p.label}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="pr-pct">Complete (%)
+            <span class="info" title="Your own judgement of progress. Rolls up into the dashboard.">i</span>
+          </label>
+          <input type="number" id="pr-pct" min="0" max="100" step="5" value="${project?.completionPct ?? 0}">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="pr-start">Planned start</label>
+          <input type="date" id="pr-start" value="${iso(project?.plannedStart)}">
+        </div>
+        <div class="field">
+          <label for="pr-end">Planned finish</label>
+          <input type="date" id="pr-end" value="${iso(project?.plannedEnd)}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="pr-tags">Tags
+          <span class="info" title="Comma separated. Handy for cutting across rooms, e.g. plumbing or permit.">i</span>
+        </label>
+        <input type="text" id="pr-tags" value="${esc((project?.tags || []).join(", "))}"
+               placeholder="plumbing, permit" autocomplete="off">
+        <span class="hint">Comma separated — useful for cutting across rooms.</span>
+      </div>
+      <div class="field">
+        <label for="pr-desc">Description</label>
+        <textarea id="pr-desc" maxlength="4000" placeholder="Scope, decisions still open, anything a contractor should know…">${esc(project?.description || "")}</textarea>
+      </div>`,
+    onConfirm: async () => {
+      const data = {
+        title: $("#pr-title").value,
+        roomId: $("#pr-room").value,
+        status: $("#pr-status").value,
+        priority: $("#pr-priority").value,
+        completionPct: $("#pr-pct").value,
+        plannedStart: $("#pr-start").value,
+        plannedEnd: $("#pr-end").value,
+        tags: $("#pr-tags").value,
+        description: $("#pr-desc").value,
+        sortOrder: project?.sortOrder ?? Date.now() % 100000
+      };
+      if (!data.title.trim()) { showModalError("Give the project a title."); return false; }
+
+      if (editing) {
+        const note = project.status !== data.status
+          ? `Moved "${data.title}" to ${store.statusLabel(data.status)}`
+          : null;
+        await store.updateProject(state.ws.id, project.id, data, note);
+        toast("Project updated.");
+      } else {
+        await store.createProject(state.ws.id, data);
+        track("project_create");
+        toast("Project created.");
+      }
+      renderRoute();
+    }
+  });
+
+  const statusSel = $("#pr-status");
+  statusSel?.addEventListener("change", () => statusSel.classList.remove("needs-choice"));
+}
+
+// ============================================================
+// View — single project
+// ============================================================
+async function viewProject(host, projectId) {
+  const ws = state.ws;
+  const mayEdit = store.canEdit(ws.myRole);
+  host.innerHTML = `<div class="loading">Loading project…</div>`;
+
+  let project, phases, tasks, note;
+  try {
+    [project, phases, tasks, state.rooms] = await Promise.all([
+      store.loadProject(ws.id, projectId),
+      store.loadPhases(ws.id, projectId),
+      store.loadTasks(ws.id, projectId),
+      store.loadRooms(ws.id)
+    ]);
+    note = await store.loadPrivateNote(ws.id, projectId);
+  } catch (err) {
+    host.innerHTML = `<div class="error-box">${esc(store.describeError(err))}</div>`;
+    return;
+  }
+
+  if (!project) {
+    host.innerHTML = `
+      <div class="empty">
+        <h3>Project not found</h3>
+        <p>It may have been deleted.</p>
+        <a class="btn btn-sec" href="#/projects">Back to projects</a>
+      </div>`;
+    return;
+  }
+
+  const openTasks = tasks.filter((t) => !t.done).length;
+
+  host.innerHTML = `
+    <nav class="crumbs"><a href="#/projects">Projects</a> <span aria-hidden="true">/</span>
+      <span class="muted wrap-any">${esc(project.title)}</span></nav>
+
+    <div class="view-head">
+      <div class="grow">
+        <h1 class="wrap-any">${esc(project.title)}</h1>
+        <div class="chips" style="margin-top:8px">
+          ${statusChip(project.status)}${priorityChip(project.priority)}
+          ${project.roomId ? `<span class="chip">${esc(roomName(project.roomId))}</span>` : ""}
+          ${(project.tags || []).map((t) => `<span class="chip">${esc(t)}</span>`).join("")}
+        </div>
+      </div>
+      ${mayEdit ? `
+        <div class="row-actions">
+          <button class="btn btn-sec btn-sm" id="btn-edit-project">Edit</button>
+          <button class="btn btn-ghost btn-sm" id="btn-delete-project">Delete</button>
+        </div>` : ""}
+    </div>
+
+    <div class="grid-stats">
+      <div class="card stat"><span>Complete</span><b class="num">${project.completionPct || 0}%</b>
+        <span class="mini"><i style="width:${project.completionPct || 0}%"></i></span></div>
+      <div class="card stat"><span>Planned</span><b class="stat-date">${esc(fmtDate(project.plannedStart))}</b>
+        <span class="sub">to ${esc(fmtDate(project.plannedEnd))}</span></div>
+      <div class="card stat"><span>Open tasks</span><b class="num">${openTasks}</b>
+        <span class="sub">${tasks.length} total</span></div>
+      <div class="card stat"><span>Phases</span><b class="num">${phases.length}</b>
+        <span class="sub">${phases.length ? "" : "None yet"}</span></div>
+    </div>
+
+    ${project.description ? `
       <div class="section">
-        <div class="empty">
-          <h3>Start with the rooms</h3>
-          <p>Rooms are what everything else hangs off — projects, photos, budgets and
-             contractor access are all organized by room.</p>
-          ${canAdd ? `<button class="btn" id="dash-add-rooms">Add rooms</button>` : ""}
-        </div>
-      </div>` : `
-      <div class="section">
-        <div class="section-head">
-          <h2>Rooms</h2>
-          <a href="#/rooms">View all</a>
-        </div>
-        <div class="grid">
-          ${rooms.slice(0, 6).map(roomCardHtml).join("")}
-        </div>
-      </div>`}
+        <div class="section-head"><h2>Description</h2></div>
+        <div class="card"><p class="wrap-any" style="white-space:pre-wrap">${esc(project.description)}</p></div>
+      </div>` : ""}
 
     <div class="section">
-      <div class="section-head"><h2>Coming next</h2></div>
-      <div class="card">
-        <p class="muted">This is the foundation release. Next up, in order:
-          projects with phases and tasks; photos, ideas and mood boards; budget,
-          contractors and the product registry; then scoped contractor sharing,
-          reports and backups.</p>
+      <div class="section-head">
+        <h2>Phases and tasks</h2>
+        ${mayEdit ? `<div class="row-actions">
+          <button class="btn btn-sec btn-sm" id="btn-add-phase">Add phase</button>
+          <button class="btn btn-sm" id="btn-add-task">Add task</button>
+        </div>` : ""}
       </div>
+      <div id="tasks-body">${phasesHtml(phases, tasks, mayEdit)}</div>
+    </div>
+
+    ${note !== null ? `
+      <div class="section">
+        <div class="section-head">
+          <h2>Private notes</h2>
+          <span class="chip chip-out">Never shared with contractors</span>
+        </div>
+        <div class="card">
+          <p class="muted" style="margin-bottom:10px">Stored separately from the project
+             itself, so scoped contractor access cannot reach it.</p>
+          <textarea id="pr-note" maxlength="8000" ${mayEdit ? "" : "disabled"}
+            placeholder="Quotes that felt high, things you would rather not share…">${esc(note)}</textarea>
+          ${mayEdit ? `<div style="margin-top:10px"><button class="btn btn-sm" id="btn-save-note">Save notes</button></div>` : ""}
+        </div>
+      </div>` : ""}
+
+    <div class="section">
+      <div class="section-head"><h2>History</h2></div>
+      <div id="project-activity" class="card"><p class="muted">Loading…</p></div>
     </div>`;
 
-  $("#dash-add-rooms")?.addEventListener("click", () => { location.hash = "#/rooms"; });
+  $("#btn-edit-project")?.addEventListener("click", () => promptProject(project));
+  $("#btn-delete-project")?.addEventListener("click", () => {
+    confirmDialog({
+      title: "Delete this project?",
+      message: `"${project.title}", its ${phases.length} phase(s), ${tasks.length} task(s) and its private notes will be removed. This cannot be undone.`,
+      confirmText: "Delete project",
+      onConfirm: async () => {
+        await store.deleteProject(ws.id, project.id);
+        await store.logActivity(ws.id, "project_delete", `Deleted project "${project.title}"`, null);
+        toast("Project deleted.");
+        location.hash = "#/projects";
+      }
+    });
+  });
+
+  $("#btn-add-phase")?.addEventListener("click", () => {
+    openModal({
+      title: "Add phase",
+      confirmText: "Add phase",
+      body: `<div class="field">
+          <label for="ph-name">Phase name
+            <span class="info" title="A stage of the work, for example Demo, Rough-in, Finish.">i</span>
+          </label>
+          <input type="text" id="ph-name" maxlength="120" placeholder="Demo" autocomplete="off">
+          <span class="hint">A stage of the work — Demo, Rough-in, Finish.</span>
+        </div>`,
+      onConfirm: async () => {
+        const name = $("#ph-name").value.trim();
+        if (!name) { showModalError("Give the phase a name."); return false; }
+        await store.createPhase(ws.id, projectId, name, phases.length);
+        toast("Phase added.");
+        renderRoute();
+      }
+    });
+  });
+
+  $("#btn-add-task")?.addEventListener("click", () => promptTask(projectId, phases, null));
+  $("#btn-save-note")?.addEventListener("click", async () => {
+    try {
+      await store.savePrivateNote(ws.id, projectId, $("#pr-note").value);
+      toast("Notes saved.");
+    } catch (err) {
+      toast(store.describeError(err), "bad");
+    }
+  });
+
+  wireTaskRows(projectId, phases, mayEdit);
+
+  store.loadActivity(ws.id, 50).then((events) => {
+    const mine = events.filter((e) => e.entityId === projectId);
+    const box = $("#project-activity");
+    if (!box) return;
+    box.innerHTML = mine.length
+      ? `<ul class="activity">${mine.map((e) => `
+          <li><span class="wrap-any">${esc(e.summary)}</span>
+            <span class="muted act-when">${esc(e.byName || "")} · ${esc(fmtDate(e.at))}</span></li>`).join("")}</ul>`
+      : `<p class="muted">Nothing recorded yet. Status changes and edits show up here.</p>`;
+  }).catch(() => {
+    const box = $("#project-activity");
+    if (box) box.innerHTML = `<p class="muted">History unavailable.</p>`;
+  });
+}
+
+function phasesHtml(phases, tasks, mayEdit) {
+  const unphased = tasks.filter((t) => !t.phaseId);
+  const groups = [
+    ...phases.map((ph) => ({ phase: ph, items: tasks.filter((t) => t.phaseId === ph.id) })),
+    ...(unphased.length || !phases.length ? [{ phase: null, items: unphased }] : [])
+  ];
+
+  if (!tasks.length && !phases.length) {
+    return `<div class="empty">
+      <h3>No tasks yet</h3>
+      <p>Break the work into tasks, and group them into phases once the sequence matters.</p>
+    </div>`;
+  }
+
+  return groups.map((g) => `
+    <div class="phase">
+      <div class="phase-head">
+        <h3>${g.phase ? esc(g.phase.name) : "Unassigned"}</h3>
+        <span class="muted num">${g.items.filter((t) => !t.done).length} open</span>
+        ${g.phase && mayEdit ? `
+          <button class="btn btn-ghost btn-sm" data-phase-rename="${esc(g.phase.id)}">Rename</button>
+          <button class="btn btn-ghost btn-sm" data-phase-delete="${esc(g.phase.id)}">Delete</button>` : ""}
+      </div>
+      ${g.items.length ? `<ul class="tasks">${g.items.map((t) => taskRowHtml(t, mayEdit)).join("")}</ul>`
+        : `<p class="muted phase-empty">No tasks in this phase.</p>`}
+    </div>`).join("");
+}
+
+function taskRowHtml(task, mayEdit) {
+  const overdue = !task.done && task.dueDate && task.dueDate < new Date(new Date().toDateString());
+  return `
+    <li class="task ${task.done ? "is-done" : ""}">
+      <label class="task-check">
+        <input type="checkbox" data-task-done="${esc(task.id)}" ${task.done ? "checked" : ""}
+               ${mayEdit ? "" : "disabled"} aria-label="Mark complete">
+        <span class="task-title wrap-any">${esc(task.title)}</span>
+      </label>
+      <span class="task-meta">
+        ${task.dueDate ? `<span class="date ${overdue ? "is-overdue" : "muted"}">${overdue ? "Overdue " : "Due "}${esc(fmtDate(task.dueDate))}</span>` : ""}
+        ${task.priority && task.priority !== "medium" ? priorityChip(task.priority) : ""}
+        ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-task-delete="${esc(task.id)}" aria-label="Delete task">Remove</button>` : ""}
+      </span>
+    </li>`;
+}
+
+function wireTaskRows(projectId, phases, mayEdit) {
+  if (!mayEdit) return;
+
+  document.querySelectorAll("[data-task-done]").forEach((box) => {
+    box.addEventListener("change", async () => {
+      try {
+        await store.updateTask(state.ws.id, box.dataset.taskDone, { done: box.checked });
+        box.closest(".task")?.classList.toggle("is-done", box.checked);
+      } catch (err) {
+        box.checked = !box.checked;
+        toast(store.describeError(err), "bad");
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-task-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      confirmDialog({
+        title: "Remove this task?",
+        message: "The task will be deleted. This cannot be undone.",
+        confirmText: "Remove",
+        onConfirm: async () => {
+          await store.deleteTask(state.ws.id, btn.dataset.taskDelete);
+          toast("Task removed.");
+          renderRoute();
+        }
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-phase-rename]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const phase = phases.find((p) => p.id === btn.dataset.phaseRename);
+      openModal({
+        title: "Rename phase",
+        confirmText: "Save",
+        body: `<div class="field"><label for="ph-new">Phase name</label>
+          <input type="text" id="ph-new" maxlength="120" value="${esc(phase?.name || "")}"></div>`,
+        onConfirm: async () => {
+          const name = $("#ph-new").value.trim();
+          if (!name) { showModalError("Give the phase a name."); return false; }
+          await store.renamePhase(state.ws.id, phase.id, name);
+          toast("Phase renamed.");
+          renderRoute();
+        }
+      });
+    });
+  });
+
+  document.querySelectorAll("[data-phase-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      confirmDialog({
+        title: "Delete this phase?",
+        message: "Its tasks are kept and moved to Unassigned.",
+        confirmText: "Delete phase",
+        onConfirm: async () => {
+          await store.deletePhase(state.ws.id, btn.dataset.phaseDelete);
+          toast("Phase deleted.");
+          renderRoute();
+        }
+      });
+    });
+  });
+}
+
+function promptTask(projectId, phases, task) {
+  openModal({
+    title: task ? "Edit task" : "Add task",
+    confirmText: task ? "Save" : "Add task",
+    body: `
+      <div class="field">
+        <label for="tk-title">Task</label>
+        <input type="text" id="tk-title" maxlength="200" value="${esc(task?.title || "")}"
+               placeholder="Confirm the soffit can come out" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="tk-phase">Phase</label>
+          <select id="tk-phase">
+            <option value="">Unassigned</option>
+            ${phases.map((p) => `<option value="${esc(p.id)}" ${task?.phaseId === p.id ? "selected" : ""}>${esc(p.name)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="tk-priority">Priority</label>
+          <select id="tk-priority">
+            ${store.PRIORITIES.map((p) => `<option value="${p.value}" ${(task?.priority || "medium") === p.value ? "selected" : ""}>${p.label}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="tk-due">Due date</label>
+        <input type="date" id="tk-due" value="">
+      </div>`,
+    onConfirm: async () => {
+      const title = $("#tk-title").value.trim();
+      if (!title) { showModalError("Give the task a title."); return false; }
+      await store.createTask(state.ws.id, projectId, {
+        title,
+        phaseId: $("#tk-phase").value,
+        priority: $("#tk-priority").value,
+        dueDate: $("#tk-due").value
+      });
+      toast("Task added.");
+      renderRoute();
+    }
+  });
 }
 
 // ============================================================
@@ -957,15 +1754,21 @@ async function viewSettings(host) {
 // ============================================================
 // Routing
 // ============================================================
+/** "#/projects/abc" -> { route: "projects", id: "abc" } */
 function readRoute() {
   const raw = (location.hash || "").replace(/^#\/?/, "").split("?")[0];
-  return NAV.some((n) => n.id === raw) ? raw : "dashboard";
+  const [head, id] = raw.split("/");
+  return {
+    route: NAV.some((n) => n.id === head) ? head : "dashboard",
+    id: id || null
+  };
 }
 
 function onHashChange() {
   const next = readRoute();
-  if (next === state.route) return;
-  state.route = next;
+  if (next.route === state.route && next.id === state.routeId) return;
+  state.route = next.route;
+  state.routeId = next.id;
   if (state.ws) renderRoute();
 }
 
@@ -1001,13 +1804,15 @@ function wireChrome() {
 
   document.body.addEventListener("click", (e) => {
     const link = e.target.closest("[data-nav]");
-    if (link) setTimeout(() => { state.route = readRoute(); renderChrome(); }, 0);
+    if (link) setTimeout(() => { state.route = readRoute().route; renderChrome(); }, 0);
   });
 }
 
 function boot() {
   wireChrome();
-  state.route = readRoute();
+  const initial = readRoute();
+  state.route = initial.route;
+  state.routeId = initial.id;
   $("#year").textContent = new Date().getFullYear();
 
   onAuth(async (user) => {
@@ -1039,6 +1844,12 @@ function iconPeople() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
     <circle cx="9" cy="8" r="3.2"/><path d="M3.5 20a5.5 5.5 0 0 1 11 0"/>
     <path d="M16 5.2a3.2 3.2 0 0 1 0 5.6"/><path d="M17.5 14.5A5.5 5.5 0 0 1 20.5 20"/></svg>`;
+}
+function iconList() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.6" cy="6" r="1.3" fill="currentColor" stroke="none"/>
+    <circle cx="3.6" cy="12" r="1.3" fill="currentColor" stroke="none"/>
+    <circle cx="3.6" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>`;
 }
 function iconGear() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

@@ -9,7 +9,8 @@
 // for access decisions, and the security rules ignore it entirely.
 // ============================================================
 
-import { firestore, currentUser } from "./firebase-config.js";
+// Keep this ?v in step with index.html and app.js — see the note there.
+import { firestore, currentUser } from "./firebase-config.js?v=0.2.0";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -493,4 +494,346 @@ export async function deleteRoom(wsId, roomId) {
 export function roomArea(room) {
   if (!room?.lengthFt || !room?.widthFt) return null;
   return Math.round(room.lengthFt * room.widthFt);
+}
+
+// ============================================================
+// Projects, phases and tasks
+//
+// Deliberately no money here. Costs, budgets and payments arrive in M4 in
+// their own collection so a scoped contractor grant can show scope and
+// schedule without exposing amounts.
+// ============================================================
+
+/**
+ * Statuses in remodel order. `lane` groups them for the board so it shows
+ * five readable columns instead of twelve that would need side-scrolling.
+ */
+export const PROJECT_STATUSES = [
+  { value: "idea",              label: "Idea",              lane: "ideas" },
+  { value: "researching",       label: "Researching",       lane: "ideas" },
+  { value: "planned",           label: "Planned",           lane: "planning" },
+  { value: "awaiting_bid",      label: "Awaiting bid",      lane: "planning" },
+  { value: "awaiting_approval", label: "Awaiting approval", lane: "planning" },
+  { value: "approved",          label: "Approved",          lane: "ready" },
+  { value: "scheduled",         label: "Scheduled",         lane: "ready" },
+  { value: "in_progress",       label: "In progress",       lane: "active" },
+  { value: "blocked",           label: "Blocked",           lane: "active" },
+  { value: "on_hold",           label: "On hold",           lane: "active" },
+  { value: "complete",          label: "Complete",          lane: "done" },
+  { value: "cancelled",         label: "Cancelled",         lane: "done" }
+];
+
+export const BOARD_LANES = [
+  { id: "ideas",    label: "Ideas" },
+  { id: "planning", label: "Planning" },
+  { id: "ready",    label: "Ready" },
+  { id: "active",   label: "Active" },
+  { id: "done",     label: "Done" }
+];
+
+export const PRIORITIES = [
+  { value: "low",      label: "Low" },
+  { value: "medium",   label: "Medium" },
+  { value: "high",     label: "High" },
+  { value: "critical", label: "Critical" }
+];
+
+export const statusLabel = (v) =>
+  PROJECT_STATUSES.find((s) => s.value === v)?.label || "Idea";
+export const statusLane = (v) =>
+  PROJECT_STATUSES.find((s) => s.value === v)?.lane || "ideas";
+export const priorityLabel = (v) =>
+  PRIORITIES.find((p) => p.value === v)?.label || "Medium";
+
+/** Statuses that mean the work is finished or abandoned. */
+export const isClosedStatus = (v) => v === "complete" || v === "cancelled";
+
+const toTimestampOrNull = (m, value) => {
+  if (!value) return null;
+  const d = value instanceof Date ? value : new Date(value + "T00:00:00");
+  return Number.isNaN(d.getTime()) ? null : m.Timestamp.fromDate(d);
+};
+
+function projectPayload(m, data) {
+  const title = trimTo(data.title, 120);
+  if (!title) throw new Error("Give the project a title.");
+
+  const status = PROJECT_STATUSES.some((s) => s.value === data.status) ? data.status : "idea";
+  const priority = PRIORITIES.some((p) => p.value === data.priority) ? data.priority : "medium";
+
+  let pct = Number(data.completionPct);
+  if (!Number.isFinite(pct)) pct = 0;
+  pct = Math.min(100, Math.max(0, Math.round(pct)));
+
+  const tags = (Array.isArray(data.tags) ? data.tags : String(data.tags || "").split(","))
+    .map((t) => trimTo(t, 24).toLowerCase())
+    .filter(Boolean)
+    .slice(0, 20);
+
+  return {
+    title,
+    description: trimTo(data.description, 4000),
+    roomId: data.roomId ? trimTo(data.roomId, 64) : null,
+    status,
+    priority,
+    completionPct: pct,
+    tags: [...new Set(tags)],
+    plannedStart: toTimestampOrNull(m, data.plannedStart),
+    plannedEnd: toTimestampOrNull(m, data.plannedEnd),
+    actualStart: toTimestampOrNull(m, data.actualStart),
+    actualEnd: toTimestampOrNull(m, data.actualEnd),
+    sortOrder: Number.isFinite(Number(data.sortOrder)) ? Number(data.sortOrder) : 0
+  };
+}
+
+const hydrateProject = (id, data) => ({
+  id,
+  ...data,
+  plannedStart: toDate(data.plannedStart),
+  plannedEnd: toDate(data.plannedEnd),
+  actualStart: toDate(data.actualStart),
+  actualEnd: toDate(data.actualEnd),
+  createdAt: toDate(data.createdAt),
+  updatedAt: toDate(data.updatedAt),
+  tags: Array.isArray(data.tags) ? data.tags : []
+});
+
+export async function loadProjects(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.collection(db, "workspaces", wsId, "projects"));
+  return snap.docs
+    .map((d) => hydrateProject(d.id, d.data()))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      (a.title || "").localeCompare(b.title || ""));
+}
+
+export async function loadProject(wsId, projectId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDoc(m.doc(db, "workspaces", wsId, "projects", projectId));
+  return snap.exists() ? hydrateProject(snap.id, snap.data()) : null;
+}
+
+export async function createProject(wsId, data) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "projects"));
+  await m.setDoc(ref, {
+    ...projectPayload(m, data),
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  await logActivity(wsId, "project_create", `Added project "${trimTo(data.title, 80)}"`, ref.id);
+  return ref.id;
+}
+
+export async function updateProject(wsId, projectId, data, activityNote) {
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "projects", projectId), {
+    ...projectPayload(m, data),
+    updatedAt: m.serverTimestamp()
+  });
+  if (activityNote) await logActivity(wsId, "project_update", activityNote, projectId);
+}
+
+/** Removes the project and everything hanging off it, in one batch. */
+export async function deleteProject(wsId, projectId) {
+  const { db, m } = await firestore();
+  const [phases, tasks] = await Promise.all([
+    m.getDocs(m.query(m.collection(db, "workspaces", wsId, "phases"),
+      m.where("projectId", "==", projectId))),
+    m.getDocs(m.query(m.collection(db, "workspaces", wsId, "tasks"),
+      m.where("projectId", "==", projectId)))
+  ]);
+  const batch = m.writeBatch(db);
+  phases.forEach((d) => batch.delete(d.ref));
+  tasks.forEach((d) => batch.delete(d.ref));
+  batch.delete(m.doc(db, "workspaces", wsId, "privateNotes", projectId));
+  batch.delete(m.doc(db, "workspaces", wsId, "projects", projectId));
+  await batch.commit();
+}
+
+// ---------- phases ----------
+export async function loadPhases(wsId, projectId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.query(
+    m.collection(db, "workspaces", wsId, "phases"),
+    m.where("projectId", "==", projectId)
+  ));
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+export async function createPhase(wsId, projectId, name, sortOrder) {
+  const user = requireUser();
+  const clean = trimTo(name, 120);
+  if (!clean) throw new Error("Give the phase a name.");
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "phases"));
+  await m.setDoc(ref, {
+    projectId,
+    name: clean,
+    sortOrder: Number(sortOrder) || 0,
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  return ref.id;
+}
+
+export async function renamePhase(wsId, phaseId, name) {
+  const clean = trimTo(name, 120);
+  if (!clean) throw new Error("Give the phase a name.");
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "phases", phaseId), {
+    name: clean,
+    updatedAt: m.serverTimestamp()
+  });
+}
+
+/** Deleting a phase keeps its tasks; they fall back to the project itself. */
+export async function deletePhase(wsId, phaseId) {
+  const { db, m } = await firestore();
+  const tasks = await m.getDocs(m.query(
+    m.collection(db, "workspaces", wsId, "tasks"),
+    m.where("phaseId", "==", phaseId)
+  ));
+  const batch = m.writeBatch(db);
+  tasks.forEach((d) => batch.update(d.ref, { phaseId: null, updatedAt: m.serverTimestamp() }));
+  batch.delete(m.doc(db, "workspaces", wsId, "phases", phaseId));
+  await batch.commit();
+}
+
+// ---------- tasks ----------
+export async function loadTasks(wsId, projectId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.query(
+    m.collection(db, "workspaces", wsId, "tasks"),
+    m.where("projectId", "==", projectId)
+  ));
+  return snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      dueDate: toDate(d.data().dueDate),
+      completedAt: toDate(d.data().completedAt)
+    }))
+    .sort((a, b) => Number(a.done) - Number(b.done) ||
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+/** Every open task in the workspace — used for the overdue count. */
+export async function loadOpenTasks(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.query(
+    m.collection(db, "workspaces", wsId, "tasks"),
+    m.where("done", "==", false)
+  ));
+  return snap.docs.map((d) => ({
+    id: d.id,
+    ...d.data(),
+    dueDate: toDate(d.data().dueDate)
+  }));
+}
+
+export async function createTask(wsId, projectId, data) {
+  const user = requireUser();
+  const title = trimTo(data.title, 200);
+  if (!title) throw new Error("Give the task a title.");
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "tasks"));
+  await m.setDoc(ref, {
+    projectId,
+    phaseId: data.phaseId || null,
+    title,
+    done: false,
+    priority: PRIORITIES.some((p) => p.value === data.priority) ? data.priority : "medium",
+    dueDate: toTimestampOrNull(m, data.dueDate),
+    assigneeUid: data.assigneeUid || null,
+    sortOrder: Number(data.sortOrder) || 0,
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  return ref.id;
+}
+
+export async function updateTask(wsId, taskId, patch) {
+  const { db, m } = await firestore();
+  const clean = { updatedAt: m.serverTimestamp() };
+  if ("title" in patch) {
+    const t = trimTo(patch.title, 200);
+    if (!t) throw new Error("Give the task a title.");
+    clean.title = t;
+  }
+  if ("done" in patch) {
+    clean.done = !!patch.done;
+    clean.completedAt = patch.done ? m.serverTimestamp() : null;
+  }
+  if ("priority" in patch) {
+    clean.priority = PRIORITIES.some((p) => p.value === patch.priority) ? patch.priority : "medium";
+  }
+  if ("dueDate" in patch) clean.dueDate = toTimestampOrNull(m, patch.dueDate);
+  if ("phaseId" in patch) clean.phaseId = patch.phaseId || null;
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "tasks", taskId), clean);
+}
+
+export async function deleteTask(wsId, taskId) {
+  const { db, m } = await firestore();
+  await m.deleteDoc(m.doc(db, "workspaces", wsId, "tasks", taskId));
+}
+
+// ---------- private notes ----------
+// Stored under the parent's id in a separate collection, never as a field on
+// the record itself, so contractor scoping in M5 cannot reach them.
+export async function loadPrivateNote(wsId, parentId) {
+  const { db, m } = await firestore();
+  try {
+    const snap = await m.getDoc(m.doc(db, "workspaces", wsId, "privateNotes", parentId));
+    return snap.exists() ? snap.data().body || "" : "";
+  } catch (err) {
+    if (err?.code === "permission-denied") return null;   // accountant role
+    throw err;
+  }
+}
+
+export async function savePrivateNote(wsId, parentId, body) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  await m.setDoc(m.doc(db, "workspaces", wsId, "privateNotes", parentId), {
+    body: trimTo(body, 8000),
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  }, { merge: true });
+}
+
+// ---------- activity ----------
+export async function logActivity(wsId, kind, summary, entityId) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  try {
+    await m.setDoc(m.doc(m.collection(db, "workspaces", wsId, "activity")), {
+      kind: trimTo(kind, 40),
+      summary: trimTo(summary, 300),
+      entityId: entityId || null,
+      byUid: user.uid,
+      byName: user.displayName || user.email || "",
+      at: m.serverTimestamp()
+    });
+  } catch (err) {
+    // History is a nice-to-have; never fail the user's actual edit over it.
+    console.warn("activity not recorded:", err?.code || err);
+  }
+}
+
+export async function loadActivity(wsId, max = 20) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.query(
+    m.collection(db, "workspaces", wsId, "activity"),
+    m.orderBy("at", "desc"),
+    m.limit(max)
+  ));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data(), at: toDate(d.data().at) }));
 }

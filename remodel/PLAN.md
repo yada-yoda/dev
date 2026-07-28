@@ -372,8 +372,23 @@ tests, favicon/OG/semver. Notes for whoever picks up M2:
   sorts asc/desc/reset but has no column chooser — add it in M2 when
   projects and expenses bring real multi-column tables).
 
-**M2 — Projects.** Projects, phases, tasks, checklists, tags, statuses,
-priorities, list + board views, filters, dashboard v1, activity log.
+**M2 — Projects. DONE (v0.2.0, 2026-07-28).** Projects, phases, tasks, tags,
+statuses, priorities, list + board views, filters, sortable table with a
+Columns manager (the standard deferred from M1), dashboard v1, append-only
+activity log, and per-project private notes. Notes for M3:
+
+- Board deliberately groups the 12 statuses into 5 lanes
+  (`BOARD_LANES` in store.js) so it never scrolls sideways.
+- No money on project docs — M4 adds a separate financials collection so a
+  contractor grant can show scope without amounts. Do not add cost fields
+  to `projects`.
+- `privateNotes/{parentId}` and the append-only `activity` collection are
+  live with rules + tests; reuse the same pattern for ideas and media.
+- Module caching: index.html loads only `app.js?v=X`, which imports
+  `store.js?v=X` and `firebase-config.js?v=X`. **Bump all three together**
+  on every release or a browser can mix fresh and stale modules.
+- Deferred: task checklists (sub-items within a task) and drag-to-reorder
+  on the board — neither blocks M3.
 
 **M3 — Ideas & media.** Photo pipeline (compress/thumb/EXIF-strip,
 adapter interface), galleries + timeline + before/after compare, idea

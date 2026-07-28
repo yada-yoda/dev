@@ -7,9 +7,10 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.1.0 — Milestone 1 (foundation).** Sign-in, workspaces, roles,
-invitations and rooms work. Projects, photos, budgets, the product registry
-and contractor sharing arrive in later milestones (see the roadmap below).
+**Status: v0.2.0 — Milestone 2 (projects).** Sign-in, workspaces, roles,
+invitations, rooms, and now projects with phases and tasks. Photos, budgets,
+the product registry and contractor sharing arrive in later milestones (see
+the roadmap below).
 
 ---
 
@@ -27,14 +28,26 @@ and contractor sharing arrive in later milestones (see the roadmap below).
   waiting for them. Invitations can be revoked at any time.
 - **Rooms.** Add the areas of the property, with type, dimensions, ceiling
   height and notes. A starter layout for a two-bedroom, two-bathroom condo is
-  one click. Everything in later milestones is organized by room.
+  one click. Everything else is organized by room.
+- **Projects.** Title, room, status, priority, planned dates, completion and
+  tags. Twelve statuses from Idea through to Complete, in a **list** view with
+  sortable, choosable columns or a **board** grouped into five lanes. Filter
+  by room, status, priority or tag, or search across everything.
+- **Phases and tasks.** Break a project into phases, add tasks with due dates
+  and priorities, tick them off. Overdue tasks are called out.
+- **Private notes.** Per project, stored in a separate collection that
+  contractor access can never reach and the accountant role cannot read.
+- **History.** An append-only activity log — nobody can rewrite or delete it,
+  including the owner — shown per project and on the dashboard.
+- **Dashboard.** Overall completion, active projects, blocked work needing
+  attention, overdue tasks and recent activity.
 
 ## Roadmap
 
 | Milestone | Scope |
 |---|---|
 | 1 (done) | Foundation: auth, workspaces, roles, invitations, rooms, security rules |
-| 2 | Projects, phases, tasks, tags, list and board views, activity log |
+| 2 (done) | Projects, phases, tasks, tags, list and board views, activity log |
 | 3 | Photos and ideas: compressed uploads, before/after galleries, mood boards |
 | 4 | Budget, expenses, contractors, contractor jobs, product and purchase registry |
 | 5 | Scoped contractor sharing with start and expiry dates, contractor portal |
@@ -127,10 +140,11 @@ npm install
 npm test
 ```
 
-44 tests cover every role plus the adversarial cases: cross-workspace reads,
+59 tests cover every role plus the adversarial cases: cross-workspace reads,
 direct document-id probing, self-promotion, forging an owner row, backdated
-timestamps, and reusing expired, revoked, replayed or someone else's
-invitation. Rules changes ship with their tests in the same commit.
+timestamps, reusing expired, revoked, replayed or someone else's invitation,
+reading private notes as the accountant role, and rewriting or deleting
+activity history. Rules changes ship with their tests in the same commit.
 
 ### Manual checklist
 
@@ -142,6 +156,30 @@ invitation. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.2.0
+
+Projects, which is what the rest of the app hangs off. A project carries a
+room, a status, a priority, dates and tags; it breaks down into phases and
+tasks; and it keeps its own history.
+
+Two decisions worth recording. First, the board groups twelve statuses into
+five lanes rather than showing a column per status — a twelve-column board
+forces sideways scrolling on any normal screen, and sideways scrolling is
+exactly what this project refuses to do. Second, there is deliberately no
+money on a project yet: costs arrive in the next milestone in their own
+collection, so that contractor sharing can later show someone the scope and
+schedule of their work without showing them the budget.
+
+Private notes and the activity log both went in now rather than later, for
+the same reason: private notes live in a separate collection so contractor
+access cannot reach them by guessing an id, and history is append-only so it
+cannot be quietly rewritten. Both are far cheaper to build in at the start
+than to retrofit.
+
+Also fixed a caching trap: a deploy could previously pair a fresh `app.js`
+with a browser-cached `store.js`. All modules now load through one versioned
+entry point.
 
 ### 0.1.0
 

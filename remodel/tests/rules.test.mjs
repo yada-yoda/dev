@@ -541,6 +541,169 @@ describe('invites', () => {
 });
 
 // ============================================================
+describe('projects, phases and tasks (M2)', () => {
+  const project = (uid, over = {}) => ({
+    title: 'Cabinet replacement',
+    description: 'Replace uppers and lowers',
+    roomId: 'room_kitchen',
+    status: 'in_progress',
+    priority: 'high',
+    completionPct: 40,
+    tags: ['kitchen', 'carpentry'],
+    sortOrder: 0,
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over
+  });
+
+  test('every member can read projects; editors and up can create them', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'projects', 'p1'), {
+      ...project(OWNER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    for (const u of [OWNER, ADMIN, EDITOR, VIEWER, ACCOUNTANT]) {
+      await assertSucceeds(getDoc(doc(as(u), 'workspaces', WS, 'projects', 'p1')));
+    }
+    await assertSucceeds(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'projects', 'p2'), project(EDITOR.uid))
+    );
+  });
+
+  test('viewer and accountant cannot create or delete a project', async () => {
+    for (const u of [VIEWER, ACCOUNTANT]) {
+      await assertFails(
+        setDoc(doc(as(u), 'workspaces', WS, 'projects', 'p_nope'), project(u.uid))
+      );
+    }
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'projects', 'p1'), {
+      ...project(OWNER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    await assertFails(deleteDoc(doc(as(VIEWER), 'workspaces', WS, 'projects', 'p1')));
+  });
+
+  test('an invented status or priority is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'projects', 'p_bad1'),
+      project(EDITOR.uid, { status: 'totally_done' })));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'projects', 'p_bad2'),
+      project(EDITOR.uid, { priority: 'urgent' })));
+  });
+
+  test('completion percentage must stay within 0-100', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'projects', 'p_bad3'),
+      project(EDITOR.uid, { completionPct: 140 })));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'projects', 'p_bad4'),
+      project(EDITOR.uid, { completionPct: -1 })));
+  });
+
+  test('a project in another workspace is not readable or writable', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', OTHER_WS, 'projects', 'p_secret'), {
+      ...project(OUTSIDER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    await assertFails(getDoc(doc(as(OWNER), 'workspaces', OTHER_WS, 'projects', 'p_secret')));
+    await assertFails(setDoc(doc(as(OWNER), 'workspaces', OTHER_WS, 'projects', 'p_inject'),
+      project(OWNER.uid)));
+  });
+
+  test('phases and tasks follow the same role rules', async () => {
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'phases', 'ph1'), {
+      projectId: 'p1', name: 'Demo', sortOrder: 0,
+      createdBy: EDITOR.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'tasks', 't1'), {
+      projectId: 'p1', title: 'Measure the run', done: false, priority: 'medium',
+      createdBy: EDITOR.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+    await assertFails(setDoc(doc(as(VIEWER), 'workspaces', WS, 'tasks', 't2'), {
+      projectId: 'p1', title: 'Nope', done: false, priority: 'medium',
+      createdBy: VIEWER.uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    }));
+  });
+
+  test('a task cannot be moved to a different project after creation', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'tasks', 't_move'), {
+      projectId: 'p1', title: 'Fixed', done: false, priority: 'low',
+      createdBy: OWNER.uid, createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(as(EDITOR), 'workspaces', WS, 'tasks', 't_move'), {
+      projectId: 'p_other', title: 'Fixed', done: false, priority: 'low',
+      updatedAt: serverTimestamp()
+    }));
+  });
+});
+
+// ============================================================
+describe('private notes are physically separated', () => {
+  beforeEach(async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'privateNotes', 'p1'), {
+      body: 'Contractor quoted high; do not share.',
+      createdBy: OWNER.uid, createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+  });
+
+  test('owner, admin, editor and viewer can read them', async () => {
+    for (const u of [OWNER, ADMIN, EDITOR, VIEWER]) {
+      await assertSucceeds(getDoc(doc(as(u), 'workspaces', WS, 'privateNotes', 'p1')));
+    }
+  });
+
+  test('the accountant role cannot read them', async () => {
+    await assertFails(getDoc(doc(as(ACCOUNTANT), 'workspaces', WS, 'privateNotes', 'p1')));
+  });
+
+  test('a non-member cannot read them by guessing the document id', async () => {
+    await assertFails(getDoc(doc(as(OUTSIDER), 'workspaces', WS, 'privateNotes', 'p1')));
+  });
+
+  test('only editors and up can write them', async () => {
+    await assertSucceeds(updateDoc(doc(as(EDITOR), 'workspaces', WS, 'privateNotes', 'p1'), {
+      body: 'Updated', updatedAt: serverTimestamp()
+    }));
+    await assertFails(updateDoc(doc(as(VIEWER), 'workspaces', WS, 'privateNotes', 'p1'), {
+      body: 'Nope', updatedAt: serverTimestamp()
+    }));
+  });
+});
+
+// ============================================================
+describe('activity log is append-only', () => {
+  const event = (uid) => ({
+    kind: 'project_status',
+    summary: 'Cabinets moved to In Progress',
+    entityId: 'p1',
+    byUid: uid,
+    at: serverTimestamp()
+  });
+
+  test('a member can append an event attributed to themselves', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'activity', 'a1'), event(EDITOR.uid))
+    );
+  });
+
+  test('an event cannot be attributed to somebody else', async () => {
+    await assertFails(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'activity', 'a2'), event(OWNER.uid))
+    );
+  });
+
+  test('history cannot be rewritten or erased, even by the owner', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'activity', 'a3'), {
+      ...event(EDITOR.uid), at: Timestamp.now()
+    }));
+    await assertFails(updateDoc(doc(as(OWNER), 'workspaces', WS, 'activity', 'a3'), {
+      summary: 'Never happened'
+    }));
+    await assertFails(deleteDoc(doc(as(OWNER), 'workspaces', WS, 'activity', 'a3')));
+  });
+
+  test('a viewer cannot write activity at all', async () => {
+    await assertFails(
+      setDoc(doc(as(VIEWER), 'workspaces', WS, 'activity', 'a4'), event(VIEWER.uid))
+    );
+  });
+});
+
+// ============================================================
 describe('user pointer index', () => {
   test('a user can read and write only their own pointer document', async () => {
     const db = as(VIEWER);
