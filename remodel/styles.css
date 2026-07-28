@@ -528,6 +528,104 @@ select.needs-choice {
 }
 
 /* ============================================================
+   Photos, lightbox and ideas
+   ============================================================ */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
+  gap: 10px;
+}
+.tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--panel);
+  cursor: pointer;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.tile:hover { border-color: var(--ink); }
+.tile-img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background-color: var(--panel);
+  background-size: cover;
+  background-position: center;
+}
+.tile-img.is-empty {
+  background-image: repeating-linear-gradient(45deg,
+    var(--panel), var(--panel) 8px, var(--border) 8px, var(--border) 16px);
+}
+.tile-cat {
+  position: absolute; top: 8px; left: 8px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+  background: rgba(20, 23, 27, .72); color: #fff;
+  padding: 2px 7px; border-radius: 999px;
+}
+.tile-cap { display: block; padding: 8px 10px; font-size: 12.5px; }
+
+.compare {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr));
+  gap: 12px;
+}
+.compare-side figcaption { font-size: 12.5px; margin-top: 6px; }
+.compare-missing .tile-img {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+
+.lightbox { margin-bottom: 14px; }
+.lightbox-img {
+  width: 100%;
+  min-height: 220px;
+  max-height: 60vh;
+  aspect-ratio: 4 / 3;
+  background: var(--panel);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: var(--radius);
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.lightbox-img.is-loading::after { content: "Loading…"; }
+
+.meta-list { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.meta-list > div { display: flex; gap: 10px; }
+.meta-list dt { color: var(--muted); flex: 0 0 72px; }
+.meta-list dd { min-width: 0; overflow-wrap: anywhere; }
+
+.idea-card { display: flex; flex-direction: column; gap: 8px; }
+.idea-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; align-items: baseline; }
+.idea-price { font-weight: 600; margin-left: auto; }
+
+/* Money fields carry the $ inside the field, two decimals on blur. */
+.money-wrap { position: relative; display: block; }
+.money-prefix {
+  position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 14px; pointer-events: none;
+}
+.money-input { padding-left: 24px; font-variant-numeric: tabular-nums; }
+
+.more-menu { display: flex; flex-direction: column; gap: 2px; }
+.more-menu a {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 10px; border-radius: var(--radius);
+  text-decoration: none; color: var(--ink); font-weight: 500;
+}
+.more-menu a:hover { background: var(--panel); }
+.more-menu svg { width: 18px; height: 18px; }
+
+/* ============================================================
    Tables — card-stacked below 640px (house rule)
    ============================================================ */
 .table-wrap { border: 1px solid var(--border); border-radius: var(--radius); }

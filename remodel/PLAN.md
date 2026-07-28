@@ -390,9 +390,21 @@ activity log, and per-project private notes. Notes for M3:
 - Deferred: task checklists (sub-items within a task) and drag-to-reorder
   on the board — neither blocks M3.
 
-**M3 — Ideas & media.** Photo pipeline (compress/thumb/EXIF-strip,
-adapter interface), galleries + timeline + before/after compare, idea
-library, mood boards, room/project media filtering, storage meter.
+**M3 — Ideas & media. MOSTLY DONE (v0.3.0, 2026-07-28).** Photo pipeline
+(`media.js`: EXIF-orientation applied then stripped, WebP, quality
+step-down, separate thumbnail), grid + timeline + before/after compare,
+room/project/category filtering, idea library with vendor/model/price/
+source/status, mobile More menu. Notes:
+
+- Payloads are Firestore **bytes**, not base64 — base64 would waste a
+  third of the 1 GiB free tier. Rules cap thumbs at 80 KB and full
+  images at 950 KB (doc limit is 1 MiB).
+- Galleries read metadata + thumbnails only; the full image loads on
+  open, and object URLs are cached per id to protect the read quota.
+- **Still outstanding for M3:** mood boards (drag-drop arrangement,
+  colour/material notes), the storage meter in Settings, and Google
+  Drive originals backup via the `drive.file` scope. None of them block
+  M4; pick them up as M3b.
 
 **M4 — Financials, contractors, products.** Budgets, expenses, receipts,
 contractor directory + jobs + invoices + payments + balances, product/UPC

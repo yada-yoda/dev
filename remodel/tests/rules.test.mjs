@@ -18,7 +18,7 @@ import {
 } from '@firebase/rules-unit-testing';
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc, collection, query, where,
-  getDocs, writeBatch, serverTimestamp, Timestamp
+  getDocs, writeBatch, serverTimestamp, Timestamp, Bytes
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -628,6 +628,104 @@ describe('projects, phases and tasks (M2)', () => {
       projectId: 'p_other', title: 'Fixed', done: false, priority: 'low',
       updatedAt: serverTimestamp()
     }));
+  });
+});
+
+// ============================================================
+describe('media and ideas (M3)', () => {
+  const mediaDoc = (uid, over = {}) => ({
+    category: 'before',
+    caption: 'Kitchen as bought',
+    roomId: 'room_kitchen',
+    projectId: null,
+    tags: ['kitchen'],
+    bytes: 180000,
+    width: 1280,
+    height: 960,
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over
+  });
+
+  test('editors can add media; viewers cannot', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'media', 'm1'), mediaDoc(EDITOR.uid))
+    );
+    await assertFails(
+      setDoc(doc(as(VIEWER), 'workspaces', WS, 'media', 'm2'), mediaDoc(VIEWER.uid))
+    );
+  });
+
+  test('every member can view media metadata', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', WS, 'media', 'm1'), {
+      ...mediaDoc(OWNER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    for (const u of [OWNER, ADMIN, EDITOR, VIEWER, ACCOUNTANT]) {
+      await assertSucceeds(getDoc(doc(as(u), 'workspaces', WS, 'media', 'm1')));
+    }
+  });
+
+  test('an invented photo category is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'media', 'm_bad'),
+      mediaDoc(EDITOR.uid, { category: 'blackmail' })));
+  });
+
+  const payload = (n) => Bytes.fromUint8Array(new Uint8Array(n));
+
+  test('image payloads are size-capped so a document cannot exceed the 1 MiB limit', async () => {
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'mediaThumbs', 'm1'),
+      { data: payload(20000) }));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'mediaThumbs', 'm2'),
+      { data: payload(90000) }));
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'mediaBlobs', 'm1'),
+      { data: payload(500000) }));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'mediaBlobs', 'm2'),
+      { data: payload(960000) }));
+  });
+
+  test('a payload sent as text rather than bytes is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'mediaBlobs', 'm3'),
+      { data: 'x'.repeat(1000) }));
+  });
+
+  test('image payloads in another workspace are unreadable by id', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', OTHER_WS, 'mediaBlobs', 'secret'),
+      { data: payload(1000) }));
+    await assertFails(getDoc(doc(as(OWNER), 'workspaces', OTHER_WS, 'mediaBlobs', 'secret')));
+  });
+
+  const ideaDoc = (uid, over = {}) => ({
+    title: 'Shaker cabinet, matte white',
+    status: 'shortlisted',
+    roomId: 'room_kitchen',
+    projectId: null,
+    tags: ['cabinets'],
+    sourceUrl: 'https://example.com/product',
+    vendor: 'Example Cabinets',
+    model: 'SHK-100',
+    estPrice: 4200,
+    notes: '',
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over
+  });
+
+  test('editors can save ideas; viewers cannot', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i1'), ideaDoc(EDITOR.uid))
+    );
+    await assertFails(
+      setDoc(doc(as(VIEWER), 'workspaces', WS, 'ideas', 'i2'), ideaDoc(VIEWER.uid))
+    );
+  });
+
+  test('an invented idea status or a negative price is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i_bad1'),
+      ideaDoc(EDITOR.uid, { status: 'maybe' })));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i_bad2'),
+      ideaDoc(EDITOR.uid, { estPrice: -5 })));
   });
 });
 

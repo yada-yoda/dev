@@ -8,10 +8,11 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.2.0";
-import * as store from "./store.js?v=0.2.0";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.3.0";
+import * as store from "./store.js?v=0.3.0";
+import * as media from "./media.js?v=0.3.0";
 
-export const VERSION = "0.2.0";
+export const VERSION = "0.3.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -28,6 +29,12 @@ function esc(value) {
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "short", day: "numeric" });
 const fmtDate = (d) => (d ? DATE_FMT.format(d) : "—");
+
+// USD by default, with the currency kept configurable for later.
+const MONEY_FMT = new Intl.NumberFormat("en-US", {
+  style: "currency", currency: "USD", minimumFractionDigits: 2, maximumFractionDigits: 2
+});
+const fmtMoney = (n) => (Number.isFinite(n) ? MONEY_FMT.format(n) : "—");
 
 /** GA4 event, no-op when analytics is opted out or blocked. */
 function track(name, params) {
@@ -49,10 +56,24 @@ const state = {
 const NAV = [
   { id: "dashboard", label: "Dashboard", icon: iconGrid },
   { id: "projects",  label: "Projects",  icon: iconList },
+  { id: "photos",    label: "Photos",    icon: iconPhoto },
+  { id: "ideas",     label: "Ideas",     icon: iconBulb },
   { id: "rooms",     label: "Rooms",     icon: iconRooms },
   { id: "people",    label: "People",    icon: iconPeople },
   { id: "settings",  label: "Settings",  icon: iconGear }
 ];
+
+// A phone bottom bar fits five targets. The rest live behind More.
+const MOBILE_PRIMARY = ["dashboard", "projects", "photos", "ideas"];
+
+const photoUI = {
+  mode: localStorage.getItem("rhq_photo_mode") || "grid",
+  room: "",
+  project: "",
+  category: ""
+};
+
+const ideaUI = { status: "", room: "" };
 
 // Projects view state: filters, list-or-board, sort, and which optional
 // columns are shown. The column choice is saved per workspace.
@@ -336,12 +357,32 @@ function renderChrome() {
   $("#topbar-title").textContent = ws.name;
   $("#topbar-role").textContent = role?.label || ws.myRole;
 
-  const navHtml = NAV.map((item) => `
+  $("#nav").innerHTML = NAV.map((item) => `
     <a href="#/${item.id}" class="${item.id === state.route ? "on" : ""}" data-nav="${item.id}">
       ${item.icon()}<span>${item.label}</span>
     </a>`).join("");
-  $("#nav").innerHTML = navHtml;
-  $("#bottom-nav").innerHTML = navHtml;
+
+  const secondary = NAV.filter((n) => !MOBILE_PRIMARY.includes(n.id));
+  $("#bottom-nav").innerHTML =
+    NAV.filter((n) => MOBILE_PRIMARY.includes(n.id)).map((item) => `
+      <a href="#/${item.id}" class="${item.id === state.route ? "on" : ""}" data-nav="${item.id}">
+        ${item.icon()}<span>${item.label}</span>
+      </a>`).join("") +
+    `<a href="#" id="btn-more" class="${secondary.some((n) => n.id === state.route) ? "on" : ""}">
+      ${iconMore()}<span>More</span></a>`;
+
+  $("#btn-more")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    openModal({
+      title: "More",
+      hideConfirm: true,
+      body: `<nav class="more-menu">${secondary.map((item) => `
+        <a href="#/${item.id}" data-more>${item.icon()}<span>${item.label}</span></a>`).join("")}</nav>`
+    });
+    document.querySelectorAll("[data-more]").forEach((link) => {
+      link.addEventListener("click", () => closeModal());
+    });
+  });
 
   const user = state.user;
   $("#side-user").innerHTML = `
@@ -358,6 +399,8 @@ function renderRoute() {
 
   switch (state.route) {
     case "projects": return state.routeId ? viewProject(view, state.routeId) : viewProjects(view);
+    case "photos":   return viewPhotos(view);
+    case "ideas":    return viewIdeas(view);
     case "rooms":    return viewRooms(view);
     case "people":   return viewPeople(view);
     case "settings": return viewSettings(view);
@@ -1195,6 +1238,583 @@ function promptTask(projectId, phases, task) {
 }
 
 // ============================================================
+// View — Photos
+// ============================================================
+const MONTH_FMT = new Intl.DateTimeFormat("en-US", { year: "numeric", month: "long" });
+
+async function viewPhotos(host) {
+  const ws = state.ws;
+  const mayEdit = store.canEdit(ws.myRole);
+
+  host.innerHTML = `
+    <div class="view-head">
+      <div class="grow">
+        <h1>Photos</h1>
+        <p>Before, during and after. Images are compressed and stripped of location
+           data on the way in.</p>
+      </div>
+      ${mayEdit ? `<button class="btn" id="btn-upload">Add photos</button>` : ""}
+    </div>
+    <input type="file" id="file-input" accept="image/*" multiple class="hidden">
+    <div class="loading">Loading photos…</div>`;
+
+  let items = [];
+  try {
+    [items, state.rooms, state.projects] = await Promise.all([
+      store.loadMedia(ws.id),
+      store.loadRooms(ws.id),
+      store.loadProjects(ws.id)
+    ]);
+  } catch (err) {
+    host.querySelector(".loading").outerHTML =
+      `<div class="error-box">${esc(store.describeError(err))}</div>`;
+    return;
+  }
+
+  const input = $("#file-input");
+  $("#btn-upload")?.addEventListener("click", () => input.click());
+  input?.addEventListener("change", () => {
+    if (input.files?.length) promptUpload([...input.files]);
+    input.value = "";
+  });
+
+  if (!items.length) {
+    host.querySelector(".loading").outerHTML = `
+      <div class="empty">
+        <h3>No photos yet</h3>
+        <p>Photograph every room before anything is touched — the "before" shots are
+           the ones people always wish they had taken. On a phone this opens the
+           camera directly.</p>
+        ${mayEdit ? `<button class="btn" id="btn-upload-empty">Add photos</button>` : ""}
+      </div>`;
+    $("#btn-upload-empty")?.addEventListener("click", () => input.click());
+    return;
+  }
+
+  const filtered = items.filter((it) =>
+    (!photoUI.room || it.roomId === photoUI.room) &&
+    (!photoUI.project || it.projectId === photoUI.project) &&
+    (!photoUI.category || it.category === photoUI.category));
+
+  host.querySelector(".loading").outerHTML = `
+    <div class="toolbar">
+      <select id="ph-room" aria-label="Filter by room">
+        <option value="">All rooms</option>
+        ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${photoUI.room === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+      </select>
+      <select id="ph-project" aria-label="Filter by project">
+        <option value="">All projects</option>
+        ${state.projects.map((p) => `<option value="${esc(p.id)}" ${photoUI.project === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("")}
+      </select>
+      <select id="ph-cat" aria-label="Filter by category">
+        <option value="">Any type</option>
+        ${store.MEDIA_CATEGORIES.map((c) => `<option value="${c.value}" ${photoUI.category === c.value ? "selected" : ""}>${c.label}</option>`).join("")}
+      </select>
+      <div class="toolbar-right">
+        <div class="seg" role="group" aria-label="View">
+          <button class="${photoUI.mode === "grid" ? "on" : ""}" data-pmode="grid" type="button">Grid</button>
+          <button class="${photoUI.mode === "timeline" ? "on" : ""}" data-pmode="timeline" type="button">Timeline</button>
+          <button class="${photoUI.mode === "compare" ? "on" : ""}" data-pmode="compare" type="button">Compare</button>
+        </div>
+      </div>
+    </div>
+    <p class="muted result-count">${filtered.length} of ${items.length} shown</p>
+    <div id="photo-body">${
+      photoUI.mode === "compare" ? compareHtml(items)
+        : photoUI.mode === "timeline" ? timelineHtml(filtered)
+        : galleryHtml(filtered)
+    }</div>`;
+
+  const bind = (sel, prop) => {
+    const el = $(sel);
+    el?.addEventListener("change", () => { photoUI[prop] = el.value; renderRoute(); });
+  };
+  bind("#ph-room", "room");
+  bind("#ph-project", "project");
+  bind("#ph-cat", "category");
+
+  document.querySelectorAll("[data-pmode]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      photoUI.mode = btn.dataset.pmode;
+      localStorage.setItem("rhq_photo_mode", photoUI.mode);
+      renderRoute();
+    });
+  });
+
+  hydrateThumbs();
+  document.querySelectorAll("[data-photo]").forEach((el) => {
+    el.addEventListener("click", () => openLightbox(el.dataset.photo, items, mayEdit));
+  });
+}
+
+function photoTileHtml(item) {
+  return `
+    <button class="tile" data-photo="${esc(item.id)}" type="button"
+            aria-label="${esc(item.caption || store.mediaCategoryLabel(item.category))}">
+      <span class="tile-img" data-thumb="${esc(item.id)}"></span>
+      <span class="tile-cat">${esc(store.mediaCategoryLabel(item.category))}</span>
+      ${item.caption ? `<span class="tile-cap wrap-any">${esc(item.caption)}</span>` : ""}
+    </button>`;
+}
+
+function galleryHtml(items) {
+  if (!items.length) return `<div class="empty"><h3>Nothing matches</h3><p>No photo matches those filters.</p></div>`;
+  return `<div class="gallery">${items.map(photoTileHtml).join("")}</div>`;
+}
+
+function timelineHtml(items) {
+  if (!items.length) return `<div class="empty"><h3>Nothing matches</h3><p>No photo matches those filters.</p></div>`;
+  const groups = new Map();
+  for (const it of items) {
+    const when = it.takenAt || it.createdAt;
+    const key = when ? MONTH_FMT.format(when) : "Undated";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(it);
+  }
+  return [...groups.entries()].map(([month, list]) => `
+    <div class="section" style="margin-top:20px">
+      <div class="section-head"><h2>${esc(month)}</h2><span class="muted num">${list.length}</span></div>
+      <div class="gallery">${list.map(photoTileHtml).join("")}</div>
+    </div>`).join("");
+}
+
+/** Pairs the newest before with the newest after for each room. */
+function compareHtml(items) {
+  const rooms = state.rooms.filter((room) =>
+    items.some((i) => i.roomId === room.id && (i.category === "before" || i.category === "after")));
+
+  if (!rooms.length) {
+    return `<div class="empty">
+      <h3>Nothing to compare yet</h3>
+      <p>Tag a photo as <strong>Before</strong> and another as <strong>After</strong> in the
+         same room, and they will line up side by side here.</p>
+    </div>`;
+  }
+
+  return rooms.map((room) => {
+    const pick = (cat) => items
+      .filter((i) => i.roomId === room.id && i.category === cat)
+      .sort((a, b) => (b.takenAt?.getTime() || 0) - (a.takenAt?.getTime() || 0))[0];
+    const before = pick("before");
+    const after = pick("after");
+    const side = (item, label) => item
+      ? `<figure class="compare-side">
+           <button class="tile" data-photo="${esc(item.id)}" type="button">
+             <span class="tile-img" data-thumb="${esc(item.id)}"></span>
+           </button>
+           <figcaption>${label} · ${esc(fmtDate(item.takenAt || item.createdAt))}</figcaption>
+         </figure>`
+      : `<figure class="compare-side compare-missing">
+           <span class="tile-img is-empty"></span>
+           <figcaption class="muted">No ${label.toLowerCase()} photo yet</figcaption>
+         </figure>`;
+    return `
+      <div class="section" style="margin-top:20px">
+        <div class="section-head"><h2>${esc(room.name)}</h2></div>
+        <div class="compare">${side(before, "Before")}${side(after, "After")}</div>
+      </div>`;
+  }).join("");
+}
+
+/** Thumbnails load after the layout is on screen, one document each. */
+async function hydrateThumbs() {
+  const slots = [...document.querySelectorAll("[data-thumb]")];
+  for (const slot of slots) {
+    const id = slot.dataset.thumb;
+    try {
+      const bytes = await store.loadThumb(state.ws.id, id);
+      if (!bytes) { slot.classList.add("is-empty"); continue; }
+      const url = media.toObjectUrl("t_" + id, bytes);
+      slot.style.backgroundImage = `url("${url}")`;
+      slot.classList.add("is-loaded");
+    } catch {
+      slot.classList.add("is-empty");
+    }
+  }
+}
+
+async function openLightbox(mediaId, items, mayEdit) {
+  const item = items.find((i) => i.id === mediaId);
+  if (!item) return;
+
+  const body = openModal({
+    title: item.caption || store.mediaCategoryLabel(item.category),
+    hideConfirm: true,
+    body: `
+      <div class="lightbox"><div class="lightbox-img is-loading" id="lb-img"></div></div>
+      <dl class="meta-list">
+        <div><dt>Type</dt><dd>${esc(store.mediaCategoryLabel(item.category))}</dd></div>
+        ${item.roomId ? `<div><dt>Room</dt><dd>${esc(roomName(item.roomId))}</dd></div>` : ""}
+        <div><dt>Taken</dt><dd class="date">${esc(fmtDate(item.takenAt || item.createdAt))}</dd></div>
+        <div><dt>Size</dt><dd>${esc(media.formatBytes(item.bytes))} · ${item.width}×${item.height}</dd></div>
+      </dl>
+      ${mayEdit ? `<div class="row-actions" style="margin-top:14px">
+        <button class="btn btn-sec btn-sm" id="lb-edit">Edit details</button>
+        <button class="btn btn-ghost btn-sm" id="lb-delete">Delete</button>
+      </div>` : ""}`
+  });
+
+  try {
+    const bytes = await store.loadFullImage(state.ws.id, mediaId);
+    const slot = body.querySelector("#lb-img");
+    if (bytes && slot) {
+      slot.style.backgroundImage = `url("${media.toObjectUrl(mediaId, bytes, item.contentType)}")`;
+      slot.classList.remove("is-loading");
+    }
+  } catch (err) {
+    const slot = body.querySelector("#lb-img");
+    if (slot) { slot.classList.remove("is-loading"); slot.textContent = store.describeError(err); }
+  }
+
+  body.querySelector("#lb-delete")?.addEventListener("click", () => {
+    confirmDialog({
+      title: "Delete this photo?",
+      message: "The image and its thumbnail are removed. This cannot be undone.",
+      confirmText: "Delete",
+      onConfirm: async () => {
+        await store.deleteMedia(state.ws.id, mediaId);
+        media.forgetObjectUrl(mediaId);
+        media.forgetObjectUrl("t_" + mediaId);
+        toast("Photo deleted.");
+        renderRoute();
+      }
+    });
+  });
+
+  body.querySelector("#lb-edit")?.addEventListener("click", () => promptPhotoMeta(item));
+}
+
+function promptPhotoMeta(item) {
+  openModal({
+    title: "Photo details",
+    confirmText: "Save",
+    body: photoFieldsHtml(item, false),
+    onConfirm: async () => {
+      await store.updateMediaMeta(state.ws.id, item.id, {
+        category: $("#pm-cat").value,
+        caption: $("#pm-caption").value,
+        roomId: $("#pm-room").value,
+        projectId: $("#pm-project").value,
+        tags: $("#pm-tags").value.split(",")
+      });
+      toast("Photo updated.");
+      renderRoute();
+    }
+  });
+}
+
+function photoFieldsHtml(item, isUpload) {
+  return `
+    ${isUpload ? `<p class="muted" style="margin-bottom:14px">These details apply to every
+      photo in this batch. You can change any of them afterwards.</p>` : ""}
+    <div class="field">
+      <label for="pm-cat">Type
+        <span class="info" title="Before, in progress and after drive the comparison view. Receipts and plans keep paperwork out of the photo stream.">i</span>
+      </label>
+      <select id="pm-cat" ${isUpload ? 'class="needs-choice"' : ""}>
+        ${store.MEDIA_CATEGORIES.map((c) => `<option value="${c.value}" ${item?.category === c.value ? "selected" : ""}>${c.label}</option>`).join("")}
+      </select>
+      <span class="hint">Before and After power the side-by-side comparison.</span>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="pm-room">Room</label>
+        <select id="pm-room">
+          <option value="">Not room-specific</option>
+          ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${item?.roomId === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+        </select>
+      </div>
+      <div class="field">
+        <label for="pm-project">Project</label>
+        <select id="pm-project">
+          <option value="">None</option>
+          ${(state.projects || []).map((p) => `<option value="${esc(p.id)}" ${item?.projectId === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label for="pm-caption">Caption</label>
+      <input type="text" id="pm-caption" maxlength="500" value="${esc(item?.caption || "")}"
+             placeholder="Soffit above the sink" autocomplete="off">
+    </div>
+    <div class="field">
+      <label for="pm-tags">Tags</label>
+      <input type="text" id="pm-tags" value="${esc((item?.tags || []).join(", "))}"
+             placeholder="cabinets, tile" autocomplete="off">
+    </div>`;
+}
+
+function promptUpload(files) {
+  const tooMany = files.length > 20 ? files.slice(0, 20) : files;
+
+  openModal({
+    title: `Add ${tooMany.length} photo${tooMany.length === 1 ? "" : "s"}`,
+    confirmText: "Upload",
+    body: `
+      ${files.length > 20 ? `<p class="field-error">Only the first 20 will be added.</p>` : ""}
+      ${photoFieldsHtml(null, true)}
+      <div id="upload-progress" class="hidden">
+        <div class="progress"><i id="up-bar" style="width:0%"></i></div>
+        <p class="muted" id="up-label" style="margin-top:8px"></p>
+      </div>`,
+    onConfirm: async () => {
+      const meta = {
+        category: $("#pm-cat").value,
+        caption: $("#pm-caption").value,
+        roomId: $("#pm-room").value,
+        projectId: $("#pm-project").value,
+        tags: $("#pm-tags").value.split(",")
+      };
+
+      $("#upload-progress").classList.remove("hidden");
+      const bar = $("#up-bar");
+      const label = $("#up-label");
+      let done = 0;
+      const failures = [];
+
+      for (const file of tooMany) {
+        label.textContent = `Processing ${file.name}…`;
+        try {
+          const processed = await media.processImage(file);
+          await store.saveMedia(state.ws.id, processed, { ...meta, fileName: file.name });
+        } catch (err) {
+          failures.push(`${file.name}: ${store.describeError(err)}`);
+        }
+        done++;
+        bar.style.width = `${Math.round((done / tooMany.length) * 100)}%`;
+      }
+
+      if (failures.length) {
+        showModalError(failures.join(" · "));
+        label.textContent = `${done - failures.length} of ${tooMany.length} added.`;
+        if (failures.length === tooMany.length) return false;
+      }
+
+      track("photo_upload", { count: done - failures.length });
+      toast(`${done - failures.length} photo${done - failures.length === 1 ? "" : "s"} added.`);
+      renderRoute();
+    }
+  });
+
+  const cat = $("#pm-cat");
+  cat?.addEventListener("change", () => cat.classList.remove("needs-choice"));
+}
+
+// ============================================================
+// View — Ideas
+// ============================================================
+async function viewIdeas(host) {
+  const ws = state.ws;
+  const mayEdit = store.canEdit(ws.myRole);
+
+  host.innerHTML = `
+    <div class="view-head">
+      <div class="grow">
+        <h1>Ideas</h1>
+        <p>Products, materials and inspiration you are considering — with where you
+           found them, what they cost, and whether you chose them.</p>
+      </div>
+      ${mayEdit ? `<button class="btn" id="btn-new-idea">Save an idea</button>` : ""}
+    </div>
+    <div class="loading">Loading ideas…</div>`;
+
+  $("#btn-new-idea")?.addEventListener("click", () => promptIdea(null));
+
+  let ideas = [];
+  try {
+    [ideas, state.rooms, state.projects] = await Promise.all([
+      store.loadIdeas(ws.id),
+      store.loadRooms(ws.id),
+      store.loadProjects(ws.id)
+    ]);
+  } catch (err) {
+    host.querySelector(".loading").outerHTML =
+      `<div class="error-box">${esc(store.describeError(err))}</div>`;
+    return;
+  }
+
+  if (!ideas.length) {
+    host.querySelector(".loading").outerHTML = `
+      <div class="empty">
+        <h3>No ideas saved yet</h3>
+        <p>When you find a tile, a fixture or a finish worth remembering, save it here
+           with its price and a link. Later you will not remember which of the four
+           shortlisted faucets was the one you liked.</p>
+        ${mayEdit ? `<button class="btn" id="btn-first-idea">Save an idea</button>` : ""}
+      </div>`;
+    $("#btn-first-idea")?.addEventListener("click", () => promptIdea(null));
+    return;
+  }
+
+  const filtered = ideas.filter((i) =>
+    (!ideaUI.status || i.status === ideaUI.status) &&
+    (!ideaUI.room || i.roomId === ideaUI.room));
+
+  host.querySelector(".loading").outerHTML = `
+    <div class="toolbar">
+      <select id="id-status" aria-label="Filter by status">
+        <option value="">Any status</option>
+        ${store.IDEA_STATUSES.map((s) => `<option value="${s.value}" ${ideaUI.status === s.value ? "selected" : ""}>${s.label}</option>`).join("")}
+      </select>
+      <select id="id-room" aria-label="Filter by room">
+        <option value="">All rooms</option>
+        ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${ideaUI.room === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+      </select>
+    </div>
+    <p class="muted result-count">${filtered.length} of ${ideas.length} shown</p>
+    <div class="grid">
+      ${filtered.map((idea) => `
+        <div class="card idea-card" data-idea="${esc(idea.id)}">
+          <div class="room-top">
+            <h3 class="wrap-any">${esc(idea.title)}</h3>
+            <span class="chip ${idea.status === "selected" || idea.status === "purchased" ? "chip-good" : idea.status === "rejected" ? "chip-out" : "chip-solid"}">${esc(store.ideaStatusLabel(idea.status))}</span>
+          </div>
+          <div class="idea-meta">
+            ${idea.vendor ? `<span class="wrap-any">${esc(idea.vendor)}</span>` : ""}
+            ${idea.model ? `<span class="muted wrap-any">${esc(idea.model)}</span>` : ""}
+            ${idea.estPrice != null ? `<span class="num idea-price">${esc(fmtMoney(idea.estPrice))}</span>` : ""}
+          </div>
+          ${idea.roomId ? `<span class="chip">${esc(roomName(idea.roomId))}</span>` : ""}
+          ${idea.notes ? `<p class="room-notes wrap-any">${esc(idea.notes)}</p>` : ""}
+          <div class="row-actions">
+            ${idea.sourceUrl ? `<a class="btn btn-ghost btn-sm" href="${esc(idea.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ""}
+            ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-idea-edit="${esc(idea.id)}">Edit</button>
+            <button class="btn btn-ghost btn-sm" data-idea-delete="${esc(idea.id)}">Delete</button>` : ""}
+          </div>
+        </div>`).join("")}
+    </div>`;
+
+  const bind = (sel, prop) => {
+    const el = $(sel);
+    el?.addEventListener("change", () => { ideaUI[prop] = el.value; renderRoute(); });
+  };
+  bind("#id-status", "status");
+  bind("#id-room", "room");
+
+  document.querySelectorAll("[data-idea-edit]").forEach((btn) => {
+    btn.addEventListener("click", () =>
+      promptIdea(ideas.find((i) => i.id === btn.dataset.ideaEdit)));
+  });
+  document.querySelectorAll("[data-idea-delete]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idea = ideas.find((i) => i.id === btn.dataset.ideaDelete);
+      confirmDialog({
+        title: "Delete this idea?",
+        message: `"${idea.title}" will be removed. This cannot be undone.`,
+        confirmText: "Delete",
+        onConfirm: async () => {
+          await store.deleteIdea(state.ws.id, idea.id);
+          toast("Idea deleted.");
+          renderRoute();
+        }
+      });
+    });
+  });
+}
+
+function promptIdea(idea) {
+  const editing = !!idea;
+  openModal({
+    title: editing ? "Edit idea" : "Save an idea",
+    confirmText: editing ? "Save changes" : "Save idea",
+    body: `
+      <div class="field">
+        <label for="ix-title">What is it</label>
+        <input type="text" id="ix-title" maxlength="160" value="${esc(idea?.title || "")}"
+               placeholder="Matte white shaker cabinet" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ix-status">Status
+            <span class="info" title="Track a candidate from saved through shortlisted to selected or rejected, so old options stay on record.">i</span>
+          </label>
+          <select id="ix-status" ${editing ? "" : 'class="needs-choice"'}>
+            ${store.IDEA_STATUSES.map((s) => `<option value="${s.value}" ${(idea?.status || "saved") === s.value ? "selected" : ""}>${s.label}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="ix-room">Room</label>
+          <select id="ix-room">
+            <option value="">Not room-specific</option>
+            ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${idea?.roomId === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ix-vendor">Vendor or brand</label>
+          <input type="text" id="ix-vendor" maxlength="120" value="${esc(idea?.vendor || "")}" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ix-model">Model or SKU
+            <span class="info" title="Worth recording now: it is what you need to reorder, claim a warranty, or match a finish years later.">i</span>
+          </label>
+          <input type="text" id="ix-model" maxlength="120" value="${esc(idea?.model || "")}" autocomplete="off">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ix-price">Estimated price</label>
+          <div class="money-wrap">
+            <span class="money-prefix">$</span>
+            <input type="number" id="ix-price" min="0" step="0.01" class="money-input"
+                   value="${idea?.estPrice != null ? idea.estPrice.toFixed(2) : ""}">
+          </div>
+        </div>
+        <div class="field">
+          <label for="ix-project">Project</label>
+          <select id="ix-project">
+            <option value="">None</option>
+            ${(state.projects || []).map((p) => `<option value="${esc(p.id)}" ${idea?.projectId === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="ix-url">Where you found it</label>
+        <input type="text" id="ix-url" maxlength="500" value="${esc(idea?.sourceUrl || "")}"
+               placeholder="example.com/product" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="ix-notes">Notes</label>
+        <textarea id="ix-notes" maxlength="4000" placeholder="Why it works, what worries you, alternatives…">${esc(idea?.notes || "")}</textarea>
+      </div>`,
+    onConfirm: async () => {
+      const data = {
+        title: $("#ix-title").value,
+        status: $("#ix-status").value,
+        roomId: $("#ix-room").value,
+        projectId: $("#ix-project").value,
+        vendor: $("#ix-vendor").value,
+        model: $("#ix-model").value,
+        estPrice: $("#ix-price").value,
+        sourceUrl: $("#ix-url").value,
+        notes: $("#ix-notes").value
+      };
+      if (!data.title.trim()) { showModalError("Give the idea a title."); return false; }
+      if (editing) {
+        await store.updateIdea(state.ws.id, idea.id, data);
+        toast("Idea updated.");
+      } else {
+        await store.createIdea(state.ws.id, data);
+        track("idea_create");
+        toast("Idea saved.");
+      }
+      renderRoute();
+    }
+  });
+
+  // House standard: money fields settle to two decimals when you leave them.
+  const price = $("#ix-price");
+  price?.addEventListener("blur", () => {
+    const n = Number(price.value);
+    if (Number.isFinite(n) && price.value !== "") price.value = n.toFixed(2);
+  });
+
+  const statusSel = $("#ix-status");
+  statusSel?.addEventListener("change", () => statusSel.classList.remove("needs-choice"));
+}
+
+// ============================================================
 // View — Rooms
 // ============================================================
 function roomCardHtml(room) {
@@ -1850,6 +2470,19 @@ function iconList() {
     <path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3.6" cy="6" r="1.3" fill="currentColor" stroke="none"/>
     <circle cx="3.6" cy="12" r="1.3" fill="currentColor" stroke="none"/>
     <circle cx="3.6" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>`;
+}
+function iconPhoto() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <rect x="3" y="5" width="18" height="14" rx="2.5"/><circle cx="9" cy="10.5" r="1.8"/>
+    <path d="m4.5 17 4.2-4.2a2 2 0 0 1 2.8 0L16 17.5"/><path d="m14.5 14 1.6-1.6a2 2 0 0 1 2.8 0l1.6 1.6"/></svg>`;
+}
+function iconBulb() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <path d="M9.5 17.5a5.8 5.8 0 1 1 5 0"/><path d="M9.7 17.5h4.6"/><path d="M10.3 20.5h3.4"/></svg>`;
+}
+function iconMore() {
+  return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>`;
 }
 function iconGear() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">

@@ -287,6 +287,77 @@ service cloud.firestore {
         allow delete: if canEdit(wsId);
       }
 
+      // ---------- media and ideas (M3) ----------
+      // A photo is three documents: metadata, a thumbnail, and the full
+      // compressed image. Galleries read only metadata + thumbnails, so
+      // browsing stays cheap against the free tier's daily read quota.
+      // Firestore caps a document at 1 MiB; the payload limits below leave
+      // room for the rest of the document.
+      function mediaCategories() {
+        return ['before', 'progress', 'after', 'inspiration', 'damage',
+                'receipt', 'plan', 'document'];
+      }
+      function mediaValid() {
+        return request.resource.data.category in mediaCategories()
+          && textWithin('caption', 500)
+          && textWithin('roomId', 64)
+          && textWithin('projectId', 64)
+          && request.resource.data.tags is list
+          && request.resource.data.tags.size() <= 20;
+      }
+
+      match /media/{mediaId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped() && mediaValid();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && mediaValid();
+        allow delete: if canEdit(wsId);
+      }
+
+      // Payloads are stored as native bytes, not base64: base64 would inflate
+      // every image by a third against the free tier's 1 GiB.
+      match /mediaThumbs/{mediaId} {
+        allow read: if isMember(wsId);
+        allow create, update: if canEdit(wsId)
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() <= 80000;
+        allow delete: if canEdit(wsId);
+      }
+
+      match /mediaBlobs/{mediaId} {
+        allow read: if isMember(wsId);
+        allow create, update: if canEdit(wsId)
+          && request.resource.data.data is bytes
+          && request.resource.data.data.size() <= 950000;
+        allow delete: if canEdit(wsId);
+      }
+
+      function ideaStatuses() {
+        return ['saved', 'researching', 'shortlisted', 'selected', 'purchased', 'rejected'];
+      }
+
+      match /ideas/{ideaId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped() && ideaValid();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && ideaValid();
+        allow delete: if canEdit(wsId);
+      }
+      function ideaValid() {
+        return request.resource.data.title is string
+          && request.resource.data.title.size() > 0
+          && request.resource.data.title.size() <= 160
+          && request.resource.data.status in ideaStatuses()
+          && request.resource.data.tags is list
+          && request.resource.data.tags.size() <= 20
+          && textWithin('sourceUrl', 500)
+          && textWithin('vendor', 120)
+          && textWithin('model', 120)
+          && textWithin('notes', 4000)
+          && (!('estPrice' in request.resource.data)
+              || request.resource.data.estPrice == null
+              || (request.resource.data.estPrice is number
+                  && request.resource.data.estPrice >= 0));
+      }
+
       // ---------- private notes ----------
       // Physically separate from the records they annotate, so a scoped
       // contractor grant (M5) cannot select them even by guessing an id, and

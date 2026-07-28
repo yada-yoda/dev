@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.2.0";
+import { firestore, currentUser } from "./firebase-config.js?v=0.3.0";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -807,6 +807,202 @@ export async function savePrivateNote(wsId, parentId, body) {
     createdAt: m.serverTimestamp(),
     updatedAt: m.serverTimestamp()
   }, { merge: true });
+}
+
+// ============================================================
+// Media
+//
+// Three documents per photo: metadata, thumbnail, full image. Galleries
+// read metadata + thumbnails only; the full image loads when opened.
+// ============================================================
+
+export const MEDIA_CATEGORIES = [
+  { value: "before",      label: "Before" },
+  { value: "progress",    label: "In progress" },
+  { value: "after",       label: "After" },
+  { value: "inspiration", label: "Inspiration" },
+  { value: "damage",      label: "Damage or issue" },
+  { value: "receipt",     label: "Receipt" },
+  { value: "plan",        label: "Plan or drawing" },
+  { value: "document",    label: "Document" }
+];
+
+export const mediaCategoryLabel = (v) =>
+  MEDIA_CATEGORIES.find((c) => c.value === v)?.label || "Photo";
+
+export async function loadMedia(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.collection(db, "workspaces", wsId, "media"));
+  return snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      takenAt: toDate(d.data().takenAt),
+      createdAt: toDate(d.data().createdAt),
+      tags: Array.isArray(d.data().tags) ? d.data().tags : []
+    }))
+    .sort((a, b) => (b.takenAt?.getTime() || b.createdAt?.getTime() || 0) -
+      (a.takenAt?.getTime() || a.createdAt?.getTime() || 0));
+}
+
+export async function loadThumb(wsId, mediaId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDoc(m.doc(db, "workspaces", wsId, "mediaThumbs", mediaId));
+  return snap.exists() ? snap.data().data : null;
+}
+
+export async function loadFullImage(wsId, mediaId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDoc(m.doc(db, "workspaces", wsId, "mediaBlobs", mediaId));
+  return snap.exists() ? snap.data().data : null;
+}
+
+/**
+ * Writes the three documents in one batch, so a photo can never end up as
+ * metadata pointing at an image that is not there.
+ */
+export async function saveMedia(wsId, processed, meta) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "media"));
+
+  const batch = m.writeBatch(db);
+  batch.set(ref, {
+    category: MEDIA_CATEGORIES.some((c) => c.value === meta.category) ? meta.category : "progress",
+    caption: trimTo(meta.caption, 500),
+    roomId: meta.roomId || null,
+    projectId: meta.projectId || null,
+    tags: (Array.isArray(meta.tags) ? meta.tags : [])
+      .map((t) => trimTo(t, 24).toLowerCase()).filter(Boolean).slice(0, 20),
+    fileName: trimTo(meta.fileName, 200),
+    contentType: processed.type,
+    width: processed.width,
+    height: processed.height,
+    bytes: processed.bytes,
+    takenAt: meta.takenAt ? m.Timestamp.fromDate(new Date(meta.takenAt)) : m.serverTimestamp(),
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  batch.set(m.doc(db, "workspaces", wsId, "mediaThumbs", ref.id), {
+    data: m.Bytes.fromUint8Array(processed.thumb)
+  });
+  batch.set(m.doc(db, "workspaces", wsId, "mediaBlobs", ref.id), {
+    data: m.Bytes.fromUint8Array(processed.full)
+  });
+  await batch.commit();
+  return ref.id;
+}
+
+export async function updateMediaMeta(wsId, mediaId, meta) {
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "media", mediaId), {
+    category: MEDIA_CATEGORIES.some((c) => c.value === meta.category) ? meta.category : "progress",
+    caption: trimTo(meta.caption, 500),
+    roomId: meta.roomId || null,
+    projectId: meta.projectId || null,
+    tags: (Array.isArray(meta.tags) ? meta.tags : [])
+      .map((t) => trimTo(t, 24).toLowerCase()).filter(Boolean).slice(0, 20),
+    updatedAt: m.serverTimestamp()
+  });
+}
+
+export async function deleteMedia(wsId, mediaId) {
+  const { db, m } = await firestore();
+  const batch = m.writeBatch(db);
+  batch.delete(m.doc(db, "workspaces", wsId, "mediaBlobs", mediaId));
+  batch.delete(m.doc(db, "workspaces", wsId, "mediaThumbs", mediaId));
+  batch.delete(m.doc(db, "workspaces", wsId, "media", mediaId));
+  await batch.commit();
+}
+
+/** Total stored image bytes, for the storage meter in Settings. */
+export function totalMediaBytes(media) {
+  return media.reduce((sum, item) => sum + (item.bytes || 0), 0);
+}
+
+// ============================================================
+// Ideas
+// ============================================================
+
+export const IDEA_STATUSES = [
+  { value: "saved",       label: "Saved" },
+  { value: "researching", label: "Researching" },
+  { value: "shortlisted", label: "Shortlisted" },
+  { value: "selected",    label: "Selected" },
+  { value: "purchased",   label: "Purchased" },
+  { value: "rejected",    label: "Rejected" }
+];
+
+export const ideaStatusLabel = (v) =>
+  IDEA_STATUSES.find((s) => s.value === v)?.label || "Saved";
+
+function ideaPayload(data) {
+  const title = trimTo(data.title, 160);
+  if (!title) throw new Error("Give the idea a title.");
+
+  let price = Number(data.estPrice);
+  if (!Number.isFinite(price) || price < 0) price = null;
+  else price = Math.round(price * 100) / 100;
+
+  let url = trimTo(data.sourceUrl, 500);
+  if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;
+
+  return {
+    title,
+    status: IDEA_STATUSES.some((s) => s.value === data.status) ? data.status : "saved",
+    roomId: data.roomId || null,
+    projectId: data.projectId || null,
+    tags: (Array.isArray(data.tags) ? data.tags : String(data.tags || "").split(","))
+      .map((t) => trimTo(t, 24).toLowerCase()).filter(Boolean).slice(0, 20),
+    sourceUrl: url,
+    vendor: trimTo(data.vendor, 120),
+    model: trimTo(data.model, 120),
+    estPrice: price,
+    notes: trimTo(data.notes, 4000),
+    mediaId: data.mediaId || null
+  };
+}
+
+export async function loadIdeas(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.collection(db, "workspaces", wsId, "ideas"));
+  const order = IDEA_STATUSES.map((s) => s.value);
+  return snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      createdAt: toDate(d.data().createdAt),
+      tags: Array.isArray(d.data().tags) ? d.data().tags : []
+    }))
+    .sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status) ||
+      (a.title || "").localeCompare(b.title || ""));
+}
+
+export async function createIdea(wsId, data) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "ideas"));
+  await m.setDoc(ref, {
+    ...ideaPayload(data),
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  return ref.id;
+}
+
+export async function updateIdea(wsId, ideaId, data) {
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId), {
+    ...ideaPayload(data),
+    updatedAt: m.serverTimestamp()
+  });
+}
+
+export async function deleteIdea(wsId, ideaId) {
+  const { db, m } = await firestore();
+  await m.deleteDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId));
 }
 
 // ---------- activity ----------

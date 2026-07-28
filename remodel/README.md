@@ -7,10 +7,10 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.2.0 — Milestone 2 (projects).** Sign-in, workspaces, roles,
-invitations, rooms, and now projects with phases and tasks. Photos, budgets,
-the product registry and contractor sharing arrive in later milestones (see
-the roadmap below).
+**Status: v0.3.0 — Milestone 3 (photos and ideas).** Sign-in, workspaces,
+roles, invitations, rooms, projects with phases and tasks, and now photos and
+an idea library. Budgets, the product registry and contractor sharing arrive
+in later milestones (see the roadmap below).
 
 ---
 
@@ -41,6 +41,14 @@ the roadmap below).
   including the owner — shown per project and on the dashboard.
 - **Dashboard.** Overall completion, active projects, blocked work needing
   attention, overdue tasks and recent activity.
+- **Photos.** Multi-file upload (the camera, on a phone), sorted into before,
+  in progress, after, inspiration, damage, receipts and plans. Grid, timeline
+  by month, and a side-by-side before/after comparison per room. Filter by
+  room, project or type.
+- **Ideas.** Products and materials you are considering, with vendor, model or
+  SKU, estimated price, a link to where you found it, and a status from Saved
+  through Shortlisted to Selected, Purchased or Rejected — so the options you
+  turned down stay on record.
 
 ## Roadmap
 
@@ -48,7 +56,7 @@ the roadmap below).
 |---|---|
 | 1 (done) | Foundation: auth, workspaces, roles, invitations, rooms, security rules |
 | 2 (done) | Projects, phases, tasks, tags, list and board views, activity log |
-| 3 | Photos and ideas: compressed uploads, before/after galleries, mood boards |
+| 3 (done) | Photos and ideas: compressed uploads, galleries, before/after comparison |
 | 4 | Budget, expenses, contractors, contractor jobs, product and purchase registry |
 | 5 | Scoped contractor sharing with start and expiry dates, contractor portal |
 | 6 | PDF reports, CSV exports, full ZIP backup, import and restore |
@@ -156,6 +164,30 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.3.0
+
+Photos and ideas — the two things people reach for first and regret not having
+later.
+
+Photos are processed entirely in the browser before they are stored: EXIF
+orientation is applied and then all EXIF is discarded, which means **GPS
+coordinates never reach the database** and cannot leak into a photo shared
+with a contractor. Each image is resized and encoded to WebP, stepping quality
+down until it fits, and a separate small thumbnail is produced. Galleries load
+only thumbnails, so browsing a few hundred photos costs a few hundred small
+reads rather than a few hundred full images — which matters on a free tier
+with a daily read quota.
+
+Images are stored as native bytes rather than base64. Base64 would inflate
+every photo by a third against the 1 GiB the free plan allows, for no benefit.
+
+The idea library records vendor, model or SKU, price and source link against a
+status, and keeps rejected options rather than deleting them — the point is to
+remember which of four shortlisted faucets you chose, and why the others lost.
+
+The navigation outgrew a phone's bottom bar at seven sections, so the four most
+used stay on the bar and the rest moved behind More.
 
 ### 0.2.0
 
