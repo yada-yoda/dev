@@ -428,7 +428,11 @@ rules test suite for every preset (the milestone is not done until the
 adversarial tests pass).
 
 **M6 — Reports & backup.** Print/PDF reports, CSV exports, ZIP backup,
-import/restore wizard.
+import/restore wizard. **CSV import landed early in v0.5.0** (`importer.js`
+— parse → preview → apply, column matching by intent, dedupe by title,
+auto-creates missing rooms, routes to projects or ideas by file shape),
+because a real Notion list needed migrating. Reuse that three-step shape
+for the full restore wizard.
 
 **M7 — Advanced.** Bids + comparison, change orders, decision log, punch
 lists, permits/inspections/warranties, deliveries, in-app notifications;

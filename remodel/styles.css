@@ -616,6 +616,18 @@ select.needs-choice {
 }
 .money-input { padding-left: 24px; font-variant-numeric: tabular-nums; }
 
+/* Import preview: a scrollable list inside the modal, never a page-wide
+   table. Vertical scrolling only. */
+.import-preview {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  max-height: 300px;
+  overflow-y: auto;
+}
+.import-preview table { font-size: 13px; }
+.import-preview th { position: sticky; top: 0; background: var(--bg); z-index: 1; }
+
 .more-menu { display: flex; flex-direction: column; gap: 2px; }
 .more-menu a {
   display: flex; align-items: center; gap: 12px;

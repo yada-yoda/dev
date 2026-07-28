@@ -8,11 +8,12 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.4.0";
-import * as store from "./store.js?v=0.4.0";
-import * as media from "./media.js?v=0.4.0";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.5.0";
+import * as store from "./store.js?v=0.5.0";
+import * as media from "./media.js?v=0.5.0";
+import * as importer from "./importer.js?v=0.5.0";
 
-export const VERSION = "0.4.0";
+export const VERSION = "0.5.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -2686,6 +2687,20 @@ async function viewSettings(host) {
       </div>
     </div>
 
+    ${store.canEdit(ws.myRole) ? `
+      <div class="section">
+        <div class="section-head"><h2>Import projects</h2></div>
+        <div class="card">
+          <p class="muted">Bring a project list in from another tool as a CSV — from
+             Notion, use <strong>••• &rarr; Export &rarr; Markdown &amp; CSV</strong>.
+             Rooms, statuses, priorities and dates are matched automatically, you see
+             exactly what will be created before anything is written, and projects you
+             already have are skipped rather than duplicated.</p>
+          <input type="file" id="import-file" accept=".csv,text/csv" class="hidden">
+          <div style="margin-top:14px"><button class="btn btn-sec btn-sm" id="btn-import">Choose a CSV file</button></div>
+        </div>
+      </div>` : ""}
+
     <div class="section">
       <div class="section-head"><h2>Storage</h2></div>
       <div class="card" id="storage-card"><p class="muted">Checking…</p></div>
@@ -2741,6 +2756,14 @@ async function viewSettings(host) {
   }).catch(() => {
     const card = $("#storage-card");
     if (card) card.innerHTML = `<p class="muted">Storage usage unavailable.</p>`;
+  });
+
+  const importInput = $("#import-file");
+  $("#btn-import")?.addEventListener("click", () => importInput.click());
+  importInput?.addEventListener("change", async () => {
+    const file = importInput.files?.[0];
+    importInput.value = "";
+    if (file) await promptImport(file);
   });
 
   $("#btn-rename")?.addEventListener("click", async () => {
@@ -2807,6 +2830,249 @@ async function viewSettings(host) {
         renderPicker();
       }
     });
+  });
+}
+
+// ============================================================
+// Import — parse, preview, then apply. Nothing is written until the
+// preview has been confirmed.
+// ============================================================
+async function promptImport(file) {
+  const ws = state.ws;
+  let parsed, plan, existingRooms;
+
+  try {
+    const text = await file.text();
+    parsed = importer.parseCsv(text);
+    if (!parsed.records.length) throw new Error("That file has no rows.");
+
+    const [projects, rooms] = await Promise.all([
+      store.loadProjects(ws.id),
+      store.loadRooms(ws.id)
+    ]);
+    existingRooms = rooms;
+    const columns = importer.detectColumns(parsed.headers);
+    plan = importer.buildPlan(parsed.records, columns, { projects, rooms });
+
+    if (!plan.projects.length) {
+      return openModal({
+        title: "Nothing to import",
+        hideConfirm: true,
+        body: `<p>${parsed.records.length} row${parsed.records.length === 1 ? "" : "s"} were read,
+               but none can be added.</p>
+               ${plan.skipped.length ? `<ul class="plain-list" style="margin-top:12px">
+                 ${plan.skipped.slice(0, 12).map((s) =>
+                   `<li><span class="wrap-any">${esc(s.title)}</span>
+                     <span class="muted" style="margin-left:auto">${esc(s.reason)}</span></li>`).join("")}
+               </ul>` : ""}
+               ${!Object.keys(importer.detectColumns(parsed.headers)).includes("title")
+                 ? `<p class="field-error" style="margin-top:12px">No name column was found.
+                    Columns seen: ${esc(parsed.headers.join(", "))}</p>` : ""}`
+      });
+    }
+  } catch (err) {
+    return openModal({
+      title: "Could not read that file",
+      hideConfirm: true,
+      body: `<p>${esc(err.message || "The file could not be parsed as CSV.")}</p>`
+    });
+  }
+
+  const columns = importer.detectColumns(parsed.headers);
+  const target = importer.guessTarget(columns);
+  if (target === "ideas") return promptImportIdeas(file, parsed, columns);
+
+  const mapped = Object.entries(columns)
+    .map(([field, header]) => `${esc(header)} &rarr; ${field}`).join(" · ");
+  const ignored = parsed.headers.filter((h) => !Object.values(columns).includes(h));
+
+  openModal({
+    title: `Import ${plan.projects.length} project${plan.projects.length === 1 ? "" : "s"}?`,
+    confirmText: `Import ${plan.projects.length}`,
+    body: `
+      <p class="muted">From <strong>${esc(file.name)}</strong> — ${parsed.records.length}
+         row${parsed.records.length === 1 ? "" : "s"} read.</p>
+
+      ${plan.newRooms.length ? `
+        <p style="margin-top:12px"><strong>${plan.newRooms.length} new room${plan.newRooms.length === 1 ? "" : "s"}</strong>
+           will be created: ${esc(plan.newRooms.join(", "))}</p>` : ""}
+
+      <div class="import-preview">
+        <table>
+          <thead><tr><th>Project</th><th>Room</th><th>Status</th><th>Priority</th></tr></thead>
+          <tbody>
+            ${plan.projects.slice(0, 40).map((p) => `
+              <tr>
+                <td data-label="Project" class="wrap-any">${esc(p.title)}</td>
+                <td data-label="Room" class="wrap-any">${esc(p.roomName) || `<span class="muted">—</span>`}</td>
+                <td data-label="Status">${esc(store.statusLabel(p.status))}${
+                  p.tags.includes("wishlist") ? ` <span class="chip">wishlist</span>` : ""}</td>
+                <td data-label="Priority">${esc(store.priorityLabel(p.priority))}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+        ${plan.projects.length > 40 ? `<p class="muted" style="padding:8px 2px">
+          …and ${plan.projects.length - 40} more.</p>` : ""}
+      </div>
+
+      ${plan.skipped.length ? `
+        <p style="margin-top:14px"><strong>${plan.skipped.length} skipped</strong> —
+           ${esc([...new Set(plan.skipped.map((s) => s.reason))].join(", "))}.
+           Nothing you already have is overwritten.</p>` : ""}
+
+      <p class="muted" style="margin-top:14px;font-size:12px">
+        Columns matched: ${mapped || "none"}.
+        ${ignored.length ? `Ignored: ${esc(ignored.join(", "))}.` : ""}
+      </p>
+
+      <div id="import-progress" class="hidden" style="margin-top:14px">
+        <div class="progress"><i id="imp-bar" style="width:0%"></i></div>
+        <p class="muted" id="imp-label" style="margin-top:8px"></p>
+      </div>`,
+    onConfirm: async () => {
+      $("#import-progress").classList.remove("hidden");
+      const bar = $("#imp-bar");
+      const label = $("#imp-label");
+
+      // Rooms first, so projects can point at them.
+      const roomIdByName = new Map(existingRooms.map((r) => [r.name.toLowerCase(), r.id]));
+      if (plan.newRooms.length) {
+        label.textContent = `Creating ${plan.newRooms.length} room…`;
+        await store.createRooms(ws.id, plan.newRooms.map((name, i) => ({
+          name, type: "custom", sortOrder: existingRooms.length + i
+        })));
+        for (const room of await store.loadRooms(ws.id)) {
+          roomIdByName.set(room.name.toLowerCase(), room.id);
+        }
+      }
+
+      let done = 0;
+      const failures = [];
+      for (const p of plan.projects) {
+        label.textContent = `Adding ${p.title.slice(0, 60)}…`;
+        try {
+          await store.createProject(ws.id, {
+            ...p,
+            roomId: p.roomId || roomIdByName.get(p.roomName.toLowerCase()) || "",
+            sortOrder: done
+          });
+        } catch (err) {
+          failures.push(`${p.title}: ${store.describeError(err)}`);
+        }
+        done++;
+        bar.style.width = `${Math.round((done / plan.projects.length) * 100)}%`;
+      }
+
+      const added = done - failures.length;
+      track("projects_import", { count: added });
+      if (failures.length) {
+        showModalError(`${added} imported, ${failures.length} failed. ${failures[0]}`);
+        if (added === 0) return false;
+      }
+      toast(`${added} project${added === 1 ? "" : "s"} imported.`);
+      location.hash = "#/projects";
+      renderRoute();
+    }
+  });
+}
+
+/** Same preview-then-apply contract, for the idea library. */
+async function promptImportIdeas(file, parsed, columns) {
+  const ws = state.ws;
+  let plan, existingRooms;
+
+  try {
+    const [ideas, rooms] = await Promise.all([
+      store.loadIdeas(ws.id),
+      store.loadRooms(ws.id)
+    ]);
+    existingRooms = rooms;
+    plan = importer.buildIdeaPlan(parsed.records, columns, { ideas, rooms });
+  } catch (err) {
+    return openModal({
+      title: "Could not prepare the import",
+      hideConfirm: true,
+      body: `<p>${esc(store.describeError(err))}</p>`
+    });
+  }
+
+  if (!plan.ideas.length) {
+    return openModal({
+      title: "Nothing to import",
+      hideConfirm: true,
+      body: `<p>Every row in that file is already saved, or has no name.</p>`
+    });
+  }
+
+  openModal({
+    title: `Import ${plan.ideas.length} idea${plan.ideas.length === 1 ? "" : "s"}?`,
+    confirmText: `Import ${plan.ideas.length}`,
+    body: `
+      <p class="muted">From <strong>${esc(file.name)}</strong>. This file looks like
+         products rather than work, so it is going to the idea library.</p>
+      ${plan.newRooms.length ? `<p style="margin-top:12px"><strong>${plan.newRooms.length}
+         new room${plan.newRooms.length === 1 ? "" : "s"}</strong>: ${esc(plan.newRooms.join(", "))}</p>` : ""}
+      <div class="import-preview">
+        <table>
+          <thead><tr><th>Idea</th><th>Vendor</th><th class="num">Price</th><th>Room</th></tr></thead>
+          <tbody>
+            ${plan.ideas.slice(0, 40).map((i) => `
+              <tr>
+                <td data-label="Idea" class="wrap-any">${esc(i.title)}</td>
+                <td data-label="Vendor" class="wrap-any">${esc(i.vendor) || `<span class="muted">—</span>`}</td>
+                <td data-label="Price" class="num">${i.estPrice != null ? esc(fmtMoney(i.estPrice)) : "—"}</td>
+                <td data-label="Room" class="wrap-any">${esc(i.roomName) || `<span class="muted">—</span>`}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+      ${plan.skipped.length ? `<p style="margin-top:14px"><strong>${plan.skipped.length}
+         skipped</strong> — ${esc([...new Set(plan.skipped.map((s) => s.reason))].join(", "))}.</p>` : ""}
+      <div id="import-progress" class="hidden" style="margin-top:14px">
+        <div class="progress"><i id="imp-bar" style="width:0%"></i></div>
+        <p class="muted" id="imp-label" style="margin-top:8px"></p>
+      </div>`,
+    onConfirm: async () => {
+      $("#import-progress").classList.remove("hidden");
+      const bar = $("#imp-bar");
+      const label = $("#imp-label");
+
+      const roomIdByName = new Map(existingRooms.map((r) => [r.name.toLowerCase(), r.id]));
+      if (plan.newRooms.length) {
+        await store.createRooms(ws.id, plan.newRooms.map((name, i) => ({
+          name, type: "custom", sortOrder: existingRooms.length + i
+        })));
+        for (const room of await store.loadRooms(ws.id)) {
+          roomIdByName.set(room.name.toLowerCase(), room.id);
+        }
+      }
+
+      let done = 0;
+      const failures = [];
+      for (const idea of plan.ideas) {
+        label.textContent = `Saving ${idea.title.slice(0, 60)}…`;
+        try {
+          await store.createIdea(ws.id, {
+            ...idea,
+            roomId: idea.roomId || roomIdByName.get(idea.roomName.toLowerCase()) || ""
+          });
+        } catch (err) {
+          failures.push(`${idea.title}: ${store.describeError(err)}`);
+        }
+        done++;
+        bar.style.width = `${Math.round((done / plan.ideas.length) * 100)}%`;
+      }
+
+      const added = done - failures.length;
+      track("ideas_import", { count: added });
+      if (failures.length) {
+        showModalError(`${added} imported, ${failures.length} failed. ${failures[0]}`);
+        if (added === 0) return false;
+      }
+      toast(`${added} idea${added === 1 ? "" : "s"} imported.`);
+      location.hash = "#/ideas";
+      renderRoute();
+    }
   });
 }
 

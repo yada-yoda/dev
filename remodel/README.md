@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.4.0 — Milestone 4 in progress (budget).** Sign-in, workspaces,
+**Status: v0.5.0 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -50,6 +50,9 @@ in later milestones (see the roadmap below).
   credit. Approved budgets are set per project, and the totals show committed
   versus paid versus outstanding, per project and overall, with upcoming
   payments called out.
+- **Import.** Bring a project or idea list in from another tool as a CSV.
+  Columns are matched automatically, you see exactly what will be created
+  before anything is written, and re-running the same file is safe.
 - **Ideas.** Products and materials you are considering, with vendor, model or
   SKU, estimated price, a link to where you found it, and a status from Saved
   through Shortlisted to Selected, Purchased or Rejected — so the options you
@@ -200,6 +203,27 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.5.0
+
+CSV import, in Settings. Built because a real project list already existed in
+another tool, and retyping it would have been both tedious and lossy.
+
+It reads a CSV exported from Notion (••• → Export → Markdown & CSV) or
+anything shaped like one. Column names are matched on intent rather than
+exact text, so "Name" or "Title", "Room" or "Area", "Finish Date" or "Due"
+all land in the right place. A row listing several rooms keeps the first as
+the room and the rest as tags, because a project belongs to one room but the
+information is worth keeping. Rooms that do not exist yet are created.
+
+The file decides where it goes: a sheet with vendors, prices and links is an
+idea list, one with statuses and dates is a project list.
+
+Three deliberate properties. Nothing is written until a preview has been
+confirmed — an import that silently creates fifty records is impossible to
+undo. Projects you already have are skipped rather than duplicated, so
+re-running the same file is safe. And an empty price stays empty rather than
+becoming zero, because "free" and "I don't know yet" are different facts.
 
 ### 0.4.0
 
