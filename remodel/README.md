@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.5.0 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
+**Status: v0.6.0 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -56,7 +56,8 @@ in later milestones (see the roadmap below).
 - **Ideas.** Products and materials you are considering, with vendor, model or
   SKU, estimated price, a link to where you found it, and a status from Saved
   through Shortlisted to Selected, Purchased or Rejected — so the options you
-  turned down stay on record.
+  turned down stay on record. Each idea can carry a photo, which also files
+  itself under Photos as Inspiration.
 
 ## Roadmap
 
@@ -203,6 +204,21 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.6.0
+
+Ideas can now carry a photo. Choosing a sofa or a tile is a visual decision,
+and an idea with a vendor and a price but no picture is missing the part you
+actually judge it on.
+
+**Add photo** on an idea card runs the image through the same pipeline as
+everything else — resized, compressed, EXIF and GPS stripped — and the photo
+lands in Photos as Inspiration too, tagged and captioned with the idea's
+name. The idea stores a reference rather than its own copy, so there is one
+image, counted once against storage, reachable from both places.
+
+A note for anyone importing: CSV is text, so an import can never bring
+pictures with it. Photos are attached afterwards, which is what this adds.
 
 ### 0.5.0
 

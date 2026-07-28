@@ -8,12 +8,12 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.5.0";
-import * as store from "./store.js?v=0.5.0";
-import * as media from "./media.js?v=0.5.0";
-import * as importer from "./importer.js?v=0.5.0";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.0";
+import * as store from "./store.js?v=0.6.0";
+import * as media from "./media.js?v=0.6.0";
+import * as importer from "./importer.js?v=0.6.0";
 
-export const VERSION = "0.5.0";
+export const VERSION = "0.6.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -1619,6 +1619,7 @@ async function viewIdeas(host) {
       </div>
       ${mayEdit ? `<button class="btn" id="btn-new-idea">Save an idea</button>` : ""}
     </div>
+    <input type="file" id="idea-file" accept="image/*" class="hidden">
     <div class="loading">Loading ideas…</div>`;
 
   $("#btn-new-idea")?.addEventListener("click", () => promptIdea(null));
@@ -1668,6 +1669,10 @@ async function viewIdeas(host) {
     <div class="grid">
       ${filtered.map((idea) => `
         <div class="card idea-card" data-idea="${esc(idea.id)}">
+          ${idea.mediaId
+            ? `<button class="idea-photo" data-idea-photo="${esc(idea.mediaId)}" type="button"
+                 aria-label="View photo"><span class="tile-img" data-thumb="${esc(idea.mediaId)}"></span></button>`
+            : ""}
           <div class="room-top">
             <h3 class="wrap-any">${esc(idea.title)}</h3>
             <span class="chip ${idea.status === "selected" || idea.status === "purchased" ? "chip-good" : idea.status === "rejected" ? "chip-out" : "chip-solid"}">${esc(store.ideaStatusLabel(idea.status))}</span>
@@ -1681,7 +1686,8 @@ async function viewIdeas(host) {
           ${idea.notes ? `<p class="room-notes wrap-any">${esc(idea.notes)}</p>` : ""}
           <div class="row-actions">
             ${idea.sourceUrl ? `<a class="btn btn-ghost btn-sm" href="${esc(idea.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ""}
-            ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-idea-edit="${esc(idea.id)}">Edit</button>
+            ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-idea-addphoto="${esc(idea.id)}">${idea.mediaId ? "Replace photo" : "Add photo"}</button>
+            <button class="btn btn-ghost btn-sm" data-idea-edit="${esc(idea.id)}">Edit</button>
             <button class="btn btn-ghost btn-sm" data-idea-delete="${esc(idea.id)}">Delete</button>` : ""}
           </div>
         </div>`).join("")}
@@ -1693,6 +1699,53 @@ async function viewIdeas(host) {
   };
   bind("#id-status", "status");
   bind("#id-room", "room");
+
+  // Thumbnails for ideas that already have a photo.
+  if (document.querySelector("[data-thumb]")) hydrateThumbs();
+
+  document.querySelectorAll("[data-idea-photo]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const all = await store.loadMedia(ws.id);
+      openLightbox(btn.dataset.ideaPhoto, all, mayEdit);
+    });
+  });
+
+  // Attaching a photo uploads it through the normal pipeline — compressed,
+  // EXIF stripped — so it also appears in Photos and counts toward storage.
+  const ideaFile = $("#idea-file");
+  let pendingIdea = null;
+  document.querySelectorAll("[data-idea-addphoto]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      pendingIdea = ideas.find((i) => i.id === btn.dataset.ideaAddphoto);
+      ideaFile.click();
+    });
+  });
+  ideaFile?.addEventListener("change", async () => {
+    const file = ideaFile.files?.[0];
+    ideaFile.value = "";
+    if (!file || !pendingIdea) return;
+    const idea = pendingIdea;
+    pendingIdea = null;
+
+    toast("Processing photo…");
+    try {
+      const processed = await media.processImage(file);
+      const mediaId = await store.saveMedia(ws.id, processed, {
+        category: "inspiration",
+        caption: idea.title,
+        roomId: idea.roomId || "",
+        projectId: idea.projectId || "",
+        tags: ["idea"],
+        fileName: file.name
+      });
+      await store.setIdeaImage(ws.id, idea.id, mediaId);
+      track("idea_photo_add");
+      toast("Photo attached.");
+      renderRoute();
+    } catch (err) {
+      toast(store.describeError(err), "bad");
+    }
+  });
 
   document.querySelectorAll("[data-idea-edit]").forEach((btn) => {
     btn.addEventListener("click", () =>

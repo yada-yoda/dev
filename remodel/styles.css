@@ -605,6 +605,15 @@ select.needs-choice {
 .meta-list dd { min-width: 0; overflow-wrap: anywhere; }
 
 .idea-card { display: flex; flex-direction: column; gap: 8px; }
+/* An idea's photo leads the card — this is a visual decision, so the picture
+   should be the first thing you see. */
+.idea-photo {
+  display: block; width: 100%; padding: 0; margin: -16px -16px 4px;
+  width: calc(100% + 32px);
+  border: none; background: none; cursor: pointer;
+  border-radius: var(--radius) var(--radius) 0 0; overflow: hidden;
+}
+.idea-photo .tile-img { aspect-ratio: 16 / 10; }
 .idea-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; align-items: baseline; }
 .idea-price { font-weight: 600; margin-left: auto; }
 

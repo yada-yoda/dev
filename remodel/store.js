@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.5.0";
+import { firestore, currentUser } from "./firebase-config.js?v=0.6.0";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -1003,6 +1003,19 @@ export async function updateIdea(wsId, ideaId, data) {
 export async function deleteIdea(wsId, ideaId) {
   const { db, m } = await firestore();
   await m.deleteDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId));
+}
+
+/**
+ * Points an idea at a photo. The image itself lives in the normal media
+ * collections, so it also shows up in Photos and counts toward storage —
+ * an idea holds a reference, not its own copy.
+ */
+export async function setIdeaImage(wsId, ideaId, mediaId) {
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId), {
+    mediaId: mediaId || null,
+    updatedAt: m.serverTimestamp()
+  });
 }
 
 // ============================================================
