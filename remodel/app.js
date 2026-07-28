@@ -8,11 +8,11 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.3.1";
-import * as store from "./store.js?v=0.3.1";
-import * as media from "./media.js?v=0.3.1";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.4.0";
+import * as store from "./store.js?v=0.4.0";
+import * as media from "./media.js?v=0.4.0";
 
-export const VERSION = "0.3.1";
+export const VERSION = "0.4.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -58,13 +58,14 @@ const NAV = [
   { id: "projects",  label: "Projects",  icon: iconList },
   { id: "photos",    label: "Photos",    icon: iconPhoto },
   { id: "ideas",     label: "Ideas",     icon: iconBulb },
+  { id: "budget",    label: "Budget",    icon: iconMoney },
   { id: "rooms",     label: "Rooms",     icon: iconRooms },
   { id: "people",    label: "People",    icon: iconPeople },
   { id: "settings",  label: "Settings",  icon: iconGear }
 ];
 
 // A phone bottom bar fits five targets. The rest live behind More.
-const MOBILE_PRIMARY = ["dashboard", "projects", "photos", "ideas"];
+const MOBILE_PRIMARY = ["dashboard", "projects", "photos", "budget"];
 
 const photoUI = {
   mode: localStorage.getItem("rhq_photo_mode") || "grid",
@@ -401,6 +402,7 @@ function renderRoute() {
     case "projects": return state.routeId ? viewProject(view, state.routeId) : viewProjects(view);
     case "photos":   return viewPhotos(view);
     case "ideas":    return viewIdeas(view);
+    case "budget":   return viewBudget(view);
     case "rooms":    return viewRooms(view);
     case "people":   return viewPeople(view);
     case "settings": return viewSettings(view);
@@ -1815,6 +1817,413 @@ function promptIdea(idea) {
 }
 
 // ============================================================
+// View — Budget
+// ============================================================
+const budgetUI = { project: "", kind: "", sort: { key: "date", dir: "desc" } };
+
+async function viewBudget(host) {
+  const ws = state.ws;
+  const mayEdit = store.canEdit(ws.myRole);
+
+  host.innerHTML = `
+    <div class="view-head">
+      <div class="grow">
+        <h1>Budget</h1>
+        <p>What things were estimated at, what you have committed to, what has been
+           billed, and what has actually been paid.</p>
+      </div>
+      ${mayEdit ? `<button class="btn" id="btn-add-expense">Record money</button>` : ""}
+    </div>
+    <div class="loading">Loading budget…</div>`;
+
+  let expenses = [], budgets = {};
+  try {
+    [expenses, budgets, state.rooms, state.projects] = await Promise.all([
+      store.loadExpenses(ws.id),
+      store.loadBudgets(ws.id),
+      store.loadRooms(ws.id),
+      store.loadProjects(ws.id)
+    ]);
+  } catch (err) {
+    host.querySelector(".loading").outerHTML =
+      `<div class="error-box">${esc(store.describeError(err))}</div>`;
+    return;
+  }
+
+  $("#btn-add-expense")?.addEventListener("click", () => promptExpense(null));
+
+  if (!expenses.length && !Object.keys(budgets).length) {
+    host.querySelector(".loading").outerHTML = `
+      <div class="empty">
+        <h3>Nothing recorded yet</h3>
+        <p>Record each money event as it happens — an estimate, a signed contract, an
+           invoice, a payment, or something bought outright. Keeping an invoice and its
+           payment as separate entries is what lets this show what you owe as well as
+           what you have spent.</p>
+        ${mayEdit ? `<button class="btn" id="btn-first-expense">Record money</button>` : ""}
+      </div>`;
+    $("#btn-first-expense")?.addEventListener("click", () => promptExpense(null));
+    return;
+  }
+
+  // Workspace-wide budget is the sum of the per-project approvals.
+  const wsBudget = Object.values(budgets).reduce((acc, b) => ({
+    approvedBudget: (acc.approvedBudget || 0) + (b.approvedBudget || 0),
+    contingency: (acc.contingency || 0) + (b.contingency || 0)
+  }), {});
+  const total = store.rollup(expenses, wsBudget);
+  const byProject = store.rollupByProject(expenses, budgets);
+  const due = store.upcomingPayments(expenses);
+
+  const filtered = expenses.filter((e) =>
+    (!budgetUI.project || e.projectId === budgetUI.project) &&
+    (!budgetUI.kind || e.kind === budgetUI.kind));
+
+  const overBudget = total.variance != null && total.variance > 0;
+
+  host.querySelector(".loading").outerHTML = `
+    <div class="grid-stats">
+      <div class="card stat"><span>Approved budget</span><b class="num">${esc(fmtMoney(total.approved))}</b>
+        <span class="sub">${total.contingency ? `plus ${esc(fmtMoney(total.contingency))} contingency` : "across all projects"}</span></div>
+      <div class="card stat"><span>Committed</span><b class="num">${esc(fmtMoney(total.committed))}</b>
+        <span class="sub ${overBudget ? "is-warn" : ""}">${
+          total.variance == null ? "no budget set"
+            : overBudget ? `${esc(fmtMoney(total.variance))} over approved`
+            : `${esc(fmtMoney(Math.abs(total.variance)))} under approved`}</span></div>
+      <div class="card stat"><span>Paid</span><b class="num">${esc(fmtMoney(total.paid))}</b>
+        <span class="sub">${total.refunds ? `${esc(fmtMoney(total.refunds))} returned` : "money actually gone"}</span></div>
+      <div class="card stat"><span>Outstanding</span><b class="num">${esc(fmtMoney(total.outstanding))}</b>
+        <span class="sub">${total.invoiced ? `${esc(fmtMoney(total.invoiced))} invoiced` : "nothing billed"}</span></div>
+    </div>
+
+    ${total.approved ? `
+      <div class="progress-wrap" style="max-width:none;margin-top:18px">
+        <div class="progress-lbl">
+          <span>Paid against approved budget</span>
+          <span class="num">${Math.round((total.paid / total.approved) * 100)}%</span>
+        </div>
+        <div class="progress"><i style="width:${Math.min(100, (total.paid / total.approved) * 100)}%"></i></div>
+        ${total.remaining != null ? `<p class="muted" style="margin-top:8px;font-size:12.5px">
+          ${total.remaining >= 0
+            ? `${esc(fmtMoney(total.remaining))} left before the approved budget is used up.`
+            : `${esc(fmtMoney(Math.abs(total.remaining)))} past the approved budget.`}</p>` : ""}
+      </div>` : ""}
+
+    ${due.length && total.outstanding > 0 ? `
+      <div class="section">
+        <div class="section-head">
+          <h2>Upcoming payments</h2>
+          <span class="muted" style="font-size:12.5px">${esc(fmtMoney(total.outstanding))} outstanding</span>
+        </div>
+        <div class="card">
+          <ul class="plain-list">
+            ${due.slice(0, 6).map((e) => {
+              const late = e.dueDate < new Date(new Date().toDateString());
+              return `<li>
+                <span class="wrap-any">${esc(e.description)}${e.vendor ? ` · ${esc(e.vendor)}` : ""}</span>
+                <span class="date ${late ? "is-overdue" : "muted"}">${late ? "Overdue " : "Due "}${esc(fmtDate(e.dueDate))}</span>
+                <span class="num" style="margin-left:auto">${esc(fmtMoney(e.total))}</span>
+              </li>`;
+            }).join("")}
+          </ul>
+        </div>
+      </div>` : ""}
+
+    <div class="section">
+      <div class="section-head">
+        <h2>By project</h2>
+        ${mayEdit ? `<button class="btn btn-ghost btn-sm" id="btn-set-budgets">Set budgets</button>` : ""}
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Project</th><th class="num">Approved</th><th class="num">Committed</th>
+            <th class="num">Paid</th><th class="num">Remaining</th>
+          </tr></thead>
+          <tbody>
+            ${state.projects.filter((p) => byProject[p.id] || budgets[p.id]).map((p) => {
+              const r = byProject[p.id] || store.rollup([], budgets[p.id]);
+              const over = r.remaining != null && r.remaining < 0;
+              return `<tr>
+                <td data-label="Project" class="wrap-any"><a href="#/projects/${esc(p.id)}">${esc(p.title)}</a></td>
+                <td data-label="Approved" class="num">${esc(fmtMoney(r.approved))}</td>
+                <td data-label="Committed" class="num">${esc(fmtMoney(r.committed))}</td>
+                <td data-label="Paid" class="num">${esc(fmtMoney(r.paid))}</td>
+                <td data-label="Remaining" class="num ${over ? "is-overdue" : ""}">${r.remaining == null ? "—" : esc(fmtMoney(r.remaining))}</td>
+              </tr>`;
+            }).join("")}
+            ${byProject[""] ? `<tr>
+              <td data-label="Project" class="muted">Not assigned to a project</td>
+              <td data-label="Approved" class="num">—</td>
+              <td data-label="Committed" class="num">${esc(fmtMoney(byProject[""].committed))}</td>
+              <td data-label="Paid" class="num">${esc(fmtMoney(byProject[""].paid))}</td>
+              <td data-label="Remaining" class="num">—</td>
+            </tr>` : ""}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><h2>Entries</h2></div>
+      <div class="toolbar">
+        <select id="bd-project" aria-label="Filter by project">
+          <option value="">All projects</option>
+          ${state.projects.map((p) => `<option value="${esc(p.id)}" ${budgetUI.project === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("")}
+        </select>
+        <select id="bd-kind" aria-label="Filter by type">
+          <option value="">Any type</option>
+          ${store.EXPENSE_KINDS.map((k) => `<option value="${k.value}" ${budgetUI.kind === k.value ? "selected" : ""}>${k.label}</option>`).join("")}
+        </select>
+      </div>
+      <p class="muted result-count">${filtered.length} of ${expenses.length} shown</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="date">Date</th><th>Description</th><th>Type</th>
+            <th>Project</th><th class="num">Total</th>${mayEdit ? "<th></th>" : ""}
+          </tr></thead>
+          <tbody>
+            ${filtered.map((e) => `
+              <tr>
+                <td data-label="Date" class="date">${esc(fmtDate(e.occurredAt))}</td>
+                <td data-label="Description" class="wrap-any">${esc(e.description)}
+                  ${e.vendor ? `<br><span class="muted">${esc(e.vendor)}</span>` : ""}</td>
+                <td data-label="Type">${kindChip(e.kind)}</td>
+                <td data-label="Project" class="wrap-any">${e.projectId
+                  ? esc(state.projects.find((p) => p.id === e.projectId)?.title || "—")
+                  : `<span class="muted">—</span>`}</td>
+                <td data-label="Total" class="num">${esc(fmtMoney(e.total))}</td>
+                ${mayEdit ? `<td data-label="">
+                  <button class="btn btn-ghost btn-sm" data-exp-edit="${esc(e.id)}">Edit</button>
+                  <button class="btn btn-ghost btn-sm" data-exp-del="${esc(e.id)}">Delete</button>
+                </td>` : ""}
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+
+  const bind = (sel, prop) => {
+    const el = $(sel);
+    el?.addEventListener("change", () => { budgetUI[prop] = el.value; renderRoute(); });
+  };
+  bind("#bd-project", "project");
+  bind("#bd-kind", "kind");
+
+  $("#btn-set-budgets")?.addEventListener("click", () => promptBudgets(budgets));
+
+  document.querySelectorAll("[data-exp-edit]").forEach((btn) => {
+    btn.addEventListener("click", () =>
+      promptExpense(expenses.find((e) => e.id === btn.dataset.expEdit)));
+  });
+  document.querySelectorAll("[data-exp-del]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const e = expenses.find((x) => x.id === btn.dataset.expDel);
+      confirmDialog({
+        title: "Delete this entry?",
+        message: `"${e.description}" (${fmtMoney(e.total)}) will be removed from the budget. This cannot be undone.`,
+        confirmText: "Delete",
+        onConfirm: async () => {
+          await store.deleteExpense(ws.id, e.id);
+          toast("Entry deleted.");
+          renderRoute();
+        }
+      });
+    });
+  });
+}
+
+function kindChip(kind) {
+  const cls = kind === "payment" || kind === "purchase" ? "chip chip-good"
+    : kind === "invoice" ? "chip chip-warn"
+    : kind === "refund" || kind === "credit" ? "chip chip-out"
+    : "chip";
+  return `<span class="${cls}">${esc(store.expenseKindLabel(kind))}</span>`;
+}
+
+function promptBudgets(budgets) {
+  openModal({
+    title: "Approved budgets",
+    confirmText: "Save budgets",
+    body: `
+      <p class="muted" style="margin-bottom:14px">What you have approved to spend on each
+         project. Leave a project blank if you have not decided yet — nothing will be
+         invented for it.</p>
+      ${state.projects.length ? state.projects.map((p) => `
+        <div class="field">
+          <label for="bg-${esc(p.id)}">${esc(p.title)}</label>
+          <div class="money-wrap">
+            <span class="money-prefix">$</span>
+            <input type="number" min="0" step="0.01" class="money-input" id="bg-${esc(p.id)}"
+                   data-budget-for="${esc(p.id)}"
+                   value="${budgets[p.id]?.approvedBudget ? Number(budgets[p.id].approvedBudget).toFixed(2) : ""}">
+          </div>
+        </div>`).join("") : `<p class="muted">Add a project first.</p>`}`,
+    onConfirm: async () => {
+      const inputs = [...document.querySelectorAll("[data-budget-for]")];
+      for (const input of inputs) {
+        const value = input.value.trim();
+        if (value === "" && !budgets[input.dataset.budgetFor]) continue;
+        await store.saveBudget(state.ws.id, input.dataset.budgetFor, {
+          approvedBudget: value === "" ? 0 : Number(value),
+          estimatedCost: budgets[input.dataset.budgetFor]?.estimatedCost || 0,
+          contingency: budgets[input.dataset.budgetFor]?.contingency || 0
+        });
+      }
+      toast("Budgets saved.");
+      renderRoute();
+    }
+  });
+
+  document.querySelectorAll(".money-input").forEach((input) => {
+    input.addEventListener("blur", () => {
+      const n = Number(input.value);
+      if (input.value !== "" && Number.isFinite(n)) input.value = n.toFixed(2);
+    });
+  });
+}
+
+function promptExpense(expense) {
+  const editing = !!expense;
+  const iso = (d) => (d ? new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10) : "");
+
+  openModal({
+    title: editing ? "Edit entry" : "Record money",
+    confirmText: editing ? "Save changes" : "Record",
+    body: `
+      <div class="field">
+        <label for="ex-kind">What kind of entry
+          <span class="info" title="An invoice and the payment that settles it are two separate entries. That is what lets the budget show what you owe as well as what you have spent.">i</span>
+        </label>
+        <select id="ex-kind" ${editing ? "" : 'class="needs-choice"'}>
+          ${store.EXPENSE_KINDS.map((k) => `<option value="${k.value}" ${expense?.kind === k.value ? "selected" : ""}>${k.label}</option>`).join("")}
+        </select>
+        <span class="hint" id="ex-kind-hint"></span>
+      </div>
+      <div class="field">
+        <label for="ex-desc">Description</label>
+        <input type="text" id="ex-desc" maxlength="200" value="${esc(expense?.description || "")}"
+               placeholder="Cabinet hardware" autocomplete="off">
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ex-amount">Amount</label>
+          <div class="money-wrap"><span class="money-prefix">$</span>
+            <input type="number" id="ex-amount" min="0" step="0.01" class="money-input"
+                   value="${expense ? Number(expense.amount).toFixed(2) : ""}"></div>
+        </div>
+        <div class="field">
+          <label for="ex-tax">Tax</label>
+          <div class="money-wrap"><span class="money-prefix">$</span>
+            <input type="number" id="ex-tax" min="0" step="0.01" class="money-input"
+                   value="${expense?.tax ? Number(expense.tax).toFixed(2) : ""}"></div>
+        </div>
+        <div class="field">
+          <label for="ex-ship">Shipping</label>
+          <div class="money-wrap"><span class="money-prefix">$</span>
+            <input type="number" id="ex-ship" min="0" step="0.01" class="money-input"
+                   value="${expense?.shipping ? Number(expense.shipping).toFixed(2) : ""}"></div>
+        </div>
+      </div>
+      <p class="muted total-preview" id="ex-total">Total: $0.00</p>
+      <div class="field-row">
+        <div class="field">
+          <label for="ex-project">Project</label>
+          <select id="ex-project">
+            <option value="">Not project-specific</option>
+            ${(state.projects || []).map((p) => `<option value="${esc(p.id)}" ${expense?.projectId === p.id ? "selected" : ""}>${esc(p.title)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field">
+          <label for="ex-room">Room</label>
+          <select id="ex-room">
+            <option value="">Not room-specific</option>
+            ${state.rooms.map((r) => `<option value="${esc(r.id)}" ${expense?.roomId === r.id ? "selected" : ""}>${esc(r.name)}</option>`).join("")}
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ex-vendor">Vendor or contractor</label>
+          <input type="text" id="ex-vendor" maxlength="120" value="${esc(expense?.vendor || "")}" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="ex-invoice">Invoice number</label>
+          <input type="text" id="ex-invoice" maxlength="60" value="${esc(expense?.invoiceNumber || "")}" autocomplete="off">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ex-date">Date</label>
+          <input type="date" id="ex-date" value="${iso(expense?.occurredAt)}">
+        </div>
+        <div class="field">
+          <label for="ex-due">Due date
+            <span class="info" title="Only meaningful for invoices — it drives the upcoming payments list.">i</span>
+          </label>
+          <input type="date" id="ex-due" value="${iso(expense?.dueDate)}">
+        </div>
+      </div>
+      <div class="field">
+        <label for="ex-notes">Notes</label>
+        <textarea id="ex-notes" maxlength="2000">${esc(expense?.notes || "")}</textarea>
+      </div>`,
+    onConfirm: async () => {
+      const data = {
+        kind: $("#ex-kind").value,
+        description: $("#ex-desc").value,
+        amount: $("#ex-amount").value,
+        tax: $("#ex-tax").value,
+        shipping: $("#ex-ship").value,
+        projectId: $("#ex-project").value,
+        roomId: $("#ex-room").value,
+        vendor: $("#ex-vendor").value,
+        invoiceNumber: $("#ex-invoice").value,
+        occurredAt: $("#ex-date").value,
+        dueDate: $("#ex-due").value,
+        notes: $("#ex-notes").value
+      };
+      if (!data.description.trim()) { showModalError("Describe what this is for."); return false; }
+      if (!(Number(data.amount) > 0)) { showModalError("Enter an amount."); return false; }
+
+      if (editing) {
+        await store.updateExpense(state.ws.id, expense.id, data);
+        toast("Entry updated.");
+      } else {
+        await store.createExpense(state.ws.id, data);
+        track("expense_create", { kind: data.kind });
+        toast("Recorded.");
+      }
+      renderRoute();
+    }
+  });
+
+  const kindSel = $("#ex-kind");
+  const hint = $("#ex-kind-hint");
+  const showHint = () => {
+    hint.textContent = store.EXPENSE_KINDS.find((k) => k.value === kindSel.value)?.hint || "";
+  };
+  kindSel?.addEventListener("change", () => { kindSel.classList.remove("needs-choice"); showHint(); });
+  showHint();
+
+  const recalc = () => {
+    const t = store.expenseTotal($("#ex-amount").value, $("#ex-tax").value, $("#ex-ship").value);
+    $("#ex-total").textContent = `Total: ${fmtMoney(t)}`;
+  };
+  ["#ex-amount", "#ex-tax", "#ex-ship"].forEach((sel) => {
+    const el = $(sel);
+    el?.addEventListener("input", recalc);
+    el?.addEventListener("blur", () => {
+      const n = Number(el.value);
+      if (el.value !== "" && Number.isFinite(n)) el.value = n.toFixed(2);
+      recalc();
+    });
+  });
+  recalc();
+}
+
+// ============================================================
 // View — Rooms
 // ============================================================
 function roomCardHtml(room) {
@@ -2509,6 +2918,11 @@ function iconPhoto() {
 function iconBulb() {
   return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
     <path d="M9.5 17.5a5.8 5.8 0 1 1 5 0"/><path d="M9.7 17.5h4.6"/><path d="M10.3 20.5h3.4"/></svg>`;
+}
+function iconMoney() {
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+    <rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/>
+    <path d="M6 12h.01M18 12h.01"/></svg>`;
 }
 function iconMore() {
   return `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

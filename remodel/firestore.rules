@@ -358,6 +358,63 @@ service cloud.firestore {
                   && request.resource.data.estPrice >= 0));
       }
 
+      // ---------- money (M4) ----------
+      // Amounts live in their own collections, never as fields on a project.
+      // That is what will let an M5 contractor grant expose a project's scope
+      // and schedule while the budget stays unreachable — not a hidden field,
+      // a different document with a different rule.
+      //
+      // Every member may read money; only editors and up may write it. The
+      // accountant role exists precisely to read here and nowhere private.
+      function money(field) {
+        return request.resource.data[field] is number
+          && request.resource.data[field] >= 0
+          && request.resource.data[field] <= 100000000;
+      }
+      function optionalMoney(field) {
+        return !(field in request.resource.data)
+          || request.resource.data[field] == null
+          || money(field);
+      }
+
+      // One money event: an estimate, a commitment, an invoice, a payment,
+      // an outright purchase, or money coming back.
+      function expenseKinds() {
+        return ['estimate', 'committed', 'invoice', 'payment', 'purchase', 'refund', 'credit'];
+      }
+      function expenseValid() {
+        return request.resource.data.kind in expenseKinds()
+          && request.resource.data.description is string
+          && request.resource.data.description.size() > 0
+          && request.resource.data.description.size() <= 200
+          && money('amount')
+          && optionalMoney('tax')
+          && optionalMoney('shipping')
+          && money('total')
+          && textWithin('vendor', 120)
+          && textWithin('invoiceNumber', 60)
+          && textWithin('roomId', 64)
+          && textWithin('projectId', 64)
+          && textWithin('contractorId', 64)
+          && textWithin('notes', 2000);
+      }
+
+      match /expenses/{expenseId} {
+        allow read: if isMember(wsId);
+        allow create: if canEdit(wsId) && createStamped() && updateStamped() && expenseValid();
+        allow update: if canEdit(wsId) && creationImmutable() && updateStamped() && expenseValid();
+        allow delete: if canEdit(wsId);
+      }
+
+      // One budget document per project, keyed by project id.
+      match /budgets/{projectId} {
+        allow read: if isMember(wsId);
+        allow write: if canEdit(wsId)
+          && optionalMoney('estimatedCost')
+          && optionalMoney('approvedBudget')
+          && optionalMoney('contingency');
+      }
+
       // ---------- private notes ----------
       // Physically separate from the records they annotate, so a scoped
       // contractor grant (M5) cannot select them even by guessing an id, and

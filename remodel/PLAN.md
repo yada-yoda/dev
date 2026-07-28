@@ -406,10 +406,21 @@ source/status, mobile More menu. Notes:
   Drive originals backup via the `drive.file` scope. None of them block
   M4; pick them up as M3b.
 
-**M4 — Financials, contractors, products.** Budgets, expenses, receipts,
-contractor directory + jobs + invoices + payments + balances, product/UPC
-registry, financial dashboards. Financial docs physically separated from
-day one.
+**M4 — Financials, contractors, products. BUDGET DONE (v0.4.0, 2026-07-28).**
+Expenses as seven kinds of money event, per-project approved budgets,
+rollups (committed / invoiced / paid / outstanding / remaining / variance),
+upcoming payments, by-project table. Money lives in `expenses` and
+`budgets` collections — never as fields on a project — so an M5 grant can
+show scope without amounts. Arithmetic has its own browser test page,
+`tests/budget-math.html` (30 checks).
+
+Key rule, do not break it: an invoice and the payment settling it are two
+rows. `paid` counts payments + purchases − refunds − credits; `invoiced`
+counts invoices; nothing counts twice.
+
+**Still to do in M4:** contractor directory, contractor jobs (contract
+amount, change orders, deposit, invoiced, paid, balance due, retainage),
+and the product/UPC purchase registry with barcode scanning.
 
 **M5 — Sharing.** Email-link contractor auth, access grants + scopes +
 presets, expiry/revoke, contractor portal, preview-as, audit log, full

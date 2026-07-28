@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.3.1 — Milestone 3 (photos and ideas).** Sign-in, workspaces,
+**Status: v0.4.0 — Milestone 4 in progress (budget).** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -45,6 +45,11 @@ in later milestones (see the roadmap below).
   in progress, after, inspiration, damage, receipts and plans. Grid, timeline
   by month, and a side-by-side before/after comparison per room. Filter by
   room, project or type.
+- **Budget.** Each money event is recorded on its own: an estimate, a
+  commitment, an invoice, a payment, an outright purchase, a refund or a
+  credit. Approved budgets are set per project, and the totals show committed
+  versus paid versus outstanding, per project and overall, with upcoming
+  payments called out.
 - **Ideas.** Products and materials you are considering, with vendor, model or
   SKU, estimated price, a link to where you found it, and a status from Saved
   through Shortlisted to Selected, Purchased or Rejected — so the options you
@@ -57,7 +62,7 @@ in later milestones (see the roadmap below).
 | 1 (done) | Foundation: auth, workspaces, roles, invitations, rooms, security rules |
 | 2 (done) | Projects, phases, tasks, tags, list and board views, activity log |
 | 3 (done) | Photos and ideas: compressed uploads, galleries, before/after comparison |
-| 4 | Budget, expenses, contractors, contractor jobs, product and purchase registry |
+| 4 (budget done) | Budget and expenses done; contractors, jobs and the product registry next |
 | 5 | Scoped contractor sharing with start and expiry dates, contractor portal |
 | 6 | PDF reports, CSV exports, full ZIP backup, import and restore |
 | 7 | Bids, change orders, decision log, punch lists, permits, warranties |
@@ -160,6 +165,14 @@ npm install
 npx firebase emulators:start --only firestore,auth --project demo-remodelhq --config ../firebase.json
 ```
 
+### Budget math tests
+
+The money arithmetic runs in a browser with no database and no sign-in — open
+`http://localhost:8745/remodel/tests/budget-math.html` while serving the
+folder. It checks that an invoice and its payment are not counted twice, that
+estimates never register as spend, that refunds and credits reduce what was
+paid, and that cents add up without floating-point drift.
+
 ### Security rules tests
 
 The rules are the security boundary, so they have their own test suite. It
@@ -171,7 +184,7 @@ npm install
 npm test
 ```
 
-59 tests cover every role plus the adversarial cases: cross-workspace reads,
+73 tests cover every role plus the adversarial cases: cross-workspace reads,
 direct document-id probing, self-promotion, forging an owner row, backdated
 timestamps, reusing expired, revoked, replayed or someone else's invitation,
 reading private notes as the accountant role, and rewriting or deleting
@@ -187,6 +200,35 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.4.0
+
+The budget, and the first half of Milestone 4.
+
+The design decision that shapes everything here: **an invoice and the payment
+that settles it are two separate entries.** It would be simpler to record one
+"expense" per cost, but then there is no way to answer "what do I still owe?"
+— and it becomes very easy to count the same 4,200 twice, once when the
+contractor bills it and again when you pay it. Keeping them apart means
+*invoiced* and *paid* are independent figures, and only *paid* ever means the
+money is gone.
+
+Seven entry kinds — estimate, committed, invoice, payment, purchase, refund,
+credit — each with a one-line explanation in the form, because the difference
+between "committed" and "invoiced" is not obvious to anyone who has not run a
+project before. Estimates deliberately never count toward spend.
+
+Approved budgets are set per project, so remaining and variance are real
+numbers rather than guesses. Nothing is invented for a project with no
+approved budget: it shows a dash.
+
+The arithmetic has its own test page at `tests/budget-math.html` — thirty
+checks including the double-counting case, refunds, paying an invoice early,
+and floating-point cents. It runs in a browser with no database or sign-in.
+
+Money lives in its own collections, never as fields on a project. That is
+what will let Milestone 5 show a contractor the scope and schedule of their
+work while the budget stays unreachable.
 
 ### 0.3.1
 

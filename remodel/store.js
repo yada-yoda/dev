@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.3.1";
+import { firestore, currentUser } from "./firebase-config.js?v=0.4.0";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -1003,6 +1003,209 @@ export async function updateIdea(wsId, ideaId, data) {
 export async function deleteIdea(wsId, ideaId) {
   const { db, m } = await firestore();
   await m.deleteDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId));
+}
+
+// ============================================================
+// Money
+//
+// Amounts live here, in their own collections, never as fields on a project.
+// That separation is what lets a contractor grant (M5) show scope and
+// schedule while the budget stays unreachable.
+//
+// One row is one money event. An invoice and the payment that settles it are
+// two separate rows, which is how "invoiced" and "paid" stay independent and
+// actual spend is never counted twice.
+// ============================================================
+
+export const EXPENSE_KINDS = [
+  { value: "estimate",  label: "Estimate",   hint: "A quoted or guessed cost. Not money spent." },
+  { value: "committed", label: "Committed",  hint: "Agreed to spend — a signed contract or accepted bid." },
+  { value: "invoice",   label: "Invoice",    hint: "Billed to you, not yet paid." },
+  { value: "payment",   label: "Payment",    hint: "Money that has actually left your account." },
+  { value: "purchase",  label: "Purchase",   hint: "Bought and paid outright, in one step." },
+  { value: "refund",    label: "Refund",     hint: "Money coming back to you." },
+  { value: "credit",    label: "Credit",     hint: "A discount or credit applied against what you owe." }
+];
+
+export const expenseKindLabel = (v) =>
+  EXPENSE_KINDS.find((k) => k.value === v)?.label || "Expense";
+
+export const PAYMENT_METHODS = ["Card", "Bank transfer", "Check", "Cash", "Financing", "Other"];
+
+const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
+/** Subtotal plus tax and shipping, rounded to cents. */
+export function expenseTotal(amount, tax, shipping) {
+  return round2(round2(amount) + round2(tax) + round2(shipping));
+}
+
+function expensePayload(m, data) {
+  const description = trimTo(data.description, 200);
+  if (!description) throw new Error("Describe what this is for.");
+
+  const kind = EXPENSE_KINDS.some((k) => k.value === data.kind) ? data.kind : "purchase";
+  const amount = Math.max(0, round2(data.amount));
+  const tax = Math.max(0, round2(data.tax));
+  const shipping = Math.max(0, round2(data.shipping));
+
+  return {
+    kind,
+    description,
+    amount,
+    tax,
+    shipping,
+    total: expenseTotal(amount, tax, shipping),
+    vendor: trimTo(data.vendor, 120),
+    invoiceNumber: trimTo(data.invoiceNumber, 60),
+    roomId: data.roomId || null,
+    projectId: data.projectId || null,
+    contractorId: data.contractorId || null,
+    paymentMethod: trimTo(data.paymentMethod, 40),
+    occurredAt: data.occurredAt
+      ? m.Timestamp.fromDate(new Date(data.occurredAt + "T00:00:00"))
+      : m.serverTimestamp(),
+    dueDate: data.dueDate
+      ? m.Timestamp.fromDate(new Date(data.dueDate + "T00:00:00"))
+      : null,
+    receiptMediaId: data.receiptMediaId || null,
+    notes: trimTo(data.notes, 2000)
+  };
+}
+
+export async function loadExpenses(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.collection(db, "workspaces", wsId, "expenses"));
+  return snap.docs
+    .map((d) => ({
+      id: d.id,
+      ...d.data(),
+      occurredAt: toDate(d.data().occurredAt),
+      dueDate: toDate(d.data().dueDate),
+      createdAt: toDate(d.data().createdAt)
+    }))
+    .sort((a, b) => (b.occurredAt?.getTime() || 0) - (a.occurredAt?.getTime() || 0));
+}
+
+export async function createExpense(wsId, data) {
+  const user = requireUser();
+  const { db, m } = await firestore();
+  const ref = m.doc(m.collection(db, "workspaces", wsId, "expenses"));
+  const payload = expensePayload(m, data);
+  await m.setDoc(ref, {
+    ...payload,
+    createdBy: user.uid,
+    createdAt: m.serverTimestamp(),
+    updatedAt: m.serverTimestamp()
+  });
+  await logActivity(wsId, "expense_create",
+    `${expenseKindLabel(payload.kind)}: ${payload.description}`, data.projectId || null);
+  return ref.id;
+}
+
+export async function updateExpense(wsId, expenseId, data) {
+  const { db, m } = await firestore();
+  await m.updateDoc(m.doc(db, "workspaces", wsId, "expenses", expenseId), {
+    ...expensePayload(m, data),
+    updatedAt: m.serverTimestamp()
+  });
+}
+
+export async function deleteExpense(wsId, expenseId) {
+  const { db, m } = await firestore();
+  await m.deleteDoc(m.doc(db, "workspaces", wsId, "expenses", expenseId));
+}
+
+// ---------- budgets ----------
+export async function loadBudgets(wsId) {
+  const { db, m } = await firestore();
+  const snap = await m.getDocs(m.collection(db, "workspaces", wsId, "budgets"));
+  const out = {};
+  snap.docs.forEach((d) => { out[d.id] = d.data(); });
+  return out;
+}
+
+export async function saveBudget(wsId, projectId, budget) {
+  const { db, m } = await firestore();
+  await m.setDoc(m.doc(db, "workspaces", wsId, "budgets", projectId), {
+    estimatedCost: Math.max(0, round2(budget.estimatedCost)),
+    approvedBudget: Math.max(0, round2(budget.approvedBudget)),
+    contingency: Math.max(0, round2(budget.contingency))
+  }, { merge: true });
+}
+
+/**
+ * Rolls a set of money events into the figures worth showing.
+ *
+ * The important property: an invoice and the payment settling it are separate
+ * rows, so `invoiced` and `paid` are independent and neither inflates actual
+ * spend. `paid` is the only figure that means money is gone.
+ */
+export function rollup(expenses, budget) {
+  const sum = (kind) => expenses
+    .filter((e) => e.kind === kind)
+    .reduce((total, e) => total + (Number(e.total) || 0), 0);
+
+  const estimate = sum("estimate");
+  const committed = sum("committed");
+  const invoiced = sum("invoice");
+  const payments = sum("payment");
+  const purchases = sum("purchase");
+  const refunds = sum("refund");
+  const credits = sum("credit");
+
+  // Money actually gone: payments and outright purchases, less anything back.
+  const paid = round2(payments + purchases - refunds - credits);
+  // Money promised: contracts, bills received, and things already bought.
+  const commitTotal = round2(committed + invoiced + purchases);
+  // Billed but not yet settled. Floored at zero: paying ahead is not a debt.
+  const outstanding = round2(Math.max(0, invoiced - payments));
+
+  const approved = round2(budget?.approvedBudget);
+  const contingency = round2(budget?.contingency);
+
+  return {
+    estimate: round2(estimate),
+    approved,
+    contingency,
+    committed: commitTotal,
+    invoiced: round2(invoiced),
+    paid,
+    refunds: round2(refunds + credits),
+    outstanding,
+    // Against the approved budget, what is left after money already gone.
+    remaining: approved ? round2(approved - paid) : null,
+    // Positive means over the approved budget on committed money.
+    variance: approved ? round2(commitTotal - approved) : null
+  };
+}
+
+/** Rollup per project id, for the by-project breakdown. */
+export function rollupByProject(expenses, budgets) {
+  const groups = new Map();
+  for (const e of expenses) {
+    const key = e.projectId || "";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(e);
+  }
+  const out = {};
+  for (const [projectId, rows] of groups) {
+    out[projectId] = rollup(rows, budgets?.[projectId]);
+  }
+  return out;
+}
+
+/**
+ * Invoices with a due date, soonest first.
+ *
+ * Payments are not linked to a specific invoice, so this cannot know which
+ * individual bill was settled. The caller shows the list only while the
+ * overall outstanding balance is above zero, which keeps a fully paid-off
+ * invoice from lingering as though it were still owed.
+ */
+export function upcomingPayments(expenses) {
+  return expenses
+    .filter((e) => e.kind === "invoice" && e.dueDate)
+    .sort((a, b) => a.dueDate - b.dueDate);
 }
 
 // ---------- activity ----------

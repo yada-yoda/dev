@@ -730,6 +730,87 @@ describe('media and ideas (M3)', () => {
 });
 
 // ============================================================
+describe('money (M4)', () => {
+  const expense = (uid, over = {}) => ({
+    kind: 'payment',
+    description: 'Progress payment 2',
+    amount: 4200,
+    tax: 0,
+    shipping: 0,
+    total: 4200,
+    vendor: 'Example Carpentry',
+    invoiceNumber: 'INV-2',
+    roomId: 'room_kitchen',
+    projectId: 'p1',
+    contractorId: null,
+    notes: '',
+    createdBy: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    ...over
+  });
+
+  test('editors and up can record money; viewers and accountants cannot', async () => {
+    await assertSucceeds(
+      setDoc(doc(as(EDITOR), 'workspaces', WS, 'expenses', 'e1'), expense(EDITOR.uid))
+    );
+    await assertFails(
+      setDoc(doc(as(VIEWER), 'workspaces', WS, 'expenses', 'e2'), expense(VIEWER.uid))
+    );
+    await assertFails(
+      setDoc(doc(as(ACCOUNTANT), 'workspaces', WS, 'expenses', 'e3'), expense(ACCOUNTANT.uid))
+    );
+  });
+
+  test('the accountant role can read money but not private notes', async () => {
+    await seed(async (db) => {
+      await setDoc(doc(db, 'workspaces', WS, 'expenses', 'e1'), {
+        ...expense(OWNER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+      });
+      await setDoc(doc(db, 'workspaces', WS, 'privateNotes', 'p1'), {
+        body: 'secret', createdBy: OWNER.uid,
+        createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+      });
+    });
+    await assertSucceeds(getDoc(doc(as(ACCOUNTANT), 'workspaces', WS, 'expenses', 'e1')));
+    await assertFails(getDoc(doc(as(ACCOUNTANT), 'workspaces', WS, 'privateNotes', 'p1')));
+  });
+
+  test('an invented money kind or a negative amount is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'expenses', 'e_bad1'),
+      expense(EDITOR.uid, { kind: 'bribe' })));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'expenses', 'e_bad2'),
+      expense(EDITOR.uid, { amount: -100, total: -100 })));
+  });
+
+  test('an amount sent as text is rejected', async () => {
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'expenses', 'e_bad3'),
+      expense(EDITOR.uid, { amount: '4200' })));
+  });
+
+  test('money in another workspace is unreachable by document id', async () => {
+    await seed((db) => setDoc(doc(db, 'workspaces', OTHER_WS, 'expenses', 'theirs'), {
+      ...expense(OUTSIDER.uid), createdAt: Timestamp.now(), updatedAt: Timestamp.now()
+    }));
+    await assertFails(getDoc(doc(as(OWNER), 'workspaces', OTHER_WS, 'expenses', 'theirs')));
+    await assertFails(getDoc(doc(as(ACCOUNTANT), 'workspaces', OTHER_WS, 'expenses', 'theirs')));
+  });
+
+  test('budgets follow the same rules and reject a negative approved amount', async () => {
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'budgets', 'p1'), {
+      estimatedCost: 16000, approvedBudget: 16000, contingency: 1500
+    }));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'budgets', 'p2'), {
+      approvedBudget: -1
+    }));
+    await assertFails(setDoc(doc(as(VIEWER), 'workspaces', WS, 'budgets', 'p3'), {
+      approvedBudget: 100
+    }));
+    await assertSucceeds(getDoc(doc(as(VIEWER), 'workspaces', WS, 'budgets', 'p1')));
+  });
+});
+
+// ============================================================
 describe('private notes are physically separated', () => {
   beforeEach(async () => {
     await seed((db) => setDoc(doc(db, 'workspaces', WS, 'privateNotes', 'p1'), {

@@ -642,6 +642,8 @@ th {
 td { padding: 11px 12px; border-bottom: 1px solid var(--border); min-width: 0; }
 tr:last-child td { border-bottom: none; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+/* Keep a row's action buttons on one line rather than stacking them. */
+tbody td:last-child { white-space: nowrap; }
 /* Dates must never truncate. */
 td.date, th.date { white-space: nowrap; }
 
@@ -848,3 +850,5 @@ td.date, th.date { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; }
 }
+
+.total-preview { font-size: 13px; margin: -6px 0 16px; font-variant-numeric: tabular-nums; }
