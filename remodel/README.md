@@ -97,6 +97,29 @@ Everything below is free and needs no payment method.
    in with `?ga=on`. Analytics records section views only — never personal
    details, photos or amounts.
 
+## About the API key in this repository
+
+`firebase-config.js` contains a Firebase web config, including an API key.
+**That is intentional and safe.** A Firebase web key is a public project
+identifier, not a credential — it is served to every visitor's browser and
+grants no access to data on its own. The security boundary is
+`firestore.rules`.
+
+GitHub's secret scanner flags it anyway, because it cannot tell a public
+Firebase key from a billable Google API key. The alert can be dismissed as
+"won't fix"; rotating the key would break the site and achieve nothing, since
+its replacement would be equally public.
+
+Two things do matter, and both are worth checking:
+
+- **Sign-in providers.** Only Google sign-in is enabled, so the key cannot be
+  used to create accounts. If email/password is ever enabled, turn on the
+  Identity Platform abuse protections with it.
+- **Key restrictions.** In Google Cloud Console the browser key should be
+  restricted to the site's domains, and to the Identity Toolkit, Token
+  Service and Cloud Firestore APIs. This costs nothing and means the key
+  cannot be pointed at a billable Google API added to the project later.
+
 ## Security model
 
 - Membership is a document, `workspaces/{id}/members/{uid}`. Its existence is
