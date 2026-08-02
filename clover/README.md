@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.147 — Step through past months on the Dashboard
+
+The Dashboard header now has a month navigator — **‹ August 2026 ›** with a
+**This month** reset — so you can flip back through previous months right there,
+without hunting in the top-bar dropdown. Forward stops at the current month (the
+Dashboard is an actuals snapshot), and the arrows stay in sync with the top-bar
+Year/Month selectors, so the whole app follows along. The monthly snapshot figures
+(income, spending, cashflow left) update to the month you’re viewing.
+
 ### v1.0.146 — A dedicated Notifications section in Settings
 
 All the ways Clover can nudge you now live in one place — **Settings →

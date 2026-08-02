@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.146';
+const VERSION = '1.0.147';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -378,6 +378,30 @@ function setActiveYear(y) {
   activeYear = y;
   const sel = document.getElementById('sel-year'); if (sel) sel.value = String(y);
   renderView(currentRoute);
+}
+// Point the app at a specific month (0-indexed) and re-render, keeping the
+// top-bar Year/Month selectors in step. Used by the dashboard month navigator.
+function goDashMonth(year, monthIdx0) {
+  activeYear = year;
+  activeMonth = monthIdx0 + 1;   // selectors + focusMonth are 1-indexed (0 = All)
+  const yS = document.getElementById('sel-year'); if (yS) yS.value = String(year);
+  const mS = document.getElementById('sel-month'); if (mS) mS.value = String(activeMonth);
+  paycheckAllYears = false;
+  renderView(currentRoute);
+}
+// Step the dashboard's focus month by ±1, rolling over year boundaries. Clamped
+// forward at the current month (the dashboard is an actuals snapshot) and back
+// at 2020 (the earliest year the selectors offer).
+function stepDashMonth(delta) {
+  const now = new Date(), cy = now.getFullYear();
+  let m = activeMonth > 0 ? activeMonth - 1 : (activeYear === cy ? now.getMonth() : 11);
+  let y = activeYear;
+  m += delta;
+  if (m < 0) { m = 11; y -= 1; }
+  else if (m > 11) { m = 0; y += 1; }
+  if (y > cy || (y === cy && m > now.getMonth())) { y = cy; m = now.getMonth(); }
+  if (y < 2020) { y = 2020; m = 0; }
+  goDashMonth(y, m);
 }
 // Loads the year range once so we know which years have data (for year tabs).
 let _yearsScanned = false;
@@ -3607,6 +3631,7 @@ const HELP_SECTIONS = [
   { id: 'dashboard', ico: '◆', title: 'Dashboard', what: 'Your at-a-glance home screen.',
     points: [
       'Key numbers for the selected month: income in, money spent, and what’s left (net).',
+      'Use the ‹ month › navigator in the header to step back through previous months (or “This month” to jump to today) — it moves with the top-bar Year/Month selectors and stops at the current month.',
       'Projected annual income and expenses based on your trend so far.',
       '“⚠ Attention” collects things that need you — bills renewing soon, late or missing paychecks, and budget placeholders waiting on last month’s actuals, and any CD that has passed its maturity date. A bell in the top-right also counts matured CDs — Clover never closes a CD on its own; it waits for you to renew or update it.',
       'Donut charts break down income and spending by category. “Expenses by category (YTD)” counts only the months that have already happened, so a yearly premium isn’t weighed against a few months of groceries.',
@@ -6643,7 +6668,25 @@ function renderDashboard(view) {
 
   const head = el('div', 'view-head');
   const left = el('div'); left.appendChild(el('h3', null, 'Dashboard'));
-  left.appendChild(el('p', 'muted', monthName + ' ' + activeYear + ' snapshot'));
+  // Month navigator — step back through previous months right here (kept in sync
+  // with the top-bar Year/Month selectors). Forward stops at the current month.
+  const nav = el('div', 'dash-month-nav');
+  const prevB = el('button', 'dash-nav-btn', '‹'); prevB.title = 'Previous month';
+  prevB.addEventListener('click', () => stepDashMonth(-1));
+  const navLabel = el('span', 'dash-nav-label', monthName + ' ' + activeYear);
+  navLabel.title = 'Snapshot month — use ‹ › to change';
+  const nextB = el('button', 'dash-nav-btn', '›'); nextB.title = 'Next month';
+  const atPresent = activeYear > curYear || (activeYear === curYear && focusMonth >= now.getMonth());
+  nextB.disabled = atPresent;
+  nextB.addEventListener('click', () => stepDashMonth(1));
+  nav.appendChild(prevB); nav.appendChild(navLabel); nav.appendChild(nextB);
+  if (!(activeYear === curYear && focusMonth === now.getMonth())) {
+    const todayB = el('button', 'dash-nav-today', 'This month');
+    todayB.title = 'Jump back to the current month';
+    todayB.addEventListener('click', () => goDashMonth(curYear, now.getMonth()));
+    nav.appendChild(todayB);
+  }
+  left.appendChild(nav);
   head.appendChild(left);
   const lockBtn = el('button', 'btn-ghost', dashUnlocked ? '✓ Done editing' : '✎ Edit layout');
   lockBtn.title = dashUnlocked ? 'Keep these changes and lock the layout' : 'Unlock to reorder, resize, remove, or add panels';

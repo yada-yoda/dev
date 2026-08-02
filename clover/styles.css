@@ -478,6 +478,14 @@ button { font-family: inherit; cursor: pointer; }
 .dph-w { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .dash-panel.dragging { opacity: .5; }
 .dash-add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+/* Dashboard month navigator (‹ Aug 2026 › · This month) */
+.dash-month-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.dash-nav-btn { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; padding: 0; }
+.dash-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.dash-nav-btn:disabled { opacity: 0.4; cursor: default; }
+.dash-nav-label { font-size: 13px; font-weight: 600; min-width: 96px; text-align: center; }
+.dash-nav-today { font-size: 12px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text-muted); cursor: pointer; margin-left: 4px; }
+.dash-nav-today:hover { border-color: var(--accent); color: var(--accent); }
 @media (max-width: 900px) { .dash-panels { grid-template-columns: 1fr; grid-auto-rows: auto; } .dash-panel, .dash-panel.span2, .dash-panel.span1q { grid-column: 1 / -1; grid-row-end: auto !important; } }
 .col-config { display: flex; flex-direction: column; gap: 2px; margin: 8px 0 14px; }
 .col-row { display: flex; align-items: center; gap: 10px; padding: 7px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); }
