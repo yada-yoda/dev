@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.6.1";
+import { firestore, currentUser } from "./firebase-config.js?v=0.6.2";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -941,9 +941,14 @@ function ideaPayload(data) {
   const title = trimTo(data.title, 160);
   if (!title) throw new Error("Give the idea a title.");
 
-  let price = Number(data.estPrice);
-  if (!Number.isFinite(price) || price < 0) price = null;
-  else price = Math.round(price * 100) / 100;
+  // A blank price means "not known yet", which must survive as null. Passing
+  // it through Number() would turn it into 0 and claim the thing is free.
+  let price = null;
+  const rawPrice = data.estPrice;
+  if (rawPrice !== null && rawPrice !== undefined && String(rawPrice).trim() !== "") {
+    const n = Number(rawPrice);
+    if (Number.isFinite(n) && n >= 0) price = Math.round(n * 100) / 100;
+  }
 
   let url = trimTo(data.sourceUrl, 500);
   if (url && !/^https?:\/\//i.test(url)) url = "https://" + url;

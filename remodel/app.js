@@ -8,12 +8,12 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.1";
-import * as store from "./store.js?v=0.6.1";
-import * as media from "./media.js?v=0.6.1";
-import * as importer from "./importer.js?v=0.6.1";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.2";
+import * as store from "./store.js?v=0.6.2";
+import * as media from "./media.js?v=0.6.2";
+import * as importer from "./importer.js?v=0.6.2";
 
-export const VERSION = "0.6.1";
+export const VERSION = "0.6.2";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);

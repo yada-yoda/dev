@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.6.1 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
+**Status: v0.6.2 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -204,6 +204,18 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.6.2
+
+Fixes an idea with no price showing as **$0.00** instead of nothing.
+
+The import was right — it produced "no price" for a blank cell — but the save
+path then ran that through a number conversion, which turns nothing into zero.
+So "I have not priced this yet" was recorded as "this is free". That is exactly
+the distinction the importer was written to protect, undone one layer down.
+
+Blank now survives as blank all the way to storage. Existing ideas already
+saved as 0.00 need their price field cleared once by hand; new ones are fine.
 
 ### 0.6.1
 
