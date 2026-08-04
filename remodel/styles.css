@@ -614,6 +614,20 @@ select.needs-choice {
   border-radius: var(--radius) var(--radius) 0 0; overflow: hidden;
 }
 .idea-photo .tile-img { aspect-ratio: 16 / 10; }
+.idea-photo { position: relative; }
+.photo-count {
+  position: absolute; right: 8px; bottom: 8px;
+  background: rgba(20, 23, 27, .78); color: #fff;
+  font-size: 11.5px; font-weight: 600;
+  padding: 2px 8px; border-radius: 999px;
+}
+
+.photo-manager { grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr)); }
+.pm-item { min-width: 0; }
+.pm-actions {
+  display: flex; gap: 10px; flex-wrap: wrap;
+  margin-top: 6px; font-size: 12px;
+}
 .idea-meta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; align-items: baseline; }
 .idea-price { font-weight: 600; margin-left: auto; }
 

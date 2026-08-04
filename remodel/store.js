@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.6.2";
+import { firestore, currentUser } from "./firebase-config.js?v=0.7.0";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;
@@ -964,8 +964,10 @@ function ideaPayload(data) {
     vendor: trimTo(data.vendor, 120),
     model: trimTo(data.model, 120),
     estPrice: price,
-    notes: trimTo(data.notes, 4000),
-    mediaId: data.mediaId || null
+    notes: trimTo(data.notes, 4000)
+    // Photos are deliberately absent: they are managed by setIdeaPhotos.
+    // Including them here would let the edit form, which has no photo
+    // fields, blank them out on every save.
   };
 }
 
@@ -1011,14 +1013,28 @@ export async function deleteIdea(wsId, ideaId) {
 }
 
 /**
- * Points an idea at a photo. The image itself lives in the normal media
- * collections, so it also shows up in Photos and counts toward storage —
- * an idea holds a reference, not its own copy.
+ * Photo ids for an idea, newest arrangement first. Tolerates the older
+ * single-photo shape so ideas saved before multi-photo still work.
  */
-export async function setIdeaImage(wsId, ideaId, mediaId) {
+export function ideaPhotoIds(idea) {
+  if (Array.isArray(idea?.mediaIds) && idea.mediaIds.length) return idea.mediaIds;
+  return idea?.mediaId ? [idea.mediaId] : [];
+}
+
+/**
+ * Sets the full photo list for an idea. The first id is the cover, mirrored
+ * into the legacy `mediaId` field so older code paths keep working.
+ *
+ * Images themselves live in the normal media collections — an idea holds
+ * references, not copies, so one photo is stored once and also appears in
+ * Photos.
+ */
+export async function setIdeaPhotos(wsId, ideaId, mediaIds) {
   const { db, m } = await firestore();
+  const clean = [...new Set((mediaIds || []).filter(Boolean))].slice(0, 20);
   await m.updateDoc(m.doc(db, "workspaces", wsId, "ideas", ideaId), {
-    mediaId: mediaId || null,
+    mediaIds: clean,
+    mediaId: clean[0] || null,
     updatedAt: m.serverTimestamp()
   });
 }

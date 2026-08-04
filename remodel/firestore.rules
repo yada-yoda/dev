@@ -352,6 +352,9 @@ service cloud.firestore {
           && textWithin('vendor', 120)
           && textWithin('model', 120)
           && textWithin('notes', 4000)
+          && (!('mediaIds' in request.resource.data)
+              || (request.resource.data.mediaIds is list
+                  && request.resource.data.mediaIds.size() <= 20))
           && (!('estPrice' in request.resource.data)
               || request.resource.data.estPrice == null
               || (request.resource.data.estPrice is number

@@ -721,6 +721,13 @@ describe('media and ideas (M3)', () => {
     );
   });
 
+  test('an idea may carry several photo references, but not unbounded', async () => {
+    await assertSucceeds(setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i_photos'),
+      ideaDoc(EDITOR.uid, { mediaIds: ['m1', 'm2', 'm3'] })));
+    await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i_toomany'),
+      ideaDoc(EDITOR.uid, { mediaIds: Array.from({ length: 21 }, (_, i) => 'm' + i) })));
+  });
+
   test('an invented idea status or a negative price is rejected', async () => {
     await assertFails(setDoc(doc(as(EDITOR), 'workspaces', WS, 'ideas', 'i_bad1'),
       ideaDoc(EDITOR.uid, { status: 'maybe' })));

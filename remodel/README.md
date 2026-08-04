@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.6.2 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
+**Status: v0.7.0 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -56,8 +56,9 @@ in later milestones (see the roadmap below).
 - **Ideas.** Products and materials you are considering, with vendor, model or
   SKU, estimated price, a link to where you found it, and a status from Saved
   through Shortlisted to Selected, Purchased or Rejected — so the options you
-  turned down stay on record. Each idea can carry a photo, which also files
-  itself under Photos as Inspiration.
+  turned down stay on record. Each idea can carry several photos — a product
+  shot, a price tag, a label with serial numbers — which also file themselves
+  under Photos as Inspiration.
 
 ## Roadmap
 
@@ -188,7 +189,7 @@ npm install
 npm test
 ```
 
-73 tests cover every role plus the adversarial cases: cross-workspace reads,
+74 tests cover every role plus the adversarial cases: cross-workspace reads,
 direct document-id probing, self-promotion, forging an owner row, backdated
 timestamps, reusing expired, revoked, replayed or someone else's invitation,
 reading private notes as the accountant role, and rewriting or deleting
@@ -204,6 +205,23 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.7.0
+
+An idea can now hold several photos instead of one. A sofa is a showroom
+shot *and* the price tag *and* the label with the serial numbers — one
+picture was never going to be enough.
+
+Upload several at once. The first is the cover shown on the card, with a
+"+2" badge for the rest; any photo can be promoted to cover, since which one
+represents the idea is a judgement rather than an accident of upload order.
+Removing a photo from an idea unlinks it and leaves it in Photos, because
+deleting an image you took because you tidied a list is a nasty surprise.
+
+Fixes an adjacent bug found while building this: editing an idea used to
+blank its photo. The edit form has no photo fields, so saving wrote "no
+photo" over whatever was attached. Photos are now managed entirely
+separately from the idea's details, so the two cannot overwrite each other.
 
 ### 0.6.2
 

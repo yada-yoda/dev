@@ -8,12 +8,12 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.2";
-import * as store from "./store.js?v=0.6.2";
-import * as media from "./media.js?v=0.6.2";
-import * as importer from "./importer.js?v=0.6.2";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.7.0";
+import * as store from "./store.js?v=0.7.0";
+import * as media from "./media.js?v=0.7.0";
+import * as importer from "./importer.js?v=0.7.0";
 
-export const VERSION = "0.6.2";
+export const VERSION = "0.7.0";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -1619,7 +1619,7 @@ async function viewIdeas(host) {
       </div>
       ${mayEdit ? `<button class="btn" id="btn-new-idea">Save an idea</button>` : ""}
     </div>
-    <input type="file" id="idea-file" accept="image/*" class="hidden">
+    <input type="file" id="idea-file" accept="image/*" multiple class="hidden">
     <div class="loading">Loading ideas…</div>`;
 
   $("#btn-new-idea")?.addEventListener("click", () => promptIdea(null));
@@ -1669,10 +1669,15 @@ async function viewIdeas(host) {
     <div class="grid">
       ${filtered.map((idea) => `
         <div class="card idea-card" data-idea="${esc(idea.id)}">
-          ${idea.mediaId
-            ? `<button class="idea-photo" data-idea-photo="${esc(idea.mediaId)}" type="button"
-                 aria-label="View photo"><span class="tile-img" data-thumb="${esc(idea.mediaId)}"></span></button>`
-            : ""}
+          ${(() => {
+            const photos = store.ideaPhotoIds(idea);
+            if (!photos.length) return "";
+            return `<button class="idea-photo" data-idea-gallery="${esc(idea.id)}" type="button"
+                aria-label="${photos.length} photo${photos.length === 1 ? "" : "s"}">
+                <span class="tile-img" data-thumb="${esc(photos[0])}"></span>
+                ${photos.length > 1 ? `<span class="photo-count">+${photos.length - 1}</span>` : ""}
+              </button>`;
+          })()}
           <div class="room-top">
             <h3 class="wrap-any">${esc(idea.title)}</h3>
             <span class="chip ${idea.status === "selected" || idea.status === "purchased" ? "chip-good" : idea.status === "rejected" ? "chip-out" : "chip-solid"}">${esc(store.ideaStatusLabel(idea.status))}</span>
@@ -1686,7 +1691,10 @@ async function viewIdeas(host) {
           ${idea.notes ? `<p class="room-notes wrap-any">${esc(idea.notes)}</p>` : ""}
           <div class="row-actions">
             ${idea.sourceUrl ? `<a class="btn btn-ghost btn-sm" href="${esc(idea.sourceUrl)}" target="_blank" rel="noopener noreferrer">Open source</a>` : ""}
-            ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-idea-addphoto="${esc(idea.id)}">${idea.mediaId ? "Replace photo" : "Add photo"}</button>
+            ${mayEdit ? `<button class="btn btn-ghost btn-sm" data-idea-photos="${esc(idea.id)}">${
+              store.ideaPhotoIds(idea).length
+                ? `Photos (${store.ideaPhotoIds(idea).length})`
+                : "Add photos"}</button>
             <button class="btn btn-ghost btn-sm" data-idea-edit="${esc(idea.id)}">Edit</button>
             <button class="btn btn-ghost btn-sm" data-idea-delete="${esc(idea.id)}">Delete</button>` : ""}
           </div>
@@ -1703,48 +1711,69 @@ async function viewIdeas(host) {
   // Thumbnails for ideas that already have a photo.
   if (document.querySelector("[data-thumb]")) hydrateThumbs();
 
-  document.querySelectorAll("[data-idea-photo]").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      const all = await store.loadMedia(ws.id);
-      openLightbox(btn.dataset.ideaPhoto, all, mayEdit);
+  // Uploads run through the normal pipeline — compressed, EXIF stripped — so
+  // an idea's photos also appear in Photos and count once toward storage.
+  const ideaFile = $("#idea-file");
+  let pendingIdea = null;
+
+  const openPhotos = (id) => promptIdeaPhotos(ideas.find((i) => i.id === id), () => {
+    pendingIdea = ideas.find((i) => i.id === id);
+    ideaFile.click();
+  }, mayEdit);
+
+  document.querySelectorAll("[data-idea-gallery]").forEach((btn) => {
+    btn.addEventListener("click", () => openPhotos(btn.dataset.ideaGallery));
+  });
+  document.querySelectorAll("[data-idea-photos]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idea = ideas.find((i) => i.id === btn.dataset.ideaPhotos);
+      // Nothing attached yet: skip the manager and go straight to the picker.
+      if (!store.ideaPhotoIds(idea).length) {
+        pendingIdea = idea;
+        ideaFile.click();
+      } else {
+        openPhotos(idea.id);
+      }
     });
   });
 
-  // Attaching a photo uploads it through the normal pipeline — compressed,
-  // EXIF stripped — so it also appears in Photos and counts toward storage.
-  const ideaFile = $("#idea-file");
-  let pendingIdea = null;
-  document.querySelectorAll("[data-idea-addphoto]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      pendingIdea = ideas.find((i) => i.id === btn.dataset.ideaAddphoto);
-      ideaFile.click();
-    });
-  });
   ideaFile?.addEventListener("change", async () => {
-    const file = ideaFile.files?.[0];
+    const files = [...(ideaFile.files || [])].slice(0, 10);
     ideaFile.value = "";
-    if (!file || !pendingIdea) return;
+    if (!files.length || !pendingIdea) return;
     const idea = pendingIdea;
     pendingIdea = null;
 
-    toast("Processing photo…");
-    try {
-      const processed = await media.processImage(file);
-      const mediaId = await store.saveMedia(ws.id, processed, {
-        category: "inspiration",
-        caption: idea.title,
-        roomId: idea.roomId || "",
-        projectId: idea.projectId || "",
-        tags: ["idea"],
-        fileName: file.name
-      });
-      await store.setIdeaImage(ws.id, idea.id, mediaId);
-      track("idea_photo_add");
-      toast("Photo attached.");
-      renderRoute();
-    } catch (err) {
-      toast(store.describeError(err), "bad");
+    toast(`Processing ${files.length} photo${files.length === 1 ? "" : "s"}…`);
+    const added = [];
+    const failures = [];
+    for (const file of files) {
+      try {
+        const processed = await media.processImage(file);
+        added.push(await store.saveMedia(ws.id, processed, {
+          category: "inspiration",
+          caption: idea.title,
+          roomId: idea.roomId || "",
+          projectId: idea.projectId || "",
+          tags: ["idea"],
+          fileName: file.name
+        }));
+      } catch (err) {
+        failures.push(store.describeError(err));
+      }
     }
+
+    if (added.length) {
+      try {
+        await store.setIdeaPhotos(ws.id, idea.id, [...store.ideaPhotoIds(idea), ...added]);
+        track("idea_photo_add", { count: added.length });
+        toast(`${added.length} photo${added.length === 1 ? "" : "s"} attached.`);
+      } catch (err) {
+        toast(store.describeError(err), "bad");
+      }
+    }
+    if (failures.length) toast(`${failures.length} could not be added. ${failures[0]}`, "bad");
+    renderRoute();
   });
 
   document.querySelectorAll("[data-idea-edit]").forEach((btn) => {
@@ -1761,6 +1790,81 @@ async function viewIdeas(host) {
         onConfirm: async () => {
           await store.deleteIdea(state.ws.id, idea.id);
           toast("Idea deleted.");
+          renderRoute();
+        }
+      });
+    });
+  });
+}
+
+/**
+ * An idea's photos: the cover first, then the rest. Cover matters because it
+ * is what you see on the card, so choosing it is an explicit action rather
+ * than an accident of upload order.
+ */
+function promptIdeaPhotos(idea, onAdd, mayEdit) {
+  const photos = store.ideaPhotoIds(idea);
+
+  const body = openModal({
+    title: idea.title,
+    hideConfirm: true,
+    body: `
+      <p class="muted" style="margin-bottom:12px">${photos.length} photo${photos.length === 1 ? "" : "s"}.
+         The first is the cover shown on the card. Every one of these also lives in
+         Photos under Inspiration.</p>
+      <div class="gallery photo-manager">
+        ${photos.map((id, i) => `
+          <div class="pm-item">
+            <button class="tile" data-open-photo="${esc(id)}" type="button">
+              <span class="tile-img" data-thumb="${esc(id)}"></span>
+              ${i === 0 ? `<span class="tile-cat">Cover</span>` : ""}
+            </button>
+            ${mayEdit ? `<div class="pm-actions">
+              ${i === 0 ? "" : `<button class="btn-link" data-make-cover="${esc(id)}">Make cover</button>`}
+              <button class="btn-link" data-drop-photo="${esc(id)}">Remove</button>
+            </div>` : ""}
+          </div>`).join("")}
+      </div>
+      ${mayEdit ? `<div style="margin-top:16px">
+        <button class="btn btn-sec btn-sm" id="pm-add">Add more photos</button>
+      </div>` : ""}`
+  });
+
+  hydrateThumbs();
+
+  body.querySelector("#pm-add")?.addEventListener("click", () => { closeModal(); onAdd(); });
+
+  body.querySelectorAll("[data-open-photo]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const all = await store.loadMedia(state.ws.id);
+      openLightbox(btn.dataset.openPhoto, all, mayEdit);
+    });
+  });
+
+  body.querySelectorAll("[data-make-cover]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.makeCover;
+      try {
+        await store.setIdeaPhotos(state.ws.id, idea.id, [id, ...photos.filter((p) => p !== id)]);
+        toast("Cover updated.");
+        closeModal();
+        renderRoute();
+      } catch (err) {
+        toast(store.describeError(err), "bad");
+      }
+    });
+  });
+
+  body.querySelectorAll("[data-drop-photo]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.dropPhoto;
+      confirmDialog({
+        title: "Remove this photo?",
+        message: "It stays in Photos — this only unlinks it from the idea.",
+        confirmText: "Remove",
+        onConfirm: async () => {
+          await store.setIdeaPhotos(state.ws.id, idea.id, photos.filter((p) => p !== id));
+          toast("Photo removed from this idea.");
           renderRoute();
         }
       });
