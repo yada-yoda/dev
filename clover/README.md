@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.148 — Two new built-in expense categories: Personal Care & Education
+
+Added **Personal Care** (subs: Hair / Barber, Nails, Spa & Massage, Cosmetics) —
+so a haircut has a real home instead of landing in “Other” — and **Education**
+(subs: Tuition, Books & Supplies, Courses, Fees). Both are seeded for new setups
+and added to existing data via a one-time migration that only fills in what’s
+missing: if you’d already created your own “Personal Care” or “Education” group,
+yours is left exactly as-is. Rename, remove, or add subs anytime under
+Settings → Lists & categories.
+
 ### v1.0.147 — Step through past months on the Dashboard
 
 The Dashboard header now has a month navigator — **‹ August 2026 ›** with a

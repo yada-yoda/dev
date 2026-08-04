@@ -58,6 +58,8 @@ const SEED_EXPENSE_GROUPS = [
   { name: 'Auto', subs: ['Fuel', 'Maintenance', 'Registration', 'Parking & Tolls'] },
   { name: 'Food', subs: ['Groceries', 'Dining Out', 'Delivery'] },
   { name: 'Entertainment', subs: ['Games', 'Events', 'Hobbies'] },
+  { name: 'Personal Care', subs: ['Hair / Barber', 'Nails', 'Spa & Massage', 'Cosmetics'] },
+  { name: 'Education', subs: ['Tuition', 'Books & Supplies', 'Courses', 'Fees'] },
   // Money moved into savings/investments isn't "spent" — but it leaves your
   // spendable pool, so it's tracked here as an allocation (pay-yourself-first).
   { name: 'Savings & Investments', subs: ['Brokerage', 'Retirement / IRA', '401(k)', 'HSA', 'Emergency Fund', 'Crypto', 'College / 529', 'Other savings'] },
@@ -86,6 +88,15 @@ function migrateExpenseSeeds(cats) {
     cats.push({ id: mkId('cat'), name: 'Savings & Investments', order: cats.length, subs: [] });
     changed = true;
   }
+  // Later-added lifestyle groups — insert once if missing (subs filled by the
+  // seed loop below). Guarded by exact name so a user who added their own
+  // "Education"/"Personal Care" keeps theirs untouched.
+  ['Personal Care', 'Education'].forEach(name => {
+    if (!cats.some(c => norm(c.name) === norm(name))) {
+      cats.push({ id: mkId('cat'), name, order: cats.length, subs: [] });
+      changed = true;
+    }
+  });
   SEED_EXPENSE_GROUPS.forEach(it => {
     if (typeof it === 'string' || !it.subs || !it.subs.length) return;
     const g = cats.find(c => norm(c.name) === norm(it.name));
