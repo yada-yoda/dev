@@ -10,7 +10,7 @@
 // ============================================================
 
 // Keep this ?v in step with index.html and app.js — see the note there.
-import { firestore, currentUser } from "./firebase-config.js?v=0.6.0";
+import { firestore, currentUser } from "./firebase-config.js?v=0.6.1";
 
 export const SCHEMA_VERSION = 1;
 const INVITE_DAYS = 14;

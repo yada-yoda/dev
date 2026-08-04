@@ -8,12 +8,12 @@
 
 // The ?v on these imports must match the one in index.html: it is what stops a
 // browser pairing a fresh app.js with a cached store.js after a deploy.
-import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.0";
-import * as store from "./store.js?v=0.6.0";
-import * as media from "./media.js?v=0.6.0";
-import * as importer from "./importer.js?v=0.6.0";
+import { CONFIGURED, onAuth, signIn, signOutNow, currentUser } from "./firebase-config.js?v=0.6.1";
+import * as store from "./store.js?v=0.6.1";
+import * as media from "./media.js?v=0.6.1";
+import * as importer from "./importer.js?v=0.6.1";
 
-export const VERSION = "0.6.0";
+export const VERSION = "0.6.1";
 
 // ---------- tiny DOM helpers ----------
 const $ = (sel) => document.querySelector(sel);
@@ -3178,12 +3178,12 @@ function wireChrome() {
     if (e.key === "Escape" && modalState) closeModal();
   });
 
+  // The hash is the single source of truth for what is on screen. There used
+  // to be a click handler here that also updated state.route on a timer; if it
+  // won the race against this event, onHashChange saw the route as already
+  // current and skipped rendering — the nav highlighted but the page never
+  // redrew. renderRoute() repaints the nav itself, so nothing else is needed.
   window.addEventListener("hashchange", onHashChange);
-
-  document.body.addEventListener("click", (e) => {
-    const link = e.target.closest("[data-nav]");
-    if (link) setTimeout(() => { state.route = readRoute().route; renderChrome(); }, 0);
-  });
 }
 
 function boot() {

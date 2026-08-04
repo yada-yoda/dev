@@ -7,7 +7,7 @@ A static single-page app with no build step and no server of its own. Data
 lives in Firebase (free Spark plan), and every access decision is enforced by
 Firestore security rules rather than by the interface.
 
-**Status: v0.6.0 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
+**Status: v0.6.1 — Milestone 4 in progress, plus CSV import.** Sign-in, workspaces,
 roles, invitations, rooms, projects with phases and tasks, and now photos and
 an idea library. Budgets, the product registry and contractor sharing arrive
 in later milestones (see the roadmap below).
@@ -204,6 +204,21 @@ activity history. Rules changes ship with their tests in the same commit.
 - Confirm a phone-width window has no horizontal scrollbar on any page.
 
 ## Changelog
+
+### 0.6.1
+
+Fixes the sidebar appearing to do nothing: clicking a section highlighted it
+and changed the address, but the page kept showing whatever was there before.
+
+The cause was two pieces of code racing to handle the same click. A leftover
+click handler updated the current-section variable on a timer, and when it won
+the race, the code that actually redraws the page looked at that variable,
+concluded the section had not changed, and skipped the redraw. Whether it
+happened came down to which fired first, which is why it was intermittent and
+why it slipped through automated clicking.
+
+The address bar is now the single source of truth for what is on screen. The
+redundant handler is gone.
 
 ### 0.6.0
 
