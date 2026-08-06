@@ -1,4 +1,9 @@
-/* Usage Tracker — v0.27.7
+/* Usage Tracker — v0.30.0
+ * v0.30.0: Three configurable month-by-month charts (cost, avg $/day, avg lifespan) with line/area/bar + 6M/12M/24M/All switchers; prefs sync per chart.
+ * v0.29.0: Bundle "create all N at once" — one product per unit, auto-numbered 1..N under a shared bundle, #1 active and the rest inventory backups.
+ * v0.28.1: Fix the "what's new" unread dot floating far right of the version number (version button was stretching to the heading width).
+ * v0.28.0: Amazon ASIN field (revealed when store is Amazon) → direct amazon.com/dp/{ASIN} reorder link; accepts a pasted URL; auto-filled from UPC lookup.
+ * v0.27.8: Reorder reminders return once you're down to your last unit of a type (was: silenced whenever any backup existed).
  * v0.27.7: Brand logo / product image moved to its own table column so thumbnails and names each align in a clean vertical strip.
  * v0.27.6: Table name cell — brand logo stays left of a wrapping title (flex row) instead of stacking above it.
  * v0.27.5: Privacy / Terms / Disclaimer page + 404 page version refresh + footer link.
@@ -618,7 +623,7 @@ async function ensureChart() {
   return _chartLoadPromise;
 }
 
-const APP_VERSION = '0.27.7';
+const APP_VERSION = '0.30.0';
 
 const LEGACY_PRODUCTS_KEY = 'usage.products.v1';
 const LEGACY_TYPES_KEY = 'usage.customTypes.v1';
@@ -661,6 +666,11 @@ const FIELDS = [
   'bundleStatus', 'bundleSize', 'bundlePosition', 'bundleId',
   'store', 'buyer', 'cardLast4',
   'purchaseDate', 'notes', 'upc', 'imageUrl', 'createdAt',
+  // v0.28.0: Amazon ASIN (10-char product id). Optional; when set it drives a
+  // direct amazon.com/dp/{ASIN} reorder link (better than a name search).
+  // Shown in the dialog when the store is Amazon (or when an ASIN is already
+  // present). Accepts a pasted Amazon URL and extracts the ASIN.
+  'asin',
   // v0.15.2: brand name (from UPCitemdb response) — drives the company-logo
   // icon via logo.dev. Editable in the dialog so users can correct or fill
   // it in for products without UPC lookups.
@@ -756,6 +766,33 @@ let columnVisibility = (() => {
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);
     return { ...defaults, ...parsed };
+  } catch { return defaults; }
+})();
+
+// v0.30.0: per-chart display prefs for the configurable time-series charts on
+// the Dashboard. Each entry is { type: 'line'|'area'|'bar', months: 6|12|24|'all' }.
+// Same dual-write pattern as the other viewing preferences (localStorage for
+// instant/offline, Firestore uiPrefs for cross-device) — see saveUiPrefsField.
+const TIMESERIES_KEY = 'usage.timeseriesCharts.v1';
+const TIMESERIES_DEFAULTS = {
+  costPerMonth: { type: 'line', months: 12 },
+  avgPerDay:    { type: 'line', months: 12 },
+  // Lifespan is naturally sparse (only months where something finished), so
+  // bars read better than a line with gaps.
+  avgLifespan:  { type: 'bar',  months: 12 },
+};
+let timeseriesPrefs = (() => {
+  const defaults = JSON.parse(JSON.stringify(TIMESERIES_DEFAULTS));
+  try {
+    const raw = localStorage.getItem(TIMESERIES_KEY);
+    if (!raw) return defaults;
+    const parsed = JSON.parse(raw) || {};
+    for (const k of Object.keys(defaults)) {
+      if (parsed[k] && typeof parsed[k] === 'object') {
+        defaults[k] = { ...defaults[k], ...parsed[k] };
+      }
+    }
+    return defaults;
   } catch { return defaults; }
 })();
 
@@ -882,6 +919,41 @@ const DEMO_PRODUCTS = (() => {
 //   'fix'         → amber          (#d98f2b)
 // An entry can have multiple tags (e.g. ['new', 'improvement']).
 const CHANGELOG = [
+  {
+    version: '0.30.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Three new charts you can shape yourself',
+    body: 'The Dashboard has three new month-by-month charts: what you spent each month, your average cost per day, and how long the products you finished actually lasted. Each one has its own switches — view it as a line, a filled area, or bars, over the last 6, 12, or 24 months (or your whole history). Your picks stick per chart and follow you to your other devices.',
+  },
+  {
+    version: '0.29.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Add a whole multipack in one go',
+    body: 'Buying a 3-pack (or any multipack)? Check "Part of a bundle purchase," enter how many are in it, and a new "Create all N at once" option appears. One tap and the app adds every unit for you — auto-numbered 1 of 3, 2 of 3, 3 of 3 — instead of you entering each by hand. The first one takes the start date you set (the one you\'re opening now); the rest land in your inventory as backups, ready to start when you get to them.',
+  },
+  {
+    version: '0.28.1',
+    date: '2026-08-06',
+    tags: ['fix'],
+    title: 'Version "new" dot sits next to the version again',
+    body: 'The little blue dot that signals an unread "What\'s new" entry was floating off to the right instead of hugging the version number. It now sits right beside it.',
+  },
+  {
+    version: '0.28.0',
+    date: '2026-08-06',
+    tags: ['new'],
+    title: 'Amazon ASIN + one-tap reorder link',
+    body: 'Bought something on Amazon? Pick Amazon as the store and a new "Amazon ASIN" field appears. Paste the ASIN or the whole Amazon product URL (it pulls the ASIN out for you), and you get a direct "Open on Amazon" link straight to that product\'s page — much handier for reordering than a name search. If a UPC lookup already knows the ASIN, it fills in automatically. The ASIN is included in CSV/JSON exports and is searchable.',
+  },
+  {
+    version: '0.27.8',
+    date: '2026-08-06',
+    tags: ['fix'],
+    title: 'Reorder reminders come back when you\'re on your last one',
+    body: 'A previous change silenced reorder reminders for any product type you kept a backup of in inventory — which meant types you always keep stocked went quiet for good. Now a reminder is only held back while you actually have a spare beyond the one running low. The moment you\'re down to your last unit of something and it\'s running low, the reminder (and the email) come back.',
+  },
   {
     version: '0.27.7',
     date: '2026-07-20',
@@ -1228,7 +1300,9 @@ function persistActiveFilters() {
 let charts = {
   byType: null, byStore: null, finishedByMonth: null,
   // v0.7.11
-  perDayByType: null, countByType: null, longestRunning: null
+  perDayByType: null, countByType: null, longestRunning: null,
+  // v0.30.0 — configurable month-by-month time series
+  costPerMonth: null, avgPerDay: null, avgLifespan: null
 };
 let zxingModule = null;       // lazy-loaded on first Scan tap
 let scannerControls = null;   // IScannerControls returned by @zxing/browser
@@ -1663,6 +1737,7 @@ async function loadAndApplyUiPrefs(uid) {
       currency: userCurrency,
       activityPageSize,
       changelogLastSeen: getLastChangelogSeen(),
+      timeseriesCharts: timeseriesPrefs, // v0.30.0
     };
     setDoc(uiPrefsDoc(uid), seed, { merge: true })
       .catch(err => console.warn('uiPrefs seed write failed:', err));
@@ -1725,6 +1800,28 @@ async function loadAndApplyUiPrefs(uid) {
     const sel = document.getElementById('activity-pagesize');
     if (sel) sel.value = String(activityPageSize);
     anyApplied = true;
+  }
+
+  // v0.30.0: timeseriesCharts — per-chart { type, months }. Merged over the
+  // defaults so a chart added in a later release still gets its default when
+  // an older cloud doc doesn't mention it. Validated per field so a malformed
+  // doc can't put a chart into an unrenderable state.
+  if (data.timeseriesCharts && typeof data.timeseriesCharts === 'object') {
+    const merged = JSON.parse(JSON.stringify(TIMESERIES_DEFAULTS));
+    for (const k of Object.keys(merged)) {
+      const incoming = data.timeseriesCharts[k];
+      if (!incoming || typeof incoming !== 'object') continue;
+      if (['line', 'area', 'bar'].includes(incoming.type)) merged[k].type = incoming.type;
+      if (incoming.months === 'all' || [6, 12, 24].includes(Number(incoming.months))) {
+        merged[k].months = incoming.months === 'all' ? 'all' : Number(incoming.months);
+      }
+    }
+    if (JSON.stringify(merged) !== JSON.stringify(timeseriesPrefs)) {
+      timeseriesPrefs = merged;
+      try { localStorage.setItem(TIMESERIES_KEY, JSON.stringify(timeseriesPrefs)); } catch {}
+      syncTimeSeriesControls();
+      anyApplied = true;
+    }
   }
 
   // changelogLastSeen — version string. Trickier: we keep whichever is
@@ -2126,7 +2223,7 @@ function getSortValue(p, column) {
 // substring match; AND-combines with row-filter tabs and chip filters.
 // Transient (not persisted) — search is meant to be momentary.
 let searchQuery = '';
-const SEARCH_FIELDS = ['productName', 'productType', 'brand', 'store', 'buyer', 'notes', 'upc', 'cardLast4'];
+const SEARCH_FIELDS = ['productName', 'productType', 'brand', 'store', 'buyer', 'notes', 'upc', 'cardLast4', 'asin'];
 
 // v0.14.0 search-autocomplete state. activeSuggestionIndex tracks keyboard
 // nav through the suggestion dropdown (arrow keys); -1 means no row is
@@ -2998,6 +3095,9 @@ async function renderDashboard() {
     renderChartPerDayByType();
     renderChartCountByType();
     renderChartLongestRunning();
+    // v0.30.0: configurable month-by-month series (cost, $/day, lifespan).
+    syncTimeSeriesControls();
+    renderTimeSeriesCharts();
   }
 }
 
@@ -3173,6 +3273,303 @@ function renderChartFinishedByMonth() {
 }
 
 function round2(v) { return Math.round((v + Number.EPSILON) * 100) / 100; }
+
+/* ---------- v0.30.0 configurable time-series charts ----------
+ * Three month-by-month charts on the Dashboard, each with a switchable chart
+ * type (line / area / bar) and time range (6M / 12M / 24M / All):
+ *
+ *   costPerMonth  — what you spent each month, bucketed by purchase date.
+ *   avgPerDay     — average daily burn rate during each month (amortized).
+ *   avgLifespan   — average lifespan of products finished in each month.
+ *
+ * All three share one renderer (renderTimeSeriesChart) driven by the
+ * TIMESERIES_CHARTS config, so adding a fourth series later is a config entry
+ * plus a compute function — not another bespoke chart function.
+ */
+
+const MS_PER_DAY = 86400000;
+
+// Month buckets ending with the current month. `start` is inclusive, `end`
+// exclusive, so overlap math never double-counts a boundary day.
+function monthBuckets(months) {
+  const now = new Date();
+  const out = [];
+  for (let i = months - 1; i >= 0; i--) {
+    const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+    out.push({
+      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}`,
+      label: start.toLocaleString(undefined, { month: 'short', year: '2-digit' }),
+      start,
+      end,
+      days: Math.round((end - start) / MS_PER_DAY),
+    });
+  }
+  return out;
+}
+
+// Turn a pref value into a concrete month count. 'all' spans from the earliest
+// date on any tracked product to now, capped at 10 years so a stray typo'd date
+// (e.g. year 1999) can't render thousands of buckets.
+function resolveMonthCount(months) {
+  if (months !== 'all') {
+    const n = Number(months);
+    return isFinite(n) && n > 0 ? Math.floor(n) : 12;
+  }
+  let earliest = null;
+  for (const p of trackedOnly()) {
+    for (const raw of [p.purchaseDate, p.startDate, p.endDate]) {
+      const d = parseLocalDate(raw);
+      if (d && (!earliest || d < earliest)) earliest = d;
+    }
+  }
+  if (!earliest) return 12;
+  const now = new Date();
+  const span = (now.getFullYear() - earliest.getFullYear()) * 12
+    + (now.getMonth() - earliest.getMonth()) + 1;
+  return Math.max(1, Math.min(span, 120));
+}
+
+function monthKeyOf(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+// Days of overlap between [aStart, aEnd] (inclusive end) and [bStart, bEnd)
+// (exclusive end). Used to spread a product's daily rate across the months its
+// lifespan touches.
+function overlapDays(aStart, aEnd, bStart, bEnd) {
+  const start = Math.max(aStart.getTime(), bStart.getTime());
+  const end = Math.min(aEnd.getTime() + MS_PER_DAY, bEnd.getTime());
+  if (end <= start) return 0;
+  return (end - start) / MS_PER_DAY;
+}
+
+// How many days of a bucket have actually elapsed. Full month for past buckets;
+// days-so-far for the current month, so a partial month isn't averaged against
+// days that haven't happened yet (which would understate the current rate).
+function elapsedDaysInBucket(b) {
+  const now = new Date();
+  const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const end = Math.min(b.end.getTime(), todayEnd.getTime());
+  const days = (end - b.start.getTime()) / MS_PER_DAY;
+  return days > 0 ? days : b.days;
+}
+
+// Money out the door per month, by purchase date (falling back to start date
+// for rows entered without one). Inventory IS included here — you paid for it
+// that month even if you haven't opened it yet. That's deliberately different
+// from groupAllocatedSpend, which excludes inventory because it answers a
+// usage-cost question rather than a cash-spent one.
+function seriesCostPerMonth(buckets) {
+  const vals = buckets.map(() => 0);
+  const idx = new Map(buckets.map((b, i) => [b.key, i]));
+  let any = false;
+  for (const p of trackedOnly()) {
+    const d = parseLocalDate(p.purchaseDate || p.startDate);
+    if (!d) continue;
+    const i = idx.get(monthKeyOf(d));
+    if (i == null) continue;
+    const c = allocatedCost(p);
+    if (!isFinite(c) || c <= 0) continue;
+    vals[i] += c;
+    any = true;
+  }
+  if (!any) return null;
+  // 0 (not null) for months with no spend — a real "you spent nothing" reading.
+  return vals.map(round2);
+}
+
+// Average $/day during each month. Every in-use product contributes its
+// amortized daily rate (allocatedCost / lifespanDays) for the days its lifespan
+// overlaps the month; the month's total is divided by elapsed days. This is the
+// same honest-math approach as the rolling 30-day tile (v0.14.2) — sequential
+// products of the same type don't double-count the way summing per-product
+// $/day would.
+function seriesAvgPerDay(buckets) {
+  const now = new Date();
+  let any = false;
+  const vals = buckets.map(b => {
+    let total = 0;
+    for (const p of trackedOnly()) {
+      if (isInventory(p)) continue; // not in use yet → no burn
+      const s = parseLocalDate(p.startDate);
+      if (!s) continue;
+      const e = p.endDate ? parseLocalDate(p.endDate) : now;
+      if (!e || e < s) continue;
+      const dur = Math.max(1, Math.round((e - s) / MS_PER_DAY));
+      const rate = allocatedCost(p) / dur;
+      if (!isFinite(rate) || rate <= 0) continue;
+      const ov = overlapDays(s, e, b.start, b.end);
+      if (ov > 0) total += rate * ov;
+    }
+    if (total <= 0) return null; // nothing in use that month → gap, not a zero
+    any = true;
+    return round2(total / elapsedDaysInBucket(b));
+  });
+  return any ? vals : null;
+}
+
+// Average lifespan (days) of products FINISHED in each month, bucketed by end
+// date. Months with no finishes are null so the line breaks rather than
+// implying an average of zero days.
+function seriesAvgLifespan(buckets) {
+  const sums = buckets.map(() => 0);
+  const counts = buckets.map(() => 0);
+  const idx = new Map(buckets.map((b, i) => [b.key, i]));
+  let any = false;
+  for (const p of trackedOnly()) {
+    if (!isFinished(p)) continue;
+    const d = parseLocalDate(p.endDate);
+    if (!d) continue;
+    const i = idx.get(monthKeyOf(d));
+    if (i == null) continue;
+    const dur = calcDuration(p);
+    if (dur == null || !isFinite(dur) || dur <= 0) continue;
+    sums[i] += dur;
+    counts[i] += 1;
+    any = true;
+  }
+  if (!any) return null;
+  return sums.map((s, i) => (counts[i] ? Math.round(s / counts[i]) : null));
+}
+
+const TIMESERIES_CHARTS = {
+  costPerMonth: {
+    canvasId: 'chart-cost-per-month',
+    color: '#2b5fd9',
+    compute: seriesCostPerMonth,
+    format: v => money(v),
+    axisFormat: v => money(v),
+    emptyText: 'No purchases with a date in this range yet.',
+    tooltip: v => `Spent ${money(v)}`,
+  },
+  avgPerDay: {
+    canvasId: 'chart-avg-per-day',
+    color: '#2d8a5f',
+    compute: seriesAvgPerDay,
+    format: v => moneyFine(v),
+    axisFormat: v => moneyFine(v),
+    emptyText: 'No products in use during this range yet.',
+    tooltip: v => `${moneyFine(v)} per day`,
+  },
+  avgLifespan: {
+    canvasId: 'chart-avg-lifespan',
+    color: '#7a4ad9',
+    compute: seriesAvgLifespan,
+    format: v => `${v} days`,
+    axisFormat: v => `${v}d`,
+    emptyText: 'Finish a few products to see how long they last.',
+    tooltip: v => `${v} day${v === 1 ? '' : 's'} average`,
+  },
+};
+
+// Keep the segmented buttons' pressed state in sync with the stored prefs.
+function syncTimeSeriesControls() {
+  for (const key of Object.keys(TIMESERIES_CHARTS)) {
+    const host = document.querySelector(`.chart-controls[data-chart="${key}"]`);
+    if (!host) continue;
+    const pref = timeseriesPrefs[key] || TIMESERIES_DEFAULTS[key];
+    host.querySelectorAll('.chart-ctl').forEach(btn => {
+      const isOn = String(pref[btn.dataset.ctl]) === String(btn.dataset.val);
+      btn.classList.toggle('is-active', isOn);
+      btn.setAttribute('aria-pressed', isOn ? 'true' : 'false');
+    });
+  }
+}
+
+function saveTimeseriesPrefs() {
+  try { localStorage.setItem(TIMESERIES_KEY, JSON.stringify(timeseriesPrefs)); } catch {}
+  saveUiPrefsField('timeseriesCharts', timeseriesPrefs);
+}
+
+function renderTimeSeriesChart(key) {
+  const cfg = TIMESERIES_CHARTS[key];
+  if (!cfg) return;
+  const canvas = document.getElementById(cfg.canvasId);
+  if (!canvas) return;
+  const pref = timeseriesPrefs[key] || TIMESERIES_DEFAULTS[key];
+  const buckets = monthBuckets(resolveMonthCount(pref.months));
+  const values = cfg.compute(buckets);
+
+  destroyChart(key);
+
+  // Empty-state: show a message in place of an axis-only chart.
+  const emptyEl = document.getElementById(`${cfg.canvasId}-empty`);
+  const hasData = Array.isArray(values) && values.some(v => v != null && v > 0);
+  if (emptyEl) {
+    emptyEl.hidden = hasData;
+    emptyEl.textContent = cfg.emptyText;
+  }
+  canvas.hidden = !hasData;
+  if (!hasData) return;
+
+  const isBar = pref.type === 'bar';
+  const isArea = pref.type === 'area';
+  // Many buckets + thin bars get unreadable; drop point markers past ~24.
+  const dense = buckets.length > 24;
+
+  charts[key] = new Chart(canvas, {
+    type: isBar ? 'bar' : 'line',
+    data: {
+      labels: buckets.map(b => b.label),
+      datasets: [{
+        data: values,
+        backgroundColor: isBar ? cfg.color : hexToRgba(cfg.color, 0.15),
+        borderColor: cfg.color,
+        borderWidth: isBar ? 0 : 2,
+        borderRadius: isBar ? 4 : undefined,
+        fill: isArea ? 'origin' : false,
+        tension: 0.25,
+        pointRadius: isBar || dense ? 0 : 3,
+        pointHoverRadius: isBar ? 0 : 5,
+        pointBackgroundColor: cfg.color,
+        // Bridge single-month gaps so one empty month doesn't split the line
+        // into disconnected fragments.
+        spanGaps: true,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => (ctx.parsed.y == null ? 'No data' : cfg.tooltip(ctx.parsed.y))
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            autoSkip: true,
+            maxRotation: 0,
+            // With a long range, thin the labels so they don't collide.
+            maxTicksLimit: dense ? 12 : 24,
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: { color: '#eef1f7' },
+          ticks: { callback: v => cfg.axisFormat(v) }
+        }
+      }
+    }
+  });
+}
+
+function renderTimeSeriesCharts() {
+  for (const key of Object.keys(TIMESERIES_CHARTS)) renderTimeSeriesChart(key);
+}
+
+// #rrggbb → rgba() so area fills can be translucent without a second palette.
+function hexToRgba(hex, alpha) {
+  const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || '');
+  if (!m) return hex;
+  return `rgba(${parseInt(m[1], 16)}, ${parseInt(m[2], 16)}, ${parseInt(m[3], 16)}, ${alpha})`;
+}
 
 /* ---------- v0.7.12 trends panel ----------
  * One rotating "insight" line above the stats bar. Two layers:
@@ -3539,18 +3936,18 @@ function computeReorderReminders() {
     meanLifespan.set(k, mean);
   }
 
-  // v0.27.3: skip reorder reminders for productTypes that already have an
-  // inventory item on hand. The point of the reminder is "buy more before
-  // you run out" — if the user has an unopened backup of the same
-  // category sitting in inventory, they have a backup ready to start
-  // when the current one finishes, so a "reorder" nudge would be wrong.
-  // Matched by productType (the category), mirroring the worker's
-  // computeReminders logic so the in-app panel and the email digest
-  // surface the same set of reminders.
-  const typesWithInventory = new Set();
+  // v0.27.8: suppress a reorder reminder only while there's a spare beyond the
+  // unit running low — i.e. 2+ on-hand units of the type (active + inventory;
+  // finished don't count). Once you're down to your last unit (on-hand == 1),
+  // the reminder fires so you know to restock before you're empty. Refines
+  // v0.27.3, which suppressed whenever ANY inventory of the type existed and so
+  // permanently silenced every type the user keeps a rolling backup of. Mirrors
+  // the worker's computeReminders (v0.3.3) so the in-app panel and the email
+  // digest surface the same set.
+  const onHandByType = new Map();
   for (const p of products) {
-    if (isInventory(p) && p.productType) {
-      typesWithInventory.add(p.productType);
+    if ((isActive(p) || isInventory(p)) && p.productType) {
+      onHandByType.set(p.productType, (onHandByType.get(p.productType) || 0) + 1);
     }
   }
 
@@ -3558,7 +3955,7 @@ function computeReorderReminders() {
   for (const p of products) {
     if (!isActive(p)) continue;
     const k = p.productType || '';
-    if (typesWithInventory.has(k)) continue; // v0.27.3 backup-in-inventory check
+    if ((onHandByType.get(k) || 0) >= 2) continue; // v0.27.8: suppress only while a spare exists
     const mean = meanLifespan.get(k);
     if (mean == null) continue;
     const dur = calcDuration(p);
@@ -4349,19 +4746,49 @@ const form = () => document.getElementById('product-form');
 function setBundleSizeVisibility() {
   const f = form();
   const bundled = f.elements.bundleStatus.checked;
-  const sizeWrap = document.getElementById('bundle-size-wrap');
-  const posWrap = document.getElementById('bundle-position-wrap');
-  sizeWrap.hidden = !bundled;
-  if (posWrap) posWrap.hidden = !bundled;
+  document.getElementById('bundle-size-wrap').hidden = !bundled;
   f.elements.bundleSize.required = bundled;
-  if (f.elements.bundlePosition) f.elements.bundlePosition.required = bundled;
   if (!bundled) {
     f.elements.bundleSize.value = '';
     if (f.elements.bundlePosition) f.elements.bundlePosition.value = '';
+    if (f.elements.bundleCreateAll) f.elements.bundleCreateAll.checked = false;
   }
+  // v0.29.0: bundle-position-wrap + bundle-all-wrap visibility (and the
+  // bundlePosition required flag) are owned by syncBundleAllOption, since they
+  // depend on the bundle size and the create-all toggle, not just bundleStatus.
+  syncBundleAllOption();
   updateBundlePositionMax();
   // v0.17.4: keep the cost label + per-item hint in sync with bundle state.
   syncBundleCostUI();
+}
+
+// v0.29.0: manage the "create all N at once" option. The checkbox is offered
+// only for a NEW add of a bundle with size >= 2 (bulk-creating siblings while
+// editing an existing row would be confusing). While it's on, the manual
+// "which number" field hides — positions are auto-assigned 1..N on save.
+function syncBundleAllOption() {
+  const f = form();
+  if (!f) return;
+  const allWrap = document.getElementById('bundle-all-wrap');
+  const posWrap = document.getElementById('bundle-position-wrap');
+  const label = document.getElementById('bundle-all-label');
+  const bundled = !!f.elements.bundleStatus?.checked;
+  const size = Number(f.elements.bundleSize?.value);
+  const canCreateAll = bundled && !editingId && isFinite(size) && size >= 2;
+
+  if (allWrap) allWrap.hidden = !canCreateAll;
+  // If the option isn't available, make sure it isn't left checked from before.
+  if (!canCreateAll && f.elements.bundleCreateAll) f.elements.bundleCreateAll.checked = false;
+  const createAll = canCreateAll && !!f.elements.bundleCreateAll?.checked;
+
+  if (posWrap) posWrap.hidden = !bundled || createAll;
+  if (f.elements.bundlePosition) f.elements.bundlePosition.required = bundled && !createAll;
+
+  if (label) {
+    label.textContent = canCreateAll
+      ? `Create all ${size} at once — auto-numbered 1 of ${size} … ${size} of ${size}`
+      : 'Create all items in this bundle at once';
+  }
 }
 
 // v0.17.4: bundle-aware cost UI. The schema treats `cost` as the FULL
@@ -4506,6 +4933,7 @@ function openAddDialog() {
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(''); // v0.9.0 — hide the Amazon link until UPC is entered
+  syncAsinField(); // v0.28.0 — hidden on fresh Add (no store yet)
   syncDialogImagePreview(); // v0.15.1 — hide preview on fresh Add
   dialog().showModal();
   // v0.7.23: autofocus the UPC field on Add. The dialog opens for the
@@ -4537,6 +4965,7 @@ function openEditDialog(id) {
   setBundleSizeVisibility();
   setUpcStatus('');
   syncAmazonCheckLink(p.upc); // v0.9.0 — show Amazon link if existing UPC is set
+  syncAsinField(); // v0.28.0 — reveal ASIN field if store is Amazon or an ASIN exists
   syncDialogImagePreview(); // v0.15.1 — show existing image
   dialog().showModal();
 }
@@ -4686,7 +5115,7 @@ function openDuplicateDialog(id) {
     'cost', 'costWithTax',
     'bundleStatus', 'bundleSize',
     'store', 'buyer', 'cardLast4',
-    'upc'
+    'upc', 'asin' // v0.28.0: same physical product → same Amazon ASIN
   ];
   populateFormSelects(source);
   for (const key of carryOver) {
@@ -4707,6 +5136,7 @@ function openDuplicateDialog(id) {
   // user can correct it if they're back-filling history. v0.15.1: local date.
   f.elements.purchaseDate.value = todayLocalISODate();
   setBundleSizeVisibility();
+  syncAsinField(); // v0.28.0 — reveal ASIN field if the carried-over store is Amazon
   document.getElementById('dialog-title').textContent = 'Duplicate product';
   toast('Duplicated — set start date when you begin using it');
 }
@@ -4740,6 +5170,7 @@ async function handleSubmit(e) {
     data.bundleStatus = false; data.bundleSize = ''; data.bundlePosition = ''; data.bundleId = '';
     data.store = ''; data.buyer = ''; data.cardLast4 = '';
     data.purchaseDate = '';
+    data.asin = ''; // v0.28.0 — ASIN is a tracked-purchase field, not for catalog favorites
     // Continue to id assignment + save below (reuses the same path).
     const id = editingId || newId();
     if (!editingId) data.createdAt = new Date().toISOString();
@@ -4771,6 +5202,15 @@ async function handleSubmit(e) {
   if (data.buyer === ADD_NEW) data.buyer = '';
   if (data.cardLast4 === ADD_NEW) data.cardLast4 = '';
 
+  // v0.28.0: normalize the Amazon ASIN — extract it from a pasted Amazon URL,
+  // or keep a bare 10-char id. If the input isn't a recognizable ASIN/URL, drop
+  // it rather than store garbage, and warn so it isn't a silent loss.
+  if (data.asin) {
+    const cleanAsin = normalizeAsin(data.asin);
+    if (!cleanAsin) toast('That didn\'t look like an Amazon ASIN or URL — leaving it blank');
+    data.asin = cleanAsin;
+  }
+
   if (!data.productName) { toast('Product name is required'); return; }
   if (!data.upc) { toast('UPC is required'); return; }
   // v0.15.1: explicit JS validation for size / unit / cost (form is novalidate
@@ -4790,6 +5230,42 @@ async function handleSubmit(e) {
     const bs = Number(data.bundleSize);
     if (!isFinite(bs) || bs <= 0) {
       toast('Enter how many were in the bundle');
+      return;
+    }
+    // v0.29.0: bulk create-all path. When the user checked "Create all N at
+    // once" (offered only for a new add with size >= 2), create one product per
+    // unit — same details, shared bundleId, auto-numbered 1..N. Position 1 keeps
+    // the form's start/end dates (the one you're using now); positions 2..N are
+    // created as inventory backups (blank dates), the natural state for a
+    // just-bought multipack — and it pairs with the reorder-reminder on-hand
+    // counting so you're only nudged once you're down to your last unit.
+    const bulkCreateAll = !editingId && !!f.elements.bundleCreateAll?.checked;
+    if (bulkCreateAll) {
+      if (bs < 2 || Math.floor(bs) !== bs) {
+        toast('Bundle size must be a whole number of 2 or more to create a set');
+        return;
+      }
+      const bundleId = newBundleId();
+      const saveBtn = document.getElementById('dialog-save');
+      saveBtn.disabled = true;
+      try {
+        const created = [];
+        for (let i = 1; i <= bs; i++) {
+          const member = { ...data, bundleId, bundlePosition: i };
+          if (i !== 1) { member.startDate = ''; member.endDate = ''; }
+          member.createdAt = new Date().toISOString();
+          const prod = { id: newId(), ...member };
+          await saveProduct(prod);
+          created.push(prod);
+        }
+        created.forEach(p => logActivity('add', p));
+        toast(`Added ${bs} bundle items — 1 of ${bs} … ${bs} of ${bs}`);
+        closeDialog();
+      } catch {
+        toast('Something went wrong creating the bundle');
+      } finally {
+        saveBtn.disabled = false;
+      }
       return;
     }
     const bp = Number(data.bundlePosition);
@@ -5755,19 +6231,27 @@ function renderStatsForExport() {
 // the export functions call setView('dashboard') first if needed.
 function renderChartsForExport() {
   const ids = ['chart-by-type', 'chart-by-store', 'chart-finished-per-month',
-               'chart-perday-by-type', 'chart-count-by-type', 'chart-longest-running'];
+               'chart-perday-by-type', 'chart-count-by-type', 'chart-longest-running',
+               // v0.30.0 — configurable time series (skipped below if empty/hidden)
+               'chart-cost-per-month', 'chart-avg-per-day', 'chart-avg-lifespan'];
   const titles = {
     'chart-by-type': 'Spend by product type',
     'chart-by-store': 'Spend by store',
     'chart-finished-per-month': 'Products finished per month',
     'chart-perday-by-type': '$/day by product type',
     'chart-count-by-type': 'Purchases by product type',
-    'chart-longest-running': 'Longest-running products'
+    'chart-longest-running': 'Longest-running products',
+    'chart-cost-per-month': 'Cost per month',
+    'chart-avg-per-day': 'Average $/day by month',
+    'chart-avg-lifespan': 'Average lifespan by month'
   };
   const blocks = [];
   for (const id of ids) {
     const c = document.getElementById(id);
     if (!c || !(c instanceof HTMLCanvasElement)) continue;
+    // v0.30.0: a time-series canvas is hidden when its range has no data —
+    // capturing it would paste a blank rectangle into the export.
+    if (c.hidden) continue;
     let dataUrl = '';
     try { dataUrl = c.toDataURL('image/png'); } catch { continue; }
     if (!dataUrl) continue;
@@ -5829,7 +6313,7 @@ function exportCSV() {
     'cost', 'costWithTax', 'allocatedCost', 'costPerUnit', 'costPerDay',
     'bundleStatus', 'bundleSize', 'bundlePosition',
     'store', 'buyer', 'cardLast4',
-    'purchaseDate', 'upc', 'notes'
+    'purchaseDate', 'upc', 'asin', 'notes'
   ];
   const rows = products.map(p => cols.map(c => {
     let v;
@@ -5884,7 +6368,7 @@ const IMPORT_COLS = [
   'startDate', 'endDate', 'cost', 'costWithTax',
   'bundleStatus', 'bundleSize', 'bundlePosition',
   'store', 'buyer', 'cardLast4',
-  'purchaseDate', 'upc', 'notes'
+  'purchaseDate', 'upc', 'asin', 'notes'
 ];
 
 function downloadJSONTemplate() {
@@ -6297,6 +6781,56 @@ function normalizeUpc(code) {
   return String(code || '').replace(/\D/g, '');
 }
 
+// v0.28.0: Amazon ASIN handling.
+// An ASIN is a 10-char alphanumeric id (products usually start "B0"). Accept
+// either a bare ASIN or a pasted Amazon URL and pull the ASIN out of it
+// (/dp/XXXXXXXXXX, /gp/product/XXXXXXXXXX, /product/XXXXXXXXXX, or ?asin=...).
+// Returns an uppercased 10-char ASIN, or '' if none can be extracted (for a
+// bare 10-char token we uppercase and keep it; anything else → '').
+function normalizeAsin(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const urlMatch = s.match(/(?:\/dp\/|\/gp\/product\/|\/product\/|[?&]asin=)([A-Z0-9]{10})/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+  const bare = s.match(/^([A-Za-z0-9]{10})$/);
+  if (bare) return bare[1].toUpperCase();
+  return '';
+}
+
+function amazonUrlForAsin(asin) {
+  return `https://www.amazon.com/dp/${encodeURIComponent(asin)}`;
+}
+
+// v0.28.0: show the ASIN field only when it's relevant — the store is Amazon,
+// or an ASIN is already saved on the product (so an existing value is never
+// hidden). Also keeps the inline "Open on Amazon" direct link in sync with the
+// current (normalized) ASIN value.
+function syncAsinField() {
+  const wrap = document.getElementById('asin-field-wrap');
+  if (!wrap) return;
+  let storeVal = '';
+  let asinVal = '';
+  try {
+    const f = form();
+    storeVal = (f.elements.store?.value || '').trim();
+    asinVal = (f.elements.asin?.value || '').trim();
+  } catch {}
+  const isAmazon = /amazon/i.test(storeVal);
+  wrap.hidden = !(isAmazon || asinVal);
+
+  const link = document.getElementById('asin-open-amazon');
+  if (link) {
+    const asin = normalizeAsin(asinVal);
+    if (asin) {
+      link.hidden = false;
+      link.href = amazonUrlForAsin(asin);
+    } else {
+      link.hidden = true;
+      link.href = '#';
+    }
+  }
+}
+
 /* v0.7.21: three-tier UPC lookup pipeline with persistent caching.
  *
  *   1. L1 in-memory `upcCache` Map — same-session repeat lookups are free.
@@ -6566,6 +7100,12 @@ function applyUpcItemToForm(item) {
   // v0.15.2: capture the brand for the company-logo icon
   const brand = (item.brand || '').trim();
   if (brand) setIfEmpty('brand', brand);
+
+  // v0.28.0: UPCitemdb sometimes includes the Amazon ASIN — capture it so the
+  // direct reorder link works without the user hunting it down. Reveal the
+  // field since an ASIN now exists even if the store isn't set to Amazon yet.
+  const dbAsin = normalizeAsin(item.asin || '');
+  if (dbAsin) { setIfEmpty('asin', dbAsin); syncAsinField(); }
 
   // Product type from category
   const guessedType = guessProductTypeFromCategory(item.category || '');
@@ -6964,6 +7504,14 @@ document.addEventListener('DOMContentLoaded', () => {
   // Both the bundle size and the cost feed into the per-item derivation.
   f.elements.bundleSize.addEventListener('input', syncBundleCostUI);
   f.elements.cost.addEventListener('input', syncBundleCostUI);
+  // v0.29.0: reveal/update the "create all N at once" option as the bundle size
+  // changes, and toggle the manual position field when it's checked.
+  f.elements.bundleSize.addEventListener('input', syncBundleAllOption);
+  if (f.elements.bundleCreateAll) f.elements.bundleCreateAll.addEventListener('change', syncBundleAllOption);
+  // v0.28.0: reveal/hide the Amazon ASIN field as the store changes, and keep
+  // the inline "Open on Amazon" link in sync as the ASIN is typed/pasted.
+  if (f.elements.store) f.elements.store.addEventListener('change', syncAsinField);
+  if (f.elements.asin) f.elements.asin.addEventListener('input', syncAsinField);
 
   document.getElementById('btn-scan-upc').addEventListener('click', openScanner);
   // v0.15.1: explicit manual Look up button. Force-fresh fetch (bypasses
@@ -7158,6 +7706,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // v0.7.16: dashboard PNG export buttons
   document.getElementById('btn-export-dashboard')?.addEventListener('click', exportDashboardPng);
   document.getElementById('btn-export-overview')?.addEventListener('click', exportOverviewPng);
+
+  // v0.30.0: time-series chart controls (type + range). One delegated listener
+  // on the charts grid covers all three charts' segmented buttons. Only the
+  // affected chart re-renders — the other five dashboard charts are untouched.
+  document.querySelector('.dash-charts')?.addEventListener('click', e => {
+    const btn = e.target.closest('.chart-ctl');
+    if (!btn) return;
+    const host = btn.closest('.chart-controls');
+    const key = host?.dataset.chart;
+    if (!key || !TIMESERIES_CHARTS[key]) return;
+    const ctl = btn.dataset.ctl;   // 'type' | 'months'
+    const val = btn.dataset.val;
+    if (!ctl) return;
+    const pref = timeseriesPrefs[key] || { ...TIMESERIES_DEFAULTS[key] };
+    // months stays numeric except for the 'all' sentinel, so resolveMonthCount
+    // and the button's data-val compare cleanly either way.
+    pref[ctl] = (ctl === 'months' && val !== 'all') ? Number(val) : val;
+    timeseriesPrefs[key] = pref;
+    saveTimeseriesPrefs();
+    syncTimeSeriesControls();
+    renderTimeSeriesChart(key);
+  });
 
   // v0.10.0: reorder reminder clicks → open the product for editing
   document.getElementById('reminders-panel')?.addEventListener('click', e => {
