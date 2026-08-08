@@ -1,0 +1,15 @@
+{
+  "name": "Recipes — your recipe box",
+  "short_name": "Recipes",
+  "description": "Save your own recipes and cook from them with big, glanceable steps on a phone or iPad.",
+  "start_url": "/recipes/",
+  "scope": "/recipes/",
+  "display": "standalone",
+  "background_color": "#faf7f2",
+  "theme_color": "#faf7f2",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
