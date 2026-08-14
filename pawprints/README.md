@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.59.0**
+**Current Version: v0.60.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.60.0** — **"Add to Home Screen" button for iPhone.** iPhones never offer to install a web
+  app on their own, so a lot of people never find out PawPrints can live on their home screen like a
+  real app. Settings now has an **App on your phone → Add to Home Screen** button (shown only on
+  iPhone/iPad, and hidden once you've already installed it) that walks through the four Safari steps
+  with pictures of the Share and Add icons. Also added the classic Apple web-app meta tags so the
+  installed app opens full-screen with the right name on older iOS versions too.
 - **v0.59.0** — **Restock emails now show each item's purchase context, and match the app's
   notification style.** The reorder reminder email was restyled into the same clean card layout as
   the other PawPrints/Usage notifications (a white card with a teal header band and a card per item),

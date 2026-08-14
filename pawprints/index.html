@@ -24,6 +24,9 @@
 <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
 <link rel="shortcut icon" href="favicon.ico">
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="PawPrints">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="manifest" href="site.webmanifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -268,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.59.0';
+const APP_VERSION = 'v0.60.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1089,10 +1092,29 @@ function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(
 
 // Settings is a full page (view-settings). The gear + other callers just navigate to it.
 function settingsModal(){ switchView('settings'); }
+// ── Add to Home Screen (iOS) ──
+// iPhones never offer to install a web app on their own (Safari has no install
+// prompt API), so this walks the user through the manual Share → Add to Home
+// Screen flow. Shown only on iOS and hidden once already running installed.
+function isIOS(){ return /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function isStandalone(){ return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+function a2hsModal(){
+  const shareIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-5px" aria-label="Share icon: a square with an arrow pointing up out of it" role="img"><path d="M16 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M12 15V3"/><path d="m8.5 6 3.5-3.5L15.5 6"/></svg>';
+  const addIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-5px" aria-label="Add to Home Screen icon: a square with a plus inside" role="img"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 9v6M9 12h6"/></svg>';
+  const step = (n, html) => '<div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-start"><span style="flex:none;width:26px;height:26px;border-radius:50%;background:var(--bg-tertiary);color:var(--accent);font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center">'+n+'</span><div style="font-size:14px;line-height:1.55;padding-top:2px;min-width:0">'+html+'</div></div>';
+  openModal('<h3>📲 Add to Home Screen</h3>'
+    + '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">Put a PawPrints icon on your home screen — it opens full-screen like a real app, no browser bars.</p>'
+    + step(1, 'Open this page in <strong>Safari</strong>. (If you\'re inside another app\'s built-in browser, tap its ⋯ menu and choose "Open in Safari" first.)')
+    + step(2, 'Tap the <strong>Share</strong> button '+shareIcon+' at the bottom of the screen.')
+    + step(3, 'Scroll down the share sheet and tap <strong>Add to Home Screen</strong> '+addIcon+'.')
+    + step(4, 'Tap <strong>Add</strong> in the top-right corner. The 🐾 PawPrints icon appears on your home screen.')
+    + '<p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0">Using Chrome on iPhone? Same steps — its Share button is in the top-right corner.</p>');
+}
 function settingsPageHTML(){
   const dogs = data.pets.length, logs = data.logs.length, records = data.vetVisits.length + data.grooming.length + data.illnesses.length + data.meds.length + data.records.length + data.inventory.length + data.contacts.length;
   return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px"><button class="btn btn-sm" onclick="switchView(settingsReturnView)">← Back</button><h2 style="font-size:20px;font-weight:700;margin:0">⚙️ Settings &amp; Data</h2></div>'
     + '<div class="card"><div class="label" style="margin-top:0">Appearance</div><button class="btn" onclick="toggleTheme();settingsModal()">'+(currentTheme()==='light'?'☀️ Light mode — switch to dark':'🌙 Dark mode — switch to light')+'</button></div>'
+    + (isIOS() && !isStandalone() ? '<div class="card"><div class="label" style="margin-top:0">App on your phone</div><button class="btn" onclick="a2hsModal()">📲 Add to Home Screen</button><p style="font-size:11px;color:var(--text-secondary);margin-top:8px;margin-bottom:0">Puts a PawPrints icon on your home screen that opens full-screen like an app.</p></div>' : '')
     + '<div class="card"><div class="label" style="margin-top:0">Backup &amp; export</div>'
       + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">Your backup is one file containing <strong>everything</strong> — '+dogs+' dog'+(dogs===1?'':'s')+', '+logs+' activity log'+(logs===1?'':'s')+', and '+records+' care record'+(records===1?'':'s')+' (vet, grooming, meds, records, illness, supplies, contacts) plus photos &amp; settings.</p>'
       + '<div style="display:flex;flex-direction:column;gap:8px">'
