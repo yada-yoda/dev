@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.60.0**
+**Current Version: v0.60.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,16 @@ covers both.
 
 ## Version History
 
+- **v0.60.1** — **Fixed supplies (and everything else) not syncing to a phone that stays open.**
+  Two sync bugs: (1) the app only downloaded from the cloud at a full page load, so a phone — especially
+  one installed on the home screen, which iOS keeps alive for days — never saw records added on another
+  device until it was force-closed and reopened. It now re-syncs whenever the app returns to the
+  foreground (throttled to once per 30 seconds), with a small "⬇️ Synced N items from your other
+  devices" toast when something new comes down. (2) Worse, saving *anything* on a stale device uploaded
+  its entire old dataset, silently erasing records other devices had added since. Saves now first rescue
+  any records the cloud has that this device doesn't before writing, and rapid saves are coalesced.
+  Known remaining limitation: a record deleted on one device can reappear from another device's local
+  copy until that device syncs.
 - **v0.60.0** — **"Add to Home Screen" button for iPhone.** iPhones never offer to install a web
   app on their own, so a lot of people never find out PawPrints can live on their home screen like a
   real app. Settings now has an **App on your phone → Add to Home Screen** button (shown only on

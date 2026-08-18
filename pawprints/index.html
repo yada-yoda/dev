@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.60.0';
+const APP_VERSION = 'v0.60.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -751,9 +751,13 @@ function signIn(withCalendar, after){
 }
 function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAccessToken = null; showToast('Signed out'); }
 
-async function loadFromFirestore(){
+// Record collections that sync as id'd arrays (merged per id, unlike settings/gcalEvents).
+const SYNC_COLLECTIONS = ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','auditLog'];
+let lastCloudPull = 0; // last time this device saw the cloud doc (load or pre-save check)
+async function loadFromFirestore(quiet){
   if(demoMode || !firebaseReady || !currentUser) return;
   const shared = !!sharedOwnerUid, uid = activeUid();
+  lastCloudPull = Date.now();
   try {
     await ensureFirestore();
     const doc = await db.collection('pawprints').doc(uid).get();
@@ -773,12 +777,16 @@ async function loadFromFirestore(){
         if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
         seedWalkBadges();
         render();
-        showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs ('+(SHARE_ACCESS_LABEL[sharedAccess]||'access')+')');
+        if(!quiet) showToast('✅ Opened '+(sharedOwnerName?sharedOwnerName+'’s':'shared')+' dogs ('+(SHARE_ACCESS_LABEL[sharedAccess]||'access')+')');
         return;
       }
-      // Own data — merge remote into local by id across each collection
-      ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','auditLog'].forEach(k => {
-        const remote = d[k] || [], localOnly = (data[k]||[]).filter(x => !new Set(remote.map(r=>r.id)).has(x.id));
+      // Own data — merge remote into local by id across each collection (remote wins
+      // per id; records that exist only on this device are kept).
+      let pulled = 0; // records the cloud had that this device didn't
+      SYNC_COLLECTIONS.forEach(k => {
+        const remote = d[k] || [], remoteIds = new Set(remote.map(r=>r.id)), localIds = new Set((data[k]||[]).map(x=>x.id));
+        pulled += remote.filter(r => !localIds.has(r.id)).length;
+        const localOnly = (data[k]||[]).filter(x => !remoteIds.has(x.id));
         data[k] = [...remote, ...localOnly];
       });
       data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
@@ -788,7 +796,8 @@ async function loadFromFirestore(){
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       backfillVetContacts(); seedWalkBadges(); saveLocal(); render();
-      showToast('✅ Synced from cloud');
+      if(!quiet) showToast('✅ Synced from cloud');
+      else if(pulled) showToast('⬇️ Synced '+pulled+' item'+(pulled===1?'':'s')+' from your other devices');
     } else if(shared){
       showToast('⚠️ Couldn’t open that shared profile — check the code and that they added your email');
       exitSharedProfile(true);
@@ -800,14 +809,40 @@ async function loadFromFirestore(){
 }
 let cloudSaveOk = null;     // null=unknown, true=saving to cloud, false=failing (rule not set / no access)
 let cloudSaveWarned = false;
+let saveInFlight = false, savePending = false; // coalesce rapid saves into at most one queued follow-up
 async function saveToFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
   const uid = activeUid(); if(!uid) return;
+  if(saveInFlight){ savePending = true; return; }
+  saveInFlight = true;
   try {
     await ensureFirestore();
+    const ref = db.collection('pawprints').doc(uid);
+    // Anti-clobber: the set() below replaces the WHOLE doc, so a device that hasn't
+    // pulled in a while would erase records other devices added since. Before writing,
+    // rescue any remote-only records into this device's data (local wins per id — we're
+    // saving this device's freshest state; only records we don't have at all are added).
+    // Throttled: skip when we've seen the cloud doc in the last 60s (photos make it big).
+    let rescued = 0;
+    if(Date.now() - lastCloudPull > 60000){
+      lastCloudPull = Date.now();
+      try {
+        const snap = await ref.get();
+        if(snap.exists){
+          const remote = snap.data();
+          SYNC_COLLECTIONS.forEach(k => {
+            const localIds = new Set((data[k]||[]).map(x=>x.id));
+            const remoteOnly = (remote[k]||[]).filter(x => x && x.id && !localIds.has(x.id));
+            if(remoteOnly.length){ data[k] = [...(data[k]||[]), ...remoteOnly]; rescued += remoteOnly.length; }
+          });
+          data.gcalEvents = Object.assign({}, remote.gcalEvents||{}, data.gcalEvents||{});
+        }
+      } catch(e){ /* pre-read failed (offline?) — still save what we have */ }
+    }
     const payload = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
     if(!sharedOwnerUid) payload.ownerName = currentUser.displayName || currentUser.email || '';
-    await db.collection('pawprints').doc(uid).set(payload);
+    await ref.set(payload);
+    if(rescued){ saveLocal(); render(); }
     if(cloudSaveOk !== true){ cloudSaveOk = true; if(currentView==='today') render(); }
   } catch(e){
     console.error('Firestore save error:', e);
@@ -818,6 +853,9 @@ async function saveToFirestore(){
       showToast('⚠️ Not syncing to the cloud — your data is only on THIS device. Add the Firestore rule to sync across devices.');
     }
     if(currentView==='today') render();
+  } finally {
+    saveInFlight = false;
+    if(savePending){ savePending = false; saveToFirestore(); }
   }
 }
 
@@ -3966,6 +4004,16 @@ if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather();
 setInterval(() => { if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather(); }, 1800000);
 // Refresh "time ago" status on Today every minute
 setInterval(() => { if(currentView==='today' && !document.getElementById('modal-root').innerHTML){ document.getElementById('view-today').innerHTML = renderToday(); } }, 60000);
+// Re-pull from the cloud when the app comes back to the foreground (throttled).
+// Without this, a phone tab / home-screen app that stays alive for days only ever
+// syncs down at its last cold start and never sees other devices' changes.
+function resyncFromCloud(){
+  if(!currentUser || !firebaseReady || demoMode) return;
+  if(Date.now() - lastCloudPull < 30000) return;
+  loadFromFirestore(true);
+}
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') resyncFromCloud(); });
+window.addEventListener('pageshow', e => { if(e.persisted) resyncFromCloud(); });
 
 function bootFirebase(){ if(typeof firebase==='undefined'){ setTimeout(bootFirebase,200); return; } initFirebase(); }
 if('requestIdleCallback' in window) requestIdleCallback(bootFirebase,{timeout:3000});
