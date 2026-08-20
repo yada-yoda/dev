@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.61.0';
+const APP_VERSION = 'v0.62.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1355,8 +1355,8 @@ async function exportXLSX(){
   const nm = (pid) => { const p = data.pets.find(x=>x.id===pid); return p ? p.name : ''; };
   const clean = (v) => v == null ? '' : v;
   const add = (title, header, rows) => { const ws = XLSX.utils.aoa_to_sheet([header, ...rows]); XLSX.utils.book_append_sheet(wb, ws, title.slice(0,31)); };
-  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Birthday estimated','Gotcha day','Color','Weight unit','Microchip','Microchip type','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Shelter ARN #','Animal ID','Shelter intake','Transferred from','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
-    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,(p.birthdayEstimated?'Yes':''),p.gotchaDay,p.color,p.weightUnit,p.microchip,p.microchipType,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.originArn,p.originAnimalId,p.originIntakeDate,p.originTransferFrom,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
+  add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Birthday estimated','Gotcha day','Color','Weight unit','Neck','Chest girth','Back length','Height (withers)','Measure unit','Measured on','Microchip','Microchip type','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Shelter ARN #','Animal ID','Shelter intake','Transferred from','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
+    data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,(p.birthdayEstimated?'Yes':''),p.gotchaDay,p.color,p.weightUnit,(p.measNeck||''),(p.measChest||''),(p.measLength||''),(p.measHeight||''),(measStr(p)?(p.measUnit||'in'):''),(p.measDate||''),p.microchip,p.microchipType,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.originArn,p.originAnimalId,p.originIntakeDate,p.originTransferFrom,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
@@ -1405,6 +1405,7 @@ async function exportPDF(onlyPetId){
     if(p.birthday) facts.push(['Age', (ageStr(p.birthday, p.birthdayEstimated)||dash)+' ('+(p.birthdayEstimated?'est. born ':'born ')+fmtDate(p.birthday)+')']);
     if(p.gotchaDay) facts.push(['Adoption / Gotcha day', fmtDate(p.gotchaDay)]);
     if(w) facts.push(['Current weight', w.value+' '+(w.unit||'lb')+' (as of '+fmtDate(w.dateTime)+')']);
+    if(measStr(p)) facts.push(['Measurements', measStr(p)+(p.measDate?' (measured '+fmtDate(p.measDate)+')':'')]);
     if(p.fixed) facts.push(['Spayed / Neutered', p.fixed+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
     if(p.microchip) facts.push(['Microchip', String(p.microchip)+(p.microchipType?'  ·  '+p.microchipType:'')]);
     if(p.license) facts.push(['License', String(p.license)]);
@@ -1472,6 +1473,12 @@ async function exportPDF(onlyPetId){
 // PET MANAGEMENT
 // ═══════════════════════════════════════════════
 function selectPet(id){ data.activePetId = id; save(); }
+// One-line summary of a dog's sizing measurements, e.g. "Neck 16 in · Chest 26 in".
+function measStr(p){
+  const u = (p && p.measUnit) || 'in';
+  return [['Neck',p&&p.measNeck],['Chest',p&&p.measChest],['Length',p&&p.measLength],['Height',p&&p.measHeight]]
+    .filter(x => num(x[1]) != null).map(x => x[0]+' '+x[1]+' '+u).join(' · ');
+}
 function petModal(id){
   const p = id ? data.pets.find(x=>x.id===id) : null;
   if(!p) draftInit('pet');
@@ -1495,6 +1502,13 @@ function petModal(id){
     +'<div class="grid-2"><div><label class="label">Current weight'+tip('The dog’s weight today (or most recent). Saving this starts the weight history — update it any time to track changes.')+'</label><input class="input" type="number" step="0.1" id="p-weight" value="'+(p?esc((weightsFor(p.id)[0]||{}).value||''):'')+'" placeholder="e.g. 42.5"></div>'
     +'<div><label class="label">Weight unit'+tip('Pounds (lb) or kilograms (kg) — used everywhere weight is shown.')+'</label><select class="select" id="p-wunit"><option value="lb"'+(p&&p.weightUnit==='lb'?' selected':'')+'>lb</option><option value="kg"'+(p&&p.weightUnit==='kg'?' selected':'')+'>kg</option></select></div></div>'
     +'<label class="label">Color / Markings</label><input class="input" id="p-color" value="'+(p?esc(p.color||''):'')+'" placeholder="e.g. Black & grey with white chest">'
+    +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em">Measurements'+tip('Sizing measurements for collars, harnesses, and coats. Use a soft cloth tape measure (or a string you then lay against a ruler), with your dog standing squarely on all four legs on a flat floor. For the neck and chest, keep two flat fingers under the tape so the fit has comfortable room. All optional.')+'</div>'
+    +'<div class="grid-2"><div><label class="label">Neck'+tip('Measure around the neck where the collar naturally sits — the lower neck, just above the shoulders. With two fingers under the tape, this number IS the collar size.')+'</label><input class="input" type="number" step="0.1" min="0" id="p-neck" value="'+(p?esc(p.measNeck||''):'')+'" placeholder="e.g. 16"></div>'
+    +'<div><label class="label">Chest girth'+tip('Wrap the tape all the way around the widest part of the ribcage, just behind the front legs. This is the harness and coat size — the most important measurement for fit.')+'</label><input class="input" type="number" step="0.1" min="0" id="p-chest" value="'+(p?esc(p.measChest||''):'')+'" placeholder="e.g. 26"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Back length'+tip('Along the spine from the base of the neck at the shoulders (the withers) to the base of the tail — where the tail meets the body, not the tail tip. Used for coat and sweater length.')+'</label><input class="input" type="number" step="0.1" min="0" id="p-backlen" value="'+(p?esc(p.measLength||''):'')+'" placeholder="e.g. 22"></div>'
+    +'<div><label class="label">Height at withers'+tip('Standing height from the floor straight up to the withers — the highest point of the shoulder blades, where the neck meets the back. Dogs are officially measured here, not at the head. Easiest with the dog against a wall: rest a level object across the withers and measure up to it.')+'</label><input class="input" type="number" step="0.1" min="0" id="p-height" value="'+(p?esc(p.measHeight||''):'')+'" placeholder="e.g. 19"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Measurement unit</label><select class="select" id="p-measunit"><option value="in"'+(!p||!p.measUnit||p.measUnit==='in'?' selected':'')+'>inches</option><option value="cm"'+(p&&p.measUnit==='cm'?' selected':'')+'>cm</option></select></div>'
+    +'<div><label class="label">Measured on'+tip('When you took these measurements. Worth re-measuring after growth, a coat change, or noticeable weight change — sizes drift.')+'</label><input class="input" type="date" id="p-measdate" value="'+(p?esc(p.measDate||''):'')+'"></div></div>'
     +'<div style="font-size:12px;font-weight:600;color:var(--accent);margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em">Origin'+tip('How and where you got your dog — handy for vet/registration records. All optional. The date is the Adoption / Gotcha Day above.')+'</div>'
     +'<label class="label">How you got your dog</label><select class="select" id="p-origintype" onchange="toggleShelterFields()"><option value="">—</option>'+sel(ORIGIN_TYPES, p?p.originType:'')+'</select>'
     +'<div class="grid-2"><div><label class="label">From / source'+tip('The shelter, rescue, breeder, pet store, or person you got them from.')+'</label><input class="input" id="p-originfrom" value="'+(p?esc(p.originFrom||''):'')+'" placeholder="e.g. Springfield Humane Society"></div>'
@@ -1568,6 +1582,7 @@ function savePet(id){
   if(!name){ showToast('⚠️ Enter a name'); return; }
   const fields = { name, photo:fv('p-photo'), breed:fv('p-breed'), sex:fv('p-sex'), fixed:fv('p-fixed'), fixedDate:fv('p-fixeddate'), birthday:fv('p-birthday'), birthdayEstimated:!!(document.getElementById('p-birthday-est')||{}).checked,
     gotchaDay:fv('p-gotcha'), color:fv('p-color'), weightUnit:fv('p-wunit')||'lb', microchip:fv('p-chip'), microchipType:fv('p-chiptype'),
+    measNeck:fv('p-neck'), measChest:fv('p-chest'), measLength:fv('p-backlen'), measHeight:fv('p-height'), measUnit:fv('p-measunit')||'in', measDate:fv('p-measdate'),
     license:fv('p-license'), originType:fv('p-origintype'), originFrom:fv('p-originfrom'), originAddress:fv('p-originaddr'), originCity:fv('p-origincity'), originState:fv('p-originstate'), originZip:fv('p-originzip'), originPhone:fv('p-originphone'), originCost:fv('p-origincost'), originContact:fv('p-origincontact'), originArn:fv('p-arn'), originAnimalId:fv('p-animalid'), originIntakeDate:fv('p-intakedate'), originTransferFrom:fv('p-transferfrom'), previousName:fv('p-prevname'), registrationNo:fv('p-regno'), registeredName:fv('p-regname'),
     vetName:fv('p-vetname'), vetDoctor:fv('p-vetdoctor'), vetPhone:fv('p-vetphone'), vetEmail:fv('p-vetemail'),
     vet2Name:fv('p-vet2name'), vet2Doctor:fv('p-vet2doctor'), vet2Phone:fv('p-vet2phone'), vet2Email:fv('p-vet2email'), notes:fv('p-notes') };
@@ -3116,6 +3131,7 @@ function renderProfile(){
   if(p.birthday) facts.push(['Age', ageStr(p.birthday, p.birthdayEstimated)+' ('+(p.birthdayEstimated?'est. born ':'born ')+fmtDate(p.birthday)+')']);
   if(p.gotchaDay){ const u = untilStr(p.gotchaDay); facts.push(['Gotcha Day', fmtDate(p.gotchaDay)+(u&&u.past?' · '+u.text.replace(' ago',' with you'):'')]); }
   if(w) facts.push(['Current weight', esc(w.value)+' '+esc(w.unit||'lb')+' ('+fmtDate(w.dateTime)+')']);
+  if(measStr(p)) facts.push(['Measurements', esc(measStr(p))+(p.measDate?' ('+fmtDate(p.measDate)+')':'')]);
   if(p.fixed) facts.push(['Spayed / Neutered', esc(p.fixed)+(p.fixedDate?' ('+fmtDate(p.fixedDate)+')':'')]);
   if(p.microchip) facts.push(['Microchip', esc(p.microchip)+(p.microchipType?' · '+esc(p.microchipType):'')]);
   if(p.license) facts.push(['License', esc(p.license)]);

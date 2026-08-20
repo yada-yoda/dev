@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.61.0**
+**Current Version: v0.62.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,14 @@ covers both.
 
 ## Version History
 
+- **v0.62.0** — **Body measurements on the dog profile.** The Edit-dog form has a new
+  **Measurements** section with the four standard sizing measurements — **Neck** (collar size),
+  **Chest girth** (harness/coat size), **Back length** (withers to tail base), and **Height at
+  withers** — plus a unit picker (inches/cm) and a "Measured on" date. Every field has a tooltip
+  explaining exactly how to take that measurement properly (soft tape, dog standing square, two
+  fingers under the tape for collar/harness numbers). Saved measurements show as a line on the
+  Profile facts, in the PDF report, and as columns in the spreadsheet export — handy to pull up in
+  the store when buying a collar, harness, or coat.
 - **v0.61.0** — **Supply & grooming form polish.** (1) Supplies get an **Amazon ASIN** field next to
   the Reorder link — enter the 10-character product ID (or paste the whole Amazon URL; the ASIN is
   extracted automatically) and an **"🛒 Amazon"** button appears alongside Reorder on low items and in
