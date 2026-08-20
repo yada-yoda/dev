@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.60.1';
+const APP_VERSION = 'v0.61.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1360,11 +1360,11 @@ async function exportXLSX(){
   add('Activity', ['Dog','Type','When','Detail','Notes'],
     data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
-  add('Grooming', ['Dog','Date','Time','Services','Groomer','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
+  add('Grooming', ['Dog','Date','Time','Services','Groomer','Phone','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,(g.phone||''),fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
-  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
@@ -2215,19 +2215,20 @@ function payToggle(px){
 }
 // Saved groomers/addresses for the grooming dropdowns.
 function groomSuggestions(){
-  const groomers = new Set(), addresses = new Set(), addrMap = {};
-  (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(!addrMap[g.groomer] && (g.address||g.city||g.state||g.zip)) addrMap[g.groomer] = { address:g.address||'', city:g.city||'', state:g.state||'', zip:g.zip||'' }; } if(g.address) addresses.add(g.address); });
+  const groomers = new Set(), addresses = new Set(), addrMap = {}, phoneMap = {};
+  (data.grooming||[]).forEach(g => { if(g.groomer){ groomers.add(g.groomer); if(!addrMap[g.groomer] && (g.address||g.city||g.state||g.zip)) addrMap[g.groomer] = { address:g.address||'', city:g.city||'', state:g.state||'', zip:g.zip||'' }; if(g.phone && !phoneMap[g.groomer]) phoneMap[g.groomer] = g.phone; } if(g.address) addresses.add(g.address); });
   (data.contacts||[]).forEach(c => { if((c.role||'').toLowerCase().indexOf('groom') > -1){
     const addr = c.address ? { address:c.address, city:c.city||'', state:c.state||'', zip:c.zip||'' } : null;
     if(c.name){ groomers.add(c.name); if(addr && !addrMap[c.name]) addrMap[c.name] = addr; }
     if(c.org){ groomers.add(c.org); if(addr && !addrMap[c.org]) addrMap[c.org] = addr; }
+    if(c.phone){ if(c.name && !phoneMap[c.name]) phoneMap[c.name] = c.phone; if(c.org && !phoneMap[c.org]) phoneMap[c.org] = c.phone; }
     if(c.address) addresses.add(c.address);
   } });
-  return { groomers:[...groomers].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), addrMap };
+  return { groomers:[...groomers].sort((a,b)=>a.localeCompare(b)), addresses:[...addresses].sort((a,b)=>a.localeCompare(b)), addrMap, phoneMap };
 }
 function onGroomPick(){
-  const a = groomSuggestions().addrMap[fv('gr-by')];
-  fillPlace('gr-by', 'gr', a);
+  const s = groomSuggestions();
+  fillPlace('gr-by', 'gr', s.addrMap[fv('gr-by')], s.phoneMap[fv('gr-by')]);
 }
 function groomModal(id){
   const g = id ? data.grooming.find(x=>x.id===id) : null;
@@ -2246,6 +2247,7 @@ function groomModal(id){
     +'<div class="grid-3"><div><label class="label">City</label><input class="input" id="gr-city" value="'+(g?esc(g.city||''):esc((groomC&&groomC.city)||''))+'" placeholder="City"></div>'
     +'<div><label class="label">State</label><input class="input" id="gr-state" value="'+(g?esc(g.state||''):esc((groomC&&groomC.state)||''))+'" placeholder="ST"></div>'
     +'<div><label class="label">ZIP</label><input class="input" id="gr-zip" inputmode="numeric" value="'+(g?esc(g.zip||''):esc((groomC&&groomC.zip)||''))+'" placeholder="ZIP"></div></div>'
+    +'<label class="label">Phone'+tip('The groomer\'s phone number — adds a one-tap Call button to the grooming entry. Fills in automatically when you pick a saved groomer or salon.')+'</label><input class="input" type="tel" id="gr-phone" value="'+(g?esc(g.phone||''):esc((groomC&&groomC.phone)||''))+'" placeholder="(555) 555-5555">'
     +'<label class="label">Services</label><div class="tag-grid" id="gr-services">'+[...new Set([...groomServiceOptions(), ...chosen])].map(s=>'<button class="tag'+(chosen.includes(s)?' active':'')+'" type="button" data-s="'+esc(s)+'" onclick="this.classList.toggle(\'active\')">'+esc(s)+'</button>').join('')+'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:14px"><input class="input" id="gr-new-service" placeholder="Add a service…" style="margin-bottom:0" onkeydown="if(event.key===\'Enter\'){event.preventDefault();addGroomService();}"><button type="button" class="btn" onclick="addGroomService()">Add</button></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the amount before tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="gr-cost" value="'+(g?esc(g.cost||''):'')+'" placeholder="0.00"></div>'
@@ -2274,7 +2276,7 @@ function saveGroom(id){
   if(lineItems.length){ const s = lineItemsTotal(lineItems); cost = s ? s.toFixed(2) : ''; }
   const payMethod = fv('gr-paymethod');
   const isCard = payMethod==='Credit card' || payMethod==='Debit card';
-  const f = { date:fv('gr-date'), time:fv('gr-time'), cost:cost, groomer:fv('gr-by'), address:fv('gr-address'), city:fv('gr-city'), state:fv('gr-state'), zip:fv('gr-zip'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes'),
+  const f = { date:fv('gr-date'), time:fv('gr-time'), cost:cost, groomer:fv('gr-by'), address:fv('gr-address'), city:fv('gr-city'), state:fv('gr-state'), zip:fv('gr-zip'), phone:fv('gr-phone'), services, nextDueDate:fv('gr-next'), notes:fv('gr-notes'),
     lineItems:lineItems, paidBy:fv('gr-paidby'), payMethod:payMethod, ccBrand:isCard?fv('gr-ccbrand'):'', ccLast4:isCard?fv('gr-cclast4'):'' };
   if(id) data.grooming = data.grooming.map(g => g.id===id ? {...g, ...f} : g);
   else data.grooming.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -2381,7 +2383,8 @@ function invModal(id, pre){
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased</label><input class="input" id="iv-store" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"></div>'
     +'<div><label class="label">UPC / barcode'+tip('The product barcode number — handy for re-ordering the exact item.')+'</label><input class="input" id="iv-upc" inputmode="numeric" value="'+(it?esc(it.upc||''):'')+'" placeholder="012345678905"></div></div>'
-    +'<label class="label">Reorder link'+tip('Paste the product page URL (Chewy, Amazon, the store site). A "Reorder" link then shows on the item and — most usefully — next to it in the Restock list when it\'s running low, so you can re-buy the exact item in one tap.')+'</label><input class="input" type="url" id="iv-url" value="'+(it?esc(it.reorderUrl||''):'')+'" placeholder="https://…">'
+    +'<div class="grid-2"><div><label class="label">Reorder link'+tip('Paste the product page URL (Chewy, Amazon, the store site). A "Reorder" link then shows on the item and — most usefully — next to it in the Restock list when it\'s running low, so you can re-buy the exact item in one tap.')+'</label><input class="input" type="url" id="iv-url" value="'+(it?esc(it.reorderUrl||''):'')+'" placeholder="https://…"></div>'
+    +'<div><label class="label">Amazon ASIN'+tip('Amazon\'s 10-character product ID — it\'s in the product page URL right after "/dp/" (e.g. B01LP0U5X0), and under "Product information" on the listing. When set, an "Amazon" button appears next to Reorder linking straight to the product. Pasting the full Amazon URL here works too — the ASIN is pulled out automatically when you save.')+'</label><input class="input" id="iv-asin" autocapitalize="characters" autocomplete="off" value="'+(it?esc(it.asin||''):'')+'" placeholder="B01LP0U5X0"></div></div>'
     +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="iv-paidby" value="'+(it?esc(it.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
@@ -2389,8 +2392,8 @@ function invModal(id, pre){
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="iv-nolife" '+(it&&it.noLifecycle?'checked':'')+' onchange="ivLifecycleToggle()"> One-time item — no start / finish tracking'+tip('For things you buy once and keep — tags, collar, license, toys. Hides the opened/finished dates and the Start/Finish buttons, and keeps the item out of the on-hand "Inventory" nudges. Leave off for consumables like food or treats.')+'</label>'
     +'<div id="iv-lifecycle-wrap"><div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
     +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder</label>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+(it&&it.trackCost?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open — it only starts once you set a Started date, so unopened stock has no per-day cost yet. Handy for comparing value between brands or pack sizes.')+'</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+'> Running low / needs reorder'+tip('Flags this item for restocking: it appears in the Restock list at the top of Supplies, nudges you on the Today page, shows the Reorder / Amazon buttons on its row, and is what the reorder reminder email (Settings) sends. Tap "Got it" after re-buying (or Finish the item) to clear it.')+'</label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-track" '+((it ? it.trackCost : true)?'checked':'')+'> Show cost breakdown'+tip('Displays cost per day and cost per unit next to this item in the list. Per-unit uses Package size (e.g. per oz / ct / lb); if none, it falls back to per Qty. Per-day is the cost spread over the days it\'s been open — it only starts once you set a Started date, so unopened stock has no per-day cost yet. Handy for comparing value between brands or pack sizes.')+'</label>'
     +'<label class="label">Notes</label><input class="input" id="iv-notes" value="'+(it?esc(it.notes||''):'')+'">'
     +'<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="saveInv('+(editing?"'"+id+"'":'null')+')">Save</button>'
     +(editing?'<button class="btn" onclick="dupInv(\''+id+'\')" title="Add another of this same item">Duplicate</button><button class="btn btn-danger" onclick="deleteInv(\''+id+'\')">Delete</button>':'')
@@ -2415,7 +2418,7 @@ function saveInv(id){
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const noLifecycle = document.getElementById('iv-nolife').checked;
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), reorderUrl:fv('iv-url'), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), reorderUrl:fv('iv-url'), asin:normalizeAsin(fv('iv-asin')), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -2521,7 +2524,7 @@ function calendarEvents(){
   const dn = p.name, ev = [];
   petArr('vetVisits').forEach(v => { if(v.date) ev.push({ key:'vet:'+v.id, date:v.date, time:v.time||'', icon:'🏥', type:'Vet', record:true, location:fullAddr(v), title:'🏥 '+dn+': '+(v.reason||'Vet visit'), desc:[v.vet&&'Vet: '+v.vet, v.clinic&&'Clinic: '+v.clinic, fullAddr(v)&&'Address: '+fullAddr(v), v.cost&&'Cost: '+money(v.cost), v.notes].filter(Boolean).join('\n'), open:"vetModal('"+v.id+"')" });
     if(v.followUpDate) ev.push({ key:'vetfollow:'+v.id, date:v.followUpDate, time:v.followUpTime||'', icon:'📌', type:'Follow-up', title:'📌 '+dn+': vet follow-up'+(v.reason?' ('+v.reason+')':''), desc:v.notes||'', open:"vetModal('"+v.id+"')" }); });
-  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
+  petArr('grooming').forEach(g => { if(g.date) ev.push({ key:'groom:'+g.id, date:g.date, time:g.time||'', icon:'✂️', type:'Grooming', record:true, location:fullAddr(g), title:'✂️ '+dn+': grooming'+(g.services&&g.services.length?' ('+g.services.join(', ')+')':''), desc:[g.groomer&&'Groomer: '+g.groomer, g.phone&&'Phone: '+g.phone, fullAddr(g)&&'Address: '+fullAddr(g), g.cost&&'Cost: '+money(g.cost), g.notes].filter(Boolean).join('\n'), open:"groomModal('"+g.id+"')" });
     if(g.nextDueDate) ev.push({ key:'groomnext:'+g.id, date:g.nextDueDate, icon:'✂️', type:'Grooming due', title:'✂️ '+dn+': grooming due', desc:'', open:"groomModal('"+g.id+"')" }); });
   petArr('meds').forEach(m => { const nd = medNextDue(m); if(nd) ev.push({ key:'med:'+m.id, date:nd, time:m.time||'', icon:'💊', type:'Med due', title:'💊 '+dn+': '+m.name+' due'+(m.kind?' ('+m.kind+')':''), desc:[m.dose&&'Dose: '+m.dose, m.givenBy&&'Given by: '+m.givenBy, m.notes].filter(Boolean).join('\n'), open:"medModal('"+m.id+"')" }); });
   petArr('records').forEach(r => { if(r.date) ev.push({ key:'rec:'+r.id, date:r.date, time:r.time||'', icon:'📋', type:r.type||'Record', record:true, location:fullAddr(r), title:'📋 '+dn+': '+(r.name||r.type||'Record'), desc:[r.type&&'Type: '+r.type, r.vaccineType&&'Vaccine: '+r.vaccineType, r.testedFor&&'Tested for: '+r.testedFor, r.result&&'Result: '+r.result, r.recordNo&&'Record #: '+r.recordNo, recProvider(r)&&'Provider: '+recProvider(r), fullAddr(r)&&'Address: '+fullAddr(r), r.phone&&'Phone: '+r.phone, r.cost&&'Cost: '+money(r.cost), r.notes].filter(Boolean).join('\n'), open:"recordModal('"+r.id+"')" });
@@ -3359,10 +3362,15 @@ function renderGroomTab(){
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="groomModal()">+ Add grooming</button></div>':'';
   if(items.length){
     const total = items.reduce((s,g)=>s+(num(g.cost)||0),0);
-    const lastGroomed = all.reduce((m,g)=> (!m || (g.date||'') > (m.date||'')) ? g : m, null); // newest, independent of display sort
-    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+fmtDate(lastGroomed.date)+'</div><div class="stat-label">Last groomed</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
+    const today = todayISO();
+    // "Last groomed" = newest visit that has already happened; a future appointment isn't a groom yet.
+    const lastGroomed = all.filter(g => (g.date||'') <= today).reduce((m,g)=> (!m || (g.date||'') > (m.date||'')) ? g : m, null);
+    const nextAppt = all.filter(g => (g.date||'') > today).reduce((m,g)=> (!m || (g.date||'') < (m.date||'')) ? g : m, null);
+    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+(lastGroomed?fmtDate(lastGroomed.date):'—')+'</div><div class="stat-label">Last groomed</div></div>'
+      + (nextAppt?'<div class="card stat-card"><div class="stat-value" style="color:var(--accent-2)">'+fmtDate(nextAppt.date)+'</div><div class="stat-label">Next appointment</div></div>':'')
+      + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
     html += dateSortBtn('toggleGroomSort', groomSortAsc);
-    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
+    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.phone?'<a class="btn btn-sm" href="tel:'+esc(g.phone)+'" onclick="event.stopPropagation()" title="Call '+esc(g.groomer||'the groomer')+'">📞 Call</a>':'')+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
@@ -3421,7 +3429,7 @@ function reorderItemsForEmail(){
   // its cost, where it was bought, and the purchase date. Blanks are dropped.
   return (data.inventory||[]).filter(i => i && i.runningLow).map(i => ({
     name: ((i.brand?i.brand+' ':'')+(i.name||'')).trim(),
-    url: safeUrl(i.reorderUrl) || '',
+    url: safeUrl(i.reorderUrl) || amazonUrl(i) || '',
     duration: invDurationText(i) || '',
     purchased: i.purchaseDate ? fmtDate(i.purchaseDate) : '',
     cost: i.cost ? money(i.cost) : '',
@@ -3441,7 +3449,11 @@ async function syncReorderPrefs(force){
     await workerFetch('/reorder/sync', { method:'POST', body: JSON.stringify({ enabled, email, items }) });
   } catch(e){ _lastReorderSig = null; /* leave dirty so the next change retries */ }
 }
-function reorderLink(i){ const u = safeUrl(i && i.reorderUrl); return u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Reorder this item — opens the product page">↗ Reorder</a>' : ''; }
+// Accepts a bare ASIN or a pasted Amazon product URL; returns the uppercased 10-char ASIN ('' if absent).
+function normalizeAsin(v){ v=(v||'').trim(); if(!v) return ''; const m = v.match(/(?:\/dp\/|\/gp\/product\/|\/gp\/aw\/d\/)([A-Za-z0-9]{10})/) || v.match(/^([A-Za-z0-9]{10})$/); return m ? m[1].toUpperCase() : v; }
+function amazonUrl(i){ const a = ((i&&i.asin)||'').trim().toUpperCase(); return /^[A-Z0-9]{10}$/.test(a) ? 'https://www.amazon.com/dp/'+a : ''; }
+function amazonLink(i){ const u = amazonUrl(i); return u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Open this product on Amazon">🛒 Amazon</a>' : ''; }
+function reorderLink(i){ const u = safeUrl(i && i.reorderUrl); const az = amazonLink(i); return (u ? '<a class="btn btn-sm btn-accent" href="'+esc(u)+'" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Reorder this item — opens the product page">↗ Reorder</a>' : '') + (u && az ? ' ' : '') + az; }
 function daysBetween(a, b){ if(!a||!b) return null; const d1 = new Date(a+'T00:00'), d2 = new Date(b+'T00:00'); if(isNaN(d1)||isNaN(d2)) return null; return Math.round((d2-d1)/86400000); }
 // "5 days in use" while open, or "used 20 days" once finished.
 function invDurationText(i){

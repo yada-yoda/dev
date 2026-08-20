@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.60.1**
+**Current Version: v0.61.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,16 @@ covers both.
 
 ## Version History
 
+- **v0.61.0** — **Supply & grooming form polish.** (1) Supplies get an **Amazon ASIN** field next to
+  the Reorder link — enter the 10-character product ID (or paste the whole Amazon URL; the ASIN is
+  extracted automatically) and an **"🛒 Amazon"** button appears alongside Reorder on low items and in
+  the Restock list; the reorder reminder email uses it too when no reorder link is set. (2) The
+  "Running low / needs reorder" checkbox now has a tooltip explaining everything it triggers. (3)
+  "Show cost breakdown" is **on by default** for new supplies. (4) Grooming entries get a **Phone**
+  field (auto-filled when you pick a saved groomer, same as the address) with a one-tap **📞 Call**
+  button on each entry; phone flows into calendar events and the spreadsheet export. (5) Fixed **"Last
+  groomed" showing a future date** when an upcoming appointment was logged — it now only counts visits
+  that already happened, and an upcoming visit shows as its own "Next appointment" stat instead.
 - **v0.60.1** — **Fixed supplies (and everything else) not syncing to a phone that stays open.**
   Two sync bugs: (1) the app only downloaded from the cloud at a full page load, so a phone — especially
   one installed on the home screen, which iOS keeps alive for days — never saw records added on another
