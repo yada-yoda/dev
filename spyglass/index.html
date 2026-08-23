@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.9.4 — watch any web page for changes</title>
+<title>Spyglass v0.9.5 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -120,6 +120,20 @@
   .pill.error{background:var(--red-bg);color:var(--red)}
   .pill.paused{background:var(--amber-bg);color:var(--amber)}
   .card .actions{display:flex;gap:.3rem;align-items:center}
+
+  /* Mobile: stack the card — screenshot full-width on top, info below it,
+     status pill up top, actions on their own row. The desktop single-row
+     layout squeezes into an unreadable column on narrow screens. */
+  @media (max-width:640px){
+    .card{flex-wrap:wrap;padding:.85rem .9rem}
+    .card .thumb{order:0;width:100%;height:170px}
+    .card .fav{order:1}
+    .card .pill{order:1;margin-left:auto}
+    .card .meta{order:2;flex:1 1 100%}
+    .card .actions{order:3;width:100%;justify-content:flex-end;
+      border-top:1px solid var(--border);padding-top:.55rem;margin-top:.1rem}
+    .card .actions .btn.sm{padding:.45rem .75rem}   /* bigger tap targets */
+  }
 
   /* ---------- empty / loading ---------- */
   .empty{text-align:center;padding:4rem 1rem;color:var(--muted)}
@@ -422,6 +436,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.9.5</strong> — Mobile layout fix: monitor cards now stack on phones — screenshot full-width on top, name and details below it, action buttons on their own row with bigger tap targets — instead of squeezing everything into one cramped column.</li>
         <li><strong>v0.9.4</strong> — Added a <em>regex101</em> link (pre-set to Spyglass's regex flavor) next to the pattern builder, for anyone who wants to hand-craft or test a tricky pattern. Most people can still just use &ldquo;Build it for me.&rdquo;</li>
         <li><strong>v0.9.3</strong> — Made the &ldquo;Render in a browser&rdquo; option clearer: an &#9432; tooltip and plainer wording explain that you can usually leave it off — the Test button turns it on for you when a page actually needs it.</li>
         <li><strong>v0.9.2</strong> — Tidied the &ldquo;Render in a browser&rdquo; option in the add/edit form — the label and its description no longer squeeze into a cramped column.</li>
@@ -458,7 +473,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.9.4";
+  const APP_VERSION = "0.9.5";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
