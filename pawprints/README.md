@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.63.0**
+**Current Version: v0.64.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.64.0** — **Built-in dropdown options can now be hidden.** Every list in Settings → Lists &
+  preferences (potty locations, food locations, water/bowl locations, stool types, supply categories,
+  supply units, grooming services) now shows its built-in options as chips — tap **×** on ones you
+  never use and they disappear from the logging dropdowns; tap **↺** in Settings to bring one back
+  any time. Old entries that used a hidden option are untouched and still display and edit correctly
+  ("Other" always stays available).
 - **v0.63.0** — **Customization round: location ZIPs, custom lists, water-reminder snooze, tappable
   badges.** (1) **Location ZIP codes** (Settings, under Home ZIP) — name a place you regularly walk
   (a park in another town, the cabin, the sitter's) and give it its own ZIP; when a walk's From/To or

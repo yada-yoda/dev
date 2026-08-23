@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.63.0';
+const APP_VERSION = 'v0.64.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -364,13 +364,16 @@ const POTTY_PLACES = ['Backyard','Front yard','On a walk','Pee pad','Other'];
 const FOOD_PLACES = ['Kitchen','Bowl (usual spot)','Crate / kennel','Outside','Living room','Other'];
 const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus'];
 // Base options + the owner's custom additions from Settings (Other always last).
-function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPottyPlaces) || []; const base = POTTY_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
-function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
+// Built-ins the user has hidden in Settings (per list kind) are filtered out of the dropdowns.
+function hiddenDefaults(kind){ return ((data.settings && data.settings.hiddenDefaults) || {})[kind] || []; }
+function notHidden(kind, arr){ const hid = hiddenDefaults(kind).map(x=>String(x).toLowerCase()); return hid.length ? arr.filter(x => !hid.includes(String(x).toLowerCase())) : arr; }
+function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPottyPlaces) || []; const base = notHidden('potty', POTTY_PLACES.filter(x => x !== 'Other')); return [...new Set([...base, ...c]), 'Other']; }
+function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = notHidden('food', FOOD_PLACES.filter(x => x !== 'Other')); return [...new Set([...base, ...c]), 'Other']; }
 // Water refills get their own bowl-location list (built-ins shared with food + custom bowls + any place already used on a water log).
-function waterPlaceOptions(){ const c = (data.settings && data.settings.customWaterPlaces) || []; const used = (data.logs||[]).filter(l=>l.type==='water' && l.place).map(l=>l.place); const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c, ...used]), 'Other']; }
-function stoolOptions(){ const c = (data.settings && data.settings.customStoolTypes) || []; return [...new Set([...STOOL_QUALITY, ...c])]; }
+function waterPlaceOptions(){ const c = (data.settings && data.settings.customWaterPlaces) || []; const used = (data.logs||[]).filter(l=>l.type==='water' && l.place).map(l=>l.place); const base = notHidden('waterplace', FOOD_PLACES.filter(x => x !== 'Other')); return [...new Set([...base, ...c, ...used]), 'Other']; }
+function stoolOptions(){ const c = (data.settings && data.settings.customStoolTypes) || []; return [...new Set([...notHidden('stool', STOOL_QUALITY), ...c])]; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
-function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...GROOM_SERVICES, ...c])]; }
+function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...notHidden('groomservice', GROOM_SERVICES), ...c])]; }
 function addGroomService(){
   if(denyManage()) return;
   const input = document.getElementById('gr-new-service'); if(!input) return;
@@ -503,11 +506,11 @@ const TREND_METRICS = [
 ];
 const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds','Other'];
 // Category dropdown = built-ins + any custom categories from Settings, with "Other" kept last.
-function catOptions(){ const c = (data.settings && data.settings.customCategories) || []; return [...new Set([...INV_CATEGORIES.filter(x=>x!=='Other'), ...c, 'Other'])]; }
+function catOptions(){ const c = (data.settings && data.settings.customCategories) || []; return [...new Set([...notHidden('category', INV_CATEGORIES.filter(x=>x!=='Other')), ...c, 'Other'])]; }
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
 const CC_BRANDS = ['Visa','Mastercard','Amex','Discover','Other'];
 const UNIT_OPTIONS = ['bag','box','can','case','pouch','bottle','jar','tub','tube','count','pack','lb','oz','kg','g'];
-function unitOptions(){ const c = (data.settings && data.settings.customUnits) || []; return [...new Set([...UNIT_OPTIONS, ...c])]; }
+function unitOptions(){ const c = (data.settings && data.settings.customUnits) || []; return [...new Set([...notHidden('unit', UNIT_OPTIONS), ...c])]; }
 // Custom-list kinds managed in Settings (kind → settings key, input id, and the word used in copy).
 const LIST_KINDS = {
   potty: { key:'customPottyPlaces', input:'list-potty', word:'location' },
@@ -1240,7 +1243,16 @@ function listEditor(label, kind, custom, base, desc){
   const inputId = LIST_KINDS[kind].input, word = LIST_KINDS[kind].word;
   let h = '<div style="margin-bottom:14px"><div class="label" style="margin-bottom:4px">'+label+'</div>';
   if(desc) h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">'+esc(desc)+'</div>';
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">Built-in: '+esc(base.join(', '))+'</div>';
+  // Built-ins are hideable per list — hidden ones drop out of the logging dropdowns but can be restored here.
+  const hid = hiddenDefaults(kind), isHid = v => hid.some(x=>String(x).toLowerCase()===String(v).toLowerCase());
+  h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Built-in — tap × to hide ones you don\'t use, ↺ to bring one back:</div>';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
+    + base.filter(b=>b!=='Other').map(b => isHid(b)
+        ? '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;opacity:.5"><span style="text-decoration:line-through">'+esc(b)+'</span> <button onclick="restoreDefault(\''+kind+'\',\''+encArg(b)+'\')" title="Show this option again" style="background:none;border:none;color:var(--success);cursor:pointer;font-size:14px;line-height:1;padding:0">↺</button></span>'
+        : '<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(b)+' <button onclick="hideDefault(\''+kind+'\',\''+encArg(b)+'\')" title="Hide from the dropdown (restore any time)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>')
+      .join('')
+    + (base.includes('Other') ? '<span class="chip" title="“Other” is always available" style="opacity:.7">Other</span>' : '')
+    + '</div>';
   h += '<div style="display:flex;gap:8px;margin-bottom:'+(custom.length?'8px':'0')+'"><input class="input" id="'+inputId+'" placeholder="Add a custom '+word+'" style="margin-bottom:0"><button class="btn" onclick="addListItem(\''+kind+'\')">Add</button></div>';
   if(custom.length) h += '<div style="display:flex;flex-wrap:wrap;gap:6px">'+custom.map((v,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(v)+' <button onclick="removeListItem(\''+kind+'\','+i+')" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>';
   return h + '</div>';
@@ -1259,6 +1271,26 @@ function removeListItem(kind, idx){
   const m = LIST_KINDS[kind]; if(!m) return;
   data.settings[m.key] = (data.settings[m.key]||[]).filter((_,i)=>i!==idx);
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+}
+// Hide / restore a BUILT-IN option (per list kind). Hidden built-ins drop out of the
+// logging dropdowns; old logs that used them are untouched and still display fine.
+function hideDefault(kind, encV){
+  if(denyManage()) return;
+  const v = decodeURIComponent(encV);
+  data.settings = data.settings || {};
+  data.settings.hiddenDefaults = data.settings.hiddenDefaults || {};
+  const arr = data.settings.hiddenDefaults[kind] = data.settings.hiddenDefaults[kind] || [];
+  if(!arr.some(x=>String(x).toLowerCase()===v.toLowerCase())) arr.push(v);
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  showToast('Hidden — restore it here any time');
+}
+function restoreDefault(kind, encV){
+  if(denyManage()) return;
+  const v = decodeURIComponent(encV);
+  const hd = (data.settings && data.settings.hiddenDefaults) || {};
+  hd[kind] = (hd[kind]||[]).filter(x=>String(x).toLowerCase()!==v.toLowerCase());
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  showToast('Restored');
 }
 function saveTimezone(){
   if(denyManage()) return;
@@ -3137,14 +3169,14 @@ function editLogModal(id){
     body += '<label class="label">Food</label><select class="select" id="e-food">'+sel(feedFoodOptions(), l.foodType||'')+'</select>'
       + '<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="e-amt" value="'+esc(l.amount||'')+'"></div>'
       + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>'
-      + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.foodPlace||'')+'</select>';
+      + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...foodPlaceOptions(), ...(l.foodPlace?[l.foodPlace]:[])])], l.foodPlace||'')+'</select>';
   } else if(l.type === 'water'){
     title = '💧 Edit water';
     body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...waterPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'')+'</select>';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
-      + '<label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select>'
+      + '<label class="label">Where</label><select class="select" id="e-place">'+sel([...new Set([...pottyPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'Backyard')+'</select>'
       + pottyLocationField(l.location, 'e-loc')
       + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel([...new Set([...stoolOptions(), ...(l.stool?[l.stool]:[])])], l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
