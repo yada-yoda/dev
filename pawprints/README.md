@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.62.0**
+**Current Version: v0.63.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,17 @@ covers both.
 
 ## Version History
 
+- **v0.63.0** — **Customization round: location ZIPs, custom lists, water-reminder snooze, tappable
+  badges.** (1) **Location ZIP codes** (Settings, under Home ZIP) — name a place you regularly walk
+  (a park in another town, the cabin, the sitter's) and give it its own ZIP; when a walk's From/To or
+  a potty spot matches, the recorded weather comes from *that* ZIP instead of home. (2) **Stool
+  types** are now customizable (Settings → Lists) beyond the built-ins. (3) **Water / bowl locations**
+  get their own customizable list — the water-refill "Where" dropdown no longer borrows the food
+  locations. (4) **Water reminder snooze & mute** — every fresh-water reminder now has a 💤 Snooze
+  button (hides it for one reminder window), and in per-bowl mode a 🔕 button stops watching that
+  bowl entirely — the fix for "I have two bowls but only fill one daily." Muted bowls are listed in
+  Settings and can be re-enabled with one tap. (5) **Badges enlarge on tap** — tapping the badge
+  medallion on the Profile (or any earned badge in the Insights grid) opens the big medal view.
 - **v0.62.0** — **Body measurements on the dog profile.** The Edit-dog form has a new
   **Measurements** section with the four standard sizing measurements — **Neck** (collar size),
   **Chest girth** (harness/coat size), **Back length** (withers to tail base), and **Height at

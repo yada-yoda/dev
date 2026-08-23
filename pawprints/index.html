@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.62.0';
+const APP_VERSION = 'v0.63.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -366,6 +366,9 @@ const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus']
 // Base options + the owner's custom additions from Settings (Other always last).
 function pottyPlaceOptions(){ const c = (data.settings && data.settings.customPottyPlaces) || []; const base = POTTY_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
 function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoodPlaces) || []; const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c]), 'Other']; }
+// Water refills get their own bowl-location list (built-ins shared with food + custom bowls + any place already used on a water log).
+function waterPlaceOptions(){ const c = (data.settings && data.settings.customWaterPlaces) || []; const used = (data.logs||[]).filter(l=>l.type==='water' && l.place).map(l=>l.place); const base = FOOD_PLACES.filter(x => x !== 'Other'); return [...new Set([...base, ...c, ...used]), 'Other']; }
+function stoolOptions(){ const c = (data.settings && data.settings.customStoolTypes) || []; return [...new Set([...STOOL_QUALITY, ...c])]; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...GROOM_SERVICES, ...c])]; }
 function addGroomService(){
@@ -440,7 +443,7 @@ function checkWalkBadges(announce){
 function showBadgeCelebration(pl){
   const pet = activePet(), name = (pet && pet.name) ? pet.name : 'your pup';
   const wrap = inner => '<div style="text-align:center;padding:6px 4px 2px">'+inner
-    + '<button class="btn-primary" style="margin-top:20px;max-width:230px" onclick="closeModal()">🎉 Awesome!</button></div>';
+    + '<button class="btn-primary" style="margin-top:20px;max-width:230px" onclick="closeModal()">'+(pl.view?'Close':'🎉 Awesome!')+'</button></div>';
   if(pl.kind === 'prestige'){
     const P = pl.P, col = prestigeColor(P), fx = prestigeFx(P), star = (fx && fx.aura) ? '🌟' : '⭐';
     openModal(wrap(
@@ -453,7 +456,7 @@ function showBadgeCelebration(pl){
   } else {
     const b = pl.badge, tc = BADGE_TIERS[b.tier] || 'var(--accent)';
     openModal(wrap(
-        '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800;margin-bottom:12px">🎉 Badge unlocked 🎉</div>'
+        '<div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:800;margin-bottom:12px">'+(pl.view?'🏅 Walking badge':'🎉 Badge unlocked 🎉')+'</div>'
       + '<div class="celebrate-medal" style="width:104px;height:104px;margin:0 auto 16px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:52px;background:radial-gradient(circle at 50% 38%,'+tc+'55,'+tc+'11);border:3px solid '+tc+';box-shadow:0 0 0 6px '+tc+'22,0 0 32px '+tc+'88">'+b.icon+'</div>'
       + '<div style="font-size:25px;font-weight:800;margin-bottom:4px">'+esc(b.name)+'</div>'
       + '<div style="font-family:JetBrains Mono,monospace;font-weight:700;color:'+tc+';margin-bottom:12px">'+fmtMi(b.mi)+' miles</div>'
@@ -475,6 +478,12 @@ function seedWalkBadges(){
     p.prestige = prestigeLevel(mi);
   });
 }
+// Open the big celebration-style view of an earned badge (tap a badge on Profile or Insights).
+function viewBadge(bmi){
+  const b = WALK_BADGES.find(x => x.mi === bmi); if(!b) return;
+  const mi = totalWalkMiles(); if(mi < b.mi) return; // locked badges have nothing to show off yet
+  showBadgeCelebration({ kind:'badge', badge:b, mi:mi, more:0, view:true });
+}
 // Small inline medallion of the highest badge earned — sized to sit next to the dog's name.
 function latestBadgeInline(){
   const mi = totalWalkMiles(), earned = walkBadgesEarned(mi);
@@ -483,7 +492,7 @@ function latestBadgeInline(){
   const P = prestigeLevel(mi), fx = prestigeFx(P);
   let shadow = '0 0 0 2px '+tc+'22', star = '';
   if(fx){ shadow += ',0 0 '+Math.min(fx.glow,13)+'px '+fx.col+'aa'; star = '<span style="position:absolute;top:-4px;right:-4px;min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:'+fx.col+';color:#0d1117;font-size:8px;font-weight:800;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--bg-card);font-family:JetBrains Mono,monospace">'+P+'</span>'; }
-  return '<span title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(fx?' · Prestige '+P:'')+'" style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:15px;flex-shrink:0;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:'+shadow+'">'+b.icon+star+'</span>';
+  return '<span onclick="event.stopPropagation();viewBadge('+b.mi+')" title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(fx?' · Prestige '+P:'')+' — tap to view" style="position:relative;display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-size:15px;flex-shrink:0;cursor:pointer;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:'+shadow+'">'+b.icon+star+'</span>';
 }
 const TREND_METRICS = [
   { k:'feeding', label:'Feeding', icon:'fed',    auto:'bar',  hint:'Total food logged per day (sum of the amounts you entered).' },
@@ -503,6 +512,8 @@ function unitOptions(){ const c = (data.settings && data.settings.customUnits) |
 const LIST_KINDS = {
   potty: { key:'customPottyPlaces', input:'list-potty', word:'location' },
   food:  { key:'customFoodPlaces',  input:'list-food',  word:'location' },
+  waterplace: { key:'customWaterPlaces', input:'list-waterplace', word:'location' },
+  stool: { key:'customStoolTypes', input:'list-stool', word:'type' },
   unit:  { key:'customUnits',       input:'list-unit',  word:'unit' },
   groomservice: { key:'customGroomServices', input:'list-groomservice', word:'service' },
   category: { key:'customCategories', input:'list-category', word:'category' }
@@ -1182,11 +1193,13 @@ function settingsListsHTML(){
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Time zone'+tip('The time zone your logged times are in. Shown on exported PDFs and used for Google Calendar events. Defaults to Central (Chicago).')+'</label><select class="select" id="tz-select" onchange="saveTimezone()" style="margin-bottom:0">'+TIMEZONES.map(t=>'<option value="'+esc(t[0])+'"'+(appTimezone()===t[0]?' selected':'')+'>'+esc(t[1])+'</option>').join('')+'</select><div style="font-size:11px;color:var(--text-secondary);margin-top:4px">Times you log are shown in '+esc(tzLabel())+'.</div></div>';
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Daily feeding goal'+tip('How much your dog should eat per day. When set, the Today page shows a progress bar under "Last fed" toward this goal.')+'</label><div style="display:flex;gap:8px"><input class="input" type="number" step="0.25" min="0" id="feed-goal" placeholder="e.g. 2" value="'+esc(s.feedGoal||'')+'" style="margin-bottom:0;flex:1"><input class="input" id="feed-goal-unit" list="feed-unit-list" placeholder="cups" value="'+esc(s.feedGoalUnit||'')+'" style="margin-bottom:0;width:96px"><button class="btn" onclick="saveFeedGoal()">Save</button></div><datalist id="feed-unit-list"><option value="cups"></option><option value="grams"></option><option value="oz"></option><option value="scoops"></option><option value="cans"></option></datalist></div>';
   const wMode = s.waterReminderMode || 'overall';
-  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Fresh-water reminder'+tip('Nudges the Today page and the header bell when the water bowl hasn\'t been refilled within this window. "Overall" watches your most recent refill anywhere; "Per bowl / location" watches each place separately. Only nags once you\'ve logged at least one water refill.')+'</label>'
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Fresh-water reminder'+tip('Nudges the Today page and the header bell when the water bowl hasn\'t been refilled within this window. "Overall" watches your most recent refill anywhere; "Per bowl / location" watches each place separately. Only nags once you\'ve logged at least one water refill. On the reminder itself you can Snooze it (hides it for one window) or, per bowl, stop watching it entirely — stopped bowls are listed below and can be re-enabled here.')+'</label>'
     + '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'
     + '<select class="select" id="water-rem-mode" style="margin-bottom:0;flex:1;min-width:150px"><option value="off"'+(wMode==='off'?' selected':'')+'>Off</option><option value="overall"'+(wMode==='overall'?' selected':'')+'>Overall (last refill)</option><option value="perLocation"'+(wMode==='perLocation'?' selected':'')+'>Per bowl / location</option></select>'
     + '<div style="display:flex;align-items:center;gap:6px"><input class="input" type="number" min="1" step="1" id="water-rem-hours" value="'+esc(s.waterReminderHours||'24')+'" style="margin-bottom:0;width:76px"><span style="font-size:13px;color:var(--text-secondary)">hours</span></div>'
-    + '<button class="btn" onclick="saveWaterReminder()">Save</button></div></div>';
+    + '<button class="btn" onclick="saveWaterReminder()">Save</button></div>'
+    + ((s.waterMutedBowls||[]).length ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Not being watched (tap × to watch again):</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'+(s.waterMutedBowls||[]).map((p,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">🔕 '+esc(p)+' <button onclick="unmuteWaterBowl('+i+')" title="Watch this bowl again" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>' : '')
+    + '</div>';
   const reOn = !!s.reorderEmailOn, reEmail = esc(s.reorderEmail || (currentUser && currentUser.email) || '');
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Reorder reminder emails'+tip('When a supply is marked "running low", PawPrints emails you a restock reminder with its reorder link. You\'re emailed once per item — it won\'t nag repeatedly — and it re-reminds only if an item goes low again after being restocked. Checked once a day.')+'</label>';
   if(!currentUser){
@@ -1205,9 +1218,15 @@ function settingsListsHTML(){
     h += '<button class="btn" style="margin-bottom:14px"'+(homeEntriesTotal?'':' disabled')+' onclick="recheckHomeWeather()">🔄 Re-check weather for home walks &amp; potty'+(homeEntriesTotal?' ('+homeEntriesTotal+')':'')+'</button>';
     h += '<div style="font-size:11px;color:var(--text-secondary);margin:-8px 0 14px">Overwrites saved weather on every at-home walk &amp; potty break with the actual reading for that time — NWS station observations for about the last 7 days, Open-Meteo for older. Use this to correct entries logged before the NWS switch.</div>';
   }
+  const lz = s.locationZips || [];
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Location ZIP codes'+tip('Walk and potty weather normally uses your home ZIP. If you regularly walk somewhere else — a park in another town, a cabin, the sitter\'s place — add that location here with its ZIP. When a walk\'s From/To or a potty spot matches the name, the weather is recorded for THAT ZIP instead of home.')+'</label>'
+    + (lz.length ? lz.map((z,i)=>'<div class="entry-row" style="padding:6px 12px;margin-bottom:6px"><span style="font-size:13px;word-break:break-word;flex:1;min-width:0">'+esc(z.place||'?')+' <span style="font-family:JetBrains Mono,monospace;color:var(--text-secondary)">'+esc(z.zip||'')+'</span></span><button class="btn btn-sm btn-danger" onclick="removeLocationZip('+i+')">Remove</button></div>').join('') : '')
+    + '<div style="display:flex;gap:8px;flex-wrap:wrap"><input class="input" id="loczip-place" placeholder="Location name (matches From/To or potty spot)" style="margin-bottom:0;flex:2;min-width:150px"><input class="input" id="loczip-zip" inputmode="numeric" maxlength="10" placeholder="ZIP" style="margin-bottom:0;flex:1;min-width:90px;max-width:120px"><button class="btn" onclick="addLocationZip()">Add</button></div></div>';
   h += '<div style="font-size:12px;color:var(--text-secondary);margin:4px 0 10px;line-height:1.5">The lists below customize the dropdowns you choose from while logging. Built-in options are always there — add your own here for ones you use often.</div>';
   h += listEditor('Potty locations', 'potty', s.customPottyPlaces||[], POTTY_PLACES, 'Shows up in the "Where" dropdown when you log a potty break (e.g. a specific yard or park).');
   h += listEditor('Food locations', 'food', s.customFoodPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a feeding (e.g. kitchen, crate).');
+  h += listEditor('Water / bowl locations', 'waterplace', s.customWaterPlaces||[], FOOD_PLACES, 'Shows up in the "Where" dropdown when you log a water refill (e.g. kitchen bowl, backyard fountain, upstairs bowl). The per-bowl water reminder watches each of these separately.');
+  h += listEditor('Stool types', 'stool', s.customStoolTypes||[], STOOL_QUALITY, 'Shows up in the Stool dropdown when a potty break includes a poop — add your own descriptions beyond the built-in ones.');
   h += listEditor('Supply categories', 'category', s.customCategories||[], INV_CATEGORIES, 'Shows up in the Category dropdown when you add a supply, and as a filter tab on the Supplies list (e.g. Toys, Health, Apparel).');
   h += listEditor('Supply units', 'unit', s.customUnits||[], UNIT_OPTIONS, 'Shows up in the Unit dropdown when you add a supply (e.g. flat, roll, dose).');
   h += listEditor('Grooming services', 'groomservice', s.customGroomServices||[], GROOM_SERVICES, 'Shows up as a service tag when you log grooming.');
@@ -1262,6 +1281,52 @@ function saveWaterReminder(){
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
   if(typeof updateRemindersPill==='function') updateRemindersPill();
   showToast(data.settings.waterReminderMode==='off'?'💧 Water reminder off':'💧 Water reminder saved');
+}
+// ── Water reminder snooze / per-bowl mute (from the reminder rows themselves) ──
+// Snooze hides one reminder for a full reminder window; mute stops watching a bowl
+// entirely (e.g. a second bowl you no longer fill daily) until re-enabled in Settings.
+function snoozeWater(encP){
+  if(denyLog()) return;
+  const p = decodeURIComponent(encP);
+  const hrs = Math.max(1, num(data.settings && data.settings.waterReminderHours) || 24);
+  data.settings = data.settings || {};
+  data.settings.waterSnooze = data.settings.waterSnooze || {};
+  data.settings.waterSnooze[p] = Date.now() + hrs*3600000;
+  save(false); render(); updateRemindersPill(); renderRemindersPanel();
+  showToast('💤 Snoozed for '+hrs+'h');
+}
+function muteWaterBowl(encP){
+  if(denyManage()) return;
+  const p = decodeURIComponent(encP);
+  data.settings = data.settings || {};
+  data.settings.waterMutedBowls = data.settings.waterMutedBowls || [];
+  if(!data.settings.waterMutedBowls.some(x=>x.toLowerCase()===p.toLowerCase())) data.settings.waterMutedBowls.push(p);
+  save(false); render(); updateRemindersPill(); renderRemindersPanel();
+  showToast('🔕 Not watching "'+p+'" anymore — re-enable in Settings');
+}
+function unmuteWaterBowl(i){
+  if(denyManage()) return;
+  data.settings.waterMutedBowls = (data.settings.waterMutedBowls||[]).filter((_,idx)=>idx!==i);
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  if(typeof updateRemindersPill==='function') updateRemindersPill();
+  showToast('💧 Watching that bowl again');
+}
+// ── Per-location ZIP codes for walk/potty weather ──
+function addLocationZip(){
+  if(denyManage()) return;
+  const place = (fv('loczip-place')||'').trim(), zip = (fv('loczip-zip')||'').trim();
+  if(!place || !zip){ showToast('⚠️ Enter a location name and its ZIP'); return; }
+  data.settings = data.settings || {};
+  data.settings.locationZips = data.settings.locationZips || [];
+  const existing = data.settings.locationZips.find(z => (z.place||'').toLowerCase() === place.toLowerCase());
+  if(existing) existing.zip = zip; else data.settings.locationZips.push({ place, zip });
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML, 'loczip-place');
+  showToast('📍 '+place+' → '+zip);
+}
+function removeLocationZip(i){
+  if(denyManage()) return;
+  data.settings.locationZips = (data.settings.locationZips||[]).filter((_,idx)=>idx!==i);
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
 }
 function saveReorderEmail(){
   if(denyManage()) return;
@@ -1668,7 +1733,7 @@ function quickWater(){
   openModal('<h3>💧 Water refilled</h3>'
     +'<p style="font-size:12px;color:var(--text-secondary);margin:-4px 0 12px">You gave fresh water / refilled the bowl — not the dog drinking.</p>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">Where'+tip('Where you refilled the bowl. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.place:'')+'</select>'
+    +'<label class="label">Where'+tip('Which bowl / location you refilled. Add your own bowl locations in Settings → Lists &amp; preferences → Water / bowl locations.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(waterPlaceOptions(), last?last.place:'')+'</select>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="saveWater()">Save</button>');
 }
@@ -1714,7 +1779,7 @@ function quickPotty(){
     +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'q\')">'+esc(r)+'</button>').join('')+'</div>'
     +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
     +pottyLocationField('home','q-loc')
-    +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool</label><select class="select" id="q-stool"><option value="">—</option>'+sel(STOOL_QUALITY,'')+'</select></div>'
+    +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool'+tip('Stool quality is an easy health signal to track. Add your own types in Settings → Lists &amp; preferences → Stool types.')+'</label><select class="select" id="q-stool"><option value="">—</option>'+sel(stoolOptions(),'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
 }
@@ -1732,7 +1797,7 @@ function savePotty(){
   const atHome = (fv('q-loc') || 'home') !== 'other';
   const id = addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), location:atHome?'home':'other', notes:fv('q-note') });
   closeModal(); showToast('🚪 Potty logged');
-  if(id && atHome && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
+  if(id && data.settings) fetchWalkWeather(id); // zipForLog decides: home ZIP at home, custom location ZIP elsewhere
 }
 function quickWalk(){
   if(denyLog()) return;
@@ -1764,7 +1829,7 @@ function saveWalk(){
   const id = addLog(entry);
   closeModal();
   showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
-  if(id && data.settings && (data.settings.homeZip||'').trim()) fetchWalkWeather(id);
+  if(id && data.settings) fetchWalkWeather(id); // zipForLog decides: custom From/To location ZIP beats home ZIP
 }
 // ── Weather for walks (zip → Open-Meteo, no API key) ──
 function weatherFromCode(code){
@@ -1782,12 +1847,17 @@ function weatherFromCode(code){
   return {emoji:'🌡️', label:''};
 }
 async function geocodeZip(zip){
+  // Cached per zip (multiple locations can have custom ZIPs); weatherGeo stays the home one.
   if(data.settings.weatherGeo && data.settings.weatherGeo.zip === zip) return data.settings.weatherGeo;
+  const geos = data.settings.weatherGeos || {};
+  if(geos[zip]) return geos[zip];
   const r = await fetch('https://api.zippopotam.us/us/' + encodeURIComponent(zip));
   if(!r.ok) throw new Error('bad zip');
   const j = await r.json(); const p = (j.places||[])[0]; if(!p) throw new Error('bad zip');
   const geo = { zip, lat:p.latitude, lon:p.longitude, name:(p['place name']||'') + (p['state abbreviation']?', '+p['state abbreviation']:'') };
-  data.settings.weatherGeo = geo; saveLocal();
+  if(zip === (data.settings.homeZip||'').trim()) data.settings.weatherGeo = geo;
+  data.settings.weatherGeos = Object.assign({}, geos, { [zip]: geo });
+  saveLocal();
   return geo;
 }
 // Pick the observation closest to time t — only if it actually lands within 3h of it.
@@ -1808,11 +1878,24 @@ async function applyWalkWeather(log, geo){
   } catch(e){ /* fall through to Open-Meteo */ }
   return await fetchWalkWeatherFor(log);
 }
+// Which ZIP an entry's weather should come from: a matching custom location ZIP
+// (walk From/To or potty spot, from Settings → Location ZIP codes) beats the home ZIP.
+// Potty breaks explicitly logged "other" only get weather when their spot has a custom ZIP.
+function zipForLog(l){
+  const zips = (data.settings && data.settings.locationZips) || [];
+  const find = v => { v = String(v||'').trim().toLowerCase(); if(!v) return ''; const m = zips.find(z => String(z.place||'').trim().toLowerCase() === v); return m ? (m.zip||'').trim() : ''; };
+  let z = '';
+  if(l.type==='walk') z = find(l.from) || find(l.to);
+  else if(l.type==='potty') z = find(l.place);
+  if(z) return z;
+  if(l.type==='potty' && (l.location||'home') === 'other') return '';
+  return (data.settings.homeZip||'').trim();
+}
 async function fetchWalkWeather(logId){
-  const zip = (data.settings.homeZip||'').trim(); if(!zip) return;
   try {
-    const geo = await geocodeZip(zip);
     const log = data.logs.find(l => l.id === logId); if(!log) return;
+    const zip = zipForLog(log); if(!zip) return;
+    const geo = await geocodeZip(zip);
     if(await applyWalkWeather(log, geo)){
       save(false);
       if(currentView==='today' || currentView==='log' || currentView==='activity') render();
@@ -1971,7 +2054,7 @@ function renderRemindersPanel(){
   if(!activePet()){ panel.innerHTML = head+'<div style="font-size:13px;color:var(--text-secondary)">Add a dog to see reminders.</div>'; return; }
   const rem = getReminders();
   if(!rem.length){ panel.innerHTML = head+'<div style="font-size:13px;color:var(--text-secondary)">All caught up — nothing due right now.</div>'; return; }
-  panel.innerHTML = head + rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="display:inline-flex">'+iconFor(r.icon,18)+'</span><span>'+esc(r.text)+'</span></div>').join('');
+  panel.innerHTML = head + rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="display:inline-flex">'+iconFor(r.icon,18)+'</span><span style="flex:1;min-width:0">'+esc(r.text)+'</span>'+(r.act||'')+'</div>').join('');
 }
 function toggleRemindersPanel(ev){
   if(ev) ev.stopPropagation();
@@ -1996,7 +2079,7 @@ function isHomeWalk(l){ const h = s => String(s||'').trim().toLowerCase() === 'h
 function isHomeEntry(l){ if(l.type==='walk') return isHomeWalk(l); if(l.type==='potty') return (l.location||'home') !== 'other'; return false; }
 // Fetch the *historical* weather for a past walk (closest hour) using the home ZIP location.
 async function fetchWalkWeatherFor(log){
-  const zip = (data.settings.homeZip||'').trim(); if(!zip || !log.dateTime) return false;
+  const zip = zipForLog(log); if(!zip || !log.dateTime) return false;
   const geo = await geocodeZip(zip);
   const date = log.dateTime.slice(0,10);
   const targetMs = new Date(log.dateTime).getTime();
@@ -2774,12 +2857,22 @@ function getReminders(){
     const staleMs = hrs*3600000;
     const agoStr = ms => { const h = Math.floor(ms/3600000); return h>=24 ? (Math.floor(h/24)+'d '+(h%24)+'h') : (h+'h'); };
     const waters = petLogs('water').filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+    const snooze = (data.settings && data.settings.waterSnooze) || {};
+    const muted = ((data.settings && data.settings.waterMutedBowls) || []).map(x=>x.toLowerCase());
+    const snoozed = key => (snooze[key]||0) > Date.now();
+    const waterActs = (key, canMute) =>
+      '<button class="btn btn-sm" onclick="event.stopPropagation();snoozeWater(\''+encArg(key)+'\')" title="Hide this reminder for one reminder window">💤</button>'
+      + (canMute ? ' <button class="btn btn-sm" onclick="event.stopPropagation();muteWaterBowl(\''+encArg(key)+'\')" title="Stop watching this bowl — re-enable any time in Settings">🔕</button>' : '');
     if(wMode === 'perLocation'){
       const seen = {}; waters.forEach(w=>{ const p=(w.place||'').trim()||'the bowl'; if(!(p in seen)) seen[p]=w; });
-      Object.keys(seen).forEach(p=>{ const age = Date.now()-new Date(seen[p].dateTime).getTime(); if(age>=staleMs) out.push({ icon:'💧', text:'Fresh water — '+p+' last refilled '+agoStr(age)+' ago', over:true, sort:-(age/staleMs) }); });
-    } else if(waters.length){
+      Object.keys(seen).forEach(p=>{
+        if(muted.includes(p.toLowerCase()) || snoozed(p)) return;
+        const age = Date.now()-new Date(seen[p].dateTime).getTime();
+        if(age>=staleMs) out.push({ icon:'💧', text:'Fresh water — '+p+' last refilled '+agoStr(age)+' ago', over:true, sort:-(age/staleMs), act:waterActs(p, true) });
+      });
+    } else if(waters.length && !snoozed('_overall')){
       const age = Date.now()-new Date(waters[0].dateTime).getTime();
-      if(age>=staleMs){ const p=(waters[0].place||'').trim(); out.push({ icon:'💧', text:'Fresh water needed — last refilled '+agoStr(age)+' ago'+(p?' ('+p+')':''), over:true, sort:-(age/staleMs) }); }
+      if(age>=staleMs){ const p=(waters[0].place||'').trim(); out.push({ icon:'💧', text:'Fresh water needed — last refilled '+agoStr(age)+' ago'+(p?' ('+p+')':''), over:true, sort:-(age/staleMs), act:waterActs('_overall', false) }); }
     }
   }
   return out.sort((a,b)=>a.sort-b.sort);
@@ -2999,7 +3092,7 @@ function renderToday(){
   else html += feedC + badgeC;
   // reminders
   const rem = getReminders();
-  if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span>'+esc(r.text)+'</span></div>').join('')+'</div>';
+  if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span style="flex:1;min-width:0">'+esc(r.text)+'</span>'+(r.act||'')+'</div>').join('')+'</div>';
   // today timeline
   const today = todayISO();
   const todays = petLogs().filter(l => l.dateTime && l.dateTime.slice(0,10) === today).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
@@ -3047,13 +3140,13 @@ function editLogModal(id){
       + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.foodPlace||'')+'</select>';
   } else if(l.type === 'water'){
     title = '💧 Edit water';
-    body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel(foodPlaceOptions(), l.place||'')+'</select>';
+    body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...waterPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'')+'</select>';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
     body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
       + '<label class="label">Where</label><select class="select" id="e-place">'+sel(pottyPlaceOptions(), l.place||'Backyard')+'</select>'
       + pottyLocationField(l.location, 'e-loc')
-      + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel(STOOL_QUALITY, l.stool||'')+'</select></div>';
+      + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel([...new Set([...stoolOptions(), ...(l.stool?[l.stool]:[])])], l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
     body += '<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="e-dur" value="'+esc(l.durationMin||'')+'"></div>'
@@ -3626,7 +3719,7 @@ function renderBadgesCard(){
       if(fx){ shadow += ',0 0 '+fx.glow+'px '+fx.col+'99'; star = '<span style="position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 4px;border-radius:10px;background:'+fx.col+';color:#0d1117;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg-tertiary);font-family:JetBrains Mono,monospace">★'+P+'</span>'; if(fx.pulse) pulseCls = ' prestige-pulse'; }
       med = 'position:relative;background:radial-gradient(circle at 50% 38%,'+tc+'44,'+tc+'11);border:2px solid '+tc+';box-shadow:'+shadow+';'+(fx&&fx.pulse?'--pglow:'+fx.glow+'px;--pcol:'+fx.col+';':'');
     } else med = 'position:relative;background:var(--bg-input);border:2px dashed var(--border)';
-    return '<div title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(on?'':' (locked)')+'\n'+esc(b.blurb)+'" style="text-align:center;padding:12px 6px;border:1px solid '+(on?tc+'66':'var(--border)')+';border-radius:14px;background:var(--bg-tertiary)">'
+    return '<div'+(on?' onclick="viewBadge('+b.mi+')"':'')+' title="'+esc(b.name)+' — '+fmtMi(b.mi)+' mi'+(on?' — tap to view':' (locked)')+'\n'+esc(b.blurb)+'" style="text-align:center;padding:12px 6px;border:1px solid '+(on?tc+'66':'var(--border)')+';border-radius:14px;background:var(--bg-tertiary)'+(on?';cursor:pointer':'')+'">'
       + '<div class="'+pulseCls.trim()+'" style="width:54px;height:54px;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:25px;'+med+'">'+(on?b.icon:'<span style="filter:grayscale(1);opacity:.35">'+b.icon+'</span>')+star+'</div>'
       + '<div style="font-size:12px;font-weight:600;line-height:1.2'+(on?'':';color:var(--text-secondary)')+'">'+esc(b.name)+'</div>'
       + '<div style="font-family:JetBrains Mono,monospace;font-size:11px;color:'+(on?tc:'var(--text-secondary)')+'">'+fmtMi(b.mi)+' mi</div></div>';
