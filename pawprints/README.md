@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.66.0**
+**Current Version: v0.67.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,14 @@ covers both.
 
 ## Version History
 
+- **v0.67.0** — **Journal in the Log tab, global search, and trustworthy deletes.** (1) The Journal
+  now also lives where you'd expect it — a **Journal sub-tab on the Log page** (same entries as the
+  Profile card, one source of truth). (2) A **🔍 search button in the header** finds anything across
+  activity logs, care records, supplies, the journal, and contacts — plain instant matching, no
+  internet or AI involved; tap a result to jump straight to it. (3) **Deletes now stick across
+  devices**: removing something leaves a small invisible marker so a phone that synced later deletes
+  it too, instead of quietly restoring it (the last known sync gap). Also fixed: deleting a dog now
+  cleans up their records, journal entries, and calendar reminders too.
 - **v0.66.0** — **Five quality-of-life features in one drop.** (1) **On this day** — the Today page
   surfaces journal entries from exactly N months or years ago today, so milestones come back to you.
   (2) **Vet visit prep** — a button on Care → Vet builds a "since the last visit" summary (weight

@@ -224,6 +224,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
     <button class="btn weather-pill hidden" id="reminders-pill" onclick="toggleRemindersPanel(event)" title="Reminders" aria-label="Reminders"></button>
     <button class="btn weather-pill hidden" id="weather-pill" onclick="toggleWeatherPanel(event)" title="Weather" aria-label="Current weather"></button>
     <select id="pet-select" class="pet-select hidden" onchange="onPetSelect(this.value)"></select>
+    <button class="btn" onclick="searchModal()" title="Search everything — logs, care records, supplies, journal, contacts" aria-label="Search">🔍</button>
     <button class="btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle light / dark mode" aria-label="Toggle light or dark mode">🌙</button>
     <button class="btn" onclick="settingsModal()" title="Settings, backup &amp; export" aria-label="Settings, backup and export">⚙️</button>
     <input type="file" id="import-file" accept=".json" onchange="importJSON(event)" style="display:none">
@@ -271,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.66.0';
+const APP_VERSION = 'v0.67.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -326,7 +327,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], records:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'' };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], records:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'', deleted:{} };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -767,6 +768,19 @@ function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAc
 
 // Record collections that sync as id'd arrays (merged per id, unlike settings/gcalEvents).
 const SYNC_COLLECTIONS = ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','auditLog'];
+// ── Deletion tombstones ──
+// The id-union merges above can't tell "deleted on another device" from "added on this
+// device", so deletes leave a marker in data.deleted {id: deletedAtMs}. Merges then drop
+// any record whose id is tombstoned instead of resurrecting it. Pruned after 120 days
+// (long past any realistic device staleness) to keep the doc small.
+function markDeleted(ids){ data.deleted = data.deleted || {}; (Array.isArray(ids)?ids:[ids]).forEach(id => { if(id) data.deleted[id] = Date.now(); }); }
+function mergeTombstones(remoteDel){
+  const tomb = Object.assign({}, remoteDel||{}, data.deleted||{});
+  const cutoff = Date.now() - 120*86400000;
+  Object.keys(tomb).forEach(k => { if(!(tomb[k] > cutoff)) delete tomb[k]; });
+  data.deleted = tomb;
+  return tomb;
+}
 let lastCloudPull = 0; // last time this device saw the cloud doc (load or pre-save check)
 async function loadFromFirestore(quiet){
   if(demoMode || !firebaseReady || !currentUser) return;
@@ -795,12 +809,15 @@ async function loadFromFirestore(quiet){
         return;
       }
       // Own data — merge remote into local by id across each collection (remote wins
-      // per id; records that exist only on this device are kept).
+      // per id; records that exist only on this device are kept; tombstoned ids are
+      // dropped from both sides so deletes propagate instead of resurrecting).
+      const tomb = mergeTombstones(d.deleted);
       let pulled = 0; // records the cloud had that this device didn't
       SYNC_COLLECTIONS.forEach(k => {
-        const remote = d[k] || [], remoteIds = new Set(remote.map(r=>r.id)), localIds = new Set((data[k]||[]).map(x=>x.id));
+        const remote = (d[k] || []).filter(r => r && !tomb[r.id]);
+        const remoteIds = new Set(remote.map(r=>r.id)), localIds = new Set((data[k]||[]).map(x=>x.id));
         pulled += remote.filter(r => !localIds.has(r.id)).length;
-        const localOnly = (data[k]||[]).filter(x => !remoteIds.has(x.id));
+        const localOnly = (data[k]||[]).filter(x => !remoteIds.has(x.id) && !tomb[x.id]);
         data[k] = [...remote, ...localOnly];
       });
       data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
@@ -844,9 +861,13 @@ async function saveToFirestore(){
         const snap = await ref.get();
         if(snap.exists){
           const remote = snap.data();
+          // Tombstones both ways: remote deletes remove our local copy; our deletes
+          // stop remote copies from being "rescued" back in.
+          const tomb = mergeTombstones(remote.deleted);
           SYNC_COLLECTIONS.forEach(k => {
+            if((data[k]||[]).some(x => x && tomb[x.id])) data[k] = data[k].filter(x => !tomb[x.id]);
             const localIds = new Set((data[k]||[]).map(x=>x.id));
-            const remoteOnly = (remote[k]||[]).filter(x => x && x.id && !localIds.has(x.id));
+            const remoteOnly = (remote[k]||[]).filter(x => x && x.id && !localIds.has(x.id) && !tomb[x.id]);
             if(remoteOnly.length){ data[k] = [...(data[k]||[]), ...remoteOnly]; rescued += remoteOnly.length; }
           });
           data.gcalEvents = Object.assign({}, remote.gcalEvents||{}, data.gcalEvents||{});
@@ -1037,9 +1058,9 @@ function exportHistoryCSV(){
   showToast('📄 History CSV saved');
 }
 // Entity deletes (with audit logging) — used by the edit modals.
-function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); markDeleted(id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); markDeleted(id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); markDeleted(id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 // ── Medical records (vaccinations, surgeries, tests, etc.) ─────────
 function toggleRecordSort(){ recordSortAsc = !recordSortAsc; render(); }
@@ -1137,10 +1158,10 @@ function saveRecord(id){
   if(gcalAccessToken) syncToGoogleCalendar();
 }
 
-function deleteRecord(id){ if(denyManage()) return; const r=data.records.find(x=>x.id===id); data.records=data.records.filter(x=>x.id!==id); if(r) logChange('deleted','record',[r.type,r.name].filter(Boolean).join(' · ')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteRecord(id){ if(denyManage()) return; const r=data.records.find(x=>x.id===id); data.records=data.records.filter(x=>x.id!==id); markDeleted(id); if(r) logChange('deleted','record',[r.type,r.name].filter(Boolean).join(' · ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); markDeleted(id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); markDeleted(id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); markDeleted(id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 // Settings is a full page (view-settings). The gear + other callers just navigate to it.
 function settingsModal(){ switchView('settings'); }
@@ -1766,8 +1787,12 @@ function deletePet(id){
   if(denyManage()) return;
   const p = data.pets.find(x=>x.id===id); if(!p) return;
   if(!confirm('Delete '+p.name+' and all their logs? This cannot be undone.')) return;
+  markDeleted(id);
   data.pets = data.pets.filter(x=>x.id!==id);
-  ['logs','vetVisits','grooming','illnesses','meds','inventory'].forEach(k => data[k] = data[k].filter(r => r.petId !== id));
+  ['logs','vetVisits','grooming','illnesses','meds','inventory','records','journal','customEvents'].forEach(k => {
+    markDeleted((data[k]||[]).filter(r => r.petId === id).map(r => r.id));
+    data[k] = (data[k]||[]).filter(r => r.petId !== id);
+  });
   if(data.activePetId === id) data.activePetId = data.pets[0]?.id || null;
   logChange('deleted','dog', p.name + ' (and all their records)');
   closeModal(); save();
@@ -1787,7 +1812,7 @@ function addLog(entry){
   if(rec.type==='walk') checkWalkBadges(true);
   return rec.id;
 }
-function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
+function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
 
 // Quick buttons
 function quickWater(){
@@ -2883,6 +2908,7 @@ function deleteEvent(id){
   if(denyManage()) return;
   const e = (data.customEvents||[]).find(x=>x.id===id);
   data.customEvents = (data.customEvents||[]).filter(x=>x.id!==id);
+  markDeleted(id);
   if(e) logChange('deleted','reminder', e.title||'');
   closeModal(); save(); showToast('🗑️ Deleted');
 }
@@ -3262,6 +3288,45 @@ function logSummary(l){
   if(l.type==='weight') return esc(l.value)+' '+esc(l.unit||'lb');
   return '';
 }
+// ── Global search — plain substring matching over everything already in memory. No AI, no network. ──
+function searchModal(){
+  if(!activePet()){ promptAddDog(); return; }
+  openModal('<h3>🔍 Search</h3>'
+    + '<input class="input" id="gs-q" placeholder="Food brand, vet name, symptom, “first swim”…" oninput="runSearch()" autocomplete="off">'
+    + '<div id="gs-results" style="margin-top:4px"><p style="font-size:12px;color:var(--text-secondary)">Searches activity logs, care records, supplies, the journal, and contacts for this dog.</p></div>');
+  const q = document.getElementById('gs-q'); if(q) q.focus();
+}
+function runSearch(){
+  const out = document.getElementById('gs-results'); if(!out) return;
+  const q = (fv('gs-q')||'').trim().toLowerCase();
+  if(q.length < 2){ out.innerHTML = '<p style="font-size:12px;color:var(--text-secondary)">Type at least 2 characters.</p>'; return; }
+  const hit = (...parts) => parts.some(v => v && String(v).toLowerCase().includes(q));
+  const groups = [];
+  const add = (title, rows) => { if(rows.length) groups.push({ title, rows: rows.slice(0,8), more: rows.length > 8 ? rows.length - 8 : 0 }); };
+  const row = (icon, label, sub, open) => ({ icon, label, sub, open });
+  add('Activity', petLogs().filter(l => l.dateTime && hit(logSummary(l).replace(/<[^>]+>/g,''), l.notes, l.place, l.foodType, l.from, l.to, l.stool))
+    .sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))
+    .map(l => row((LOG_META[l.type]&&LOG_META[l.type].i)||'log', logSummary(l).replace(/<[^>]+>/g,''), fmtDateTime(l.dateTime), "editLogModal('"+l.id+"')")));
+  const care = [];
+  petArr('vetVisits').forEach(v => { if(hit(v.reason, v.vet, v.clinic, v.notes)) care.push(row('vet', (v.reason||'Vet visit')+(v.vet?' · '+v.vet:''), fmtDate(v.date), "vetModal('"+v.id+"')")); });
+  petArr('grooming').forEach(g => { if(hit(g.groomer, (g.services||[]).join(' '), g.notes)) care.push(row('groom', (g.services&&g.services.length?g.services.join(', '):'Grooming')+(g.groomer?' · '+g.groomer:''), fmtDate(g.date), "groomModal('"+g.id+"')")); });
+  petArr('meds').forEach(m => { if(hit(m.name, m.kind, m.dose, m.notes)) care.push(row('meds', m.name+(m.kind?' ('+m.kind+')':''), m.lastGiven?('last '+fmtDate(m.lastGiven)):'', "medModal('"+m.id+"')")); });
+  petArr('records').forEach(r => { if(hit(r.name, r.type, r.vaccineType, r.result, r.vet, r.clinic, r.notes)) care.push(row('records', (r.name||r.type||'Record'), fmtDate(r.date), "recordModal('"+r.id+"')")); });
+  petArr('illnesses').forEach(e => { if(hit(e.diagnosis, (e.symptoms||[]).join(' '), e.treatment, e.notes)) care.push(row('illness', e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness', fmtDate(e.start), "illnessModal('"+e.id+"')")); });
+  add('Care', care);
+  add('Supplies', petArr('inventory').filter(i => hit(i.name, i.brand, i.category, i.store, i.upc, i.asin, i.notes))
+    .map(i => row('supplies', ((i.brand?i.brand+' ':'')+(i.name||'')).trim(), [i.category, i.purchaseDate?fmtDate(i.purchaseDate):''].filter(Boolean).join(' · '), "invModal('"+i.id+"')")));
+  add('Journal', petArr('journal').filter(n => hit(n.title, n.text))
+    .map(n => row('log', (JOURNAL_KINDS[journalKind(n)].e+' '+(n.title||String(n.text||'').split('\n')[0].slice(0,50))), n.dateTime?fmtDate(n.dateTime):'', "noteModal('"+n.id+"')")));
+  add('Contacts', (data.contacts||[]).filter(c => hit(c.name, c.org, c.role, c.phone, c.email, c.notes))
+    .map(c => row('contacts', (c.name||c.org||'Contact')+(c.role?' · '+c.role:''), c.phone||'', "contactModal('"+c.id+"')")));
+  if(!groups.length){ out.innerHTML = '<p style="font-size:13px;color:var(--text-secondary)">No matches for “'+esc(q)+'”.</p>'; return; }
+  out.innerHTML = groups.map(g =>
+    '<div class="label" style="margin:12px 0 4px">'+esc(g.title)+'</div>'
+    + g.rows.map(r => '<div class="entry-row clickable" onclick="closeModal();setTimeout(function(){'+r.open+'},0)" style="padding:8px 12px;margin-bottom:6px"><span style="display:inline-flex;flex-shrink:0">'+svgIcon(r.icon,16)+'</span><div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis">'+esc(r.label)+'</div>'+(r.sub?'<div style="font-size:11px;color:var(--text-secondary)">'+esc(r.sub)+'</div>':'')+'</div></div>').join('')
+    + (g.more ? '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:6px">+ '+g.more+' more — refine the search</div>' : '')
+  ).join('');
+}
 function timelineRow(l){
   const m = LOG_META[l.type] || {i:'•',c:'var(--text-secondary)'};
   return '<div class="timeline-item"><div class="tl-icon" style="color:'+m.c+'">'+svgIcon(m.i,20)+'</div>'
@@ -3332,9 +3397,11 @@ function emptyState(){
 // ── LOG ──
 function renderLog(){
   if(!activePet()) return emptyState();
-  const tabs = [['feed','Feed'],['water','Water'],['potty','Potty'],['walk','Walk'],['weight','Weight']];
+  const tabs = [['feed','Feed'],['water','Water'],['potty','Potty'],['walk','Walk'],['weight','Weight'],['journal','Journal']];
   let html = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px"><h2 style="font-size:20px;font-weight:700">Log activity</h2><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="openActivity()">'+svgIcon('log',16)+' All activity by day</button><button class="btn btn-sm" onclick="openHistory()">🕘 Change history</button></div></div>';
-  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+svgIcon(LOG_META[k].i,16)+' '+l+'</button>').join('')+'</div>';
+  html += '<div class="subtab">'+tabs.map(([k,l])=>'<button class="'+(logSubtab===k?'active':'')+'" onclick="setLogSubtab(\''+k+'\')">'+svgIcon((LOG_META[k]&&LOG_META[k].i)||'log',16)+' '+l+'</button>').join('')+'</div>';
+  // Journal & milestones lives in data.journal, not logs — reuse the Profile card here so it's reachable from Log too.
+  if(logSubtab === 'journal') return html + renderNotes();
   const opener = { feed:'quickFeed', water:'quickWater', potty:'quickPotty', walk:'quickWalk', weight:'quickWeight' }[logSubtab];
   html += '<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="'+opener+'()">+ Add '+logSubtab+' entry</button></div>';
   const entries = petLogs(logSubtab).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
@@ -3463,6 +3530,7 @@ function saveNote(id){
 function deleteNote(id){
   if(denyManage()) return;
   data.journal = (data.journal||[]).filter(x=>x.id!==id);
+  markDeleted(id);
   logChange('deleted','note','');
   closeModal(); save(); showToast('🗑️ Deleted');
 }
