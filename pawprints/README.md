@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.67.0**
+**Current Version: v0.67.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.67.1** — **Mobile audit pass.** Checked every tab and every recently-added modal at iPhone
+  width against the live site — all clean except one: the supply form's checkbox labels ("One-time
+  item…", "Running low…", "Show cost breakdown") couldn't wrap on narrow screens, so the end of the
+  text and the help icon could get clipped. They now wrap properly.
 - **v0.67.0** — **Journal in the Log tab, global search, and trustworthy deletes.** (1) The Journal
   now also lives where you'd expect it — a **Journal sub-tab on the Log page** (same entries as the
   Profile card, one source of truth). (2) A **🔍 search button in the header** finds anything across
