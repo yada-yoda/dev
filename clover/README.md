@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.149 — Search the Expenses list (and the top-right box now works)
+
+The Expenses **List** view has a live **Search** box — find a vendor, description,
+note, category, account, person, or amount. Type “Supercuts” and you’ll see every
+visit, newest first, so the top row is the last time you spent there. Search spans
+the whole selected year (the month selector is set aside while searching), so a
+purchase isn’t hidden by the current month.
+
+The **top-right search box** was previously wired to nothing — now it drives the
+list search on whichever searchable page you’re on (Expenses, Bills, Class
+Actions), with a placeholder that names the page. Look in another year up top if
+the purchase was earlier than the one shown.
+
 ### v1.0.148 — Two new built-in expense categories: Personal Care & Education
 
 Added **Personal Care** (subs: Hair / Barber, Nails, Spa & Massage, Cosmetics) —

@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.148';
+const VERSION = '1.0.149';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -73,6 +73,7 @@ let expenseTab = 'grid';           // 'grid' | 'list'
 let expenseCatFilter = 'all';
 let expenseListSort = { key: 'date', dir: 'desc' };
 let expenseBadgeFilter = null;     // { key, value } from clicking an expense value bubble
+let expenseSearch = '';            // live search over the expense list (vendor, description, notes…)
 let expenseIncludeRecurring = true;  // roll active bills into the expense grid
 let paycheckSort = { key: 'payDate', dir: 'desc' };
 let paycheckStatusFilter = 'all';
@@ -260,6 +261,7 @@ function renderView(route) {
   view.innerHTML = '';
   renderNotifications();
   syncCdReminders();
+  syncTopSearch(route);
   const state = ownerState();
   if (state === 'denied') { view.appendChild(deniedPanel()); return; }
   if (state === 'setup') view.appendChild(setupBanner());
@@ -465,6 +467,31 @@ function wireChrome() {
     bell.addEventListener('click', ev => { ev.stopPropagation(); document.getElementById('notif-panel').classList.toggle('hidden'); });
     document.addEventListener('click', ev => { const w = document.getElementById('notif-wrap'); if (w && !w.contains(ev.target)) document.getElementById('notif-panel').classList.add('hidden'); });
   }
+  // Top-right search drives whichever list page you're on that supports search
+  // (Expenses, Bills, Class Actions). syncTopSearch() keeps its text + placeholder
+  // in step as you navigate; on other pages it's a no-op with a generic hint.
+  const gsearch = document.getElementById('search');
+  if (gsearch) {
+    gsearch.addEventListener('input', () => {
+      const q = gsearch.value, id = currentRoute && currentRoute.id;
+      if (id === 'expenses') expenseSearch = q;
+      else if (id === 'subscriptions') subsSearch = q;
+      else if (id === 'settlements') settleSearch = q;
+      else return;
+      renderView(currentRoute);
+      const n = document.getElementById('search'); if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (e) {} }
+    });
+  }
+}
+// Reflect the current page's search term + a page-specific placeholder in the
+// top-right box, so navigating between pages doesn't leave stale text there.
+function syncTopSearch(route) {
+  const box = document.getElementById('search'); if (!box) return;
+  const id = route && route.id;
+  if (id === 'expenses') { box.value = expenseSearch; box.placeholder = 'Search expenses…'; }
+  else if (id === 'subscriptions') { box.value = subsSearch; box.placeholder = 'Search bills…'; }
+  else if (id === 'settlements') { box.value = settleSearch; box.placeholder = 'Search Class Actions…'; }
+  else { box.value = ''; box.placeholder = 'Search…'; }
 }
 
 function toggleDrawer() {
@@ -3670,6 +3697,7 @@ const HELP_SECTIONS = [
       'The grid’s “Year total” column adds up every month in the row, and with bills rolled in the months that haven’t happened yet are estimates — so it’s a full-year forecast, not a year-to-date figure. The dashboard’s “Expenses by category (YTD)” donut is the year-to-date view, which is why the two differ.',
       'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
       'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.',
+      'In List view, search by vendor, description, notes, category, account, person, or amount — e.g. type “Supercuts” to see every visit and when the last one was. Searching spans the whole selected year (the month selector is ignored while a search is active), and the top-right search box does the same thing. Look in another year up top if the purchase was earlier.',
       'Picking Auto → Fuel adds Gallons and Price / gallon fields. Fill both and the Amount works itself out; the pump price keeps its third decimal (3.499, not 3.50) so it ties out to the receipt. Both are available as optional columns in List view.',
       'Money you move into savings or investments goes under the “Savings & Investments” category — pick it and a “Moved to” field appears for the destination account. It’s a transfer (the money is still yours), but it counts for the month so your leftover reflects it.'
     ] },
@@ -3737,7 +3765,7 @@ function renderHelp(view) {
   const tips = el('ul', 'help-tips');
   [
     'Tables can be sorted (click a header) and their columns customized (the ⚙ Columns button).',
-    'Most list pages have a live search box; forms explain each field with an ⓘ tooltip.',
+    'Many list pages have a live search box (Expenses, Bills, Class Actions); the top-right search drives whichever of those you’re on. Forms explain each field with an ⓘ tooltip.',
     'The year and month selectors at the top control what most pages show.',
     'Editing an expense, income entry, paycheck, bill, account, or settlement? Its form has a “History” tab showing exactly what changed and when — e.g. “Amount $42.80 → $51.25”.'
   ].forEach(t => tips.appendChild(el('li', null, t)));
@@ -4217,10 +4245,24 @@ function buildExpenseListCol(store, key) {
   }
   return null;
 }
+// Everything about a payment that a text search should match — description,
+// vendor (e.g. "Supercuts"), notes, category/source, account, person, check #,
+// and the amount both formatted and raw.
+function expenseSearchHay(store, r) {
+  return [
+    r.title, r.vendor, r.notes,
+    store.expenseGroupName(r.categoryId), store.subName('expense', r.categoryId, r.subId),
+    store.accountName(r.accountId), store.accountName(r.toAccountId), store.personName(r.personId),
+    r.checkNo, money(expenseAmount(r)), String(expenseAmount(r))
+  ].filter(v => v && v !== '—').join('  ').toLowerCase();
+}
 function expenseList(data) {
   const store = window.cloverStore;
+  const q = expenseSearch.trim().toLowerCase();
   let rows = data.expensePayments.slice();
-  if (activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
+  // While searching, span the whole year (ignore the month filter) so "when did I
+  // last spend at X" isn't hidden by the current month selection.
+  if (!q && activeMonth > 0) rows = rows.filter(e => monthIdx(e.date) === activeMonth - 1);
   if (expenseCatFilter !== 'all') rows = rows.filter(e => e.categoryId === expenseCatFilter);
   if (expenseBadgeFilter) {
     const f = expenseBadgeFilter;
@@ -4230,13 +4272,21 @@ function expenseList(data) {
       : f.key === 'person' ? store.personName(r.personId) : '';
     rows = rows.filter(r => valOf(r) === f.value);
   }
+  if (q) rows = rows.filter(r => expenseSearchHay(store, r).includes(q));
 
   const wrap = el('div');
   const bar = el('div', 'filter-bar');
   const catSel = select([{ value: 'all', label: 'All categories' }].concat(store.state.expenseCategories.map(c => ({ value: c.id, label: c.name }))), expenseCatFilter);
   catSel.addEventListener('change', () => { expenseCatFilter = catSel.value; renderView(currentRoute); });
   bar.appendChild(labelWrap('Category', catSel));
-  bar.appendChild(el('div', 'muted', rows.length + ' shown' + (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : '')));
+  const searchIn = input(expenseSearch, { placeholder: 'Search vendor, description, notes…' });
+  searchIn.id = 'expense-search'; searchIn.type = 'search';
+  searchIn.addEventListener('input', () => {
+    expenseSearch = searchIn.value; renderView(currentRoute);
+    const n = document.getElementById('expense-search'); if (n) { n.focus(); const L = n.value.length; try { n.setSelectionRange(L, L); } catch (e) {} }
+  });
+  bar.appendChild(labelWrap('Search', searchIn));
+  bar.appendChild(el('div', 'muted', rows.length + ' shown' + (q ? ' · matching “' + expenseSearch.trim() + '” in ' + activeYear + (activeMonth > 0 ? ' (all months)' : '') : (activeMonth > 0 ? ' · ' + MONTHS[activeMonth - 1] : ''))));
   const colsBtn = columnsButton('expenseList', EXPLIST_ALL_COLS, EXPLIST_DEFAULT_COLS, EXPLIST_COL_LABELS, 'Expense list columns');
   colsBtn.style.marginLeft = 'auto';
   bar.appendChild(colsBtn);
@@ -4252,7 +4302,12 @@ function expenseList(data) {
   }
 
   if (!rows.length) {
-    wrap.appendChild(emptyState('No expenses logged', 'Add one-off or actual expenses for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '. (Recurring bills live on the Bills & Subscriptions page.)', '+ Add expense', () => expenseModal(null)));
+    if (q) {
+      const es = emptyState('No matches', 'Nothing in ' + activeYear + ' matches “' + expenseSearch.trim() + '”. Searches the selected year — check a different year up top if it was earlier.', '✕ Clear search', () => { expenseSearch = ''; renderView(currentRoute); });
+      wrap.appendChild(es);
+    } else {
+      wrap.appendChild(emptyState('No expenses logged', 'Add one-off or actual expenses for ' + activeYear + (activeMonth > 0 ? ' / ' + MONTHS[activeMonth - 1] : '') + '. (Recurring bills live on the Bills & Subscriptions page.)', '+ Add expense', () => expenseModal(null)));
+    }
     return wrap;
   }
 
