@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.64.0';
+const APP_VERSION = 'v0.65.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1463,7 +1463,7 @@ async function exportXLSX(){
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
   add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
-  add('Notes', ['Dog','When','Note'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),n.text].map(clean)));
+  add('Journal', ['Dog','When','Type','Title','Entry'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),JOURNAL_KINDS[journalKind(n)].label,(n.title||''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
   try { XLSX.writeFile(wb, 'pawprints-'+todayISO()+'.xlsx'); showToast('✅ Spreadsheet saved'); } catch(e){ showToast('⚠️ Could not save spreadsheet'); }
 }
@@ -1545,6 +1545,9 @@ async function exportPDF(onlyPetId){
 
     const inv = recordsFor('inventory', p.id).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
     if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Paid','Status'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), [(i.qty||''),(i.unit||''),(i.size?'· '+i.size:'')].filter(Boolean).join(' '), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, payStr(i)||dash, invStatus(i)+(i.runningLow?'  ·  low':'')]), y); }
+
+    const jn = (data.journal||[]).filter(n=>n.petId===p.id).sort((a,b)=>new Date(b.dateTime||0)-new Date(a.dateTime||0));
+    if(jn.length){ y = heading('Journal & milestones', y); y = table(['When','Type','Title','Entry'], jn.map(n=>[n.dateTime?fmtDateTime(n.dateTime):dash, JOURNAL_KINDS[journalKind(n)].label, n.title||dash, n.text||dash]), y); }
 
     const allLogs = data.logs.filter(l=>l.petId===p.id && l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
     const acts = allLogs.filter(l=>l.type!=='weight').slice(0,40);
@@ -2661,6 +2664,8 @@ function calendarEvents(){
     if(r.nextDue) ev.push({ key:'recdue:'+r.id, date:r.nextDue, icon:'📋', type:(r.type||'Record')+' due', title:'📋 '+dn+': '+(r.name||r.type||'Record')+' due', desc:'', open:"recordModal('"+r.id+"')" }); });
   petArr('illnesses').forEach(e => { if(e.start) ev.push({ key:'ill:'+e.id, date:e.start, icon:'🤒', type:'Illness', record:true, title:'🤒 '+dn+': '+(e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')||'illness'), desc:e.notes||'', open:"illnessModal('"+e.id+"')" }); });
   petArr('customEvents').forEach(e => { if(e.date){ const ic = reminderIcon(e.evtype); ev.push({ key:'custom:'+e.id, date:e.date, time:e.time||'', icon:ic, type:e.evtype||'Reminder', location:e.location||'', title:ic+' '+(e.title||'Reminder'), desc:e.notes||'', open:"eventModal('"+e.id+"')" }); } });
+  // Journal & milestones — in-app calendar only (local:true keeps the diary out of GCal sync + .ics export).
+  petArr('journal').forEach(n => { if(n.dateTime){ const k = journalKind(n), km = JOURNAL_KINDS[k]; ev.push({ key:'journal:'+n.id, date:n.dateTime.slice(0,10), time:'', icon:km.e, type:'Journal — '+km.label, local:true, title:km.e+' '+dn+': '+(n.title||String(n.text||'').split('\n')[0].slice(0,40)||km.label), desc:n.text||'', open:"noteModal('"+n.id+"')" }); } });
   // birthday + gotcha day (recurring annual, shown for current year)
   return ev.sort((a,b)=> new Date(dateSafe(a.date)) - new Date(dateSafe(b.date)));
 }
@@ -2782,7 +2787,7 @@ function setTargetCalendar(id){ data.settings.gcalCalendarId = id; gcalChoosing 
 async function syncToGoogleCalendar(){
   if(!gcalAccessToken){ connectGoogleCalendar(); return; }
   const calId = data.settings.gcalCalendarId || 'primary';
-  const events = calendarEvents();
+  const events = calendarEvents().filter(e => !e.local); // journal entries stay in-app only
   if(!events.length){ showToast('No dated events to sync yet'); return; }
   showToast('⏳ Syncing to Google Calendar…');
   let ok = 0, fail = 0;
@@ -2853,7 +2858,7 @@ function deleteEvent(id){
 }
 // .ics export fallback (no Google account needed)
 function exportICS(){
-  const events = calendarEvents();
+  const events = calendarEvents().filter(e => !e.local); // journal entries stay in-app only
   if(!events.length){ showToast('No dated events to export'); return; }
   const stamp = (s)=> (s||todayISO()).replace(/-/g,'');
   const dtstart = (e) => {
@@ -3293,12 +3298,29 @@ function renderProfile(){
     + (canManage()?'<button class="btn" style="border-style:dashed;margin-top:6px" onclick="petModal()">+ Add another dog</button>':'')+'</div>';
   return html;
 }
-// ── Dog notes / journal (free-form, timestamped observations) ──
+// ── Journal & milestones — the dog's diary: firsts, milestones, memories, plus plain notes ──
+const JOURNAL_KINDS = { first:{e:'🌟',label:'First'}, milestone:{e:'🏆',label:'Milestone'}, memory:{e:'❤️',label:'Memory'}, funny:{e:'😂',label:'Funny moment'}, note:{e:'📝',label:'Note'} };
+function journalKind(n){ return JOURNAL_KINDS[n.kind] ? n.kind : 'note'; } // legacy entries had no kind
+let journalFilter = 'all';
+function setJournalFilter(k){ journalFilter = k; render(); }
 function renderNotes(){
-  const notes = petArr('journal').slice().sort((a,b)=>new Date(b.dateTime||0)-new Date(a.dateTime||0));
-  let html = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(notes.length?'12px':'0')+'"><h3 class="section-title" style="margin:0">'+svgIcon('log',18)+' Notes</h3>'+(canManage()?'<button class="btn btn-sm" onclick="noteModal()">+ Add note</button>':'')+'</div>';
-  if(notes.length) html += notes.map(n=>'<div class="entry-row'+(canManage()?' clickable':'')+'"'+(canManage()?' onclick="noteModal(\''+n.id+'\')"':'')+'><div style="flex:1"><div style="font-size:14px;white-space:pre-wrap">'+esc(n.text)+'</div><div class="tl-time">'+fmtDateTime(n.dateTime)+'</div></div></div>').join('');
-  else html += '<p style="color:var(--text-secondary);font-size:14px;margin:8px 0 0">No notes yet — jot down anything worth remembering (a guess at his age, a quirk, a vet’s remark).</p>';
+  const all = petArr('journal').slice().sort((a,b)=>new Date(b.dateTime||0)-new Date(a.dateTime||0));
+  const kindsPresent = [...new Set(all.map(journalKind))];
+  if(journalFilter !== 'all' && !kindsPresent.includes(journalFilter)) journalFilter = 'all';
+  const notes = journalFilter==='all' ? all : all.filter(n=>journalKind(n)===journalFilter);
+  let html = '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:'+(all.length?'10px':'0')+'"><h3 class="section-title" style="margin:0">'+svgIcon('log',18)+' Journal &amp; milestones</h3>'+(canManage()?'<button class="btn btn-sm" onclick="noteModal()">+ Add entry</button>':'')+'</div>';
+  if(all.length > 3 && kindsPresent.length > 1){
+    const fbtn = (k, lbl) => '<button class="tag'+(journalFilter===k?' active':'')+'" type="button" onclick="setJournalFilter(\''+k+'\')">'+lbl+'</button>';
+    html += '<div class="tag-grid" style="margin-bottom:10px">'+fbtn('all','All')+kindsPresent.map(k=>fbtn(k, JOURNAL_KINDS[k].e+' '+JOURNAL_KINDS[k].label)).join('')+'</div>';
+  }
+  if(notes.length) html += notes.map(n=>{
+    const k = journalKind(n), km = JOURNAL_KINDS[k];
+    return '<div class="entry-row'+(canManage()?' clickable':'')+'"'+(canManage()?' onclick="noteModal(\''+n.id+'\')"':'')+'><div style="flex:1;min-width:0">'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+(k!=='note'?'<span class="chip" style="font-size:10px">'+km.e+' '+km.label+'</span>':'')+(n.title?'<span style="font-weight:700;font-size:14px">'+esc(n.title)+'</span>':'')+'</div>'
+      + (n.text?'<div style="font-size:14px;white-space:pre-wrap'+((n.title||k!=='note')?';margin-top:4px':'')+'">'+esc(n.text)+'</div>':'')
+      + '<div class="tl-time">'+fmtDateTime(n.dateTime)+'</div></div></div>';
+  }).join('');
+  else html += '<p style="color:var(--text-secondary);font-size:14px;margin:8px 0 0">'+(all.length?'Nothing under this filter yet.':'Start the diary — the first swim, the first time he answered to his name, a funny habit, a vet\'s remark. Little moments you\'ll want to look back on.')+'</p>';
   return html + '</div>';
 }
 function noteModal(id){
@@ -3306,9 +3328,13 @@ function noteModal(id){
   if(!activePet()){ promptAddDog(); return; }
   const n = id ? (data.journal||[]).find(x=>x.id===id) : null;
   if(!n) draftInit('note');
-  openModal('<h3>📝 '+(n?'Edit note':'Add note')+'</h3>'
+  const curK = n ? journalKind(n) : 'note';
+  openModal('<h3>📖 '+(n?'Edit entry':'Journal entry')+'</h3>'
+    +'<label class="label">Type'+tip('What kind of moment this is. "First" and "Milestone" are the diary keepers — first swim, first night without the crate, learned to shake. They get their badge on the entry and show on the in-app calendar. "Note" is for plain observations.')+'</label>'
+    +'<div class="tag-grid" id="nt-kind" style="margin-bottom:14px">'+Object.keys(JOURNAL_KINDS).map(k=>'<button class="tag'+(curK===k?' active':'')+'" type="button" data-k="'+k+'" onclick="document.querySelectorAll(\'#nt-kind .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\')">'+JOURNAL_KINDS[k].e+' '+JOURNAL_KINDS[k].label+'</button>').join('')+'</div>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="nt-dt" value="'+(n?esc(n.dateTime||nowLocalISO()):nowLocalISO())+'">'
-    +'<label class="label">Note</label><textarea class="textarea" id="nt-text" rows="4" placeholder="e.g. We think he’s about 4 years old.">'+(n?esc(n.text||''):'')+'</textarea>'
+    +'<label class="label">Title (optional)'+tip('A short headline for the moment — "First swim!", "Learned to shake". Shows bold on the entry and as the calendar label.')+'</label><input class="input" id="nt-title" value="'+(n?esc(n.title||''):'')+'" placeholder="First swim!">'
+    +'<label class="label">What happened</label><textarea class="textarea" id="nt-text" rows="4" placeholder="e.g. Waded in cautiously at the lake, then wouldn\'t come out for an hour.">'+(n?esc(n.text||''):'')+'</textarea>'
     +'<div style="display:flex;gap:10px"><button class="btn-primary" onclick="saveNote('+(n?"'"+n.id+"'":'null')+')">Save</button>'
     +(n?'<button class="btn btn-danger" onclick="deleteNote(\''+n.id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
@@ -3317,13 +3343,15 @@ function saveNote(id){
   if(denyManage()) return;
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
-  const text = fv('nt-text'); if(!text){ showToast('⚠️ Enter a note'); return; }
-  const f = { text:text, dateTime:fv('nt-dt')||nowLocalISO() };
+  const text = fv('nt-text'), title = (fv('nt-title')||'').trim();
+  if(!text && !title){ showToast('⚠️ Give it a title or write what happened'); return; }
+  const kEl = document.querySelector('#nt-kind .tag.active');
+  const f = { kind:(kEl?kEl.dataset.k:'note'), title:title, text:text, dateTime:fv('nt-dt')||nowLocalISO() };
   data.journal = data.journal || [];
   if(id){ data.journal = data.journal.map(x=>x.id===id ? {...x, ...f} : x); }
   else { data.journal.unshift({ id:genId(), petId:data.activePetId, ...f }); }
-  logChange(id?'edited':'added','note', text.slice(0,40));
-  closeModal(); save(); showToast('📝 Note saved');
+  logChange(id?'edited':'added','journal entry', (JOURNAL_KINDS[f.kind].label+': '+(title||text)).slice(0,60));
+  closeModal(); save(); showToast(JOURNAL_KINDS[f.kind].e+' Saved to the journal');
 }
 function deleteNote(id){
   if(denyManage()) return;

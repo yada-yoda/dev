@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.64.0**
+**Current Version: v0.65.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,15 @@ covers both.
 
 ## Version History
 
+- **v0.65.0** — **The Notes card grew into a real Journal & milestones diary.** Each entry now has a
+  type — 🌟 **First** (first swim, first night out of the crate), 🏆 **Milestone**, ❤️ **Memory**,
+  😂 **Funny moment**, or 📝 plain Note — plus an optional bold title ("First swim!") and the story
+  underneath. Entries show their type badge on the Profile card, and once you have a few, filter
+  chips let you flip straight to just the Firsts or just the funny ones. Dated entries also appear
+  on the in-app Calendar with their type emoji (kept out of Google Calendar sync and .ics export on
+  purpose — the diary stays in the app). The journal now exports with type + title to the
+  spreadsheet and gets its own section in the PDF report. Existing notes are untouched — they just
+  became "Note"-type entries.
 - **v0.64.0** — **Built-in dropdown options can now be hidden.** Every list in Settings → Lists &
   preferences (potty locations, food locations, water/bowl locations, stool types, supply categories,
   supply units, grooming services) now shows its built-in options as chips — tap **×** on ones you
