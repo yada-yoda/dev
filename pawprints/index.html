@@ -271,7 +271,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.65.0';
+const APP_VERSION = 'v0.66.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1203,6 +1203,14 @@ function settingsListsHTML(){
     + '<button class="btn" onclick="saveWaterReminder()">Save</button></div>'
     + ((s.waterMutedBowls||[]).length ? '<div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Not being watched (tap × to watch again):</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'+(s.waterMutedBowls||[]).map((p,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">🔕 '+esc(p)+' <button onclick="unmuteWaterBowl('+i+')" title="Watch this bowl again" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>' : '')
     + '</div>';
+  const rtTimes = (s.routineFeedTimes||[]).slice().sort();
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Daily routine checklist'+tip('Optional checklist card on the Today page for the routine you set here. Items tick themselves off as you log — feedings check off in order as you log them, and the walk / fresh-water items check off with any walk or water refill that day. A feed time that passes without a log gets an "overdue" tag.')+'</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="routine-on" '+(s.routineOn?'checked':'')+' onchange="saveRoutine()"> Show the checklist on Today</label>'
+    + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Feeding times:</div>'
+    + (rtTimes.length ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'+rtTimes.map((t,i)=>'<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(fmtClock(t))+' <button onclick="removeRoutineTime('+i+')" title="Remove" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>').join('')+'</div>' : '')
+    + '<div style="display:flex;gap:8px;margin-bottom:8px"><input class="input" type="time" id="routine-time" style="margin-bottom:0;max-width:150px"><button class="btn" onclick="addRoutineTime()">Add feed time</button></div>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:4px;cursor:pointer"><input type="checkbox" id="routine-walk" '+(s.routineWalk?'checked':'')+' onchange="saveRoutine()"> Daily walk</label>'
+    + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="routine-water" '+(s.routineWater?'checked':'')+' onchange="saveRoutine()"> Fresh water daily</label></div>';
   const reOn = !!s.reorderEmailOn, reEmail = esc(s.reorderEmail || (currentUser && currentUser.email) || '');
   h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Reorder reminder emails'+tip('When a supply is marked "running low", PawPrints emails you a restock reminder with its reorder link. You\'re emailed once per item — it won\'t nag repeatedly — and it re-reminds only if an item goes low again after being restocked. Checked once a day.')+'</label>';
   if(!currentUser){
@@ -1342,6 +1350,28 @@ function unmuteWaterBowl(i){
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
   if(typeof updateRemindersPill==='function') updateRemindersPill();
   showToast('💧 Watching that bowl again');
+}
+// ── Daily routine checklist settings ──
+function saveRoutine(){
+  if(denyManage()) return;
+  data.settings = data.settings || {};
+  data.settings.routineOn = !!(document.getElementById('routine-on')||{}).checked;
+  data.settings.routineWalk = !!(document.getElementById('routine-walk')||{}).checked;
+  data.settings.routineWater = !!(document.getElementById('routine-water')||{}).checked;
+  save(false);
+}
+function addRoutineTime(){
+  if(denyManage()) return;
+  const t = fv('routine-time'); if(!t){ showToast('⚠️ Pick a time first'); return; }
+  data.settings = data.settings || {};
+  data.settings.routineFeedTimes = data.settings.routineFeedTimes || [];
+  if(!data.settings.routineFeedTimes.includes(t)){ data.settings.routineFeedTimes.push(t); data.settings.routineFeedTimes.sort(); }
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+}
+function removeRoutineTime(i){
+  if(denyManage()) return;
+  data.settings.routineFeedTimes = ((data.settings.routineFeedTimes||[]).slice().sort()).filter((_,idx)=>idx!==i);
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
 }
 // ── Per-location ZIP codes for walk/potty weather ──
 function addLocationZip(){
@@ -3088,6 +3118,77 @@ function renderFeedingCard(){
   }
   return '<div class="card" style="margin-bottom:0;display:flex;flex-direction:column;justify-content:center">'+body+'</div>';
 }
+// ── On this day — journal flashbacks from exactly N months / years ago today ──
+function renderOnThisDay(){
+  const entries = petArr('journal').filter(n=>n.dateTime);
+  if(!entries.length) return '';
+  const now = new Date(), ty = now.getFullYear(), tm = now.getMonth(), td = now.getDate();
+  const hits = [];
+  entries.forEach(n => {
+    const d = new Date(n.dateTime); if(isNaN(d) || d.getDate() !== td) return;
+    const months = (ty - d.getFullYear())*12 + (tm - d.getMonth());
+    if(months <= 0) return;
+    const label = months % 12 === 0 ? ((months/12)+' year'+(months===12?'':'s')+' ago today') : (months+' month'+(months===1?'':'s')+' ago today');
+    hits.push({ n, months, label });
+  });
+  if(!hits.length) return '';
+  hits.sort((a,b)=>a.months-b.months);
+  return '<div class="card"><h3 class="section-title">📅 On this day</h3>' + hits.map(h => {
+    const k = journalKind(h.n), km = JOURNAL_KINDS[k];
+    return '<div class="entry-row'+(canManage()?' clickable':'')+'"'+(canManage()?' onclick="noteModal(\''+h.n.id+'\')"':'')+'><div style="flex:1;min-width:0">'
+      + '<div style="font-size:12px;color:var(--accent);font-weight:700">'+h.label+'</div>'
+      + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px">'+(k!=='note'?'<span class="chip" style="font-size:10px">'+km.e+' '+km.label+'</span>':'')+(h.n.title?'<span style="font-weight:700;font-size:14px">'+esc(h.n.title)+'</span>':'')+'</div>'
+      + (h.n.text?'<div style="font-size:13px;white-space:pre-wrap;margin-top:2px">'+esc(h.n.text)+'</div>':'')
+      + '</div></div>';
+  }).join('') + '</div>';
+}
+// ── Walk helper — paw-safety warnings + the nicest walk window, from the cached header weather ──
+function renderWalkHelper(){
+  const w = headerWeather;
+  if(!w || w.tempF == null) return '';
+  const fmtHour = t => { const d = new Date(t); if(Math.abs(d.getTime()-Date.now()) < 45*60000) return 'right now'; let hh = d.getHours(); const ap = hh>=12?'PM':'AM'; return ((hh%12)||12)+' '+ap; };
+  // pick the most pleasant upcoming daylight hour: closest to 65°F, precip-heavy hours penalized
+  let best = null, bs = Infinity;
+  (w.hourly||[]).forEach(h => {
+    const hr = new Date(h.t).getHours(); if(hr < 6 || hr > 21 || h.tempF == null) return;
+    const s = Math.abs(h.tempF - 65) + ((h.pop||0) >= 40 ? 100 : (h.pop||0)/4);
+    if(s < bs){ bs = s; best = h; }
+  });
+  if(w.tempF >= 85){
+    return '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07);font-size:13px;line-height:1.5"><strong>🔥 '+w.tempF+'° — check the pavement before walking.</strong> Sunny asphalt can reach paw-burning temps from about 85° air. Back-of-hand test: hold it on the pavement for 7 seconds — too hot for your hand means too hot for paws. Stick to grass and shade'+(best && best.tempF <= w.tempF-6 ? ', or wait for '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.</div>';
+  }
+  if(w.tempF <= 15){
+    return '<div class="card" style="border-color:var(--blue);background:rgba(88,166,255,.07);font-size:13px;line-height:1.5"><strong>🥶 '+w.tempF+'° — short-walk weather.</strong> Watch for paw lifting or shivering, and rinse paws after — road salt and ice-melt irritate pads'+(best && best.tempF >= w.tempF+6 ? '. Warmest window: '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.</div>';
+  }
+  if(best && Math.abs(best.tempF - 65) <= 13){
+    return '<div class="card" style="font-size:13px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">'+(best.emoji||'🌤️')+'</span><div><strong>Nice walk window:</strong> '+fmtHour(best.t)+' — '+best.tempF+'°'+((best.pop!=null&&best.pop>0)?' · '+best.pop+'% precip':'')+'</div></div>';
+  }
+  return '';
+}
+// ── Daily routine checklist (opt-in via Settings) — ticks itself off from today's logs ──
+function renderRoutineCard(){
+  const s = data.settings || {};
+  if(!s.routineOn) return '';
+  const times = (s.routineFeedTimes||[]).slice().sort();
+  const today = todayISO();
+  const feedsToday = petLogs('feed').filter(l=>l.dateTime && l.dateTime.slice(0,10)===today).length;
+  const walkDone = petLogs('walk').some(l=>l.dateTime && l.dateTime.slice(0,10)===today);
+  const waterDone = petLogs('water').some(l=>l.dateTime && l.dateTime.slice(0,10)===today);
+  const nowHM = new Date().toTimeString().slice(0,5);
+  const items = [];
+  times.forEach((t,i)=>{ const done = feedsToday > i; items.push({ label:'Feed at '+fmtClock(t), done, late: !done && nowHM > t }); });
+  if(s.routineWalk) items.push({ label:'Walk', done:walkDone });
+  if(s.routineWater) items.push({ label:'Fresh water', done:waterDone });
+  if(!items.length) return '';
+  const doneN = items.filter(i=>i.done).length;
+  return '<div class="card"><h3 class="section-title">✅ Today\'s routine <span style="font-family:JetBrains Mono,monospace;font-size:12px;color:var(--text-secondary);font-weight:400">'+doneN+'/'+items.length+'</span></h3>'
+    + items.map(i=>'<div style="display:flex;align-items:center;gap:10px;padding:5px 0;font-size:14px'+(i.done?';color:var(--text-secondary)':'')+'">'
+      + '<span style="width:20px;height:20px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;flex:none;font-size:13px;'+(i.done?'background:var(--success);color:#fff':'border:2px solid '+(i.late?'var(--warning)':'var(--border)'))+'">'+(i.done?'✓':'')+'</span>'
+      + '<span style="'+(i.done?'text-decoration:line-through':'')+'">'+esc(i.label)+'</span>'
+      + (i.late?'<span class="chip" style="font-size:10px;background:rgba(210,153,34,.15);color:var(--warning)">overdue</span>':'')
+      + '</div>').join('')
+    + '</div>';
+}
 function renderToday(){
   if(!activePet()) return emptyState();
   const p = activePet();
@@ -3116,6 +3217,8 @@ function renderToday(){
     + '<button class="quick-btn" onclick="quickPotty()"><span class="qi">'+svgIcon('potty')+'</span>Potty</button>'
     + '<button class="quick-btn" onclick="quickWalk()"><span class="qi">'+svgIcon('walk')+'</span>Walk</button>'
     + '</div></div>';
+  // daily routine checklist (opt-in)
+  html += renderRoutineCard();
   // status
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)
@@ -3123,6 +3226,8 @@ function renderToday(){
     + statusCard('Last potty',svgIcon('potty',16),potty?potty.dateTime:null,8)
     + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
     + '</div></div>';
+  // paw-safety / best-walk-window strip (needs the header weather, i.e. a home ZIP)
+  html += renderWalkHelper();
   // fed-today progress + next walking badge, side by side
   const feedC = renderFeedingCard(), badgeC = renderNextBadgeToday();
   if(feedC && badgeC) html += '<div class="grid-2" style="margin-bottom:12px">'+feedC+badgeC+'</div>';
@@ -3130,6 +3235,8 @@ function renderToday(){
   // reminders
   const rem = getReminders();
   if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span style="flex:1;min-width:0">'+esc(r.text)+'</span>'+(r.act||'')+'</div>').join('')+'</div>';
+  // journal flashbacks
+  html += renderOnThisDay();
   // today timeline
   const today = todayISO();
   const todays = petLogs().filter(l => l.dateTime && l.dateTime.slice(0,10) === today).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
@@ -3509,12 +3616,73 @@ function vetPanel(){
   if(!primary && !secondary) return '<div class="card"><h3 class="section-title" style="margin:0 0 8px">'+svgIcon('care',18)+' '+esc(p.name)+'’s vet</h3><p style="color:var(--text-secondary);font-size:14px;margin:0">No vet saved yet — <a style="color:var(--accent-2);cursor:pointer;font-weight:500" onclick="petModal(\''+p.id+'\')">add your vet</a> in the profile and it shows here.</p></div>';
   return '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h3 class="section-title" style="margin:0">'+svgIcon('care',18)+' '+esc(p.name)+'’s vet'+(hasTwo?'s':'')+'</h3><button class="btn btn-sm" onclick="petModal(\''+p.id+'\')">Edit</button></div>'+primary+secondary+'</div>';
 }
+// ── Vet visit prep sheet — "since the last visit" summary to show or read to the vet ──
+let _vetPrepText = '';
+function vetPrepModal(){
+  if(!activePet()){ promptAddDog(); return; }
+  const p = activePet(), today = todayISO();
+  const past = petArr('vetVisits').filter(v=>v.date && v.date <= today).sort((a,b)=> b.date < a.date ? -1 : 1);
+  const last = past[0] || null, since = last ? last.date : null;
+  const inRange = ds => !!ds && (!since || ds > since);
+  const S = [];
+  // Weight
+  const ws = weightsFor(p.id), wNow = ws[0];
+  const wPrev = since ? (ws.find(x => x.dateTime && x.dateTime.slice(0,10) <= since) || null) : null;
+  const wRows = [];
+  if(wNow){
+    wRows.push('Current: '+wNow.value+' '+(wNow.unit||'lb')+' ('+fmtDate(wNow.dateTime)+')');
+    if(wPrev && wPrev !== wNow && num(wPrev.value) != null && num(wNow.value) != null){
+      const d = Math.round((num(wNow.value)-num(wPrev.value))*10)/10;
+      wRows.push('Around last visit: '+wPrev.value+' '+(wPrev.unit||'lb')+'  →  change '+(d>0?'+':'')+d+' '+(wNow.unit||'lb'));
+    }
+  } else wRows.push('No weights recorded yet');
+  S.push({ t:'Weight', rows:wRows });
+  // Illnesses
+  const ills = petArr('illnesses').filter(e=>inRange(e.start));
+  S.push({ t:'Illnesses', rows: ills.length ? ills.map(e=>fmtDate(e.start)+(e.recovery?' – '+fmtDate(e.recovery):' (ongoing)')+': '+(e.diagnosis||(e.symptoms||[]).join(', ')||'illness')+(e.severity?' · '+e.severity:'')) : ['None recorded'] });
+  // Unusual stools
+  const stools = petLogs('potty').filter(l=>l.dateTime && inRange(l.dateTime.slice(0,10)) && l.stool && l.stool !== 'Normal');
+  const byType = {}; stools.forEach(l=>{ byType[l.stool] = (byType[l.stool]||0)+1; });
+  S.push({ t:'Unusual stools', rows: stools.length ? [stools.length+' non-normal: '+Object.keys(byType).map(k=>k+' ×'+byType[k]).join(', '), 'Most recent: '+fmtDate(stools.sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0].dateTime)] : ['All normal'] });
+  // Meds & preventatives
+  const meds = petArr('meds');
+  S.push({ t:'Meds & preventatives', rows: meds.length ? meds.map(m=>{ const nd = medNextDue(m); const late = nd && nd < today; return m.name+(m.kind?' ('+m.kind+')':'')+(m.lastGiven?' — last '+fmtDate(m.lastGiven):'')+(nd?' — next '+fmtDate(nd)+(late?'  [OVERDUE]':''):''); }) : ['None tracked'] });
+  // Food
+  const foods = petArr('inventory').filter(i=>i.category==='Food');
+  const cur = foods.filter(i=>invStatus(i)==='In use').map(i=>((i.brand?i.brand+' ':'')+i.name).trim());
+  const started = foods.filter(i=>inRange(i.startDate)).map(i=>((i.brand?i.brand+' ':'')+i.name).trim()+' (started '+fmtDate(i.startDate)+')');
+  const fRows = [];
+  if(cur.length) fRows.push('Current: '+cur.join('; '));
+  if(started.length) fRows.push('Changed/opened since: '+started.join('; '));
+  if(!fRows.length) fRows.push('No food tracked');
+  S.push({ t:'Food', rows:fRows });
+  // New care records
+  const recs = petArr('records').filter(r=>inRange(r.date));
+  if(recs.length) S.push({ t:'New records', rows: recs.map(r=>fmtDate(r.date)+': '+(r.name||r.type||'record')+(r.result?' — '+r.result:'')) });
+  // Upcoming
+  const upRows = [];
+  petArr('vetVisits').forEach(v=>{ if(v.date && v.date > today) upRows.push(fmtDate(v.date)+': '+(v.reason||'vet visit')); if(v.followUpDate && v.followUpDate >= today) upRows.push(fmtDate(v.followUpDate)+': follow-up'+(v.reason?' ('+v.reason+')':'')); });
+  if(upRows.length) S.push({ t:'Upcoming', rows:upRows });
+  const header = p.name+' — vet prep, '+fmtDate(today)+'\n'+[ageStr(p.birthday,p.birthdayEstimated), p.breed, p.sex].filter(Boolean).join(' · ')
+    + '\nCovers: '+(last ? 'since the last visit, '+fmtDate(last.date)+(last.reason?' ('+last.reason+')':'') : 'all recorded history — no past vet visit logged');
+  _vetPrepText = header+'\n\n'+S.map(s=>s.t.toUpperCase()+'\n'+s.rows.map(r=>'- '+r).join('\n')).join('\n\n');
+  openModal('<h3>📋 Vet visit prep</h3>'
+    + '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:12px;line-height:1.5">'+esc(p.name)+' · '+[ageStr(p.birthday,p.birthdayEstimated), p.breed].filter(Boolean).map(esc).join(' · ')+'<br>Covers '+(last?('everything since the last visit — <strong>'+fmtDate(last.date)+'</strong>'+(last.reason?' ('+esc(last.reason)+')':'')):'all recorded history (no past vet visit logged)')+'.</div>'
+    + S.map(s=>'<div style="margin-bottom:12px"><div class="label" style="margin-bottom:2px">'+esc(s.t)+'</div>'+s.rows.map(r=>'<div style="font-size:13px;line-height:1.5;padding-left:2px">'+esc(r)+'</div>').join('')+'</div>').join('')
+    + '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="copyVetPrep()">📋 Copy as text</button><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+function copyVetPrep(){
+  if(navigator.clipboard && _vetPrepText){ navigator.clipboard.writeText(_vetPrepText).then(()=>showToast('📋 Copied — paste it anywhere')).catch(()=>showToast('⚠️ Couldn\'t copy')); }
+  else showToast('⚠️ Couldn\'t copy');
+}
 function renderVetTab(){
   const visits = petArr('vetVisits').slice().sort((a,b)=> vetSortAsc ? (new Date(dateSafe(a.date))-new Date(dateSafe(b.date))) : (new Date(dateSafe(b.date))-new Date(dateSafe(a.date))));
   const now = todayISO();
   const upcoming = visits.filter(v=>v.date > now), past = visits.filter(v=>v.date <= now);
   const followups = visits.filter(v=>v.followUpDate && v.followUpDate >= now);
-  let html = vetPanel() + (canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="vetModal()">+ Add vet visit</button></div>':'');
+  let html = vetPanel() + '<div class="card" style="padding:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">'
+    + (canManage()?'<button class="btn-primary" style="max-width:300px;flex:1;min-width:180px" onclick="vetModal()">+ Add vet visit</button>':'')
+    + '<button class="btn" style="flex:1;min-width:180px;max-width:300px" onclick="vetPrepModal()" title="A summary of everything since the last visit — weight change, illnesses, unusual stools, meds — ready to show or read to the vet">📋 Vet visit prep</button></div>';
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
   if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
@@ -3919,8 +4087,73 @@ function renderInsights(){
   html += '<div id="spend-card-wrap">'+renderSpendCard()+'</div>';
   // potty breakdown (range-selectable: 30d / 90d / YTD)
   html += '<div id="potty-card-wrap">'+renderPottyCard()+'</div>';
+  // Year in review launcher
+  if(petLogs().some(l=>l.dateTime)) html += '<div class="card" style="text-align:center;padding:18px"><button class="btn" style="max-width:320px" onclick="yearReviewModal()" title="A shareable card of the year — miles, meals, badges, milestones, spending">🎁 '+new Date().getFullYear()+' in review</button></div>';
   if(!feeds.length && !walks.length && weights.length<2 && !anySpend) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
   return html;
+}
+// ── Year in review — a shareable "wrapped" card for one calendar year ──
+function yearReviewModal(y){
+  if(!activePet()){ promptAddDog(); return; }
+  const p = activePet();
+  const years = [...new Set(petLogs().filter(l=>l.dateTime).map(l=>l.dateTime.slice(0,4)))].sort();
+  y = y || String(new Date().getFullYear());
+  const inY = ds => ds && String(ds).slice(0,4) === y;
+  const logsY = petLogs().filter(l=>inY(l.dateTime));
+  const walksY = logsY.filter(l=>l.type==='walk'), feedsY = logsY.filter(l=>l.type==='feed');
+  const miY = walksY.reduce((s,w)=>s+(num(w.distance)||0),0);
+  const walkMinY = walksY.reduce((s,w)=>s+(num(w.durationMin)||0),0);
+  const pottyY = logsY.filter(l=>l.type==='potty'), waterY = logsY.filter(l=>l.type==='water');
+  // badges crossed during this year = milestones between miles-before and miles-after
+  const miBefore = petLogs('walk').filter(l=>l.dateTime && l.dateTime.slice(0,4) < y).reduce((s,w)=>s+(num(w.distance)||0),0);
+  const newBadges = WALK_BADGES.filter(b => b.mi > miBefore && b.mi <= miBefore + miY);
+  const jY = petArr('journal').filter(n=>inY(n.dateTime));
+  const firstsY = jY.filter(n=>journalKind(n)==='first');
+  const spendY = petArr('vetVisits').filter(v=>inY(v.date)).reduce((s,v)=>s+(num(v.cost)||0),0)
+    + petArr('grooming').filter(g=>inY(g.date)).reduce((s,g)=>s+(num(g.cost)||0),0)
+    + petArr('inventory').filter(i=>inY(i.purchaseDate)).reduce((s,i)=>s+(num(i.cost)||0),0);
+  const spots = {}; pottyY.forEach(l=>{ const s=(l.place||'').trim(); if(s) spots[s]=(spots[s]||0)+1; });
+  const topSpot = Object.keys(spots).sort((a,b)=>spots[b]-spots[a])[0] || '';
+  const months = {}; logsY.forEach(l=>{ const m=l.dateTime.slice(0,7); months[m]=(months[m]||0)+1; });
+  const busyM = Object.keys(months).sort((a,b)=>months[b]-months[a])[0];
+  const busyLabel = busyM ? new Date(busyM+'-15T12:00').toLocaleDateString('en-US',{month:'long'}) : '';
+  const tile = (v,l,c) => '<div style="background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:12px 8px;text-align:center"><div style="font-family:JetBrains Mono,monospace;font-size:20px;font-weight:700;color:'+c+'">'+v+'</div><div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+l+'</div></div>';
+  const tiles = [];
+  if(walksY.length) tiles.push(tile(fmtMi(miY),'miles walked','var(--accent)'), tile(walksY.length,'walks','var(--accent-2)'));
+  if(walkMinY) tiles.push(tile(Math.round(walkMinY/60)+'h','time walking','var(--accent-2)'));
+  if(feedsY.length) tiles.push(tile(feedsY.length,'meals served','var(--success)'));
+  if(waterY.length) tiles.push(tile(waterY.length,'water refills','var(--blue)'));
+  if(pottyY.length) tiles.push(tile(pottyY.length,'potty breaks','var(--accent-purple)'));
+  if(newBadges.length) tiles.push(tile(newBadges.map(b=>b.icon).join(' '),'badge'+(newBadges.length===1?'':'s')+' earned','var(--accent)'));
+  if(firstsY.length) tiles.push(tile('🌟 '+firstsY.length,'first'+(firstsY.length===1?'':'s'),'var(--accent)'));
+  if(spendY) tiles.push(tile(money(spendY),'spent on the pup','var(--success)'));
+  if(topSpot) tiles.push(tile('📍','fav potty spot: '+esc(topSpot),'var(--accent-2)'));
+  if(busyLabel) tiles.push(tile(busyLabel,'busiest month','var(--accent-purple)'));
+  const yearBtns = years.length > 1 ? '<div class="tag-grid" style="margin-bottom:12px;justify-content:center">'+years.map(yy=>'<button class="tag'+(yy===y?' active':'')+'" type="button" onclick="closeModal();yearReviewModal(\''+yy+'\')">'+yy+'</button>').join('')+'</div>' : '';
+  openModal('<h3>🎁 Year in review</h3>'
+    + yearBtns
+    + '<div id="yir-card" style="background:var(--bg-card);border:1px solid var(--border);border-radius:16px;padding:20px 16px;text-align:center">'
+    + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent);margin-bottom:8px">':'<div style="font-size:40px">🐾</div>')
+    + '<div style="font-size:20px;font-weight:800">'+esc(p.name)+'’s '+y+'</div>'
+    + '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:14px">'+(firstsY.length && firstsY[0].title ? '“'+esc(firstsY[0].title)+'” and '+(logsY.length)+' logged moments' : logsY.length+' logged moments')+'</div>'
+    + (tiles.length ? '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">'+tiles.join('')+'</div>' : '<p style="font-size:13px;color:var(--text-secondary)">Nothing logged in '+y+' yet.</p>')
+    + '<div style="font-size:10px;color:var(--text-secondary);margin-top:14px">🐾 PawPrints</div>'
+    + '</div>'
+    + '<div style="display:flex;gap:10px;margin-top:14px"><button class="btn-primary" onclick="exportYearReviewPng(\''+y+'\')">📷 Save as image</button><button class="btn" onclick="closeModal()">Close</button></div>');
+}
+async function exportYearReviewPng(y){
+  const card = document.getElementById('yir-card'); if(!card) return;
+  try {
+    showToast('📷 Rendering image…');
+    await loadHtml2Canvas();
+    const bg = getComputedStyle(card).backgroundColor || '#0d1117';
+    const canvas = await html2canvas(card, { backgroundColor:bg, scale:2, useCORS:true, logging:false });
+    const pet = activePet(); const slug = pet && pet.name ? pet.name.trim().replace(/[^\w]+/g,'-').toLowerCase()+'-' : '';
+    const a = document.createElement('a');
+    a.href = canvas.toDataURL('image/png'); a.download = 'pawprints-'+slug+y+'-review.png';
+    document.body.appendChild(a); a.click(); a.remove();
+    showToast('📷 Saved image');
+  } catch(e){ showToast('⚠️ Couldn\'t export image'); }
 }
 // Spending breakdown card — vet / grooming / supplies within the selected range.
 function renderSpendCard(){

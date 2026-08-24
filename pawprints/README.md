@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.65.0**
+**Current Version: v0.66.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,18 @@ covers both.
 
 ## Version History
 
+- **v0.66.0** — **Five quality-of-life features in one drop.** (1) **On this day** — the Today page
+  surfaces journal entries from exactly N months or years ago today, so milestones come back to you.
+  (2) **Vet visit prep** — a button on Care → Vet builds a "since the last visit" summary (weight
+  change, illnesses, unusual stools, meds status, food changes, upcoming appointments) with one-tap
+  copy-as-text to show or send to the vet. (3) **Daily routine checklist** (opt-in, Settings → Lists
+  & preferences) — set your feed times and daily walk/water expectations and Today shows a checklist
+  that ticks itself off from your logs, with "overdue" tags on missed feed times. (4) **Walk helper**
+  — using the weather you already get, Today warns on hot-pavement days (85°+, with the 7-second
+  back-of-hand test) and freezing days (paw/salt care), and otherwise suggests the nicest walk window
+  in the next 12 hours. (5) **Year in review** — a 🎁 button on Insights builds a shareable card of
+  the year: miles, walks, meals, badges earned, firsts, favorite potty spot, busiest month, and total
+  spend — saveable as a PNG.
 - **v0.65.0** — **The Notes card grew into a real Journal & milestones diary.** Each entry now has a
   type — 🌟 **First** (first swim, first night out of the crate), 🏆 **Milestone**, ❤️ **Memory**,
   😂 **Funny moment**, or 📝 plain Note — plus an optional bold title ("First swim!") and the story
