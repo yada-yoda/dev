@@ -45,6 +45,24 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.151 — Class Action payouts post to Income automatically
+
+Logging a payout on a settlement now records it in the Income grid on its own,
+under **Other → Lawsuit**, dated to the payout — no more separate “+ Income”
+step (that button is gone). The income entry stays **linked** to the payout:
+edit the amount or date, or delete the payout, and the income entry follows.
+Deleting the whole settlement removes its posted income too.
+
+It’s safe on existing data: the first time you open Class Actions it back-fills
+income for payouts logged before this change, and if you’d already added one by
+hand it **adopts that entry instead of duplicating it**, so nothing is
+double-counted. Opening a linked income entry shows a note pointing you back to
+the Class Actions page to change the synced fields (amount/date); other fields
+like taxable and notes stay yours to edit.
+
+_If your “Other” income group doesn’t already have a class-action subcategory, a
+“Lawsuit” one is created for it._
+
 ### v1.0.150 — Duplicate a Class Action row
 
 Each row in **Class Actions** now has a **Duplicate** button, matching the one on

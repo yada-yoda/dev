@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.150';
+const VERSION = '1.0.151';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2645,6 +2645,14 @@ function incomeModal(existing) {
   const e = existing ? Object.assign({}, existing) : { status: 'received', taxable: 'unknown', date: todayISO() };
   const body = el('div', 'form-grid');
 
+  // Entries auto-posted from a Class Action payout are kept in sync with that
+  // payout — editing the amount/date here would be overwritten on the next sync.
+  if (e.srcSettlement) {
+    const note = el('div', 'form-hint-banner', '⚖ Linked to a Class Action payout. To change the amount or date, edit the payout on the Class Actions page — those fields re-sync from there. Other fields (taxable, notes) are safe to edit here.');
+    note.style.gridColumn = '1 / -1';
+    body.appendChild(note);
+  }
+
   const via = el('datalist'); via.id = 'via-list';
   ['Direct Deposit', 'PayPal', 'Venmo', 'Check', 'Bank transfer', 'Cash', 'Statement credit', 'Reinvested'].forEach(v => { const o = el('option'); o.value = v; via.appendChild(o); });
   body.appendChild(via);
@@ -3441,10 +3449,17 @@ function buildSettleCol(store, key) {
   }
   return null;
 }
+let _settleIncomeSynced = false;   // one-time-per-session reconcile of existing payouts → income
 function renderSettlements(view) {
   destroyCharts();
   const store = window.cloverStore, s = store.state;
   const all = s.settlements || [];
+  // First visit this session: back-fill Income for payouts logged before auto-post
+  // existed (idempotent + adopts prior manual entries, so it never double-counts).
+  if (!_settleIncomeSynced && ownerState() === 'owner') {
+    _settleIncomeSynced = true;
+    all.forEach(st => store.reconcileSettlementIncome(st).catch(() => {}));
+  }
   let rows = all.slice();
   if (settleStatusFilter !== 'all') rows = rows.filter(r => (r.status || 'Not submitted') === settleStatusFilter);
   if (settleBadgeFilter) {
@@ -3552,20 +3567,21 @@ function renderSettlements(view) {
     ...tableColKeys(store, 'settlements', SETTLE_COL_LABELS, SETTLE_DEFAULT_COLS).map(k => buildSettleCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => {
         const td = el('td', 'row-actions');
-        const inc = el('button', 'icon-btn', '+ Income'); inc.title = 'Record a payout from this settlement as income'; inc.addEventListener('click', () => settlementToIncome(r));
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => settlementModal(r));
         const dup = el('button', 'icon-btn', 'Duplicate');
         dup.title = 'Start a new claim prefilled from this one (filed date set to today; status, payouts, and history reset)';
         dup.addEventListener('click', () => {
           const pre = JSON.parse(JSON.stringify(r));
-          delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt;
+          delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt; delete pre.incomeYears;
           pre.dateFiled = todayISO();
           pre.status = 'Submitted';
           pre.payments = [];
           settlementModal(pre);
         });
-        const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeSettlement(r.id)));
-        td.appendChild(inc); td.appendChild(edit); td.appendChild(dup); td.appendChild(del); return td; } }
+        const del = el('button', 'icon-btn danger', 'Remove');
+        // Remove the settlement's auto-posted income first, then the settlement.
+        del.addEventListener('click', () => confirmRemove(r.name, async () => { await store.reconcileSettlementIncome(r, { remove: true }); store.removeSettlement(r.id); }));
+        td.appendChild(edit); td.appendChild(dup); td.appendChild(del); return td; } }
   ];
   const tcard = el('div', 'card table-card');
   tcard.appendChild(sortableTable(cols, rows, settleSort, ns => { settleSort = ns || { key: 'dateFiled', dir: 'desc' }; renderView(currentRoute); }, null));
@@ -3639,27 +3655,16 @@ function settlementModal(existing) {
         payments: r.payments.filter(p => (p.amount != null && p.amount !== '') || p.date).map(p => ({ id: p.id || ('pay' + Math.random().toString(36).slice(2)), date: p.date || '', amount: Number(p.amount) || 0, method: p.method || '' }))
       });
       store.saveSettlement(item);
+      // Auto-post its payouts into the Income grid (Other → Lawsuit), linked so
+      // edits/removals stay in sync. Fire-and-forget; it re-renders on completion.
+      const hadPay = (item.payments || []).some(p => Number(p.amount) > 0 && /^\d{4}/.test(p.date || ''));
+      store.reconcileSettlementIncome(item).then(() => { if (hadPay) toast('Payouts synced to Income'); }).catch(() => {});
       toast(isEdit ? 'Settlement updated' : 'Settlement added');
     }
   });
 }
 // Prefill the income modal from a settlement — records the latest payout (or the
 // estimate) under Other → Class Action Settlement. Never auto-saves.
-function settlementToIncome(st) {
-  const store = window.cloverStore, s = store.state;
-  const otherCat = s.incomeCategories.find(c => /^other$/i.test((c.name || '').trim())) || s.incomeCategories.find(c => /other/i.test(c.name || ''));
-  const caSub = otherCat && (otherCat.subs || []).find(su => /class action/i.test(su.name || ''));
-  const pays = (st.payments || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || ''));
-  const last = pays[pays.length - 1];
-  const amt = last ? last.amount : (st.expectedAmount != null ? st.expectedAmount : '');
-  incomeModal({
-    categoryId: otherCat ? otherCat.id : '', subId: caSub ? caSub.id : '',
-    otherType: 'Class Action Settlement', description: st.name || '',
-    gross: amt, net: amt, date: (last && last.date) || todayISO(),
-    receivedVia: (last && last.method) || st.method || '', status: 'received', taxable: 'yes'
-  });
-}
-
 // ============================================================
 // Help / Guide — a plain-language wiki explaining what every page is for.
 // KEEP THIS UPDATED when pages/features are added, changed, or removed.
@@ -3699,7 +3704,7 @@ const HELP_SECTIONS = [
       'Its first job: search to check whether you already submitted to a settlement before filing again.',
       'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
       'Each row has a Duplicate button — handy when a new settlement shares most of the same details. It prefills a fresh claim from that row with the filed date set to today and the status, payouts, and history reset, so you just adjust what’s different and save.',
-      '“+ Income” records a payout as income under Other → Class Action Settlement — nothing is added to income automatically.',
+      'Each payout you log on a settlement is posted to the Income grid automatically, under Other → Lawsuit, dated to the payout. It stays linked: edit or remove the payout and its income entry follows. (Opening that income entry shows a note pointing you back here to change the amount or date.)',
       'Import your existing list from a CSV on the Import / Export page (a template is provided), or with the ⬆ Import button here.'
     ] },
   { id: 'expenses', ico: '▼', title: 'Expenses', what: 'Your actual, one-off spending (cash-basis).',

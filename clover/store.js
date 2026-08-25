@@ -258,7 +258,7 @@ function migrateCdStarts(accounts) {
   return changed;
 }
 
-const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy', 'balanceAsOf', 'cdPrincipalAsOf', 'cdStartEst', 'cdTermEst']);
+const HISTORY_SKIP = new Set(['id', 'createdAt', 'updatedAt', 'history', 'batchId', 'priceHistory', 'cdRenewals', 'cdFundedBy', 'balanceAsOf', 'cdPrincipalAsOf', 'cdStartEst', 'cdTermEst', 'incomeYears', 'srcSettlement', 'srcPayment']);
 const HISTORY_MAX = 25;
 function histSnap(v) {
   if (v == null || v === '') return '';
@@ -565,6 +565,80 @@ window.cloverStore = {
     scheduleSave(); notify(); return item;
   },
   removeSettlement(id) { state.settlements = state.settlements.filter(x => x.id !== id); scheduleSave(); notify(); },
+
+  // Target for auto-posted class-action payouts: Other → a class-action sub.
+  // Prefers a "Lawsuit" sub, then any class-action/settlement sub, and creates a
+  // "Lawsuit" sub if none exists so payouts always have a home in the grid.
+  _classActionIncomeTarget() {
+    const cats = state.incomeCategories || [];
+    const other = cats.find(c => /^other$/i.test((c.name || '').trim())) || cats.find(c => /other/i.test(c.name || ''));
+    if (!other) return { cat: null, sub: null };
+    if (!Array.isArray(other.subs)) other.subs = [];
+    let sub = other.subs.find(s => /lawsuit/i.test(s.name || ''))
+           || other.subs.find(s => /class.?action|settlement/i.test(s.name || ''));
+    if (!sub) { sub = { id: mkId('sub'), name: 'Lawsuit' }; other.subs.push(sub); scheduleSave(); }
+    return { cat: other, sub };
+  },
+  // Mirror a settlement's payouts into the Income grid as linked entries
+  // (srcSettlement + srcPayment), one per valid payout, under Other → Lawsuit.
+  // Idempotent: updates the matching linked entry, removes ones whose payout was
+  // deleted/moved to another year, and ADOPTS a matching pre-existing manual
+  // entry (same amount+date) instead of creating a duplicate. Pass {remove:true}
+  // to strip all of a settlement's linked income (used before deletion).
+  async reconcileSettlementIncome(st, opts) {
+    if (!state._uid || !st || !st.id) return;
+    const remove = !!(opts && opts.remove);
+    const { cat, sub } = this._classActionIncomeTarget();
+    if (!cat) return;
+    const yearOf = p => (p.date || '').slice(0, 4);
+    const valid = remove ? [] : (st.payments || []).filter(p => p && p.id && /^\d{4}/.test(p.date || '') && Number(p.amount) > 0);
+    const desiredYears = [...new Set(valid.map(yearOf))];
+    const prevYears = Array.isArray(st.incomeYears) ? st.incomeYears.map(String) : [];
+    const years = [...new Set([...desiredYears, ...prevYears])];
+    for (const y of years) {
+      await this.loadYear(y);
+      const d = state.years[String(y)]; if (!d) continue;
+      if (!Array.isArray(d.income)) d.income = [];
+      const want = valid.filter(p => yearOf(p) === y);
+      const wantIds = new Set(want.map(p => p.id));
+      let changed = false;
+      // Drop linked entries whose payout no longer lives in this year.
+      const before = d.income.length;
+      d.income = d.income.filter(e => !(e.srcSettlement === st.id && !wantIds.has(e.srcPayment)));
+      if (d.income.length !== before) changed = true;
+      // Upsert one linked income entry per payout.
+      want.forEach(p => {
+        const amt = Number(p.amount) || 0;
+        let e = d.income.find(x => x.srcSettlement === st.id && x.srcPayment === p.id);
+        if (!e) {
+          // Adopt a matching manual "+ Income" entry rather than duplicating it.
+          e = d.income.find(x => !x.srcSettlement && x.categoryId === cat.id
+            && Math.round((Number(x.gross) || 0) * 100) === Math.round(amt * 100)
+            && (x.date || '') === (p.date || '')
+            && ((x.description || '') === (st.name || '') || /class.?action|lawsuit|settlement/i.test(x.otherType || '') || x.subId === sub.id));
+        }
+        const isNew = !e;
+        const base = e || { id: mkId('inc'), status: 'received', taxable: 'yes' };
+        Object.assign(base, {
+          categoryId: cat.id, subId: sub.id,
+          otherType: base.otherType || 'Class Action Settlement',
+          description: st.name || base.description || 'Class action payout',
+          gross: amt, net: amt, date: p.date,
+          receivedVia: base.receivedVia || p.method || st.method || '',
+          srcSettlement: st.id, srcPayment: p.id
+        });
+        stampSaved(base);
+        if (isNew) d.income.push(base);
+        changed = true;
+      });
+      if (changed) this.scheduleSaveYear(y);
+    }
+    const newYears = desiredYears.slice().sort();
+    if (JSON.stringify(newYears) !== JSON.stringify(prevYears.slice().sort())) {
+      st.incomeYears = newYears; scheduleSave();
+    }
+    notify();
+  },
 
   // --- credit scores + savings-rate history (Phase 5, meta doc, cross-year) ---
   saveCreditScore(entry) {
