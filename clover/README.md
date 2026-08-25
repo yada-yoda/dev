@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.150 — Duplicate a Class Action row
+
+Each row in **Class Actions** now has a **Duplicate** button, matching the one on
+the Expenses list. It opens a new claim prefilled from that row — useful when a
+new settlement shares most of the same details — with the filed date set to today
+and the status, payouts, and edit history reset, so you only change what’s
+different and save.
+
 ### v1.0.149 — Search the Expenses list (and the top-right box now works)
 
 The Expenses **List** view has a live **Search** box — find a vendor, description,

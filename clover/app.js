@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.149';
+const VERSION = '1.0.150';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3554,8 +3554,18 @@ function renderSettlements(view) {
         const td = el('td', 'row-actions');
         const inc = el('button', 'icon-btn', '+ Income'); inc.title = 'Record a payout from this settlement as income'; inc.addEventListener('click', () => settlementToIncome(r));
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => settlementModal(r));
+        const dup = el('button', 'icon-btn', 'Duplicate');
+        dup.title = 'Start a new claim prefilled from this one (filed date set to today; status, payouts, and history reset)';
+        dup.addEventListener('click', () => {
+          const pre = JSON.parse(JSON.stringify(r));
+          delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt;
+          pre.dateFiled = todayISO();
+          pre.status = 'Submitted';
+          pre.payments = [];
+          settlementModal(pre);
+        });
         const del = el('button', 'icon-btn danger', 'Remove'); del.addEventListener('click', () => confirmRemove(r.name, () => store.removeSettlement(r.id)));
-        td.appendChild(inc); td.appendChild(edit); td.appendChild(del); return td; } }
+        td.appendChild(inc); td.appendChild(edit); td.appendChild(dup); td.appendChild(del); return td; } }
   ];
   const tcard = el('div', 'card table-card');
   tcard.appendChild(sortableTable(cols, rows, settleSort, ns => { settleSort = ns || { key: 'dateFiled', dir: 'desc' }; renderView(currentRoute); }, null));
@@ -3688,6 +3698,7 @@ const HELP_SECTIONS = [
     points: [
       'Its first job: search to check whether you already submitted to a settlement before filing again.',
       'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
+      'Each row has a Duplicate button — handy when a new settlement shares most of the same details. It prefills a fresh claim from that row with the filed date set to today and the status, payouts, and history reset, so you just adjust what’s different and save.',
       '“+ Income” records a payout as income under Other → Class Action Settlement — nothing is added to income automatically.',
       'Import your existing list from a CSV on the Import / Export page (a template is provided), or with the ⬆ Import button here.'
     ] },
