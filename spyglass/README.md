@@ -127,6 +127,13 @@ curl -X POST https://spyglass-worker.sevendwarfs.workers.dev/trigger -H "x-trigg
 
 ## Changelog
 
+### v0.9.6 (worker v0.9.2)
+Cards show "Last change: <date, time>" (or "No changes detected yet"). The worker stamps
+`lastChangedAt` on the monitor doc whenever a change is recorded; existing monitors were backfilled
+from their newest changed snapshot. (v0.9.5 restacked cards on mobile — screenshot on top, info
+below, actions row; v0.9.2–v0.9.4 polished the Render toggle + added its tooltip and a regex101
+link.)
+
 ### v0.9.1 (worker v0.9.1)
 Added longer check-frequency options (every 2 days, 3 days, weekly, every 2 weeks, monthly) for
 slow-changing pages. `freqLabel` renders multi-day/week/month intervals cleanly. After an *error*,

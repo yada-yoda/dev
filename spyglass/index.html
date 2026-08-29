@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
-<title>Spyglass v0.9.5 — watch any web page for changes</title>
+<title>Spyglass v0.9.6 — watch any web page for changes</title>
 <meta name="description" content="Spyglass watches web pages and emails you when they change. Your own personal page-change monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -436,6 +436,7 @@
     <header><h3>What's new</h3><button class="btn ghost" data-close>&times;</button></header>
     <div class="body">
       <ul class="changelog">
+        <li><strong>v0.9.6</strong> — Each monitor card now shows when the last change was detected, with the full date and time (&ldquo;Last change: Aug 11, 9:50 AM&rdquo;) — or &ldquo;No changes detected yet.&rdquo; Existing monitors were backfilled from their history.</li>
         <li><strong>v0.9.5</strong> — Mobile layout fix: monitor cards now stack on phones — screenshot full-width on top, name and details below it, action buttons on their own row with bigger tap targets — instead of squeezing everything into one cramped column.</li>
         <li><strong>v0.9.4</strong> — Added a <em>regex101</em> link (pre-set to Spyglass's regex flavor) next to the pattern builder, for anyone who wants to hand-craft or test a tricky pattern. Most people can still just use &ldquo;Build it for me.&rdquo;</li>
         <li><strong>v0.9.3</strong> — Made the &ldquo;Render in a browser&rdquo; option clearer: an &#9432; tooltip and plainer wording explain that you can usually leave it off — the Test button turns it on for you when a page actually needs it.</li>
@@ -473,7 +474,7 @@
     messagingSenderId: "77811070485",
     appId: "1:77811070485:web:db0524ff89c33c49cc401c"
   };
-  const APP_VERSION = "0.9.5";
+  const APP_VERSION = "0.9.6";
   // Admin account (uid is public-equivalent — it's just the Firebase auth
   // subject; all enforcement lives in Firestore security rules).
   const ADMIN_UID = "HWXl8ZWQ4qPybl3kZmm6PoUHdHE3";
@@ -508,6 +509,15 @@ function fmtAgo(ts){
   if(s < 3600) return Math.floor(s/60) + "m ago";
   if(s < 86400) return Math.floor(s/3600) + "h ago";
   return Math.floor(s/86400) + "d ago";
+}
+/* Absolute date+time for "Last change" — year shown only when it differs
+   from the current year, e.g. "Jul 12, 8:32 PM" / "Dec 3, 2025, 4:10 PM". */
+function fmtDateTime(ts){
+  const d = new Date((typeof ts === "number") ? ts : (ts.toMillis ? ts.toMillis() : Date.parse(ts)));
+  if(!Number.isFinite(d.getTime())) return "";
+  const opts = { month:"short", day:"numeric", hour:"numeric", minute:"2-digit" };
+  if(d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  return d.toLocaleString("en-US", opts);
 }
 function domainOf(u){ try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return u; } }
 function favOf(u){ try{ return "https://www.google.com/s2/favicons?sz=64&domain=" + new URL(u).hostname; }catch(e){ return ""; } }
@@ -557,12 +567,13 @@ function demoData(){
   return [
     {id:"d1", name:"GPU restock page", url:"https://example.com/gpu", type:"keyword", keyword:"In stock",
      frequencyMinutes:15, enabled:true, lastStatus:"changed", changeCount:3, lastCheckedAt:now-1000*60*4,
-     lastContent:'Keyword "In stock": present'},
+     lastChangedAt:now-1000*60*4, lastContent:'Keyword "In stock": present'},
     {id:"d2", name:"Apartment listing", url:"https://example.com/rentals/123", type:"pattern", pattern:"\\$([\\d,]+)/mo",
      frequencyMinutes:60, enabled:true, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*40,
      lastContent:"$1,850/mo"},
     {id:"d3", name:"Company careers", url:"https://example.com/careers", type:"text",
-     frequencyMinutes:1440, enabled:true, lastStatus:"changed", changeCount:1, lastCheckedAt:now-1000*60*60*6},
+     frequencyMinutes:1440, enabled:true, lastStatus:"changed", changeCount:1, lastCheckedAt:now-1000*60*60*6,
+     lastChangedAt:now-1000*60*60*6},
     {id:"d4", name:"Terms of service", url:"https://example.com/tos", type:"text",
      frequencyMinutes:1440, enabled:false, lastStatus:"unchanged", changeCount:0, lastCheckedAt:now-1000*60*60*30},
     {id:"d5", name:"Status page", url:"https://example.com/status", type:"keyword", keyword:"operational",
@@ -698,6 +709,7 @@ function renderCard(m){
         ${val ? `<div class="val">${escapeHtml(val)}</div>` : ""}
         <div class="url">${escapeHtml(m.url)}</div>
         <div class="sub">Checks every ${freqLabel(m.frequencyMinutes)} &middot; last ${fmtAgo(m.lastCheckedAt)} &middot; ${m.changeCount||0} change${(m.changeCount||0)===1?"":"s"}</div>
+        <div class="sub">${m.lastChangedAt ? "Last change: " + fmtDateTime(m.lastChangedAt) : "No changes detected yet"}</div>
       </div>
       ${statusPill(m)}
       <div class="actions">
