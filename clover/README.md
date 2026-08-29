@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.152 — Quick Notes on each Class Action
+
+Each Class Action row now has a **Notes** button — a fast way to jot or read a
+note for that claim (deadlines, correlation IDs, follow-ups) without opening the
+full Edit form. Rows that already have a note show a 📝 on the button. It’s the
+same note that was always on the Edit form and can be shown as a “Notes” column
+via ⚙ Columns — just far easier to find now.
+
 ### v1.0.151 — Class Action payouts post to Income automatically
 
 Logging a payout on a settlement now records it in the Income grid on its own,

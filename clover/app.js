@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.151';
+const VERSION = '1.0.152';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3568,6 +3568,9 @@ function renderSettlements(view) {
     { label: '', sortable: false, cell: r => {
         const td = el('td', 'row-actions');
         const edit = el('button', 'icon-btn', 'Edit'); edit.addEventListener('click', () => settlementModal(r));
+        const notesBtn = el('button', 'icon-btn' + (r.notes ? ' has-note' : ''), (r.notes ? '📝 ' : '') + 'Notes');
+        notesBtn.title = r.notes ? ('Note: ' + firstLine(r.notes)) : 'Add a note to this class action';
+        notesBtn.addEventListener('click', () => settlementNotesModal(r));
         const dup = el('button', 'icon-btn', 'Duplicate');
         dup.title = 'Start a new claim prefilled from this one (filed date set to today; status, payouts, and history reset)';
         dup.addEventListener('click', () => {
@@ -3581,11 +3584,32 @@ function renderSettlements(view) {
         const del = el('button', 'icon-btn danger', 'Remove');
         // Remove the settlement's auto-posted income first, then the settlement.
         del.addEventListener('click', () => confirmRemove(r.name, async () => { await store.reconcileSettlementIncome(r, { remove: true }); store.removeSettlement(r.id); }));
-        td.appendChild(edit); td.appendChild(dup); td.appendChild(del); return td; } }
+        td.appendChild(edit); td.appendChild(notesBtn); td.appendChild(dup); td.appendChild(del); return td; } }
   ];
   const tcard = el('div', 'card table-card');
   tcard.appendChild(sortableTable(cols, rows, settleSort, ns => { settleSort = ns || { key: 'dateFiled', dir: 'desc' }; renderView(currentRoute); }, null));
   view.appendChild(tcard);
+}
+// Quick per-row note editor — a focused way to jot/read notes without opening the
+// full Edit form. Writes the same `notes` field (also editable under Edit and
+// showable as the optional Notes column).
+function settlementNotesModal(existing) {
+  const store = window.cloverStore;
+  if (!existing || !existing.id) return settlementModal(existing);
+  const ta = document.createElement('textarea');
+  ta.value = existing.notes || ''; ta.rows = 7;
+  ta.placeholder = 'Deadlines, correlation IDs, follow-ups, what you claimed — anything worth keeping.';
+  const body = el('div', 'form-grid');
+  body.appendChild(field('Notes for “' + (existing.name || 'this class action') + '”', ta, 'Freeform notes kept on this class action. Also editable from Edit, and available as a “Notes” column via the ⚙ Columns button.'));
+  setTimeout(() => { try { ta.focus(); const L = ta.value.length; ta.setSelectionRange(L, L); } catch (e) {} }, 0);
+  openModal({
+    title: 'Notes', body, confirmLabel: 'Save',
+    onConfirm: () => {
+      const item = Object.assign({}, existing, { notes: ta.value.trim() });
+      store.saveSettlement(item);
+      toast('Notes saved');
+    }
+  });
 }
 function settlementModal(existing) {
   const store = window.cloverStore, s = store.state;
@@ -3703,6 +3727,7 @@ const HELP_SECTIONS = [
     points: [
       'Its first job: search to check whether you already submitted to a settlement before filing again.',
       'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
+      'Each row has a Notes button (📝 when a note exists) for quick freeform notes on that class action — the same notes are on the Edit form and can be shown as a “Notes” column via ⚙ Columns.',
       'Each row has a Duplicate button — handy when a new settlement shares most of the same details. It prefills a fresh claim from that row with the filed date set to today and the status, payouts, and history reset, so you just adjust what’s different and save.',
       'Each payout you log on a settlement is posted to the Income grid automatically, under Other → Lawsuit, dated to the payout. It stays linked: edit or remove the payout and its income entry follows. (Opening that income entry shows a note pointing you back here to change the amount or date.)',
       'Import your existing list from a CSV on the Import / Export page (a template is provided), or with the ⬆ Import button here.'
