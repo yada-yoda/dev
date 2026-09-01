@@ -106,7 +106,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.9.1"
+SITE_VERSION = "v0.10.0"
 
 
 # ---------- helpers ----------
@@ -1163,18 +1163,64 @@ def gen_socials(socials, email_subject=""):
     )
 
 
+def embed_url(url):
+    """Normalize a YouTube/Vimeo link to its embeddable form.
+
+    People paste whatever the browser address bar shows, but a watch or
+    share URL cannot be framed - YouTube and Vimeo both refuse it, so the
+    reel would render as a blank box. Convert the common shapes; anything
+    already an /embed/ or player. URL (or an unrecognized host) passes
+    through untouched.
+    """
+    u = (url or "").strip()
+    if not u:
+        return ""
+
+    # youtu.be/VIDEOID
+    m = re.match(r"https?://(?:www\.)?youtu\.be/([\w-]+)", u)
+    if m:
+        return f"https://www.youtube.com/embed/{m.group(1)}"
+
+    # youtube.com/watch?v=VIDEOID  (and /shorts/, /live/)
+    m = re.match(r"https?://(?:www\.)?youtube\.com/watch\?(?:.*&)?v=([\w-]+)", u)
+    if m:
+        return f"https://www.youtube.com/embed/{m.group(1)}"
+    m = re.match(r"https?://(?:www\.)?youtube\.com/(?:shorts|live)/([\w-]+)", u)
+    if m:
+        return f"https://www.youtube.com/embed/{m.group(1)}"
+
+    # vimeo.com/VIDEOID  (optionally /HASH for unlisted videos)
+    m = re.match(r"https?://(?:www\.)?vimeo\.com/(\d+)(?:/(\w+))?", u)
+    if m:
+        vid, h = m.group(1), m.group(2)
+        return f"https://player.vimeo.com/video/{vid}" + (f"?h={h}" if h else "")
+
+    return u
+
+
 def gen_reel(contact):
     r = contact["reel"]
-    if r.get("url"):
+    url = (r.get("url") or "").strip()
+    fil = (r.get("file") or "").strip()
+
+    # `source` makes the choice explicit so the unused field can stay
+    # populated. Fall back to the old url-wins-then-file behaviour when
+    # source is absent (older data files).
+    source = str(r.get("source") or "").strip().lower()
+    if source not in {"file", "embed", "none"}:
+        source = "embed" if url else ("file" if fil else "none")
+
+    if source == "embed" and url:
         return (
             f'\n      <div class="reel">\n'
-            f'        <iframe src="{esc(r["url"])}" allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>\n'
+            f'        <iframe src="{esc(embed_url(url))}" title="Acting reel" '
+            f'allow="autoplay; fullscreen; picture-in-picture" allowfullscreen></iframe>\n'
             f'      </div>\n      '
         )
-    if r.get("file"):
+    if source == "file" and fil:
         return (
             f'\n      <div class="reel">\n'
-            f'        <video controls playsinline preload="metadata"><source src="{esc(r["file"])}" type="video/mp4"></video>\n'
+            f'        <video controls playsinline preload="metadata"><source src="{esc(fil)}" type="video/mp4"></video>\n'
             f'      </div>\n      '
         )
     return (

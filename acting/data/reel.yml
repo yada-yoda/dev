@@ -1,9 +1,25 @@
-# Reel embed in the Credits section. URL wins over file if both are set.
-# Leave both empty to show the "Reel coming soon" placeholder.
+# Reel embed in the Credits section - edited via Decap CMS at /acting/admin/.
 #
-# The committed file is a web-compressed copy (1080p, CRF 26, faststart)
+# `source` decides which of the two below is actually used, so switching
+# between a self-hosted file and a YouTube/Vimeo embed is one dropdown
+# rather than remembering to clear the other field:
+#
+#   file   - play the uploaded MP4 in `file`
+#   embed  - show the YouTube / Vimeo player from `url`
+#   none   - show the `placeholder` text instead
+#
+# Whichever you are not using can stay filled in; it is simply ignored,
+# so you can flip back and forth without losing the other setting.
+#
+# `url` accepts a normal watch/share link (youtube.com/watch?v=...,
+# youtu.be/..., vimeo.com/...) - the build converts it to the proper
+# embed form automatically.
+#
+# The committed MP4 is a web-compressed copy (1080p, CRF 26, faststart)
 # of the master export. Keep the master out of the repo - see .gitignore.
 
-url: ""              # e.g. "https://player.vimeo.com/video/12345678" or a YouTube embed URL
+source: "file"
+
+url: ""
 file: "assets/reel/frank-rizzo-reel.mp4"
 placeholder: "Reel coming soon"

@@ -530,16 +530,28 @@ collections:
         label: "Reel"
         name: "reel"
         fields:
-          - label: "Reel URL"
-            name: "url"
-            widget: "string"
-            required: false
-            hint: "Vimeo or YouTube embed URL, e.g. https://player.vimeo.com/video/12345678. Leave blank to use a file upload below."
-          - label: "Reel file (upload)"
+          - label: "Which reel to show"
+            name: "source"
+            widget: "select"
+            default: "file"
+            hint: "Pick where the reel plays from. Whichever field you are NOT using can stay filled in - it is just ignored - so you can switch back and forth without losing the other setting."
+            options:
+              - { label: "Uploaded video file",        value: "file" }
+              - { label: "YouTube / Vimeo link",       value: "embed" }
+              - { label: "Nothing yet (placeholder)",  value: "none" }
+
+          - label: "Uploaded video file"
             name: "file"
             widget: "file"
             required: false
             media_folder: "/acting/assets/reel"
             public_folder: "/acting/assets/reel"
-            hint: "Optional: upload an MP4 directly. URL above wins if both are set."
-          - { label: "Placeholder text (when no reel set)", name: "placeholder", widget: "string", default: "Reel coming soon" }
+            hint: "Used when 'Which reel to show' is set to Uploaded video file. Upload an MP4. Keep it web-sized - roughly 5-8MB for a 30-second reel; very large files are slow to load."
+
+          - label: "YouTube / Vimeo link"
+            name: "url"
+            widget: "string"
+            required: false
+            hint: "Used when 'Which reel to show' is set to YouTube / Vimeo link. Paste the normal link from your browser (youtube.com/watch?v=..., youtu.be/..., or vimeo.com/...) - it is converted to the correct embed form automatically."
+
+          - { label: "Placeholder text", name: "placeholder", widget: "string", default: "Reel coming soon", hint: "Shown when 'Which reel to show' is set to Nothing yet." }
