@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.152';
+const VERSION = '1.0.153';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3769,7 +3769,8 @@ const HELP_SECTIONS = [
     points: [
       'Chart your credit scores over time by provider. Adding a score, the provider is a dropdown of the ones you’ve used before (plus common ones); pick “Add new provider…” to enter a different one.',
       'All-time and current-year high/low cards sit above the chart — like a stock’s range — each naming the provider that reported it (credit models differ between providers, so the source matters).',
-      'Log savings APYs per bank — the bank is a dropdown of ones you’ve logged (plus your Settings list), with “Add new institution…” to enter another. All-time and current-year high/low cards sit above the chart, each naming the bank. Some banks (e.g. Synchrony) can auto-sync from a public rate feed.'
+      'Log savings APYs per bank — the bank is a dropdown of ones you’ve logged (plus your Settings list), with “Add new institution…” to enter another. All-time and current-year high/low cards sit above the chart, each naming the bank. Some banks (e.g. Synchrony) can auto-sync from a public rate feed.',
+      'Each score and rate row has a Duplicate button — a quick way to log the next reading for the same provider or bank: it prefills a new entry from that row with the date set to today, so you just update the number.'
     ] },
   { id: 'taxes', ico: '§', title: 'Taxes', what: 'Your tax-filing history.',
     points: ['Record each year’s forms, whether you got a refund or owed, prep cost, and preparer — original filings and amendments.'] },
@@ -6112,7 +6113,7 @@ function renderCreditTab(view) {
 
   const cols = [
     ...tableColKeys(store, 'credit', CREDIT_COL_LABELS, CREDIT_ALL_COLS).map(k => buildCreditCol(store, k)).filter(Boolean),
-    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => creditScoreModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + (r.provider || 'score'), () => store.removeCreditScore(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
+    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => creditScoreModal(r)); const dup = el('button', 'icon-btn', 'Duplicate'); dup.title = 'Add a new score prefilled from this one (same provider, date set to today)'; dup.addEventListener('click', () => { const pre = Object.assign({}, r); delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt; pre.date = todayISO(); creditScoreModal(pre); }); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + (r.provider || 'score'), () => store.removeCreditScore(r.id))); td.appendChild(e); td.appendChild(dup); td.appendChild(d); return td; } }
   ];
   view.appendChild(tableTools(columnsButton('credit', CREDIT_ALL_COLS, CREDIT_ALL_COLS, CREDIT_COL_LABELS, 'Credit score columns')));
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.creditScores, creditSort, ns => { creditSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null)); view.appendChild(card);
@@ -6237,7 +6238,7 @@ function renderRatesTab(view) {
 
   const cols = [
     ...tableColKeys(store, 'rates', RATES_COL_LABELS, RATES_ALL_COLS).map(k => buildRatesCol(store, k)).filter(Boolean),
-    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(d); return td; } }
+    { label: '', sortable: false, cell: r => { const td = el('td', 'row-actions'); const e = el('button', 'icon-btn', 'Edit'); e.addEventListener('click', () => rateModal(r)); const dup = el('button', 'icon-btn', 'Duplicate'); dup.title = 'Add a new rate prefilled from this one (same bank, date set to today)'; dup.addEventListener('click', () => { const pre = Object.assign({}, r); delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt; pre.date = todayISO(); rateModal(pre); }); const d = el('button', 'icon-btn danger', 'Remove'); d.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + rateInstitution(store, r), () => store.removeRate(r.id))); td.appendChild(e); td.appendChild(dup); td.appendChild(d); return td; } }
   ];
   view.appendChild(tableTools.apply(null, rateSyncButtons(store).concat([columnsButton('rates', RATES_ALL_COLS, RATES_ALL_COLS, RATES_COL_LABELS, 'Savings rate columns')])));
   const card = el('div', 'card table-card'); card.appendChild(sortableTable(cols, s.rateHistory, rateSort, ns => { rateSort = ns || { key: 'date', dir: 'desc' }; renderView(currentRoute); }, null)); view.appendChild(card);
@@ -6268,13 +6269,14 @@ function creditScoreModal(existing) {
   body.appendChild(field('Score', fScore, 'The credit score number (usually 300–850).'));
   body.appendChild(field('Provider', provNode, 'Who reported it — pick one you’ve logged before, or “Add new provider…” to enter another (Credit Karma, a bureau, myFICO, etc.). Each provider is charted as its own line.'));
 
+  const isEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit score' : 'Add score', body: withHistoryTab(body, existing), confirmLabel: 'Save',
+    title: isEdit ? 'Edit score' : 'Add score', body: withHistoryTab(body, isEdit ? existing : null), confirmLabel: 'Save',
     onConfirm: () => {
       const score = parseInt(fScore.value, 10);
       if (isNaN(score)) { fScore.focus(); toast('Score is required', 'warn'); return false; }
       store.saveCreditScore(Object.assign(r, { date: fDate.value || todayISO(), score, provider: provVal() }));
-      toast(existing ? 'Score updated' : 'Score added');
+      toast(isEdit ? 'Score updated' : 'Score added');
     }
   });
 }
@@ -6304,8 +6306,9 @@ function rateModal(existing) {
   body.appendChild(field('Bank / institution', instNode, 'Which bank the APY is for (e.g. Ally, Synchrony). Rates are tracked per institution and each is charted as its own line. Pick one you’ve logged before, or “Add new institution…” to enter another; manage the full list in Settings.'));
   body.appendChild(field('APY %', fApy, 'The annual percentage yield at that date.'));
 
+  const isEdit = !!(existing && existing.id);
   openModal({
-    title: existing ? 'Edit rate' : 'Add rate', body: withHistoryTab(body, existing), confirmLabel: 'Save',
+    title: isEdit ? 'Edit rate' : 'Add rate', body: withHistoryTab(body, isEdit ? existing : null), confirmLabel: 'Save',
     onConfirm: () => {
       const inst = instVal();
       if (!inst) { fInstSel.focus(); toast('Enter a bank / institution', 'warn'); return false; }
@@ -6314,7 +6317,7 @@ function rateModal(existing) {
       const entry = Object.assign(r, { date: fDate.value || todayISO(), institution: inst, apy });
       delete entry.accountId;   // migrate any legacy account-based entry
       store.saveRate(entry);
-      toast(existing ? 'Rate updated' : 'Rate added');
+      toast(isEdit ? 'Rate updated' : 'Rate added');
     }
   });
 }

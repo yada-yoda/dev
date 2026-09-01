@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.153 — Duplicate a credit score or savings-rate row
+
+Each row on **Credit & Rates** (both the credit-score and savings-APY tables)
+now has a **Duplicate** button — the quick way to log the next reading for the
+same provider or bank. It prefills a new entry from that row with the date set
+to today, so you just update the number and Save.
+
 ### v1.0.152 — Quick Notes on each Class Action
 
 Each Class Action row now has a **Notes** button — a fast way to jot or read a
