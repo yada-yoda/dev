@@ -106,7 +106,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.9.0"
+SITE_VERSION = "v0.9.1"
 
 
 # ---------- helpers ----------
@@ -1174,7 +1174,7 @@ def gen_reel(contact):
     if r.get("file"):
         return (
             f'\n      <div class="reel">\n'
-            f'        <video controls preload="metadata"><source src="{esc(r["file"])}" type="video/mp4"></video>\n'
+            f'        <video controls playsinline preload="metadata"><source src="{esc(r["file"])}" type="video/mp4"></video>\n'
             f'      </div>\n      '
         )
     return (
