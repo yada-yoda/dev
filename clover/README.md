@@ -45,6 +45,13 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.154 — Distinct colors for Expenses list badges
+
+On the Expenses list, the **Category**, **Source**, and **Paid from** pills now
+each have their own color (blue-gray, purple, and teal) instead of Source and
+Paid from both being plain gray — so the columns are easier to tell apart at a
+glance, matching how badges are colored on the other list pages.
+
 ### v1.0.153 — Duplicate a credit score or savings-rate row
 
 Each row on **Credit & Rates** (both the credit-score and savings-APY tables)

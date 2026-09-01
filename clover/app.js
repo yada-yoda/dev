@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.153';
+const VERSION = '1.0.154';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -4257,11 +4257,11 @@ function buildExpenseListCol(store, key) {
         return td; } };
     case 'source': return { label: 'Source', key: 'source', value: r => store.subName('expense', r.categoryId, r.subId) || '', cell: r => {
         const td = el('td'); const n = store.subName('expense', r.categoryId, r.subId);
-        if (n) td.appendChild(expenseFilterBadge('source', n, '')); else td.textContent = '—';
+        if (n) td.appendChild(expenseFilterBadge('source', n, 'purple')); else td.textContent = '—';
         return td; } };
     case 'account': return { label: 'Paid from', key: 'account', value: r => store.accountName(r.accountId) || '', cell: r => {
         const td = el('td'); const n = store.accountName(r.accountId);
-        if (n && n !== '—') td.appendChild(expenseFilterBadge('account', n, '')); else td.textContent = '—';
+        if (n && n !== '—') td.appendChild(expenseFilterBadge('account', n, 'teal')); else td.textContent = '—';
         if (r.checkNo) td.appendChild(el('div', 'acct-sub', 'Check #' + r.checkNo));
         // Transfers (savings/investment) show where the money landed.
         if (r.toAccountId) { const t = el('div', 'acct-sub', '→ ' + (store.accountName(r.toAccountId) || 'account')); t.title = 'Transferred into this account — moved, not spent'; td.appendChild(t); }

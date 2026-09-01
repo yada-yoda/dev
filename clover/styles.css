@@ -291,6 +291,7 @@ button { font-family: inherit; cursor: pointer; }
 .badge.green { background: var(--accent-soft); color: var(--accent-hover); }
 .badge.red { background: var(--expense-soft); color: var(--expense); }
 .badge.amber { background: var(--warn-soft); color: var(--warn); }
+.badge.teal { background: #e2f4f1; color: #0f766e; }
 
 /* ---------- Empty state ---------- */
 .empty {
