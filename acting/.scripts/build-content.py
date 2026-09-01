@@ -91,6 +91,7 @@ from pathlib import Path
 import re
 import html as html_lib
 import urllib.parse
+import datetime as _dt
 
 try:
     import yaml
@@ -105,7 +106,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.8.1"
+SITE_VERSION = "v0.9.0"
 
 
 # ---------- helpers ----------
@@ -792,9 +793,48 @@ def gen_theater_print(theater, footnotes_doc):
 
 # ---------- hero (slides + quotes) ----------
 
+_reported_expired_slides = set()
+
+
+def active_hero_slides(hero):
+    """Hero slides with already-expired ones dropped.
+
+    A slide may carry `expires: "YYYY-MM-DD"` to retire itself on that
+    date (e.g. a show poster once the run closes). Slides whose date has
+    already passed are omitted from the build entirely; ones still in the
+    future are emitted with a data-expires attribute so the hero JS can
+    retire them at runtime even if no rebuild happens in between.
+
+    gen_hero_slides and gen_hero_quotes MUST both use this list — the
+    rotator pairs slide N with quote N by index.
+    """
+    today = _dt.date.today()
+    kept, dropped = [], []
+    for s in hero["slides"]:
+        raw = str(s.get("expires") or "").strip()
+        if raw:
+            try:
+                if _dt.date.fromisoformat(raw) <= today:
+                    dropped.append((s.get("photo") or s.get("video") or "?", raw))
+                    continue
+            except ValueError:
+                print(f"  Warning: hero slide has an unparseable expires value {raw!r} "
+                      "(want YYYY-MM-DD) - slide kept.")
+        kept.append(s)
+    # gen_hero_slides and gen_hero_quotes both call this; only report once.
+    for src, when in dropped:
+        key = (src, when)
+        if key not in _reported_expired_slides:
+            _reported_expired_slides.add(key)
+            print(f"  Hero slide retired (expired {when}): {src}")
+    return kept
+
+
 def gen_hero_slides(hero):
     lines = []
-    for s in hero["slides"]:
+    for s in active_hero_slides(hero):
+        expires = str(s.get("expires") or "").strip()
+        exp_attr = f' data-expires="{esc(expires)}"' if expires else ""
         video = s.get("video", "").strip() if s.get("video") else ""
         photo = s.get("photo", "").strip() if s.get("photo") else ""
         if video:
@@ -803,22 +843,25 @@ def gen_hero_slides(hero):
             # so videos play their full length once. Muted by default
             # (autoplay requirement); the floating volume control unmutes.
             lines.append(
-                f'    <video class="hero-slide" muted playsinline preload="metadata">'
+                f'    <video class="hero-slide"{exp_attr} muted playsinline preload="metadata">'
                 f'<source src="{esc(video)}" type="video/mp4">'
                 f'</video>'
             )
         else:
             lines.append(
-                f'    <div class="hero-slide" style="background-image:url(\'{esc(photo)}\')"></div>'
+                f'    <div class="hero-slide"{exp_attr} style="background-image:url(\'{esc(photo)}\')"></div>'
             )
     return "\n  <div class=\"hero-slides\" aria-hidden=\"true\">\n" + "\n".join(lines) + "\n  </div>\n  "
 
 
 def gen_hero_quotes(hero):
     lines = []
-    for s in hero["slides"]:
+    for s in active_hero_slides(hero):
+        expires = str(s.get("expires") or "").strip()
+        exp_attr = f' data-expires="{esc(expires)}"' if expires else ""
         lines.append(
-            f"      <span>{esc(s['quote_line_1'])}<br>{esc(s['quote_line_2'])}</span>"
+            f"      <span{exp_attr}>{esc(s.get('quote_line_1', ''))}<br>"
+            f"{esc(s.get('quote_line_2', ''))}</span>"
         )
     return "\n    <div class=\"hero-quotes\" aria-hidden=\"true\">\n" + "\n".join(lines) + "\n    </div>\n    "
 

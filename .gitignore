@@ -18,3 +18,7 @@ __pycache__/
 
 # Cloudflare Wrangler local cache (should never be committed)
 oauth-worker/.wrangler/
+
+# Reel master export - only the web-compressed copy is committed
+acting/assets/reel/*.mp4
+!acting/assets/reel/frank-rizzo-reel.mp4

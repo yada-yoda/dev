@@ -1,4 +1,4 @@
-# Headshot gallery — edited via Decap CMS at /acting/admin/.
+# Headshot gallery - edited via Decap CMS at /acting/admin/.
 #
 # The FIRST entry is the large headshot shown when the page loads.
 # Every entry also renders as a 65px thumbnail under the social links;
@@ -10,8 +10,14 @@
 
 entries:
   - image: "assets/headshots/01-main.jpg"
-    alt: "Frank Rizzo, Chicago-based actor — front-facing color headshot, blue backdrop"
+    alt: "Frank Rizzo, Chicago-based actor - front-facing color headshot, suit and tie, blue backdrop"
     label: "Suit and tie"
-  - image: "assets/headshots/09172024.jpg"
-    alt: "Frank Rizzo, Chicago-based actor — smiling color headshot, gray quarter-zip, white backdrop"
+  - image: "assets/headshots/02-quarter-zip.jpg"
+    alt: "Frank Rizzo, Chicago-based actor - smiling color headshot, gray quarter-zip over navy collar, white backdrop"
     label: "Casual quarter-zip"
+  - image: "assets/headshots/03-glasses.jpg"
+    alt: "Frank Rizzo, Chicago-based actor - smiling color headshot with glasses, light blue button-up over black tee, warm gray backdrop"
+    label: "Glasses, button-up"
+  - image: "assets/headshots/04-navy-polo.jpg"
+    alt: "Frank Rizzo, Chicago-based actor - broad smile color headshot, navy polo, white backdrop"
+    label: "Navy polo"

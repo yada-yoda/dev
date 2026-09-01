@@ -2,11 +2,23 @@
 # 8-second loop. Each slide has EITHER a photo OR a video (video wins
 # if both are set). Quote_line_1 + quote_line_2 render as exactly two
 # lines; leave them empty to show the slide with no overlay text.
+#
+# Optional `expires: "YYYY-MM-DD"` retires a slide on that date. The
+# build omits it once past, and the hero JS also filters it at runtime
+# so it disappears on schedule even if no rebuild has happened.
 
 slides:
   - video: "assets/slideshow/videos/waiter-boys.mp4"
     quote_line_1: "Play the verb,"
     quote_line_2: "not the mood."
+
+  # Run closes Sept 21. `expires` hides the slide from that date onward
+  # WITHOUT needing a rebuild - the hero JS filters it at runtime. Archive
+  # the file and delete this entry once the run is over.
+  - photo: "assets/slideshow/photos/nice-shirt.jpg"
+    expires: "2026-09-28"
+    quote_line_1: ""
+    quote_line_2: ""
 
   - photo: "assets/slideshow/photos/stage.jpg"
     quote_line_1: "Separation is in"

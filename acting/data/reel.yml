@@ -1,6 +1,9 @@
 # Reel embed in the Credits section. URL wins over file if both are set.
 # Leave both empty to show the "Reel coming soon" placeholder.
+#
+# The committed file is a web-compressed copy (1080p, CRF 26, faststart)
+# of the master export. Keep the master out of the repo - see .gitignore.
 
-url: ""              # e.g. "https://player.vimeo.com/video/12345678" or YouTube embed URL
-file: ""             # e.g. "assets/reel/reel.mp4"
+url: ""              # e.g. "https://player.vimeo.com/video/12345678" or a YouTube embed URL
+file: "assets/reel/frank-rizzo-reel.mp4"
 placeholder: "Reel coming soon"
