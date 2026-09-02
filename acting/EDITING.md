@@ -124,6 +124,9 @@ website and the PDF stay in sync.
 3. Mirror in `EDIT: print-theater-credits` (uses `rs-venue-sub` instead
    of `venue-sub`).
 4. Bump the resume year.
+5. Optional: in `data/theater.yml`, add `url:` to an entry to make the
+   production name a link on the website (e.g. a show page with
+   tickets). The printed resume ignores it.
 
 ### Update the bio paragraph
 

@@ -106,7 +106,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.10.1"
+SITE_VERSION = "v0.11.0"
 
 
 # ---------- helpers ----------
@@ -676,6 +676,7 @@ def _theater_resolve(theater, footnotes_doc):
             "role": t["role"],
             "venue": venue_text,
             "marker": venue_marker,
+            "url": (t.get("url") or "").strip(),
         })
 
     active_footnotes = [] if strict else [
@@ -698,8 +699,13 @@ def gen_theater_screen(theater, footnotes_doc, is_active=False):
             f'<sup class="venue-mark">{esc(t["marker"])}</sup>'
             if t["marker"] else ""
         )
+        title_cell = (
+            f'<a href="{esc(t["url"])}" target="_blank" rel="noopener" '
+            f'title="Show page &amp; tickets">{esc(t["production"])}</a>'
+            if t["url"] else esc(t["production"])
+        )
         rows.append(
-            f'          <tr><td class="title">{esc(t["production"])}</td>'
+            f'          <tr><td class="title">{title_cell}</td>'
             f'<td class="role">{role_cell}</td>'
             f'<td class="dir">{esc(t["venue"])}{marker_html}</td></tr>'
         )

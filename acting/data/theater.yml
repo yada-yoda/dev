@@ -8,12 +8,16 @@
 # Strict Mode (in theater-footnotes.yml) swaps the venue cell for the
 # parent venue name and hides the footnote — for agency submissions
 # that follow the strict "producing company only" resume convention.
+#
+# Optional "url" turns the production name into a link on the website
+# (e.g. a show page with tickets). The printed resume never links.
 
 entries:
   - production: NICE SHIRT
     role: Ensemble/Sketch
     venue: e.t.c theatre
     footnote: "*"
+    url: https://niceshirt.rizzo.cc/
   - production: "Grad Revue II Show"
     role: "Ensemble"
     venue: "Donny's Skybox"

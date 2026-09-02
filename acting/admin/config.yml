@@ -333,6 +333,7 @@ collections:
               - { label: "Production", name: "production", widget: "string" }
               - { label: "Role / Sketches", name: "role", widget: "string", default: "Ensemble", hint: "Use Ensemble for ensemble work; for sketch shows, comma-separate the sketch names" }
               - { label: "Stage / Venue", name: "venue", widget: "string", default: "New Judy's Beat Lounge", hint: "Just the specific stage name (e.g. Donny's Skybox, New Judy's Beat Lounge, De Maat Studio). For non-Second City credits, enter the actual venue name." }
+              - { label: "Link (optional)", name: "url", widget: "string", required: false, hint: "Full URL of a show page or ticket link. When set, the production name on the website becomes a clickable link (opens in a new tab). The printed resume never links." }
               - label: "Footnote marker"
                 name: "footnote"
                 widget: "select"
