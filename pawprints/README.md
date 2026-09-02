@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.68.0**
+**Current Version: v0.68.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,10 @@ covers both.
 
 ## Version History
 
+- **v0.68.1** — **Overdue potty halves now highlight individually.** When pee or poop passes its
+  threshold, that half of the card gets its own red-tinted highlight (not just red text). If *both*
+  are overdue, both halves highlight and the one further past its own threshold glows brighter, with
+  a bolder time — so a glance tells you not just that something's due, but which one is most due.
 - **v0.68.0** — **"Last potty" now shows pee and poop separately.** The Today status card splits in
   half: 💧 last pee and 💩 last poop, each with its own time — because they run on different clocks,
   and "last potty 2h ago" couldn't tell you the poop was actually this morning. Each half has its own
