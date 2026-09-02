@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.67.1';
+const APP_VERSION = 'v0.68.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3117,6 +3117,20 @@ function render(){
 
 
 // ── TODAY ──
+// "Last potty" split into pee / poop halves — they run on different clocks (a dog pees far
+// more often than it poops), so one combined time hides which need is actually due.
+function pottySplitCard(){
+  const desc = (a,b)=>new Date(b.dateTime)-new Date(a.dateTime);
+  const pee = petLogs('potty').filter(l=>l.dateTime && (l.result==='Pee'||l.result==='Both')).sort(desc)[0] || null;
+  const poop = petLogs('potty').filter(l=>l.dateTime && (l.result==='Poop'||l.result==='Both'||!!(l.stool&&String(l.stool).trim()))).sort(desc)[0] || null;
+  const overPee = pee && (Date.now()-new Date(pee.dateTime).getTime()) > 8*3600000;
+  const overPoop = poop && (Date.now()-new Date(poop.dateTime).getTime()) > 24*3600000;
+  const half = (emoji, label, l, over) => '<div style="min-width:0"><div style="font-size:11px;color:var(--text-secondary)">'+emoji+' '+label+'</div>'
+    + '<div class="sc-val" style="font-size:14px;margin-top:2px;color:'+(!l?'var(--text-secondary)':over?'var(--danger)':'var(--text-primary)')+'">'+(l?timeAgo(l.dateTime).replace(' ago',''):'—')+'</div>'
+    + '<div style="font-size:11px;color:var(--text-secondary);margin-top:2px">'+(l?fmtTime(l.dateTime):'not logged')+'</div></div>';
+  return '<div class="status-card'+((overPee||overPoop||(!pee&&!poop))?' overdue':'')+'"><div class="sc-label">'+svgIcon('potty',16)+' Last potty</div>'
+    + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:5px">'+half('💧','Pee',pee,overPee)+half('💩','Poop',poop,overPoop)+'</div></div>';
+}
 function statusCard(label, icon, dt, overdueHrs, extra){
   const ago = timeAgo(dt);
   const over = dt && overdueHrs && (Date.now()-new Date(dt).getTime()) > overdueHrs*3600000;
@@ -3218,7 +3232,7 @@ function renderRoutineCard(){
 function renderToday(){
   if(!activePet()) return emptyState();
   const p = activePet();
-  const fed = lastLog('feed'), water = lastLog('water'), potty = lastRealPotty(), walk = lastLog('walk');
+  const fed = lastLog('feed'), water = lastLog('water'), walk = lastLog('walk');
   const w = latestWeight();
   let html = '';
   // shared-access notice
@@ -3249,7 +3263,7 @@ function renderToday(){
   html += '<div class="card"><h3 class="section-title">Status</h3><div class="status-grid">'
     + statusCard('Last fed',svgIcon('fed',16),fed?fed.dateTime:null,12)
     + statusCard('Water refilled',svgIcon('water',16),water?water.dateTime:null,null)
-    + statusCard('Last potty',svgIcon('potty',16),potty?potty.dateTime:null,8)
+    + pottySplitCard()
     + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
     + '</div></div>';
   // paw-safety / best-walk-window strip (needs the header weather, i.e. a home ZIP)

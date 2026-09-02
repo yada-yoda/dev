@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.67.1**
+**Current Version: v0.68.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.68.0** — **"Last potty" now shows pee and poop separately.** The Today status card splits in
+  half: 💧 last pee and 💩 last poop, each with its own time — because they run on different clocks,
+  and "last potty 2h ago" couldn't tell you the poop was actually this morning. Each half has its own
+  overdue signal too: pee turns red past 8 hours (as before), poop past 24. A "Both" entry — or any
+  potty break where you noted a stool — counts for both sides.
 - **v0.67.1** — **Mobile audit pass.** Checked every tab and every recently-added modal at iPhone
   width against the live site — all clean except one: the supply form's checkbox labels ("One-time
   item…", "Running low…", "Show cost breakdown") couldn't wrap on narrow screens, so the end of the
