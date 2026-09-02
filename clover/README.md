@@ -45,6 +45,14 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.155 — Duplicate an Income list row
+
+The Income **List** view now has a **Duplicate** button on each income row — the
+quick way to log something similar without retyping. It prefills a new entry from
+that row with the date set to today; you just tweak what’s different and Save.
+(Duplicating a settlement-linked payout entry makes a plain, unlinked copy.
+Paychecks are duplicated from the Paychecks page.)
+
 ### v1.0.154 — Distinct colors for Expenses list badges
 
 On the Expenses list, the **Category**, **Source**, and **Paid from** pills now

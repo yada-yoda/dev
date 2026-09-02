@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.154';
+const VERSION = '1.0.155';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2629,6 +2629,21 @@ function incomeList(data) {
         const edit = el('button', 'icon-btn', 'Edit');
         edit.addEventListener('click', () => r.kind === 'paycheck' ? paycheckModal(r.raw) : incomeModal(r.raw));
         act.appendChild(edit);
+        // Duplicate income entries (paychecks live on their own page). Prefills a
+        // new entry from this one, date set to today, and drops any settlement
+        // link so the copy is a plain manual entry.
+        if (r.kind !== 'paycheck') {
+          const dup = el('button', 'icon-btn', 'Duplicate');
+          dup.title = 'Add a new income entry prefilled from this one (date set to today)';
+          dup.addEventListener('click', () => {
+            const pre = Object.assign({}, r.raw);
+            delete pre.id; delete pre.history; delete pre.createdAt; delete pre.updatedAt;
+            delete pre.srcSettlement; delete pre.srcPayment;
+            pre.date = todayISO();
+            incomeModal(pre);
+          });
+          act.appendChild(dup);
+        }
         const del = el('button', 'icon-btn danger', 'Remove');
         del.addEventListener('click', () => confirmRemove(fmtDate(r.date) + ' · ' + r.catName, () => r.kind === 'paycheck' ? store.removePaycheck(yearOfPaycheck(r.raw), r.raw.id) : store.removeIncome(activeYear, r.raw.id)));
         act.appendChild(del);
@@ -2831,7 +2846,7 @@ function incomeModal(existing) {
   // entry — title/toast key off a real id, not merely a truthy arg.
   const incIsEdit = !!(existing && existing.id);
   openModal({
-    title: incIsEdit ? 'Edit income' : 'Add income', body: withHistoryTab(body, existing), confirmLabel: 'Save',
+    title: incIsEdit ? 'Edit income' : 'Add income', body: withHistoryTab(body, incIsEdit ? existing : null), confirmLabel: 'Save',
     onConfirm: () => {
       if (!fCat.value) { toast('Pick a category', 'warn'); fCat.focus(); return false; }
       const gross = parseFloat(fGross.value);
@@ -3708,6 +3723,7 @@ const HELP_SECTIONS = [
     points: [
       'Covers dividends, interest, rewards/cash-back, IRA & estate distributions, class-action payouts, selling, and anything under “Other.”',
       'Annual grid view totals income by category across the months; List view shows every entry — and now includes your paychecks.',
+      'In List view, each income row has a Duplicate button — a quick way to log something similar: it prefills a new entry from that row with the date set to today, so you just tweak what’s different. (Paychecks are duplicated from the Paychecks page.)',
       'Picking certain categories reveals tailored fields (e.g. a dividend’s ticker, a reward’s program/type, an IRA distribution’s withholdings).'
     ] },
   { id: 'paychecks', ico: '▤', title: 'Paychecks', what: 'Your wages — the source of truth for employment income.',
