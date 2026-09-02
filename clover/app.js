@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.155';
+const VERSION = '1.0.156';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -37,6 +37,7 @@ const ROUTES = [
   { id: 'taxes',         label: 'Taxes',          ico: '§', phase: 9 },
   { group: 'Setup' },
   { id: 'accounts',      label: 'Accounts',       ico: '▦', phase: 1 },
+  { id: 'cdladder',      label: 'CD Ladder',      ico: '⧗', phase: 1, sub: true },
   { id: 'import',        label: 'Import / Export', ico: '⇅', phase: 8 },
   { id: 'settings',      label: 'Settings',       ico: '⚙', phase: 1 },
   { id: 'help',          label: 'Help / Guide',   ico: '?', phase: 1 }
@@ -146,6 +147,7 @@ function buildNav() {
     const a = document.createElement('a');
     a.href = '#' + r.id;
     a.dataset.route = r.id;
+    if (r.sub) a.className = 'nav-sub';
     a.innerHTML = `<span class="ico">${r.ico}</span> ${r.label}`;
     nav.appendChild(a);
   }
@@ -158,15 +160,28 @@ window.addEventListener('hashchange', () => {
 function routeTo(id) {
   const route = ROUTES.find(r => r.id === id) || ROUTES.find(r => r.id === DEFAULT_ROUTE);
   currentRoute = route;
+  // "CD Ladder" and "Accounts" share one view; the CD-timeline mode follows the
+  // route so the nav highlight and title stay honest.
+  if (route.id === 'cdladder') { accountsCdTimeline = true; accountsTab = 'open'; }
+  else if (route.id === 'accounts') accountsCdTimeline = false;
   document.querySelectorAll('.nav a').forEach(a =>
     a.classList.toggle('active', a.dataset.route === route.id));
   document.getElementById('view-title').textContent = route.label;
   closeDrawer();
   renderView(route);
 }
+// Switch between the Accounts table and the CD-timeline view, keeping the URL/nav
+// in step. Called from the ⧗ tab and the CD type badge.
+function goAccountsView(timelineOn) {
+  accountsCdTimeline = timelineOn;
+  if (timelineOn) { accountsTab = 'open'; if (accountsFilter && accountsFilter.key === 'type') accountsFilter = null; }
+  const target = timelineOn ? 'cdladder' : 'accounts';
+  if (location.hash.slice(1) === target) renderView(currentRoute);
+  else location.hash = target;
+}
 
 // Feature views (P1-7 + P8 import/export).
-const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, settlements: renderSettlements, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport, help: renderHelp };
+const LIVE_VIEWS = { dashboard: renderDashboard, settings: renderSettings, accounts: renderAccounts, cdladder: renderAccounts, income: renderIncome, subscriptions: renderSubscriptions, budget: renderBudget, expenses: renderExpenses, paychecks: renderPaychecks, raises: renderRaises, selling: renderSelling, settlements: renderSettlements, credit: renderCredit, taxes: renderTaxes, reports: renderReports, calendar: renderCalendar, import: renderImport, help: renderHelp };
 let calCursor = null;   // { year, month } for the calendar view
 
 // 'setup'  = not yet locked to an owner UID (show account ID to finish setup)
@@ -1199,10 +1214,7 @@ function valueBadge(scope, colKey, text) {
   b.addEventListener('click', ev => {
     ev.stopPropagation();
     if (scope === 'accounts' && colKey === 'type' && text === 'CD') {
-      accountsCdTimeline = !accountsCdTimeline;
-      if (accountsCdTimeline && accountsFilter && accountsFilter.key === 'type') accountsFilter = null;
-      accountsTab = 'open';
-      renderView(currentRoute); return;
+      goAccountsView(!accountsCdTimeline); return;
     }
     if (scope === 'accounts' && colKey === 'type') accountsCdTimeline = false;
     const cur = tableFilterGet(scope);
@@ -1784,7 +1796,8 @@ function renderAccounts(view) {
   const tabs = el('div', 'tabs');
   [['open', 'Open (' + openAccts.length + ')'], ['closed', 'Closed (' + closedAccts.length + ')']].forEach(([t, label]) => {
     const b = el('button', 'tab' + (accountsTab === t ? ' active' : ''), label);
-    b.addEventListener('click', () => { accountsTab = t; renderView(currentRoute); });
+    // Picking Open/Closed leaves timeline mode (and the CD Ladder route with it).
+    b.addEventListener('click', () => { accountsTab = t; if (accountsCdTimeline) goAccountsView(false); else renderView(currentRoute); });
     tabs.appendChild(b);
   });
   // The timeline rides the tab row — next to Open/Closed, where views get
@@ -1795,12 +1808,7 @@ function renderAccounts(view) {
     const cdTab = el('button', 'tab' + (cdOn ? ' active' : ''), '⧗ CD timeline');
     cdTab.title = cdOn ? 'Hide the CD maturity timeline and clear the CD filter'
       : 'Show the CD maturity timeline — every term, renewal, and consolidation drawn to its real dates; the table also gains a Principal column with each amount\u2019s as-of date';
-    cdTab.addEventListener('click', () => {
-      accountsCdTimeline = !cdOn;
-      if (accountsCdTimeline && accountsFilter && accountsFilter.key === 'type') accountsFilter = null;
-      accountsTab = 'open';   // the timeline lives on the Open tab
-      renderView(currentRoute);
-    });
+    cdTab.addEventListener('click', () => goAccountsView(!cdOn));
     tabs.appendChild(cdTab);
   }
   view.appendChild(tabs);
@@ -6457,7 +6465,7 @@ function buildWarnings(store, data, s) {
     w.appendChild(badge('Matured', 'red'));
     w.appendChild(el('span', null, maturedCd.length + ' CD' + (maturedCd.length === 1 ? ' has' : 's have') + ' passed maturity \u2014 renew or update ' + (maturedCd.length === 1 ? 'it' : 'them') + ' (Clover won\u2019t close ' + (maturedCd.length === 1 ? 'it' : 'them') + ' for you)'));
     const go = el('button', 'btn-ghost', 'Review \u2192');
-    go.addEventListener('click', () => { accountsCdTimeline = true; accountsTab = 'open'; location.hash = 'accounts'; });
+    go.addEventListener('click', () => { location.hash = 'cdladder'; });
     w.appendChild(go);
     list.appendChild(w);
   }

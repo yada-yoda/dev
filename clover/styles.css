@@ -114,6 +114,9 @@ button { font-family: inherit; cursor: pointer; }
 .nav a:hover { background: var(--surface-2); color: var(--text); }
 .nav a.active { background: var(--accent-soft); color: var(--accent-hover); font-weight: 600; }
 .nav a .ico { width: 18px; text-align: center; font-size: 15px; }
+/* Sub-item: a view that lives inside the entry above it (CD Ladder under Accounts) */
+.nav a.nav-sub { margin-left: 18px; padding-left: 10px; font-size: 12.5px; border-left: 2px solid var(--border); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.nav a.nav-sub.active { border-left-color: var(--accent); }
 .nav-sep { height: 1px; background: var(--border); margin: 10px 12px; }
 /* Section labels teach the mental model: log money in, log money out, then
    look at it, then set it up. */

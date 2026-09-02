@@ -45,6 +45,15 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.156 — “CD Ladder” in the sidebar
+
+The CD maturity timeline / ladder was only reachable from inside the Accounts
+page (the ⧗ tab or a CD badge), which made it easy to lose. It now has its own
+**CD Ladder** entry in the sidebar, indented under **Accounts** to show it’s that
+page’s view. Clicking it takes you straight to the timeline; the ⧗ tab and the
+Accounts entry stay in step with it, so the highlighted menu item always matches
+what you’re looking at.
+
 ### v1.0.155 — Duplicate an Income list row
 
 The Income **List** view now has a **Duplicate** button on each income row — the
