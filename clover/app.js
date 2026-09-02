@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.156';
+const VERSION = '1.0.157';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2119,6 +2119,28 @@ function accountModal(existing) {
   const rMat = input('', { type: 'date' });
   const rTerm = input('', { placeholder: 'e.g. 12 (blank keeps current)' });
   rTerm.__wrap = el('div', 'unit-input'); rTerm.__wrap.appendChild(rTerm); rTerm.__wrap.appendChild(el('span', 'unit-suffix', 'months'));
+  // Length and maturity describe the same thing from different ends, so each
+  // fills in the other live off the new start date. Assigning .value doesn't
+  // fire 'input', so these can't loop; typing in one always wins over the other.
+  const syncRenewFromTerm = () => {
+    const mo = store.parseTermMonths(rTerm.value);
+    if (!rStart.value || mo == null) return;
+    rMat.value = store.addMonthsClamped(rStart.value, mo);
+  };
+  const syncRenewFromMat = () => {
+    if (!rStart.value || !rMat.value) return;
+    const mo = store.monthsBetween(rStart.value, rMat.value);
+    if (mo != null && mo > 0) rTerm.value = String(mo);
+  };
+  rTerm.addEventListener('input', syncRenewFromTerm);
+  rMat.addEventListener('input', syncRenewFromMat);
+  // Moving the start date re-derives whichever side isn't the one you just set:
+  // a known length keeps its length (maturity shifts), otherwise the length is
+  // recomputed against the maturity you already entered.
+  rStart.addEventListener('input', () => {
+    if (store.parseTermMonths(rTerm.value) != null) syncRenewFromTerm();
+    else syncRenewFromMat();
+  });
   const rLast4 = input('', { placeholder: a.last4 ? 'blank = keep ••' + a.last4 : 'optional' }); rLast4.maxLength = 4; rLast4.inputMode = 'numeric';
   const rPrincipal = moneyInput('', { placeholder: a.cdPrincipal ? 'blank = keep ' + money(Number(a.cdPrincipal)) : 'optional' });
   const consolChecks = [];
@@ -2127,8 +2149,8 @@ function accountModal(existing) {
     renewWrap.style.display = 'none';
     renewWrap.appendChild(field('New start date', rStart, 'When the renewed term actually begins. Defaults to the old maturity date, but change it if this renewed early or the new term doesn’t start until days after maturity — it drives where the new bar sits on the timeline.'));
     renewWrap.appendChild(field('New APY %', rApy, 'The rate the renewed CD earns — e.g. 4.25. Worth a call to the bank about current rates before the auto-renew window closes.'));
-    renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month, Aug 1 2026 start runs to Aug 1, 2027.'));
-    renewWrap.appendChild(field('New CD length', rTerm, 'The renewed term — e.g. 12 months, 9 months. Blank keeps the current length.'));
+    renewWrap.appendChild(field('New maturity date', rMat, 'When the renewed CD matures — e.g. a 12-month, Aug 1 2026 start runs to Aug 1, 2027. Fill this in and the length works itself out; fill in the length and this does.'));
+    renewWrap.appendChild(field('New CD length', rTerm, 'The renewed term — e.g. 12 months, 9 months. Blank keeps the current length. Typing a length fills in the maturity date from the new start date (and vice versa).'));
     renewWrap.appendChild(field('New account # (last 4)', rLast4, 'Only if the bank issued a NEW account number for the renewal — blank keeps the current one.'));
     renewWrap.appendChild(field('New principal $', rPrincipal, 'The renewed balance — usually old principal plus the interest it earned, plus anything you added. Blank keeps the current figure.'));
     // Consolidation: other CDs whose money rolled INTO this renewal. Sources get
@@ -3781,6 +3803,7 @@ const HELP_SECTIONS = [
   { id: 'accounts', ico: '▦', title: 'Accounts', what: 'Your banks, cards, brokerages, and other financial accounts.',
     points: [
       'Type-specific fields appear as needed: CD term/APY/maturity, credit-card statement & due days (with a “best card to use today” float), and a current APY for checking/savings/money-market.',
+      'In the renewal form, New CD length and New maturity date fill each other in as you type, measured from the new start date — enter whichever you know. Month-ends are handled properly (a Jan 31 start plus one month lands on Feb 28).',
       'When a CD matures, Edit → “Renew CD…” rolls it into its next term — new APY, maturity, length, and (if the bank issued one) a new account number. The ending term is archived to a Renewals tab on that account, so past rates, dates, and numbers stay lookupable. The button turns amber when maturity is within 14 days.',
       'Once a CD passes its maturity date Clover never closes or renews it for you — it waits. A 🔔 bell (top right) and a Dashboard flag list any matured CDs, and an email (from notify.rizzo.cc, no Google needed) reminds you once per matured CD. Manage all of this under Settings → Notifications — the bell, the matured-CD email, and the 7-days-ahead calendar email.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',

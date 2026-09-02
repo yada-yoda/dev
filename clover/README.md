@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.157 — CD renewal: length and maturity date fill each other in
+
+In the **Renew CD** form, **New CD length** and **New maturity date** now update
+each other live, measured from the new start date — type `36` months and the
+maturity date appears; pick a maturity date and the length appears. Enter
+whichever you actually know and the other side works itself out.
+
+Month-ends are handled correctly: a Jan 31 start plus one month lands on Feb 28
+(Feb 29 in a leap year), and reading that back still counts as one month.
+
 ### v1.0.156 — “CD Ladder” in the sidebar
 
 The CD maturity timeline / ladder was only reachable from inside the Accounts

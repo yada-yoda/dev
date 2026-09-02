@@ -519,6 +519,8 @@ window.cloverStore = {
   },
   setGcal(patch) { state.settings.gcal = Object.assign({}, state.settings.gcal, patch); scheduleSave(); notify(); },
   parseTermMonths, subMonthsClamped, monthsBetween,
+  // Same calendar math as subMonthsClamped, forward: Jan 31 + 1 month = Feb 28.
+  addMonthsClamped: (iso, months) => subMonthsClamped(iso, -months),
   // Generic top-level settings flag (e.g. showFomc). Use for simple booleans that
   // don't warrant their own method; anything structured deserves a dedicated one.
   setSetting(key, val) { state.settings[key] = val; scheduleSave(); notify(); },
