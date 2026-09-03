@@ -106,7 +106,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.11.1"
+SITE_VERSION = "v0.11.2"
 
 
 # ---------- helpers ----------
@@ -1293,14 +1293,24 @@ def gen_og_tags(site):
 
 
 def gen_ga4(site):
+    """GA4 loader with a per-device opt-out: visit once with ?ga=off to stop
+    counting this browser (the flag persists in localStorage), ?ga=on to
+    resume. Handy for keeping the owner's own visits out of the numbers."""
     ga4 = site["analytics"]["ga4_id"]
     return (
-        f'\n<script async src="https://www.googletagmanager.com/gtag/js?id={esc(ga4)}"></script>\n'
-        '<script>\n'
-        '  window.dataLayer = window.dataLayer || [];\n'
-        '  function gtag(){dataLayer.push(arguments);}\n'
-        "  gtag('js', new Date());\n"
-        f"  gtag('config', '{esc(ga4)}', {{ 'anonymize_ip': true }});\n"
+        '\n<script>\n'
+        '(function(){\n'
+        '  try{\n'
+        "    var q=new URLSearchParams(location.search).get('ga');\n"
+        "    if(q==='off')localStorage.setItem('ga_optout','1');\n"
+        "    if(q==='on')localStorage.removeItem('ga_optout');\n"
+        "    if(localStorage.getItem('ga_optout')==='1')return;\n"
+        '  }catch(e){}\n'
+        "  var s=document.createElement('script');s.async=true;\n"
+        f"  s.src='https://www.googletagmanager.com/gtag/js?id={esc(ga4)}';document.head.appendChild(s);\n"
+        '  window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}\n'
+        f"  window.gtag=gtag;gtag('js',new Date());gtag('config','{esc(ga4)}',{{anonymize_ip:true}});\n"
+        '})();\n'
         '</script>\n'
     )
 

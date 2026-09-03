@@ -74,7 +74,7 @@ collections:
         label: "Analytics"
         name: "analytics"
         fields:
-          - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently shared with book/greenline (G-DYME377V2S)." }
+          - { label: "GA4 Tracking ID", name: "ga4_id", widget: "string", hint: "e.g. G-XXXXXXXX. Currently a dedicated Rizzo.cc property." }
 
       - file: "acting/data/menu.yml"
         label: "Top-Nav Menu"
