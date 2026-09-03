@@ -301,6 +301,7 @@ collections:
               - { label: "Role / Character", name: "role", widget: "string" }
               - { label: "Director", name: "director", widget: "string" }
               - { label: "IMDB tt ID", name: "imdb", widget: "string", required: false, hint: "e.g. tt12345678 - leave blank to fall back to IMDB search by title" }
+              - { label: "Official site (optional)", name: "url", widget: "string", required: false, hint: "If the film has its own site, paste it here and the title links there instead of IMDB, e.g. https://waiterboys.com/. Leave blank to link to IMDB." }
 
       - file: "acting/data/tv.yml"
         label: "TV"

@@ -567,13 +567,18 @@ def gen_film_screen(films, is_active=True):
     rows = []
     for f in films:
         title = esc(f["title"])
-        href = (
-            f"https://www.imdb.com/title/{esc(f['imdb'])}/"
-            if f.get("imdb")
-            else f"https://www.imdb.com/find/?s=tt&q={title.replace(' ', '+')}"
-        )
+        # Precedence: an explicit `url` (e.g. the film's own site) beats a
+        # tt-id IMDB page, which beats an IMDB title search as a last resort.
+        own = (f.get("url") or "").strip()
+        if own:
+            href, link_title = esc(own), "Official film site"
+        elif f.get("imdb"):
+            href, link_title = f"https://www.imdb.com/title/{esc(f['imdb'])}/", "View on IMDB"
+        else:
+            href = f"https://www.imdb.com/find/?s=tt&q={title.replace(' ', '+')}"
+            link_title = "View on IMDB"
         rows.append(
-            f'          <tr><td class="title"><a href="{href}" target="_blank" rel="noopener" title="View on IMDB">{title}</a> '
+            f'          <tr><td class="title"><a href="{href}" target="_blank" rel="noopener" title="{link_title}">{title}</a> '
             f'<span class="sub" style="color:var(--dim)">({esc(f["type"])}, {esc(f["year"])})</span></td>'
             f'<td class="role">{esc(f["role"])}</td>'
             f'<td class="dir">dir. {esc(f["director"])}</td></tr>'
