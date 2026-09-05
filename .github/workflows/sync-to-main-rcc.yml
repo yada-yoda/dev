@@ -18,7 +18,6 @@ on:
       - 'acting/index.html'
       - 'acting/404.html'
       - 'acting/assets/**'
-      - 'acting/agencies/**'
       - 'acting/humans.txt'
       - 'acting/llms.txt'
       - 'acting/robots.txt'
@@ -57,6 +56,7 @@ jobs:
           # but the --exclude list means CNAME, README.md, and .git are safe.
           rsync -av --delete \
             --exclude='admin/' \
+            --exclude='agencies/' \
             --exclude='data/' \
             --exclude='.scripts/' \
             --exclude='source/' \

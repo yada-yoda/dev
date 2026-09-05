@@ -22,3 +22,6 @@ oauth-worker/.wrangler/
 # Reel master export - only the web-compressed copy is committed
 acting/assets/reel/*.mp4
 !acting/assets/reel/frank-rizzo-reel.mp4
+
+# Agency submission tracker - PRIVATE, local only (T:/ClaudeCodeRepo/acting-private)
+acting/agencies/
