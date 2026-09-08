@@ -90,6 +90,7 @@ Idempotent: running with unchanged data files produces unchanged output.
 from pathlib import Path
 import re
 import html as html_lib
+import json
 import urllib.parse
 import datetime as _dt
 
@@ -101,12 +102,13 @@ except ImportError:
 
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "index.html"
+RESOURCES = ROOT / "resources.html"
 DATA = ROOT / "data"
 
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.11.2"
+SITE_VERSION = "v0.12.0"
 
 
 # ---------- helpers ----------
@@ -139,7 +141,7 @@ def replace_block(html, marker, new_inner):
         re.DOTALL,
     )
     if not pattern.search(html):
-        raise SystemExit(f"Marker not found in index.html: EDIT: {marker}")
+        raise SystemExit(f"Marker not found: EDIT: {marker}")
     return pattern.sub(
         lambda m: m.group(1) + new_inner + m.group(3),
         html,
@@ -1320,15 +1322,25 @@ def gen_ga4(site):
     )
 
 
-def gen_menu(site):
+def gen_menu(site, subpage=None):
+    """Top-nav links. On a subpage (e.g. resources.html) anchor links like
+    #about are rewritten to ./#about so they go back to the home page, and
+    the entry whose URL matches `subpage` gets class="current"."""
     items = site.get("menu", [])
     if not items:
         return "\n  <nav class=\"nav\"></nav>\n  "
-    links = "\n".join(
-        f'    <a href="{esc(m["url"])}">{esc(m["label"])}</a>'
-        for m in items
-    )
-    return "\n  <nav class=\"nav\">\n" + links + "\n  </nav>\n  "
+    out = []
+    for m in items:
+        url = str(m.get("url", ""))
+        cls = ""
+        if subpage:
+            if url.startswith("#"):
+                url = "./" + url
+                cls = ' class="home"'
+            elif url.strip("/") == subpage:
+                cls = ' class="current"'
+        out.append(f'    <a href="{esc(url)}"{cls}>{esc(m["label"])}</a>')
+    return "\n  <nav class=\"nav\">\n" + "\n".join(out) + "\n  </nav>\n  "
 
 
 # Map of section toggle key → CSS selector to hide when false.
@@ -1380,6 +1392,248 @@ def gen_footer(site):
         rendered = rendered.replace("{{version}}", "")
 
     return f"\n<footer>\n  {rendered}\n</footer>\n"
+
+
+# ---------- Resources page (resources.html) ----------
+
+RES_KIND_LABEL = {
+    "fb": "Facebook",
+    "web": "Website",
+    "gov": "Official",
+    "school": "School",
+    "book": "Reading",
+}
+
+
+def _host(url):
+    """facebook.com from https://www.facebook.com/groups/123 - shown small
+    on each card so the destination is obvious before clicking."""
+    u = re.sub(r"^https?://(www\.)?", "", str(url or ""))
+    return u.split("/")[0]
+
+
+def _ico_letter(entry):
+    kind = entry.get("kind", "web")
+    if kind == "fb":
+        return "f"
+    if kind == "gov":
+        return "G"
+    if kind == "book":
+        return "B"
+    name = re.sub(r"^The\s+", "", str(entry.get("name", "")).strip())
+    return (name[:1] or "?").upper()
+
+
+def _res_entries(links):
+    for s in links.get("sections") or []:
+        for g in s.get("groups") or []:
+            for e in g.get("entries") or []:
+                yield s, g, e
+
+
+def _res_counts(links):
+    per_section = {}
+    fb = 0
+    total = 0
+    for s, _g, e in _res_entries(links):
+        per_section[s["id"]] = per_section.get(s["id"], 0) + 1
+        total += 1
+        if e.get("kind") == "fb":
+            fb += 1
+    return total, fb, per_section
+
+
+def gen_res_meta(page):
+    s = page.get("seo") or {}
+    return (
+        f'\n<title>{esc(s.get("title"))}</title>\n'
+        f'<meta name="description" content="{esc(s.get("description"))}">\n'
+        f'<meta name="theme-color" content="#2c2e3d">\n'
+        f'<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large">\n'
+        f'<link rel="canonical" href="{esc(s.get("canonical_url"))}">\n'
+    )
+
+
+def gen_res_og(page, site):
+    s = page.get("seo") or {}
+    og = site.get("og") or {}
+    tw = site.get("twitter") or {}
+    image = og.get("image", "https://rizzo.cc/assets/og-image.png")
+    title = s.get("og_title") or s.get("title")
+    desc = s.get("og_description") or s.get("description")
+    return (
+        f'\n<meta property="og:type" content="website">\n'
+        f'<meta property="og:site_name" content="{esc(og.get("site_name", "Rizzo.cc"))}">\n'
+        f'<meta property="og:title" content="{esc(title)}">\n'
+        f'<meta property="og:description" content="{esc(desc)}">\n'
+        f'<meta property="og:url" content="{esc(s.get("canonical_url"))}">\n'
+        f'<meta property="og:image" content="{esc(image)}">\n'
+        f'<meta property="og:image:secure_url" content="{esc(image)}">\n'
+        f'<meta property="og:image:width" content="1200">\n'
+        f'<meta property="og:image:height" content="630">\n'
+        f'<meta property="og:image:alt" content="{esc(og.get("image_alt"))}">\n'
+        f'<meta property="og:locale" content="{esc(og.get("locale", "en_US"))}">\n'
+        '\n<!-- Twitter / X -->\n'
+        f'<meta name="twitter:card" content="{esc(tw.get("card", "summary_large_image"))}">\n'
+        f'<meta name="twitter:title" content="{esc(title)}">\n'
+        f'<meta name="twitter:description" content="{esc(desc)}">\n'
+        f'<meta name="twitter:image" content="{esc(image)}">\n'
+    )
+
+
+def gen_res_json_ld(page, site):
+    s = page.get("seo") or {}
+    canonical = str(s.get("canonical_url", "https://rizzo.cc/resources"))
+    home = str((site.get("seo") or {}).get("canonical_url", "https://rizzo.cc/"))
+    data = {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "@id": canonical + "#page",
+        "url": canonical,
+        "name": s.get("title"),
+        "description": s.get("description"),
+        "inLanguage": "en-US",
+        "isPartOf": {"@id": home + "#website"},
+        "about": {"@id": home + "#frank"},
+    }
+    return "\n<script type=\"application/ld+json\">\n" + json.dumps(data, indent=2, ensure_ascii=False) + "\n</script>\n"
+
+
+def gen_res_hero(page, links, verbs):
+    total, _fb, _per = _res_counts(links)
+    return (
+        f'\n    <div class="eyebrow">{esc(page.get("eyebrow", "For actors"))}</div>\n'
+        f'    <h1>{esc(page.get("title", "Resources"))}</h1>\n'
+        f'    <p>{esc(page.get("intro"))}</p>\n'
+        f'    <div class="meta">'
+        f'<span>Links <b>{total}</b></span>'
+        f'<span>Verbs <b>{len(verbs)}</b></span>'
+        f'<span>Updated <b>{esc(page.get("updated"))}</b></span>'
+        f'</div>\n    '
+    )
+
+
+def gen_res_rail(links):
+    total, fb, per = _res_counts(links)
+
+    def chip(cat, label, n, on=False):
+        return (
+            f'      <button class="chip{" on" if on else ""}" type="button" data-cat="{esc(cat)}">'
+            f'{esc(label)} <span class="n">{n}</span></button>\n'
+        )
+
+    chips = chip("all", "All", total, on=True) + chip("fb", "Facebook", fb)
+    for s in links.get("sections") or []:
+        chips += chip(s["id"], s.get("chip") or s.get("title"), per.get(s["id"], 0))
+    return (
+        '\n    <div class="search"><label class="visually-hidden" for="link-search" hidden>Search links</label>'
+        '<input type="search" id="link-search" placeholder="Search links..." autocomplete="off"></div>\n'
+        '    <div class="chips" role="group" aria-label="Filter by category">\n'
+        + chips +
+        '    </div>\n'
+        '    <div class="rail-jump"><a href="#verbs">Action verbs &darr;</a></div>\n    '
+    )
+
+
+def gen_res_sections(links):
+    out = []
+    for s in links.get("sections") or []:
+        sid = str(s.get("id", "")).strip()
+        n = sum(len(g.get("entries") or []) for g in s.get("groups") or [])
+        out.append(f'\n      <section class="blk" id="s-{esc(sid)}">')
+        out.append(f'        <div class="sec-head"><h2>{esc(s.get("title"))}</h2><span class="count">{n} links</span></div>')
+        for g in s.get("groups") or []:
+            out.append(f'        <div class="sub">{esc(g.get("title"))}</div>')
+            out.append('        <div class="cards">')
+            for e in g.get("entries") or []:
+                kind = str(e.get("kind") or "web")
+                name = str(e.get("name") or "")
+                desc = str(e.get("desc") or "")
+                url = str(e.get("url") or "#")
+                q = f"{name} {desc} {_host(url)}".lower()
+                if e.get("private"):
+                    pill = '<span class="pill private">Private</span>'
+                else:
+                    pill = f'<span class="pill{" fb" if kind == "fb" else ""}">{esc(RES_KIND_LABEL.get(kind, "Website"))}</span>'
+                out.append(
+                    f'          <a class="card" href="{esc(url)}" target="_blank" rel="noopener" '
+                    f'data-cat="{esc(sid)}" data-kind="{esc(kind)}" data-name="{esc(name)}" data-q="{esc(q)}">'
+                    f'<span class="top"><span class="ico {esc(kind)}" aria-hidden="true">{esc(_ico_letter(e))}</span>'
+                    f'<span><span class="name">{esc(name)}</span><span class="desc">{esc(desc)}</span></span></span>'
+                    f'<span class="foot"><span class="host">{esc(_host(url))}</span>{pill}</span></a>'
+                )
+            out.append('        </div>')
+        out.append('      </section>')
+    return "\n".join(out) + "\n      "
+
+
+def gen_res_verbs(page, verbs):
+    rows = []
+    for v in verbs:
+        verb = str(v.get("verb") or "").strip()
+        shades = str(v.get("shades") or "").strip()
+        if not verb:
+            continue
+        q = f"{verb} {shades}".lower()
+        rows.append(f'            <tr data-q="{esc(q)}"><td class="v">{esc(verb)}</td><td class="s">{esc(shades)}</td></tr>')
+    intro = page.get("verbs_intro")
+    intro_html = f'      <p class="verbs-intro">{esc(intro)}</p>\n' if intro else ""
+    return (
+        "\n" + intro_html +
+        '      <div class="verbs-tools"><input type="search" id="verb-search" placeholder="Filter verbs... e.g. soothe, tempt, punish" autocomplete="off" aria-label="Filter verbs"><span class="n" id="verb-shown"></span></div>\n'
+        '      <div class="vt-wrap"><table id="verb-table"><thead><tr><th>Verb</th><th>Shades of it</th></tr></thead><tbody>\n'
+        + "\n".join(rows) +
+        '\n      </tbody></table></div>\n      '
+    )
+
+
+def gen_res_source(page):
+    text = page.get("source_text") or ""
+    title = page.get("source_title") or ""
+    url = page.get("source_url") or ""
+    after = page.get("source_after") or ""
+    if not (text or title):
+        return "\n"
+    if url:
+        title_html = f'<a href="{esc(url)}" target="_blank" rel="noopener">{esc(title)}</a>'
+    else:
+        title_html = f"<em>{esc(title)}</em>"
+    return f'\n      <div class="source">{esc(text)} {title_html} {esc(after)}</div>\n      '
+
+
+def gen_res_quote(page):
+    quote = page.get("quote")
+    if not quote:
+        return "\n"
+    return f'\n<div class="wrap"><p class="quote">{esc(quote)}</p></div>\n'
+
+
+def build_resources(site):
+    """Regenerate resources.html from the three resources-*.yml files.
+    Shares menu / footer / GA4 with index.html so those stay in sync."""
+    if not RESOURCES.exists():
+        return
+    page = _load_obj(DATA / "resources-page.yml")
+    links = _load_obj(DATA / "resources-links.yml")
+    verbs = _load_list(DATA / "resources-verbs.yml")
+
+    html = RESOURCES.read_text(encoding="utf-8")
+    html = replace_block(html, "res-meta", gen_res_meta(page))
+    html = replace_block(html, "res-og", gen_res_og(page, site))
+    html = replace_block(html, "res-json-ld", gen_res_json_ld(page, site))
+    html = replace_block(html, "ga4", gen_ga4(site))
+    html = replace_block(html, "menu", gen_menu(site, subpage="resources"))
+    html = replace_block(html, "res-hero", gen_res_hero(page, links, verbs))
+    html = replace_block(html, "res-rail", gen_res_rail(links))
+    html = replace_block(html, "res-sections", gen_res_sections(links))
+    html = replace_block(html, "res-verbs", gen_res_verbs(page, verbs))
+    html = replace_block(html, "res-source", gen_res_source(page))
+    html = replace_block(html, "res-quote", gen_res_quote(page))
+    html = replace_block(html, "footer", gen_footer(site))
+    RESOURCES.write_text(html, encoding="utf-8")
+
+    total, _fb, _per = _res_counts(links)
+    print(f"Wrote {RESOURCES.relative_to(ROOT)} ({total} links, {len(verbs)} verbs)")
 
 
 # ---------- main ----------
@@ -1536,6 +1790,9 @@ def main():
 
     INDEX.write_text(html, encoding="utf-8")
     print(f"Wrote {INDEX.relative_to(ROOT)}")
+
+    # Second page: resources.html (links + action verbs for other actors).
+    build_resources(site)
 
     # Report the one-page budget so growth is visible in the build log.
     pct = est_pt / PRINT_BUDGET_PT * 100

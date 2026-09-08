@@ -1,0 +1,186 @@
+# Resources page - the link list. Three levels:
+#   sections  -> the big headings (each also becomes a filter chip)
+#   groups    -> small caps sub-headings inside a section
+#   entries   -> one card per link
+#
+# Entry fields:
+#   name     - card title
+#   desc     - one line under the title (what it is / why it's here)
+#   url      - full URL
+#   kind     - fb | web | gov | school | book  (sets the icon + type pill)
+#   private  - true for request-to-join groups (shows a Private pill)
+#
+# `id` must be a short lowercase slug with no spaces; it becomes the
+# section anchor (#s-casting) and the chip's filter key. `chip` is the
+# short label on the filter chip.
+
+sections:
+  - id: casting
+    title: "Casting, Background & Stand-in"
+    chip: "Casting"
+    groups:
+      - title: "Facebook groups & pages"
+        entries:
+          - name: "Chicago Cine Casting"
+            desc: "Chicago PD background & stand-ins"
+            url: "https://www.facebook.com/ChicagoCineCasting/"
+            kind: fb
+          - name: "One Chicago Extras"
+            desc: "Chicago PD"
+            url: "https://www.facebook.com/OneChicagoExtras/"
+            kind: fb
+          - name: "Chicago Fire & Chicago Med Extras"
+            desc: "One Chicago background"
+            url: "https://www.facebook.com/people/Chicago-Fire-Extras"
+            kind: fb
+          - name: "4 Star Casting"
+            desc: "The Chi and more"
+            url: "https://www.facebook.com/4StarCasting"
+            kind: fb
+          - name: "Everyset Background Casting - Chicago"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/291103010620279"
+            kind: fb
+          - name: "Chicago Casting"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/649275436036362"
+            kind: fb
+          - name: "Chicagoland Extras"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/209909336153090"
+            kind: fb
+          - name: "Wayward Casting"
+            desc: "Page"
+            url: "https://www.facebook.com/WaywardCasting/"
+            kind: fb
+          - name: "Trigger Casting"
+            desc: "Page"
+            url: "https://www.facebook.com/TriggerCasting"
+            kind: fb
+          - name: "Chicago BG"
+            desc: "Request to join"
+            url: "https://www.facebook.com/groups/1063815790369278/"
+            kind: fb
+            private: true
+      - title: "Casting offices & listings"
+        entries:
+          - name: "Chicago Film Office"
+            desc: "Current casting information from the city"
+            url: "https://www.chicago.gov/city/en/depts/dca/supp_info/chicago_film_office11.html"
+            kind: gov
+          - name: "Illinois Film Office"
+            desc: "State film office, production listings"
+            url: "https://dceo.illinois.gov/whyillinois/film.html"
+            kind: gov
+          - name: "4 Star Casting"
+            desc: "Official site - The Chi"
+            url: "http://www.4starcasting.com/"
+            kind: web
+          - name: "Extra Ordinary Casting of Chicago"
+            desc: "Background casting office"
+            url: "http://www.extraordinarycasting.net/"
+            kind: web
+          - name: "Paskal Rudnicke Casting"
+            desc: "Principal casting, film and TV"
+            url: "https://prcasting.com/"
+            kind: web
+          - name: "Simon Casting"
+            desc: "Principal casting, film, TV and commercial"
+            url: "http://simoncasting.com/"
+            kind: web
+          - name: "O'Connor Casting"
+            desc: "Commercial and film casting"
+            url: "https://oconnorcasting.tv/"
+            kind: web
+      - title: "Submission sites"
+        entries:
+          - name: "Actors Access"
+            desc: "Breakdowns, submissions, self-tapes"
+            url: "https://actorsaccess.com/"
+            kind: web
+          - name: "Backstage"
+            desc: "Casting calls, auditions, industry news"
+            url: "https://www.backstage.com/"
+            kind: web
+          - name: "Casting Networks"
+            desc: "Commercial and print submissions"
+            url: "https://www.castingnetworks.com/"
+            kind: web
+
+  - id: classes
+    title: "Classes & Training"
+    chip: "Classes"
+    groups:
+      - title: "Where I've studied"
+        entries:
+          - name: "The Second City"
+            desc: "Improv, acting, conservatory, writing"
+            url: "https://www.secondcity.com/classes/chicago"
+            kind: school
+          - name: "Acting Studio Chicago"
+            desc: "On-camera, audition technique, intimacy tools"
+            url: "https://www.actingstudiochicago.com/"
+            kind: school
+      - title: "More schools & studios"
+        entries:
+          - name: "iO Theater"
+            desc: "Long-form improv, sketch, writing"
+            url: "https://ioimprov.com/classes/"
+            kind: school
+          - name: "The Annoyance Theatre"
+            desc: "Improv and sketch, Annoyance style"
+            url: "https://www.theannoyance.com/"
+            kind: school
+          - name: "Green Shirt Studio"
+            desc: "Meisner-based acting, on-camera, scene study"
+            url: "https://www.greenshirtstudio.com/"
+            kind: school
+          - name: "Chicago Filmmakers"
+            desc: "Acting for camera, production, workshops"
+            url: "https://chicagofilmmakers.org/"
+            kind: school
+          - name: "The Lincoln Lodge"
+            desc: "Improv, sketch and stand-up classes"
+            url: "https://www.thelincolnlodge.com/classes"
+            kind: school
+
+  - id: community
+    title: "Community & Crew"
+    chip: "Community"
+    groups:
+      - title: "Facebook communities"
+        entries:
+          - name: "Talent Managers for Actors"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/843656639050766"
+            kind: fb
+          - name: "Chicago Filmmakers"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/109674265769579"
+            kind: fb
+          - name: "Chicago Filmmakers Group"
+            desc: "Group"
+            url: "https://www.facebook.com/groups/1499557083689860"
+            kind: fb
+          - name: "Chicago Film Crews"
+            desc: "Crew calls and gear"
+            url: "https://www.facebook.com/groups/1593183987632789"
+            kind: fb
+      - title: "More resources"
+        entries:
+          - name: "SAG-AFTRA Chicago Local"
+            desc: "Union local, meetings, member resources"
+            url: "https://www.sagaftra.org/local/chicago"
+            kind: web
+          - name: "Chicago Filming Locations"
+            desc: "Permits and location info"
+            url: "https://www.chicagofilming.com/"
+            kind: gov
+          - name: "Acting Studio Chicago: Talent Agents"
+            desc: "Agent list for the Chicago market"
+            url: "https://www.actingstudiochicago.com/talent-agents/"
+            kind: web
+          - name: "Second City suggested reading"
+            desc: "My Goodreads shelf"
+            url: "https://www.goodreads.com/review/list/114731698-frank?shelf=acting-suggested-reading"
+            kind: book

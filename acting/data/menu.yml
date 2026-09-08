@@ -9,5 +9,7 @@ entries:
     url: "#resume"
   - label: "Credits"
     url: "#credits"
+  - label: "Resources"
+    url: "resources"
   - label: "Contact"
     url: "#contact"

@@ -1,0 +1,84 @@
+# Resources page - Action Verbs table. One entry per playable action.
+#   verb   - the action, without "To" (the page adds it)
+#   shades - comma-separated synonyms / neighbors that shade the verb
+# Keep the list alphabetical; the page renders it in file order.
+
+entries:
+  - { verb: "Abuse", shades: "mistreat, harm, debauch, curse, revile, batter" }
+  - { verb: "Annoy", shades: "pester, irritate, plague, torment, harass, badger" }
+  - { verb: "Assuage", shades: "moderate, soften, relieve, qualify, satisfy" }
+  - { verb: "Beg", shades: "entreat, implore, beseech, plead, fall on one's knees" }
+  - { verb: "Belittle", shades: "minimize, dwarf, underrate, undervalue, disparage, deprecate, degrade, debase, run down" }
+  - { verb: "Bend", shades: "influence, direct, deviate, subdue, conquer" }
+  - { verb: "Blame", shades: "censure, accuse, curse" }
+  - { verb: "Bridle", shades: "harness, restrain, hamper" }
+  - { verb: "Broaden", shades: "increase, enlarge, expand, widen" }
+  - { verb: "Castigate", shades: "criticize, punish, nail, reprimand" }
+  - { verb: "Chastise", shades: "correct, penalize, punish" }
+  - { verb: "Clinch", shades: "embrace, secure, cinch" }
+  - { verb: "Coach", shades: "advise, teach, drill, guide" }
+  - { verb: "Coerce", shades: "compel, force, drive, impel" }
+  - { verb: "Command", shades: "dominate, govern, discipline, order, dictate, direct, instruct, rule, ordain, possess, hold, boss, monopolize, hog" }
+  - { verb: "Compel", shades: "prompt, force" }
+  - { verb: "Conquer", shades: "vanquish, subdue, crush, subjugate, best, overcome, overpower, reduce, humble" }
+  - { verb: "Court", shades: "invite, woo, flatter, fool" }
+  - { verb: "Cradle", shades: "support, sustain, nurture, foster, suckle" }
+  - { verb: "Dazzle", shades: "blind, confuse, astonish" }
+  - { verb: "Demoralize", shades: "sully, defile, soil, drive to the dogs" }
+  - { verb: "Deny", shades: "refute, disclaim, reject, refuse, prohibit" }
+  - { verb: "Doctor", shades: "adulterate, falsify, treat, repair" }
+  - { verb: "Dog", shades: "pester, irritate, plague, torment, harass, badger" }
+  - { verb: "Dragoon", shades: "coerce, intimidate" }
+  - { verb: "Drive", shades: "compel, move, animate, pry, thrust, push, shove, ram, force, prod, goad, coerce" }
+  - { verb: "Dupe", shades: "deceive, victimize, beguile, trick, hoax, bamboozle, double-cross, bluff, hoodwink, cheat, swindle, defraud" }
+  - { verb: "Embolden", shades: "encourage, arouse, hearten, assure, inspire, serve, motivate, incite" }
+  - { verb: "Enslave", shades: "subjugate, enthrall, master, crush, quell" }
+  - { verb: "Evoke", shades: "elicit, provoke, induce, prompt, summon, conjure" }
+  - { verb: "Gag", shades: "silence, restrain, muzzle" }
+  - { verb: "Guilt", shades: "catch at, penetrate, blame, censure, accuse, condemn" }
+  - { verb: "Harm", shades: "hurt, impair, damage, worsen, break" }
+  - { verb: "Heal", shades: "doctor, cure" }
+  - { verb: "Honor", shades: "praise, celebrate, distinguish, worship, respect" }
+  - { verb: "Hoodwink", shades: "deceive, victimize, beguile, trick, hoax, gull" }
+  - { verb: "Induce", shades: "elicit, persuade, coax" }
+  - { verb: "Infuse", shades: "inspire, uplift, infect" }
+  - { verb: "Inspire", shades: "give hope, cheer, assure" }
+  - { verb: "Maul", shades: "abuse, bruise, persecute" }
+  - { verb: "Mollify", shades: "calm, tranquilize, soften, pacify, relieve, soothe, lull, subdue" }
+  - { verb: "Mystify", shades: "perplex, baffle, confound" }
+  - { verb: "Nourish", shades: "encourage, invite, abet, bolster" }
+  - { verb: "Nurse", shades: "suckle, nurture, attend" }
+  - { verb: "Nurture", shades: "feed, train, encourage, cherish, treasure" }
+  - { verb: "Overpower", shades: "upset, surmount, trip up, overwhelm" }
+  - { verb: "Pay back", shades: "retaliate, get even, strike back, avenge" }
+  - { verb: "Persecute", shades: "oppress, torment" }
+  - { verb: "Provoke", shades: "rile, induce, anger, excite, annoy" }
+  - { verb: "Punish", shades: "chastise, chasten, penalize, discipline, nail, castigate, correct" }
+  - { verb: "Purify", shades: "refine, cleanse, sanctify" }
+  - { verb: "Purloin", shades: "steal, swipe, pilfer, filch, swindle" }
+  - { verb: "Rally", shades: "encourage, hearten, inspire, arouse, motivate, stimulate" }
+  - { verb: "Reform", shades: "convert, remodel, regenerate, renew, turn over a new leaf" }
+  - { verb: "Rescue", shades: "save, free, deliver, release" }
+  - { verb: "Restrain", shades: "hinder, confine, restrict, cloister" }
+  - { verb: "Revive", shades: "restore, recover, refresh" }
+  - { verb: "Rob", shades: "steal, thieve, purloin, burglarize" }
+  - { verb: "Save", shades: "reserve, rescue, prevent, preserve" }
+  - { verb: "Settle", shades: "organize, fix, establish, assure, resolve, defeat, arrange, punish" }
+  - { verb: "Shake", shades: "rattle, unsettle, jolt, unnerve" }
+  - { verb: "Silence", shades: "quiet, hush, gag, muzzle, still" }
+  - { verb: "Smite", shades: "strike, afflict, punish, chastise" }
+  - { verb: "Soften", shades: "moderate, muffle, persuade, besiege, encircle, beleaguer" }
+  - { verb: "Solicit", shades: "implore" }
+  - { verb: "Soothe", shades: "calm, relieve" }
+  - { verb: "Suckle", shades: "nurse, nurture, minister" }
+  - { verb: "Tame", shades: "break, domesticate, subdue" }
+  - { verb: "Tantalize", shades: "tempt, tease, attract, invite, titillate, pique" }
+  - { verb: "Tarnish", shades: "dim, stain, taint, vilify, stigmatize" }
+  - { verb: "Teach", shades: "tutor, coach, instruct, direct, enlighten" }
+  - { verb: "Temper", shades: "moderate, restrain, tone down, mitigate" }
+  - { verb: "Tempt", shades: "enamor, endear, charm, fascinate, attract, captivate, bewitch" }
+  - { verb: "Threaten", shades: "menace, bludgeon, denounce, warn, intimidate" }
+  - { verb: "Titillate", shades: "tickle, interest, tempt, thrill, delight, amuse" }
+  - { verb: "Transform", shades: "change, convert, revamp" }
+  - { verb: "Vaporize", shades: "sublimate, evaporate" }
+  - { verb: "Wound", shades: "harm, injure, irritate, offend" }

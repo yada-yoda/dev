@@ -1,0 +1,30 @@
+# Resources page (resources.html) - page copy + SEO. The link list lives
+# in resources-links.yml and the action verbs in resources-verbs.yml so
+# each is a focused edit in Decap.
+
+eyebrow: "For actors"
+title: "Resources"
+intro: "Casting pages, background and stand-in groups, classes, and the working-actor cheat sheets I keep coming back to. Bookmark it, share it, use it."
+
+# Free text shown in the hero meta row (e.g. "September 2026"). Update
+# when you add or prune links so readers know the list is maintained.
+updated: "September 2026"
+
+# Short paragraph above the verb table.
+verbs_intro: "Play the verb, not the mood. Each entry is one playable action plus the neighbors that shade it. Type to filter."
+
+# Credit line under the verb table. Leave source_url empty to drop the link.
+source_text: "Verbs and synonyms adapted from"
+source_title: "Actions: The Actors' Thesaurus"
+source_url: "https://www.amazon.com/Actions-Actors-Thesaurus-Marina-Caldarone/dp/0896762521/"
+source_after: "by Marina Caldarone and Maggie Lloyd-Williams. Buy the book; this is the short list."
+
+# Closing line at the bottom of the page. Leave empty to hide it.
+quote: "Never announce your moves before you make them. Move in silence and shock them with your success."
+
+seo:
+  title: "Actor Resources - Casting, Classes & Action Verbs | Rizzo.cc"
+  description: "Chicago casting groups, background and stand-in pages, acting classes, submission sites, and a searchable action-verb list for actors. Free to use and share."
+  canonical_url: "https://rizzo.cc/resources"
+  og_title: "Actor Resources - Rizzo.cc"
+  og_description: "Casting groups, classes, submission sites, and a searchable action-verb list for working actors."
