@@ -18,7 +18,8 @@ Almost all visible content has a **second option**: the Decap CMS at
 | Training entries | Training | `data/training.yml` |
 | Physical / Languages / Measurements / Licensing / Skills / Favorite Films / Inspirations | Stats, Skills &amp; Influences | `data/panels.yml` |
 | Email, socials, contact copy, reel URL/file | Contact, Socials, Reel | `data/contact.yml` |
-| Everything else (CSS, layout, structural HTML) | &mdash; | `index.html` |
+| Resources page: copy + SEO, link list, Action Verbs | Resources Page | `data/resources-page.yml`, `data/resources-links.yml`, `data/resources-verbs.yml` |
+| Everything else (CSS, layout, structural HTML) | &mdash; | `index.html`, `resources.html` |
 
 **When you edit through Decap or the data files**, a GitHub Action
 regenerates `index.html` automatically within ~60 seconds. Don&rsquo;t
@@ -82,6 +83,25 @@ GitHub&rsquo;s web editor has a search box at the top.
 | `EDIT: print-header` | Name + ACTOR + Email/Web/Local Hire on PDF | &mdash; |
 | `EDIT: resume-year` | Year used in the PDF download filename | &mdash; |
 | `EDIT: ga4` | Google Analytics tracking ID | &mdash; |
+
+### Resources page (`resources.html`)
+
+The `/resources` page is built the same way from three data files. Its
+markers are `EDIT: res-meta`, `res-og`, `res-json-ld`, `res-hero`,
+`res-rail`, `res-sections`, `res-verbs`, `res-source`, `res-quote`,
+plus the shared `menu`, `footer`, and `ga4` blocks. All are regenerated
+by the build, so edit the data files (or the Resources Page collection
+in Decap), not the HTML.
+
+| Want to... | Edit |
+|---|---|
+| Add, remove, or reorder a link | `data/resources-links.yml` &rarr; find the section &rarr; group &rarr; add an entry (name, desc, url, kind, private) |
+| Add a whole new section or filter chip | Add a section (id, title, chip, groups) to `data/resources-links.yml`. The chip and its count appear automatically. |
+| Change the "Updated" date, intro, or closing quote | `data/resources-page.yml` |
+| Add a verb to the Action Verbs table | `data/resources-verbs.yml` (keep alphabetical) |
+| Add a menu link to the page | `data/menu.yml` &rarr; `url: "resources"` (already there) |
+
+Link `kind` values: `fb`, `web`, `gov`, `school`, `book`. Anything else falls back to the Website pill.
 
 When a screen edit has a print-resume mirror, **change both** so the
 website and the PDF stay in sync.

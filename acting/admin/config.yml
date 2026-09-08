@@ -557,3 +557,98 @@ collections:
             hint: "Used when 'Which reel to show' is set to YouTube / Vimeo link. Paste the normal link from your browser (youtube.com/watch?v=..., youtu.be/..., or vimeo.com/...) - it is converted to the correct embed form automatically."
 
           - { label: "Placeholder text", name: "placeholder", widget: "string", default: "Reel coming soon", hint: "Shown when 'Which reel to show' is set to Nothing yet." }
+
+  # ============ RESOURCES PAGE ============
+  # resources.html - the "for other actors" page: casting groups, classes,
+  # community links, and the Action Verbs table. Three per-topic files so
+  # each is a focused edit. The GitHub Action regenerates resources.html
+  # from these on publish, same as index.html.
+  - name: "resources"
+    label: "Resources Page"
+    description: "The /resources page for other actors: page copy, the link list (sections > groups > links), and the Action Verbs table."
+    files:
+      - file: "acting/data/resources-page.yml"
+        label: "Page copy + SEO"
+        name: "resources_page"
+        fields:
+          - { label: "Eyebrow (small caps line above the title)", name: "eyebrow", widget: "string", default: "For actors" }
+          - { label: "Title", name: "title", widget: "string", default: "Resources" }
+          - { label: "Intro paragraph", name: "intro", widget: "text" }
+          - { label: "Updated (free text, e.g. September 2026)", name: "updated", widget: "string", hint: "Shown in the hero. Bump it whenever you add or prune links." }
+          - { label: "Action Verbs intro line", name: "verbs_intro", widget: "string", required: false }
+          - label: "Verb list credit line"
+            name: "source_text"
+            widget: "string"
+            required: false
+            hint: "Text before the book title, e.g. 'Verbs and synonyms adapted from'."
+          - { label: "Credit: book title", name: "source_title", widget: "string", required: false }
+          - { label: "Credit: book link", name: "source_url", widget: "string", required: false, hint: "Leave empty to show the title without a link." }
+          - { label: "Credit: text after the title", name: "source_after", widget: "string", required: false }
+          - { label: "Closing quote (bottom of page)", name: "quote", widget: "string", required: false, hint: "Leave empty to hide it." }
+          - label: "SEO + social preview"
+            name: "seo"
+            widget: "object"
+            fields:
+              - { label: "Page title (browser tab + Google)", name: "title", widget: "string", hint: "Keep under ~60 chars" }
+              - { label: "Meta description", name: "description", widget: "text", hint: "Keep under ~155 chars" }
+              - { label: "Canonical URL", name: "canonical_url", widget: "string", default: "https://rizzo.cc/resources" }
+              - { label: "Social preview title", name: "og_title", widget: "string", required: false }
+              - { label: "Social preview description", name: "og_description", widget: "text", required: false }
+
+      - file: "acting/data/resources-links.yml"
+        label: "Links"
+        name: "resources_links"
+        fields:
+          - label: "Sections"
+            name: "sections"
+            widget: "list"
+            label_singular: "Section"
+            summary: "{{fields.title}}"
+            hint: "Each section is a big heading AND a filter chip in the left rail. Drag to reorder."
+            fields:
+              - { label: "ID (short slug, lowercase, no spaces)", name: "id", widget: "string", pattern: ["^[a-z0-9-]+$", "Lowercase letters, numbers and dashes only"], hint: "Becomes the section anchor (#s-casting) and the chip's filter key. Don't change it once the page is live - links to it would break." }
+              - { label: "Heading", name: "title", widget: "string" }
+              - { label: "Chip label (short)", name: "chip", widget: "string", hint: "The one-word label on the filter chip, e.g. Casting" }
+              - label: "Groups"
+                name: "groups"
+                widget: "list"
+                label_singular: "Group"
+                summary: "{{fields.title}}"
+                hint: "Small-caps sub-heading inside the section, e.g. 'Facebook groups & pages'."
+                fields:
+                  - { label: "Group heading", name: "title", widget: "string" }
+                  - label: "Links"
+                    name: "entries"
+                    widget: "list"
+                    label_singular: "Link"
+                    summary: "{{fields.name}} - {{fields.url}}"
+                    fields:
+                      - { label: "Name", name: "name", widget: "string" }
+                      - { label: "One-line description", name: "desc", widget: "string", hint: "What it is or why it's here, e.g. 'Chicago PD background & stand-ins'." }
+                      - { label: "URL", name: "url", widget: "string" }
+                      - label: "Type"
+                        name: "kind"
+                        widget: "select"
+                        default: "web"
+                        hint: "Sets the icon and the small type pill on the card."
+                        options:
+                          - { label: "Facebook group / page", value: "fb" }
+                          - { label: "Website",               value: "web" }
+                          - { label: "Official / government", value: "gov" }
+                          - { label: "School / studio",       value: "school" }
+                          - { label: "Reading / books",       value: "book" }
+                      - { label: "Private (request to join)", name: "private", widget: "boolean", default: false, required: false, hint: "Shows a Private pill instead of the type pill." }
+
+      - file: "acting/data/resources-verbs.yml"
+        label: "Action Verbs"
+        name: "resources_verbs"
+        fields:
+          - label: "Verbs"
+            name: "entries"
+            widget: "list"
+            label_singular: "Verb"
+            summary: "To {{fields.verb}}"
+            hint: "Keep alphabetical. The page shows them in this order."
+            fields:
+              - { label: "Verb (without 'To')", name: "verb", widget: "string" }
+              - { label: "Shades (comma-separated synonyms)", name: "shades", widget: "string", required: false }

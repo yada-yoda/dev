@@ -16,6 +16,7 @@ on:
     branches: [main]
     paths:
       - 'acting/index.html'
+      - 'acting/resources.html'
       - 'acting/404.html'
       - 'acting/assets/**'
       - 'acting/humans.txt'
