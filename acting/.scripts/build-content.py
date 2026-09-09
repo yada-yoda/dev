@@ -108,7 +108,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.12.0"
+SITE_VERSION = "v0.13.0"
 
 
 # ---------- helpers ----------
@@ -1390,6 +1390,11 @@ def gen_footer(site):
             rendered = rendered.rstrip() + " " + version_html
     else:
         rendered = rendered.replace("{{version}}", "")
+
+    # Old-school visit counter, to the right of the version. Starts hidden and
+    # is revealed by JS only once a real number arrives, so a Worker outage or
+    # a blocked request leaves no empty artifact in the footer.
+    rendered = rendered.rstrip() + '<span class="hits" id="hits" hidden></span>'
 
     return f"\n<footer>\n  {rendered}\n</footer>\n"
 

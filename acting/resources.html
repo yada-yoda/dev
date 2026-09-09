@@ -247,6 +247,13 @@ footer{
   text-align:center;
 }
 footer .ver{display:inline-block;margin-left:8px;border:1px solid var(--line);border-radius:4px;padding:1px 6px;font-size:11px}
+/* Visit counter chip, matching .ver. tabular-nums keeps the width steady. */
+footer .hits{
+  display:inline-block;margin-left:6px;border:1px solid var(--line);
+  border-radius:4px;padding:1px 6px;font-size:11px;
+  font-variant-numeric:tabular-nums;cursor:default;
+}
+footer .hits[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -466,7 +473,7 @@ footer .ver{display:inline-block;margin-left:8px;border:1px solid var(--line);bo
 
 <!-- EDIT: footer — auto-generated from data/footer.yml. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.12.0</span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.13.0</span><span class="hits" id="hits" hidden></span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -535,6 +542,32 @@ footer .ver{display:inline-block;margin-left:8px;border:1px solid var(--line);bo
 
   // ---- Year ----
   const yr = document.getElementById('yr'); if (yr) yr.textContent = new Date().getFullYear();
+
+  /* Footer visit counter - same Worker and same session/opt-out rules as the
+     home page, so both pages of the site share one honest total. See the
+     longer comment in index.html. */
+  (function visitCounter(){
+    var el = document.getElementById('hits');
+    if (!el) return;
+    var counted = false, optout = false;
+    try {
+      counted = sessionStorage.getItem('hit') === '1';
+      optout  = localStorage.getItem('ga_optout') === '1';
+    } catch(e){}
+    var bump = !counted && !optout;
+    fetch('https://hits-worker.sevendwarfs.workers.dev/hit/rizzocc',
+          {method: bump ? 'POST' : 'GET'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (!d || typeof d.count !== 'number') return;
+        if (bump){ try { sessionStorage.setItem('hit','1'); } catch(e){} }
+        el.textContent = d.count.toLocaleString('en-US') +
+                         (d.count === 1 ? ' visit' : ' visits');
+        el.title = 'Visits to rizzo.cc, counted once per browser session.';
+        el.hidden = false;
+      })
+      .catch(function(){});
+  })();
 })();
 </script>
 </body>
