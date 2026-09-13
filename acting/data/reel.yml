@@ -22,4 +22,16 @@ source: "file"
 
 url: ""
 file: "assets/reel/frank-rizzo-reel.mp4"
+
+# Still shown before play, on the home page and /reel. If you swap the
+# reel, replace this too (a frame from ~2 s in works well) or clear it to
+# let the browser use the first frame.
+#   ffmpeg -ss 2 -i reel.mp4 -frames:v 1 poster.jpg
+poster: "assets/reel/frank-rizzo-reel-poster.jpg"
+
+# For the video's structured data on /reel (Google video results).
+# uploaded = when the reel was cut (YYYY-MM-DD); duration in whole seconds.
+uploaded: "2026-08-12"
+duration_seconds: 29
+
 placeholder: "Reel coming soon"

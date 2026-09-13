@@ -22,4 +22,14 @@
     <changefreq>monthly</changefreq>
     <priority>0.6</priority>
   </url>
+  <url>
+    <loc>https://rizzo.cc/reel</loc>
+    <lastmod>2026-09-13</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+    <image:image>
+      <image:loc>https://rizzo.cc/assets/reel/frank-rizzo-reel-poster.jpg</image:loc>
+      <image:title>Frank Rizzo acting reel</image:title>
+    </image:image>
+  </url>
 </urlset>

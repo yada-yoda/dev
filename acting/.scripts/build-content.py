@@ -31,7 +31,8 @@ as a separate clickable entry):
   Contact, Socials, Reel collection:
     data/contact.yml      — email + contact_section copy
     data/socials.yml      — social pills (entries:)
-    data/reel.yml         — reel embed (url, file, placeholder)
+    data/reel.yml         — reel embed (source, url, file, poster, placeholder)
+    data/reel-page.yml    — /reel page copy, SEO, chapters (Reel Page collection)
 
   Site Settings collection:
     data/seo.yml          — SEO + Open Graph + Twitter card
@@ -103,12 +104,13 @@ except ImportError:
 ROOT = Path(__file__).resolve().parent.parent
 INDEX = ROOT / "index.html"
 RESOURCES = ROOT / "resources.html"
+REEL = ROOT / "reel.html"
 DATA = ROOT / "data"
 
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.13.0"
+SITE_VERSION = "v0.14.0"
 
 
 # ---------- helpers ----------
@@ -1231,9 +1233,13 @@ def gen_reel(contact):
             f'      </div>\n      '
         )
     if source == "file" and fil:
+        # Poster = the still shown before play. Optional; without it the
+        # browser shows whatever frame preload="metadata" lands on.
+        poster = (r.get("poster") or "").strip()
+        poster_attr = f' poster="{esc(poster)}"' if poster else ""
         return (
             f'\n      <div class="reel">\n'
-            f'        <video controls playsinline preload="metadata"><source src="{esc(fil)}" type="video/mp4"></video>\n'
+            f'        <video controls playsinline preload="metadata"{poster_attr}><source src="{esc(fil)}" type="video/mp4"></video>\n'
             f'      </div>\n      '
         )
     return (
@@ -1641,6 +1647,281 @@ def build_resources(site):
     print(f"Wrote {RESOURCES.relative_to(ROOT)} ({total} links, {len(verbs)} verbs)")
 
 
+# ---------- Reel page (reel.html) ----------
+# /reel is the one-screen page for agents: the same reel the home page
+# shows (data/reel.yml via gen_reel), a strip with headshot / name / facts
+# / credits / buttons, optional jump-to-clip chapters, and the home page's
+# printable resume copied in at build time so the two can never disagree.
+
+def _abs_url(site, rel):
+    """Site-relative asset path -> absolute production URL."""
+    base = str((site.get("seo") or {}).get("canonical_url", "https://rizzo.cc/")).rstrip("/") + "/"
+    rel = str(rel or "")
+    if rel.startswith("http://") or rel.startswith("https://"):
+        return rel
+    return base + rel.lstrip("/")
+
+
+def _reel_facts(page, panels):
+    """Fill the facts template ({{height}} etc.) from physical + licensing.
+    Height and age range are wrapped in <i> so the CSS can accent them."""
+    phys = panels.get("physical") or {}
+    lic = panels.get("licensing") or {}
+    tpl = str(page.get("facts") or "Actor · {{local_hire}} · {{height}} · {{age_range}} · {{union}}")
+    vals = {
+        "height": f'<i>{esc(phys.get("height", ""))}</i>',
+        "age_range": f'<i>{esc(phys.get("age_range", ""))}</i>',
+        "union": esc(lic.get("union", "")),
+        "local_hire": esc(lic.get("local_hire", "")),
+    }
+    out = esc(tpl)
+    for k, v in vals.items():
+        out = out.replace("{{" + k + "}}", v)
+    return out
+
+
+def _reel_credits(credits, n):
+    """Newest-first titles across film, tv, theater for the strip. Films
+    dated after this year are unreleased and skipped, so an in-progress
+    feature never leads the line."""
+    year = _dt.date.today().year
+    out = []
+    for f in credits.get("film") or []:
+        try:
+            if int(f.get("year") or 0) > year:
+                continue
+        except (TypeError, ValueError):
+            pass
+        out.append(f.get("title", ""))
+    out += [t.get("title", "") for t in credits.get("tv") or []]
+    out += [t.get("production", "") for t in credits.get("theater") or []]
+    out = [o for o in out if o]
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        n = 4
+    return out[: max(0, n)]
+
+
+def gen_reel_meta(page):
+    s = page.get("seo") or {}
+    return (
+        f'\n<title>{esc(s.get("title"))}</title>\n'
+        f'<meta name="description" content="{esc(s.get("description"))}">\n'
+        '<meta name="theme-color" content="#0b0c11">\n'
+        '<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">\n'
+        f'<link rel="canonical" href="{esc(s.get("canonical_url", "https://rizzo.cc/reel"))}">\n'
+    )
+
+
+def gen_reel_og(page, site, reel):
+    s = page.get("seo") or {}
+    og = site.get("og") or {}
+    title = s.get("og_title") or s.get("title")
+    desc = s.get("og_description") or s.get("description")
+    canonical = s.get("canonical_url", "https://rizzo.cc/reel")
+    poster = _abs_url(site, reel["poster"]) if reel.get("poster") else og.get("image", "https://rizzo.cc/assets/og-image.png")
+    source = str(reel.get("source") or "").lower()
+    lines = [
+        "",
+        '<meta property="og:type" content="video.other">',
+        f'<meta property="og:site_name" content="{esc(og.get("site_name", "Rizzo.cc"))}">',
+        f'<meta property="og:title" content="{esc(title)}">',
+        f'<meta property="og:description" content="{esc(desc)}">',
+        f'<meta property="og:url" content="{esc(canonical)}">',
+        f'<meta property="og:image" content="{esc(poster)}">',
+        f'<meta property="og:image:secure_url" content="{esc(poster)}">',
+        f'<meta property="og:image:alt" content="{esc(og.get("image_alt", ""))}">',
+        f'<meta property="og:locale" content="{esc(og.get("locale", "en_US"))}">',
+    ]
+    if source == "file" and reel.get("file"):
+        mp4 = _abs_url(site, reel["file"])
+        lines += [
+            f'<meta property="og:video" content="{esc(mp4)}">',
+            f'<meta property="og:video:secure_url" content="{esc(mp4)}">',
+            '<meta property="og:video:type" content="video/mp4">',
+        ]
+    elif source == "embed" and reel.get("url"):
+        lines.append(f'<meta property="og:video" content="{esc(embed_url(reel["url"]))}">')
+    lines += [
+        "",
+        "<!-- Twitter / X -->",
+        '<meta name="twitter:card" content="summary_large_image">',
+        f'<meta name="twitter:title" content="{esc(title)}">',
+        f'<meta name="twitter:description" content="{esc(desc)}">',
+        f'<meta name="twitter:image" content="{esc(poster)}">',
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def gen_reel_json_ld(page, site, reel):
+    """VideoObject so search engines can surface /reel as a video result."""
+    s = page.get("seo") or {}
+    canonical = str(s.get("canonical_url", "https://rizzo.cc/reel"))
+    home = str((site.get("seo") or {}).get("canonical_url", "https://rizzo.cc/"))
+    data = {
+        "@context": "https://schema.org",
+        "@type": "VideoObject",
+        "@id": canonical + "#video",
+        "url": canonical,
+        "name": s.get("title"),
+        "description": s.get("description"),
+        "inLanguage": "en-US",
+        "isPartOf": {"@id": home + "#website"},
+        "actor": {"@id": home + "#frank"},
+    }
+    if reel.get("poster"):
+        data["thumbnailUrl"] = _abs_url(site, reel["poster"])
+    source = str(reel.get("source") or "").lower()
+    if source == "file" and reel.get("file"):
+        data["contentUrl"] = _abs_url(site, reel["file"])
+        data["encodingFormat"] = "video/mp4"
+    elif source == "embed" and reel.get("url"):
+        data["embedUrl"] = embed_url(reel["url"])
+    if reel.get("uploaded"):
+        data["uploadDate"] = str(reel["uploaded"])
+    try:
+        secs = int(reel.get("duration_seconds") or 0)
+        if secs > 0:
+            data["duration"] = f"PT{secs}S"
+    except (TypeError, ValueError):
+        pass
+    return "\n<script type=\"application/ld+json\">\n" + json.dumps(data, indent=2, ensure_ascii=False) + "\n</script>\n"
+
+
+def gen_reel_chapters(page):
+    """Jump-to-clip chips under the video. Each chapter is {label, time},
+    time in seconds. Empty when none are set, so the row disappears."""
+    chips = []
+    for c in page.get("chapters") or []:
+        try:
+            t = float(c.get("time") or 0)
+        except (TypeError, ValueError):
+            continue
+        label = str(c.get("label") or "").strip()
+        if not label:
+            continue
+        m, sec = divmod(int(round(t)), 60)
+        chips.append(
+            f'    <button type="button" data-t="{t:g}" data-label="{esc(label)}">'
+            f'{esc(label)}<small>{m}:{sec:02d}</small></button>'
+        )
+    if not chips:
+        return "\n  "
+    return '\n  <div class="chapters" aria-label="Jump to clip">\n' + "\n".join(chips) + "\n  </div>\n  "
+
+
+def gen_reel_strip(page, site, reel, panels, credits, contact, headshots):
+    name = (site.get("seo") or {}).get("author") or "Frank Rizzo"
+    entries = headshots.get("entries") or []
+    thumb = ""
+    if entries:
+        thumb = (
+            f'<img class="thumb" src="{esc(entries[0].get("image", ""))}" '
+            f'alt="{esc(entries[0].get("alt", ""))}" width="56" height="56">'
+        )
+    facts = _reel_facts(page, panels)
+    tagline = str(page.get("tagline") or "").strip()
+    cred = _reel_credits(credits, page.get("credits_max", 4))
+    b = page.get("buttons") or {}
+    email = contact.get("email", "")
+    href = mailto_url(email, b.get("email_subject") or contact.get("email_subject", ""))
+    source = str(reel.get("source") or "").lower()
+
+    acts = [f'<a class="btn" href="{esc(href)}">{esc(b.get("email", "Email"))}</a>']
+    acts.append(f'<button type="button" class="btn ghost js-print">{esc(b.get("resume", "Resume (PDF)"))}</button>')
+    if source == "file" and reel.get("file"):
+        # Download button only makes sense for an uploaded file; a
+        # YouTube/Vimeo embed has nothing to hand over.
+        fname = re.sub(r"[^A-Za-z0-9]+", "-", name).strip("-") + "-Reel.mp4"
+        acts.append(
+            f'<a class="btn ghost" href="{esc(reel["file"])}" download="{esc(fname)}">'
+            f'{esc(b.get("download", "Download MP4"))}</a>'
+        )
+    if b.get("actors_access_url"):
+        acts.append(
+            f'<a class="btn ghost" href="{esc(b["actors_access_url"])}" target="_blank" rel="noopener">'
+            f'{esc(b.get("actors_access", "Actors Access"))}</a>'
+        )
+
+    lines = ["", '    <div class="who">', f"      {thumb}", "      <div>",
+             f"        <h1>{esc(name)}</h1>",
+             f'        <p class="facts">{facts}</p>']
+    if tagline:
+        lines.append(f'        <p class="tagline">{esc(tagline)}</p>')
+    if cred:
+        lines.append(f'        <p class="credits">{" &middot; ".join(esc(c) for c in cred)}</p>')
+    lines += ["      </div>", "    </div>", '    <div class="acts">']
+    lines += [f"      {a}" for a in acts]
+    lines += ["    </div>", "    "]
+    return "\n".join(lines)
+
+
+def _extract_print_assets(index_html):
+    """Lift the printable resume out of the BUILT index.html: the CSS run
+    that holds .resume-sheet + the @media print block, and the .resume-sheet
+    div itself (already stamped with its density tier). Copying rather than
+    regenerating means /reel prints the exact same one-page resume."""
+    css_start = index_html.find("/* The resume sheet is hidden on screen")
+    assert css_start >= 0, "index.html: resume print CSS anchor not found"
+    mp = index_html.find("@media print{", css_start)
+    assert mp >= 0, "index.html: @media print block not found"
+    depth, i = 0, mp
+    while i < len(index_html):
+        ch = index_html[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                break
+        i += 1
+    assert depth == 0, "index.html: unbalanced @media print block"
+    css = index_html[css_start:i + 1]
+
+    d_start = index_html.find('<div class="resume-sheet')
+    assert d_start >= 0, "index.html: resume-sheet div not found"
+    # Walk to the sheet's own closing tag by div depth rather than relying
+    # on whatever happens to follow it in index.html (the floating print
+    # button sits BEFORE the sheet, so a forward search for it finds nothing).
+    depth = 0
+    d_end = -1
+    for m in re.finditer(r"<(/?)div\b", index_html[d_start:]):
+        depth += -1 if m.group(1) else 1
+        if depth == 0:
+            d_end = index_html.index(">", d_start + m.end()) + 1
+            break
+    assert d_end > d_start, "index.html: resume-sheet div never closes"
+    return css, index_html[d_start:d_end]
+
+
+def build_reel(site, credits, panels, contact, headshots):
+    """Regenerate reel.html. Must run AFTER index.html is written, because
+    it lifts the finished resume block out of that file."""
+    if not REEL.exists():
+        return
+    page = _load_obj(DATA / "reel-page.yml")
+    reel = contact.get("reel") or {}
+    print_css, sheet = _extract_print_assets(INDEX.read_text(encoding="utf-8"))
+
+    html = REEL.read_text(encoding="utf-8")
+    html = replace_block(html, "reel-meta", gen_reel_meta(page))
+    html = replace_block(html, "reel-og", gen_reel_og(page, site, reel))
+    html = replace_block(html, "reel-json-ld", gen_reel_json_ld(page, site, reel))
+    html = replace_block(html, "ga4", gen_ga4(site))
+    html = replace_block(html, "print-css", "\n<style>\n" + print_css + "\n</style>\n")
+    html = replace_block(html, "menu", gen_menu(site, subpage="reel"))
+    html = replace_block(html, "reel-video", gen_reel(contact))
+    html = replace_block(html, "reel-chapters", gen_reel_chapters(page))
+    html = replace_block(html, "reel-strip", gen_reel_strip(page, site, reel, panels, credits, contact, headshots))
+    html = replace_block(html, "footer", gen_footer(site))
+    html = replace_block(html, "resume-sheet", "\n" + sheet + "\n")
+    REEL.write_text(html, encoding="utf-8")
+    n_ch = len(page.get("chapters") or [])
+    print(f"Wrote {REEL.relative_to(ROOT)} (reel source: {reel.get('source') or 'auto'}, {n_ch} chapters)")
+
+
 # ---------- main ----------
 
 def _load_list(path):
@@ -1798,6 +2079,7 @@ def main():
 
     # Second page: resources.html (links + action verbs for other actors).
     build_resources(site)
+    build_reel(site, credits, panels, contact, headshots)
 
     # Report the one-page budget so growth is visible in the build log.
     pct = est_pt / PRINT_BUDGET_PT * 100

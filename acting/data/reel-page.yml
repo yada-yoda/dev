@@ -1,0 +1,35 @@
+# Reel page (rizzo.cc/reel) - copy and SEO. Edited via Decap CMS > Reel Page.
+#
+# This is the one-screen page you send agents. The reel ITSELF is not set
+# here: it comes from data/reel.yml, the same source the home page's
+# Selected Work block uses, so changing the reel once updates both pages.
+# Stats come from physical.yml + licensing.yml; the credits line is built
+# from film.yml / tv.yml / theater.yml (newest first, unreleased films
+# skipped); the printable resume is the home page's, copied in at build.
+
+seo:
+  title: "Frank Rizzo - Acting Reel | Rizzo.cc"
+  description: "30-second acting reel for Frank Rizzo, Chicago-based non-union actor. Watch it, download the MP4, or save the one-page resume."
+  canonical_url: "https://rizzo.cc/reel"
+  og_title: "Frank Rizzo - Acting Reel"
+  og_description: "30-second reel. Watch, download, and grab the one-page resume."
+
+# Line under the name. {{height}} {{age_range}} {{union}} {{local_hire}}
+# fill in from your Stats so this never goes stale.
+facts: "Actor · {{local_hire}} · {{height}} · {{age_range}} · {{union}} · 30-second reel"
+
+# One short line under the facts. Blank hides it.
+tagline: ""
+
+# How many titles to list under the facts, newest first across Film, TV
+# and Theater. Films dated after this year are unreleased and skipped.
+credits_max: 4
+
+buttons:
+  email: "Email Frank"
+  # Different from the home page's subject so reel-driven mail is easy to spot.
+  email_subject: "Reel inquiry via Rizzo.cc"
+  resume: "Resume (PDF)"
+  download: "Download MP4"
+  actors_access: "Actors Access"
+  actors_access_url: "https://resumes.actorsaccess.com/frankrizzo"

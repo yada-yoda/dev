@@ -186,6 +186,50 @@ collections:
               - { label: "Label", name: "label", widget: "string", hint: "Short name for this look, e.g. 'Suit and tie', 'Casual quarter-zip', 'Dramatic B&W'. Shown as the thumbnail's accessible name and in the list summary above." }
               - { label: "Alt text", name: "alt", widget: "string", hint: "Describes the photo for screen readers and search engines. Include wardrobe + backdrop, e.g. 'Frank Rizzo, Chicago-based actor — smiling color headshot, gray quarter-zip, white backdrop'." }
 
+  # ============ REEL PAGE (/reel) ============
+  # The one-screen page you send agents. The video itself is set under
+  # Contact, Socials, Reel > Reel; this is the copy around it.
+  - name: "reel_page"
+    label: "Reel Page"
+    description: "Copy, SEO and chapters for rizzo.cc/reel - the page you send agents. The video comes from Contact, Socials, Reel > Reel, so it always matches the home page."
+    files:
+      - file: "acting/data/reel-page.yml"
+        label: "Reel page"
+        name: "reel_page"
+        fields:
+          - label: "SEO"
+            name: "seo"
+            widget: "object"
+            fields:
+              - { label: "Page title", name: "title", widget: "string", hint: "Browser tab + Google result. Keep under about 60 characters." }
+              - { label: "Meta description", name: "description", widget: "text", hint: "Shown in Google results. Keep under about 155 characters." }
+              - { label: "Canonical URL", name: "canonical_url", widget: "string", default: "https://rizzo.cc/reel" }
+              - { label: "Social title", name: "og_title", widget: "string", required: false, hint: "What Slack, iMessage, etc. show when the link is shared. Blank uses the page title." }
+              - { label: "Social description", name: "og_description", widget: "text", required: false }
+          - { label: "Facts line", name: "facts", widget: "string", hint: "The line under your name. Use {{height}}, {{age_range}}, {{union}} and {{local_hire}} and they fill in from your Stats, so this never goes stale." }
+          - { label: "Tagline (optional)", name: "tagline", widget: "string", required: false, hint: "One short line under the facts. Leave blank to hide." }
+          - { label: "Credits shown", name: "credits_max", widget: "number", value_type: "int", min: 0, max: 8, default: 4, hint: "How many titles to list, newest first across Film, TV and Theater. Unreleased films (a future year) are skipped." }
+          - label: "Chapters (jump-to-clip chips)"
+            name: "chapters"
+            widget: "list"
+            required: false
+            label_singular: "Chapter"
+            summary: "{{fields.label}} at {{fields.time}}s"
+            hint: "Optional chips under the video that jump to a clip. Time is seconds from the start (14 or 14.5). Leave the list empty to hide the row."
+            fields:
+              - { label: "Label", name: "label", widget: "string", hint: "e.g. Waiter Boys, Deadly Domicile, Comedic, Dramatic" }
+              - { label: "Start (seconds)", name: "time", widget: "number", value_type: "float", min: 0, step: 0.5 }
+          - label: "Buttons"
+            name: "buttons"
+            widget: "object"
+            fields:
+              - { label: "Email button", name: "email", widget: "string", default: "Email Frank" }
+              - { label: "Email subject", name: "email_subject", widget: "string", default: "Reel inquiry via Rizzo.cc", hint: "Different from the home page's subject so reel-driven mail is easy to spot in your inbox." }
+              - { label: "Resume button", name: "resume", widget: "string", default: "Resume (PDF)", hint: "Prints the same one-page resume as the home page." }
+              - { label: "Download button", name: "download", widget: "string", default: "Download MP4", hint: "Only shown when the reel is an uploaded file." }
+              - { label: "Actors Access button", name: "actors_access", widget: "string", default: "Actors Access" }
+              - { label: "Actors Access URL", name: "actors_access_url", widget: "string", required: false, hint: "Leave blank to hide the button." }
+
   # ============ BIO ============
   - name: "bio"
     label: "Bio"
@@ -556,6 +600,15 @@ collections:
             required: false
             hint: "Used when 'Which reel to show' is set to YouTube / Vimeo link. Paste the normal link from your browser (youtube.com/watch?v=..., youtu.be/..., or vimeo.com/...) - it is converted to the correct embed form automatically."
 
+          - label: "Poster frame"
+            name: "poster"
+            widget: "image"
+            required: false
+            media_folder: "/acting/assets/reel"
+            public_folder: "assets/reel"
+            hint: "The still shown before play, on both the home page and /reel. If you swap the reel, replace this too (a frame from about 2 seconds in works well) or clear it to let the browser use the first frame."
+          - { label: "Reel cut date", name: "uploaded", widget: "string", required: false, hint: "YYYY-MM-DD. Goes into the video's structured data on /reel so Google can show it as a video result. When the reel was cut, not when it was uploaded here." }
+          - { label: "Length (seconds)", name: "duration_seconds", widget: "number", value_type: "int", required: false, min: 1, hint: "Whole seconds, for the same structured data. A 30-second reel is 29 or 30." }
           - { label: "Placeholder text", name: "placeholder", widget: "string", default: "Reel coming soon", hint: "Shown when 'Which reel to show' is set to Nothing yet." }
 
   # ============ RESOURCES PAGE ============

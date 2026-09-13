@@ -17,6 +17,7 @@ on:
     paths:
       - 'acting/index.html'
       - 'acting/resources.html'
+      - 'acting/reel.html'
       - 'acting/404.html'
       - 'acting/assets/**'
       - 'acting/humans.txt'

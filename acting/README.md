@@ -3,11 +3,34 @@
 Static site source, edited via a self-hosted CMS and mirrored to a
 production repo for deployment.
 
-Two pages: `index.html` (the profile) and `resources.html` (links and
-an action-verb table for other actors). Both are regenerated from
-`data/*.yml` by `.scripts/build-content.py`; see `EDITING.md`.
+Three pages: `index.html` (the profile), `resources.html` (links and
+an action-verb table for other actors), and `reel.html` (the reel page
+for agents). All are regenerated from `data/*.yml` by
+`.scripts/build-content.py`; see `EDITING.md`.
 
 ## Changelog
+
+### v0.14.0 - 2026-09-13
+
+New `/reel` page - the link to send agents. It shows the same reel the
+home page's Selected Work block uses (change it once in the CMS and both
+update), with a headshot, name, the key stats, a short credits line, and
+four buttons: Email, Resume (PDF), Download MP4, Actors Access.
+
+The Resume button prints the exact same one-page resume as the home page.
+Rather than building a second copy, the build lifts the finished resume
+out of the home page and drops it into /reel, so the two can never drift.
+
+Sending a personalised link works out of the box: add `?from=bigmouth`
+(any short tag) and every view, play, halfway mark, completion, download
+and resume print is recorded in Analytics with that tag, so you can see
+which agency actually opened it. The page has its own visit counter in the
+footer, separate from the home page's.
+
+Chapters are supported (jump-to-clip chips under the video, set in the CMS
+under Reel Page) and will be filled in once the clip boundaries are
+confirmed. The reel now has a poster frame on both pages, and /reel
+carries video structured data so Google can show it as a video result.
 
 ### v0.13.0 - 2026-09-09
 
