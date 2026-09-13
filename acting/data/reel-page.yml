@@ -23,7 +23,10 @@ tagline: ""
 
 # How many titles to list under the facts, newest first across Film, TV
 # and Theater. Films dated after this year are unreleased and skipped.
-credits_max: 4
+# 0 hides the line - kept off because the newest credits are not all in
+# the reel, and a title an agent can't then find in the video reads as
+# a mismatch.
+credits_max: 0
 
 # Jump-to-clip chips under the video. Time is seconds into the reel; the
 # label is what the chip says. Leave the list empty to hide the row. The

@@ -14,8 +14,10 @@ for agents). All are regenerated from `data/*.yml` by
 
 New `/reel` page - the link to send agents. It shows the same reel the
 home page's Selected Work block uses (change it once in the CMS and both
-update), with a headshot, name, the key stats, a short credits line, and
-four buttons: Email, Resume (PDF), Download MP4, Actors Access.
+update), with a headshot, name, the key stats, and four buttons: Email,
+Resume (PDF), Download MP4, Actors Access. A credits line under the stats
+is available but switched off, since not every recent credit is in the
+reel.
 
 The Resume button prints the exact same one-page resume as the home page.
 Rather than building a second copy, the build lifts the finished resume
