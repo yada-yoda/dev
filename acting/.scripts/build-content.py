@@ -1911,7 +1911,9 @@ def build_reel(site, credits, panels, contact, headshots):
     html = replace_block(html, "reel-json-ld", gen_reel_json_ld(page, site, reel))
     html = replace_block(html, "ga4", gen_ga4(site))
     html = replace_block(html, "print-css", "\n<style>\n" + print_css + "\n</style>\n")
-    html = replace_block(html, "menu", gen_menu(site, subpage="reel"))
+    # No "menu" block here: /reel has no top bar by design (it goes to
+    # agents, the video should be the whole page), so it is the one page
+    # that does not carry the shared nav.
     html = replace_block(html, "reel-video", gen_reel(contact))
     html = replace_block(html, "reel-chapters", gen_reel_chapters(page))
     html = replace_block(html, "reel-strip", gen_reel_strip(page, site, reel, panels, credits, contact, headshots))

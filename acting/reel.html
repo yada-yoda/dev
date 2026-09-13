@@ -104,8 +104,10 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 /* Screening-room look: the page itself is near-black so nothing competes
-   with the footage. The topbar and footer keep the site's navy so /reel
-   still reads as part of rizzo.cc. */
+   with the footage. There is deliberately no top bar or site menu - this
+   page is sent to agents, and the video should be the first and only
+   thing on screen. The footer keeps the site's navy so /reel still reads
+   as part of rizzo.cc. */
 body{
   background:#0b0c11;color:var(--text);
   font-family:'Source Sans 3','Source Sans Pro',system-ui,-apple-system,sans-serif;
@@ -117,27 +119,6 @@ a:hover{color:var(--accent-2)}
 h1,h2,h3{font-family:'Montserrat',sans-serif;font-weight:700;letter-spacing:.02em;color:#fff}
 img{max-width:100%;display:block}
 ul{list-style:none}
-
-/* ------- Top bar (solid variant, same as resources.html) ------- */
-.topbar{
-  position:sticky;top:0;z-index:50;
-  display:flex;align-items:center;justify-content:space-between;
-  padding:18px 32px;
-  background:rgba(37,39,58,.96);box-shadow:0 1px 0 var(--line);
-  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-}
-.brand{
-  display:inline-flex;align-items:flex-end;gap:0;
-  font-family:'Montserrat',sans-serif;font-weight:900;
-  letter-spacing:.18em;font-size:18px;color:#fff;text-transform:uppercase;line-height:1;
-}
-.brand .rizzo-wrap{display:inline-flex;align-items:center;background:#fff;padding:2px 6px;border-radius:3px}
-.brand .rizzo-mark{height:22px;width:88px;max-width:none;display:block;filter:invert(1)}
-.brand .tld{color:var(--accent);font-size:10px;letter-spacing:.08em;line-height:1;display:block;padding-bottom:2px}
-.nav{display:flex;gap:28px}
-.nav a{font-family:'Montserrat',sans-serif;font-weight:600;font-size:12px;letter-spacing:.2em;text-transform:uppercase;color:var(--text)}
-.nav a:hover,.nav a.current{color:var(--accent)}
-@media (max-width:720px){.nav{gap:12px 16px;flex-wrap:wrap;justify-content:flex-end}.nav a{font-size:11px;letter-spacing:.14em}.topbar{padding:14px 18px;gap:12px}}
 
 /* ------- Stage: the reel, edge to edge ------- */
 .reel-page{min-height:70vh}
@@ -505,23 +486,8 @@ footer .hits[hidden]{display:none}
 </head>
 <body>
 
-<header class="topbar" id="topbar">
-  <a class="brand" href="./" aria-label="Rizzo.cc home">
-    <span class="rizzo-wrap"><img class="rizzo-mark" src="assets/rizzo_logo_white.png" alt="RIZZO"></span>
-    <span class="tld" aria-hidden="true">.cc</span>
-  </a>
-  <!-- EDIT: menu — top nav links. Auto-generated from data/menu.yml (anchor links are prefixed with ./ so they go back to the home page). -->
-  <nav class="nav">
-    <a href="./#about" class="home">About</a>
-    <a href="./#resume" class="home">Resume</a>
-    <a href="./#credits" class="home">Credits</a>
-    <a href="reel" class="current">Reel</a>
-    <a href="resources">Resources</a>
-    <a href="./#contact" class="home">Contact</a>
-  </nav>
-  <!-- /EDIT: menu -->
-</header>
-
+<!-- No header on purpose: this page goes to agents, so the reel is the
+     first thing on screen and nothing pulls them off it. -->
 <main class="reel-page">
   <div class="stage">
     <!-- EDIT: reel-video — the same reel the home page shows. Auto-generated from data/reel.yml. -->

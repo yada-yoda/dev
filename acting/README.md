@@ -19,6 +19,11 @@ Resume (PDF), Download MP4, Actors Access. A credits line under the stats
 is available but switched off, since not every recent credit is in the
 reel.
 
+The page is deliberately bare: no top navigation, just the video and
+what an agent needs next. It is not in the site menu either - it exists
+for the link you send, not for visitors browsing the home page - though
+search engines can still find it.
+
 The Resume button prints the exact same one-page resume as the home page.
 Rather than building a second copy, the build lifts the finished resume
 out of the home page and drops it into /reel, so the two can never drift.
