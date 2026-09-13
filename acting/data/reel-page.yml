@@ -25,6 +25,19 @@ tagline: ""
 # and Theater. Films dated after this year are unreleased and skipped.
 credits_max: 4
 
+# Jump-to-clip chips under the video. Time is seconds into the reel; the
+# label is what the chip says. Leave the list empty to hide the row. The
+# title and end cards are not chapters, so the first one starts at 1s.
+chapters:
+  - label: "Waiter Boys · Comedic monologue"
+    time: 1.0
+  - label: "Deadly Domicile · Dramatic scene"
+    time: 6.7
+  - label: "Waiter Boys · Ensemble comedy"
+    time: 18.7
+  - label: "Waiter Boys · Confrontation"
+    time: 24.9
+
 buttons:
   email: "Email Frank"
   # Different from the home page's subject so reel-driven mail is easy to spot.

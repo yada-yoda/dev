@@ -27,10 +27,12 @@ and resume print is recorded in Analytics with that tag, so you can see
 which agency actually opened it. The page has its own visit counter in the
 footer, separate from the home page's.
 
-Chapters are supported (jump-to-clip chips under the video, set in the CMS
-under Reel Page) and will be filled in once the clip boundaries are
-confirmed. The reel now has a poster frame on both pages, and /reel
-carries video structured data so Google can show it as a video result.
+Four jump-to-clip chips sit under the video, one per scene in the reel
+(the cut points were found by scene detection and checked frame by
+frame). They are editable in the CMS under Reel Page, and clicking one is
+recorded in Analytics too, so you can see which clip an agency skipped
+to. The reel now has a poster frame on both pages, and /reel carries
+video structured data so Google can show it as a video result.
 
 ### v0.13.0 - 2026-09-09
 
