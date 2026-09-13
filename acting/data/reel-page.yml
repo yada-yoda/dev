@@ -29,11 +29,11 @@ credits_max: 4
 # label is what the chip says. Leave the list empty to hide the row. The
 # title and end cards are not chapters, so the first one starts at 1s.
 chapters:
-  - label: "Comedy"
-    time: 1.0
   - label: "Drama"
+    time: 1.0
+  - label: "Suspense"
     time: 6.7
-  - label: "Ensemble"
+  - label: "Comedy"
     time: 18.7
   - label: "Confrontation"
     time: 24.9
