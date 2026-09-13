@@ -29,13 +29,13 @@ credits_max: 4
 # label is what the chip says. Leave the list empty to hide the row. The
 # title and end cards are not chapters, so the first one starts at 1s.
 chapters:
-  - label: "Waiter Boys · Comedic monologue"
+  - label: "Comedy"
     time: 1.0
-  - label: "Deadly Domicile · Dramatic scene"
+  - label: "Drama"
     time: 6.7
-  - label: "Waiter Boys · Ensemble comedy"
+  - label: "Ensemble"
     time: 18.7
-  - label: "Waiter Boys · Confrontation"
+  - label: "Confrontation"
     time: 24.9
 
 buttons:
