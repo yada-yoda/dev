@@ -1709,7 +1709,12 @@ def gen_reel_meta(page):
         f'\n<title>{esc(s.get("title"))}</title>\n'
         f'<meta name="description" content="{esc(s.get("description"))}">\n'
         '<meta name="theme-color" content="#0b0c11">\n'
-        '<meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1">\n'
+        # Link-only page: it reaches agents by the URL the user sends, never
+        # by search. noindex here, and it is left out of sitemap.xml and
+        # llms.txt. Deliberately NOT blocked in robots.txt - a crawler has to
+        # be able to fetch the page to see the noindex; a Disallow would let
+        # the bare URL get indexed off an inbound link with no way to say no.
+        '<meta name="robots" content="noindex, nofollow">\n'
         f'<link rel="canonical" href="{esc(s.get("canonical_url", "https://rizzo.cc/reel"))}">\n'
     )
 

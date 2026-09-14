@@ -20,9 +20,13 @@ is available but switched off, since not every recent credit is in the
 reel.
 
 The page is deliberately bare: no top navigation, just the video and
-what an agent needs next. It is not in the site menu either - it exists
-for the link you send, not for visitors browsing the home page - though
-search engines can still find it.
+what an agent needs next. It is link-only: not in the site menu, not in
+the sitemap, and marked noindex, so the only way anyone reaches it is
+the link you send. That also keeps the view counter honest - every view
+is someone you sent there.
+
+Training entries now name the school in full, "The Second City Training
+Center", on the site and the printed resume.
 
 The Resume button prints the exact same one-page resume as the home page.
 Rather than building a second copy, the build lifts the finished resume
