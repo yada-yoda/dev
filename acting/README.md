@@ -26,10 +26,11 @@ carry its own hard-coded photo; it now takes whichever look is first in
 the Headshots list, the same as the page and the /reel thumb, so changing
 the main photo once in the CMS changes it everywhere.
 
-Key Skills gained an optional site-only closer (CMS: Key Skills > Site-only
-closer). It lands at the end of the skills paragraph on the page to end on
-a light note, and is deliberately kept off the printed resume, which has
-to stay tight and professional.
+Key Skills now ends on a light closer - one true, specific line so the
+list finishes on a human note - on the site and the printed resume alike;
+it is the last item in the skills paragraph. There is also an optional
+site-only tail (CMS: Key Skills > Site-only closer) for anything that
+should show on the page but stay off the PDF; it is empty for now.
 
 ### v0.14.0 - 2026-09-13
 
