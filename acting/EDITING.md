@@ -12,6 +12,7 @@ Almost all visible content has a **second option**: the Decap CMS at
 | Content | Decap CMS collection | Data file |
 |---|---|---|
 | Hero photos + quotes | Hero (Slideshow) | `data/hero.yml` |
+| Headshot looks (large photo + thumbnail row) and the optional downloadable headshot PDF per look | Headshots | `data/headshots.yml` (PDFs live in `assets/headshots/`; the PDF tile only renders once the file exists) |
 | Bio paragraph | Bio | `data/bio.md` |
 | RIZZO definition + pull quote | About | `data/about.yml` |
 | Film / TV / Theater credits | Credits | `data/credits.yml` |
@@ -201,10 +202,15 @@ website and the PDF stay in sync.
 
 ### Update the headshot
 
-1. Replace the file at `assets/headshot.jpg` (use a 1:1 square crop
-   with breathing room above the crown; ~800&times;800 is ideal).
-2. The HTML doesn&rsquo;t need to change &mdash; everything points at the
-   same path.
+1. Decap &rarr; **Headshots**. Add a look (square-ish, ~800&times;800 or
+   larger) or pick an existing one.
+2. **Drag the look you want to the top of the list.** The first entry is
+   the large photo on the page, the photo on the printed resume, and the
+   small thumb on `/reel` &mdash; all three follow it.
+3. Optional: attach a print-ready **Headshot PDF** to a look; it shows up
+   as a PDF tile at the end of the thumbnail row once uploaded.
+4. Publish. The build regenerates `EDIT: headshot-main`,
+   `EDIT: headshot-gallery`, and `EDIT: print-headshot`.
 
 ### Update the OG share image
 

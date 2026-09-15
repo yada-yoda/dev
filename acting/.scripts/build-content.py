@@ -110,7 +110,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.14.0"
+SITE_VERSION = "v0.15.0"
 
 
 # ---------- helpers ----------
@@ -432,6 +432,17 @@ def gen_headshot_main(headshots):
     )
 
 
+def gen_print_headshot(headshots):
+    """Photo on the printed resume. Always the FIRST headshots.yml entry -
+    the same one shown large on the page - so the PDF and the site never
+    disagree about which look is current."""
+    entries = headshots.get("entries") or []
+    src = (entries[0].get("image") if entries else "") or "assets/headshot.jpg"
+    return (
+        f'\n    <img class="rs-headshot" src="{esc(src)}" alt="Frank Rizzo headshot">\n    '
+    )
+
+
 def gen_headshot_gallery(headshots):
     """65px thumbnail row. Each button carries data-src, which the gallery
     JS swaps into the main headshot. First entry starts active."""
@@ -453,6 +464,28 @@ def gen_headshot_gallery(headshots):
         )
     if not buttons:
         return "\n        "
+    # A look can carry a print-ready PDF (`pdf:`), which renders as a PDF
+    # tile after the thumbnails - same size, document icon, downloads on
+    # click. Gated on the file existing so the site never links to a 404
+    # when the path is set in the CMS before the upload lands.
+    for i, e in enumerate(entries):
+        pdf = str(e.get("pdf") or "").strip()
+        if not pdf:
+            continue
+        if not (ROOT / pdf).exists():
+            print(f"  headshot PDF not found, tile skipped: {pdf}")
+            continue
+        label = e.get("label") or f"Headshot {i + 1}"
+        buttons.append(
+            f'          <a class="pdf" href="{esc(pdf)}" download '
+            f'title="{esc(label)} - headshot PDF" '
+            f'aria-label="Download the {esc(label)} headshot as a PDF" data-label="{esc(label)}">\n'
+            '            <svg viewBox="0 0 24 24" aria-hidden="true">'
+            '<path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/>'
+            '<path d="M14 2v6h6"/></svg>\n'
+            '            <span>PDF</span>\n'
+            '          </a>'
+        )
     return (
         '\n        <div class="headshot-gallery" aria-label="Headshot gallery">\n'
         + "\n".join(buttons)
@@ -1057,11 +1090,18 @@ def gen_licensing_print(lic):
     )
 
 
-def gen_skills(skills_str):
+def gen_skills(skills_str, web_only=""):
+    """Site version of the skills paragraph. `web_only` is an optional tail
+    that appears here but NOT on the printed resume - the light closer
+    ("Fun to work with ...") that suits a browsing agent but not a
+    one-page PDF that has to stay tight."""
+    text = skills_str
+    if (web_only or "").strip():
+        text = f"{skills_str} · {web_only.strip()}" if skills_str else web_only.strip()
     return (
         "\n      <div class=\"panel\">\n"
         "        <h4>Key Skills</h4>\n"
-        f"        <p>\n          {esc(skills_str)}\n        </p>\n"
+        f"        <p>\n          {esc(text)}\n        </p>\n"
         "      </div>\n      "
     )
 
@@ -1974,6 +2014,8 @@ def main():
         "languages":      _load_list(DATA / "languages.yml"),
         "licensing":      _load_obj(DATA / "licensing.yml"),
         "skills":         _load_obj(DATA / "skills.yml").get("text", ""),
+        # Site-only tail for the skills paragraph; the PDF never sees it.
+        "skills_web_only": _load_obj(DATA / "skills.yml").get("web_only", ""),
         "favorite_films": _load_list(DATA / "favorite-films.yml"),
         "inspirations":   _load_list(DATA / "inspirations.yml"),
     }
@@ -2019,6 +2061,7 @@ def main():
     # Profile: headshot + gallery thumbnails
     html = replace_block(html, "headshot-main", gen_headshot_main(headshots))
     html = replace_block(html, "headshot-gallery", gen_headshot_gallery(headshots))
+    html = replace_block(html, "print-headshot", gen_print_headshot(headshots))
 
     # Bio + Credits + Training
     html = replace_block(html, "bio", gen_bio())
@@ -2065,7 +2108,7 @@ def main():
     html = replace_block(html, "measurements", gen_measurements(panels["measurements"]))
     html = replace_block(html, "licensing", gen_licensing(panels["licensing"]))
     html = replace_block(html, "print-licensing", gen_licensing_print(panels["licensing"]))
-    html = replace_block(html, "skills", gen_skills(panels["skills"]))
+    html = replace_block(html, "skills", gen_skills(panels["skills"], panels.get("skills_web_only", "")))
     html = replace_block(html, "print-skills", gen_skills_print(panels["skills"]))
     html = replace_block(html, "favorite-films", gen_favorite_films(panels["favorite_films"]))
     html = replace_block(html, "inspirations", gen_inspirations(panels["inspirations"]))

@@ -185,6 +185,13 @@ collections:
                 hint: "Upload a new look or pick an existing one from assets/headshots/."
               - { label: "Label", name: "label", widget: "string", hint: "Short name for this look, e.g. 'Suit and tie', 'Casual quarter-zip', 'Dramatic B&W'. Shown as the thumbnail's accessible name and in the list summary above." }
               - { label: "Alt text", name: "alt", widget: "string", hint: "Describes the photo for screen readers and search engines. Include wardrobe + backdrop, e.g. 'Frank Rizzo, Chicago-based actor — smiling color headshot, gray quarter-zip, white backdrop'." }
+              - label: "Headshot PDF (optional)"
+                name: "pdf"
+                widget: "file"
+                required: false
+                media_folder: "/acting/assets/headshots"
+                public_folder: "assets/headshots"
+                hint: "Print-ready PDF of this look. Adds a PDF tile at the end of the thumbnail row that downloads it. The tile only appears once the file is uploaded; leave blank for looks without one."
 
   # ============ REEL PAGE (/reel) ============
   # The one-screen page you send agents. The video itself is set under
@@ -510,6 +517,11 @@ collections:
             name: "text"
             widget: "text"
             hint: "One paragraph. Separate items with ' · ' (space-middot-space). Industry rule of thumb: 8-12 high-impact items beats a long list of hobbies."
+          - label: "Site-only closer (optional)"
+            name: "web_only"
+            widget: "string"
+            required: false
+            hint: "Appended to the end of the skills paragraph on the website only - never on the printed resume. A light line to end on for anyone reading the page. Same ' · ' separator if you want more than one."
 
       - file: "acting/data/favorite-films.yml"
         label: "Favorite Films"

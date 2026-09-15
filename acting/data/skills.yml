@@ -3,3 +3,7 @@
 # Industry rule of thumb: 8–12 high-impact entries beats a long list.
 
 text: "Bike Riding · Chess · Finance · Frisbee Golf · Gaming (Video / Computer) · Guitar (General) · IT / Computer Science · Marketing · Music Industry · Music Management · Photographic Memory · Poker · Road Driving · Football · Ice Skating · Roller Skating · Running · Soccer · Track and Field (Discus / Shotput) · Weight Lifting · Yoga · Stock Market · Swimming · Tour Management"
+
+# Site-only closer: appended after the list on the website, never on the
+# printed resume. A light line to end on for anyone actually reading the page.
+web_only: "Fun to work with · Beaten by Paul Scheer in fantasy football two years in a row"

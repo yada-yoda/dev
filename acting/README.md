@@ -10,6 +10,27 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.15.0 - 2026-09-15
+
+A headshot can now be downloaded as a print-ready PDF. A PDF tile sits at
+the end of the thumbnail row under the headshot - same size as the
+thumbnails, with a document icon - and clicking it downloads the file, so
+an agent who wants the headshot for a submission has it in one click
+instead of asking. Each look can have its own PDF (CMS: Headshots > Look
+> Headshot PDF); the tile only appears once the file is actually there,
+so a half-finished CMS edit can never leave a broken link on the page.
+Downloads are recorded in Analytics as `headshot_download`.
+
+The navy dress shirt is now the main headshot. The printed resume used to
+carry its own hard-coded photo; it now takes whichever look is first in
+the Headshots list, the same as the page and the /reel thumb, so changing
+the main photo once in the CMS changes it everywhere.
+
+Key Skills gained an optional site-only closer (CMS: Key Skills > Site-only
+closer). It lands at the end of the skills paragraph on the page to end on
+a light note, and is deliberately kept off the printed resume, which has
+to stay tight and professional.
+
 ### v0.14.0 - 2026-09-13
 
 New `/reel` page - the link to send agents. It shows the same reel the
