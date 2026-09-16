@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.70.0';
+const APP_VERSION = 'v0.70.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -747,7 +747,7 @@ function initFirebase(){
       currentUser = user; updateAuthUI();
       if(user){
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
-        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
+        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
       else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; }
     });
@@ -848,12 +848,22 @@ async function loadFromFirestore(quiet){
 }
 let cloudSaveOk = null;     // null=unknown, true=saving to cloud, false=failing (rule not set / no access)
 let cloudSaveWarned = false;
-let saveInFlight = false, savePending = false; // coalesce rapid saves into at most one queued follow-up
+let saveInFlight = false, savePending = false, saveInFlightSince = 0; // coalesce rapid saves into at most one queued follow-up
+// "Local changes not yet confirmed in the cloud" — persisted so a phone whose upload was
+// killed by backgrounding (or that got force-closed) pushes them on its next open/foreground.
+// Set on every persist, cleared ONLY after a set() actually succeeds.
+let cloudDirty = false; try { cloudDirty = !!localStorage.getItem('pawprints_dirty'); } catch(e){}
+function setCloudDirty(v){ cloudDirty = v; try { if(v) localStorage.setItem('pawprints_dirty','1'); else localStorage.removeItem('pawprints_dirty'); } catch(e){} }
 async function saveToFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
   const uid = activeUid(); if(!uid) return;
-  if(saveInFlight){ savePending = true; return; }
-  saveInFlight = true;
+  // iOS can freeze the page mid-request and never settle that promise on resume, which
+  // used to leave saveInFlight stuck true — silently dropping every later save this
+  // session. Timeouts below make a hung request FAIL, and if the flag is somehow still
+  // stuck past 45s, a new save takes over instead of queueing behind a corpse.
+  if(saveInFlight && Date.now() - saveInFlightSince < 45000){ savePending = true; return; }
+  saveInFlight = true; saveInFlightSince = Date.now();
+  const timeout = ms => new Promise((_,rej)=>setTimeout(()=>rej(new Error('cloud-timeout')), ms));
   try {
     await ensureFirestore();
     const ref = db.collection('pawprints').doc(uid);
@@ -861,12 +871,13 @@ async function saveToFirestore(){
     // pulled in a while would erase records other devices added since. Before writing,
     // rescue any remote-only records into this device's data (local wins per id — we're
     // saving this device's freshest state; only records we don't have at all are added).
-    // Throttled: skip when we've seen the cloud doc in the last 60s (photos make it big).
+    // Throttled: skip when we've seen the cloud doc in the last 60s (photos make it big),
+    // and when the page is hidden (a backgrounding phone gets one round trip, not two).
     let rescued = 0;
-    if(Date.now() - lastCloudPull > 60000){
+    if(document.visibilityState !== 'hidden' && Date.now() - lastCloudPull > 60000){
       lastCloudPull = Date.now();
       try {
-        const snap = await ref.get();
+        const snap = await Promise.race([ref.get(), timeout(10000)]);
         if(snap.exists){
           const remote = snap.data();
           // Tombstones both ways: remote deletes remove our local copy; our deletes
@@ -884,7 +895,8 @@ async function saveToFirestore(){
     }
     const payload = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
     if(!sharedOwnerUid) payload.ownerName = currentUser.displayName || currentUser.email || '';
-    await ref.set(payload);
+    await Promise.race([ref.set(payload), timeout(25000)]);
+    setCloudDirty(false); // confirmed in the cloud
     if(rescued){ saveLocal(); render(); }
     if(cloudSaveOk !== true){ cloudSaveOk = true; if(currentView==='today') render(); }
   } catch(e){
@@ -979,7 +991,7 @@ function exitSharedProfile(silent){
 // ═══════════════════════════════════════════════
 function saveLocal(){ if(demoMode || sharedOwnerUid) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
 function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); } } catch(e){} }
-function persist(){ saveLocal(); saveToFirestore(); }
+function persist(){ if(!demoMode) setCloudDirty(true); saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(rerender !== false) render(); }
 
 function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-backup-' + todayISO() + '.json'); showToast('💾 Backup saved'); }
@@ -3278,7 +3290,7 @@ function renderToday(){
   }
   // cloud-sync-off warning (signed in but writes are being denied — usually the Firestore rule isn't set)
   if(cloudSaveOk === false && currentUser && !sharedOwnerUid){
-    html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Not syncing to the cloud.</strong> Your entries are saved on <strong>this device only</strong> — they won’t appear on your other devices, and clearing this browser would lose them. This usually means the Firestore security rule isn’t set up yet.</div></div>';
+    html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Last cloud sync didn’t go through.</strong> Your entries are safe on <strong>this device</strong> and will retry automatically the next time you log something or reopen the app. If this message never goes away, check your connection — or the Firestore security rule isn’t set up yet.</div></div>';
   }
   // header summary
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
@@ -4550,10 +4562,19 @@ setInterval(() => { if(currentView==='today' && !document.getElementById('modal-
 // syncs down at its last cold start and never sees other devices' changes.
 function resyncFromCloud(){
   if(!currentUser || !firebaseReady || demoMode) return;
+  // First-chance PUSH of local changes the cloud never confirmed (upload killed by
+  // backgrounding, or a force-closed app) — this is what gets a stranded phone entry
+  // to the other devices. Runs before the throttled pull; new ids can't be clobbered.
+  if(cloudDirty) saveToFirestore();
   if(Date.now() - lastCloudPull < 30000) return;
   loadFromFirestore(true);
 }
-document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') resyncFromCloud(); });
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') resyncFromCloud();
+  // Going to background with unconfirmed changes: fire one last attempt — it often
+  // completes in the grace window, and the dirty flag covers it if it doesn't.
+  else if(cloudDirty && currentUser && firebaseReady && !demoMode) saveToFirestore();
+});
 window.addEventListener('pageshow', e => { if(e.persisted) resyncFromCloud(); });
 
 function bootFirebase(){ if(typeof firebase==='undefined'){ setTimeout(bootFirebase,200); return; } initFirebase(); }

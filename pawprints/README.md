@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.70.0**
+**Current Version: v0.70.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,15 @@ covers both.
 
 ## Version History
 
+- **v0.70.1** — **Fixed phone entries sometimes never reaching the desktop.** Two related bugs:
+  (1) if you logged something and immediately locked the phone, iOS could freeze the upload in a
+  way that jammed the sync machinery for the rest of that session — the phone kept showing your
+  entries, but nothing reached the cloud, so desktop refreshes found nothing. Uploads now time out
+  instead of jamming, and a jammed lock frees itself. (2) An upload killed by backgrounding was
+  simply lost with no retry. The app now remembers "these changes haven't been confirmed in the
+  cloud" (it survives force-closing the app) and pushes them automatically the next time the app is
+  opened, foregrounded, or you log anything — plus one last-ditch upload attempt as the app goes to
+  the background. The red sync-warning card also retries automatically now and says so.
 - **v0.70.0** — **"Where purchased" remembers your stores.** The supply form's store field is now
   type-or-pick: every store you've entered on a past purchase automatically appears as a suggestion
   (typeahead dropdown plus a "Pick a past store" selector), so "Chewy" only ever needs typing once.
