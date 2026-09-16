@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.68.1**
+**Current Version: v0.69.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.69.0** — **Potty logging drops "Both" — Pee and Poop are now separate toggles.** In the potty
+  form (quick log and edit alike) you tap Pee, Poop, or both; the stool dropdown appears whenever
+  Poop is selected. "Nothing" remains its own exclusive option. Old entries are untouched — a
+  legacy "Both" entry opens with both toggles lit and now displays as "Pee + Poop" in timelines and
+  exports. The Insights potty breakdown chips now count 💧 Pees and 💩 Poops as their own tallies (a
+  break with both adds one to each) instead of showing a combined "Both" bucket.
 - **v0.68.1** — **Overdue potty halves now highlight individually.** When pee or poop passes its
   threshold, that half of the card gets its own red-tinted highlight (not just red text). If *both*
   are overdue, both halves highlight and the one further past its own threshold glows brighter, with

@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.68.1';
+const APP_VERSION = 'v0.69.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -360,7 +360,10 @@ function denyManage(){ if(canManage()) return false; showToast(sharedAccess==='l
 // ═══════════════════════════════════════════════
 const FOOD_TYPES = ['Dry kibble','Wet food','Raw','Home-cooked','Mixed','Treat','Dental chew','Other'];
 const AMOUNT_UNITS = ['cups','grams','oz','cans','scoops','pieces'];
-const POTTY_RESULTS = ['Pee','Poop','Both','Nothing'];
+// Form options: Pee and Poop are INDEPENDENT toggles (both can be on); Nothing is exclusive.
+// Stored result stays the legacy single string — 'Both' when both are picked — so older
+// entries and every pee/poop classifier keep working unchanged.
+const POTTY_RESULTS = ['Pee','Poop','Nothing'];
 const POTTY_PLACES = ['Backyard','Front yard','On a walk','Pee pad','Other'];
 const FOOD_PLACES = ['Kitchen','Bowl (usual spot)','Crate / kennel','Outside','Living room','Other'];
 const STOOL_QUALITY = ['Normal','Soft','Loose/Diarrhea','Hard','Bloody','Mucus'];
@@ -1866,24 +1869,43 @@ function quickPotty(){
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🚪 Potty break</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">What did they do?</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#q-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'q\')">'+esc(r)+'</button>').join('')+'</div>'
+    +'<label class="label">What did they do?'+tip('Pee and Poop toggle separately — tap both when they did both. Picking Poop opens the stool dropdown.')+'</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="pottyTagToggle(this,\'q\')">'+esc(r)+'</button>').join('')+'</div>'
     +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
     +pottyLocationField('home','q-loc')
     +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool'+tip('Stool quality is an easy health signal to track. Add your own types in Settings → Lists &amp; preferences → Stool types.')+'</label><select class="select" id="q-stool"><option value="">—</option>'+sel(stoolOptions(),'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
 }
-// Show the stool dropdown only when the potty result includes poop (Poop or Both); clear it otherwise.
+// Toggle a potty tag: Pee/Poop toggle independently; Nothing clears them and vice versa.
+function pottyTagToggle(btn, prefix){
+  const grid = document.getElementById(prefix+'-potty-tags'); if(!grid) return;
+  if(btn.dataset.pr === 'Nothing'){
+    const on = !btn.classList.contains('active');
+    grid.querySelectorAll('.tag').forEach(t=>t.classList.remove('active'));
+    if(on) btn.classList.add('active');
+  } else {
+    btn.classList.toggle('active');
+    const n = grid.querySelector('.tag[data-pr="Nothing"]'); if(n) n.classList.remove('active');
+  }
+  updateStoolVisibility(prefix);
+}
+// Legacy single-string result from the toggles: '' when nothing picked, 'Both' when pee AND poop.
+function pottyResultFrom(prefix){
+  const on = k => !!document.querySelector('#'+prefix+'-potty-tags .tag[data-pr="'+k+'"].active');
+  if(on('Nothing')) return 'Nothing';
+  const pee = on('Pee'), poop = on('Poop');
+  return pee && poop ? 'Both' : pee ? 'Pee' : poop ? 'Poop' : '';
+}
+// Show the stool dropdown whenever the Poop toggle is on; clear it otherwise.
 function updateStoolVisibility(prefix){
-  const active = document.querySelector('#'+prefix+'-potty-tags .tag.active');
-  const r = active ? active.dataset.pr : '';
+  const poopOn = !!document.querySelector('#'+prefix+'-potty-tags .tag[data-pr="Poop"].active');
   const wrap = document.getElementById(prefix+'-stool-wrap');
-  const show = (r === 'Poop' || r === 'Both');
-  if(wrap) wrap.style.display = show ? '' : 'none';
-  if(!show){ const s = document.getElementById(prefix+'-stool'); if(s) s.value = ''; }
+  if(wrap) wrap.style.display = poopOn ? '' : 'none';
+  if(!poopOn){ const s = document.getElementById(prefix+'-stool'); if(s) s.value = ''; }
 }
 function savePotty(){
-  const result = document.querySelector('#q-potty-tags .tag.active')?.dataset.pr || 'Pee';
+  const result = pottyResultFrom('q');
+  if(!result){ showToast('⚠️ Pick pee, poop, or nothing'); return; }
   const atHome = (fv('q-loc') || 'home') !== 'other';
   const id = addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), location:atHome?'home':'other', notes:fv('q-note') });
   closeModal(); showToast('🚪 Potty logged');
@@ -3299,7 +3321,7 @@ const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--b
 function logSummary(l){
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water'+(l.place?' @ '+esc(l.place):'');
-  if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result||'Potty') + (rest.length ? ' — ' + rest.join(' · ') : ''); }
+  if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result==='Both'?'Pee + Poop':(l.result||'Potty')) + (rest.length ? ' — ' + rest.join(' · ') : ''); }
   if(l.type==='walk'){
     let route = '';
     if(l.from || l.to) route = [esc(l.from), esc(l.to)].filter(Boolean).join(l.roundTrip ? ' ↔ ' : ' → ') + (l.roundTrip && !(l.from && l.to) ? ' (round trip)' : '');
@@ -3374,10 +3396,15 @@ function editLogModal(id){
     body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...waterPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'')+'</select>';
   } else if(l.type === 'potty'){
     title = '🚪 Edit potty break';
-    body += '<label class="label">What did they do?</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(l.result===r?' active':'')+'" data-pr="'+esc(r)+'" onclick="document.querySelectorAll(\'#e-potty-tags .tag\').forEach(t=>t.classList.remove(\'active\'));this.classList.add(\'active\');updateStoolVisibility(\'e\')">'+esc(r)+'</button>').join('')+'</div>'
+    body += (()=>{ // pre-select from the stored result; legacy 'Both' (or a noted stool) lights Poop too
+      const peeOn = l.result==='Pee' || l.result==='Both';
+      const poopOn = l.result==='Poop' || l.result==='Both' || !!(l.stool && String(l.stool).trim());
+      const isOn = r => r==='Pee' ? peeOn : r==='Poop' ? poopOn : l.result==='Nothing';
+      return '<label class="label">What did they do?'+tip('Pee and Poop toggle separately — tap both when they did both. Picking Poop opens the stool dropdown.')+'</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(isOn(r)?' active':'')+'" data-pr="'+esc(r)+'" onclick="pottyTagToggle(this,\'e\')">'+esc(r)+'</button>').join('')+'</div>';
+    })()
       + '<label class="label">Where</label><select class="select" id="e-place">'+sel([...new Set([...pottyPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'Backyard')+'</select>'
       + pottyLocationField(l.location, 'e-loc')
-      + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both')?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel([...new Set([...stoolOptions(), ...(l.stool?[l.stool]:[])])], l.stool||'')+'</select></div>';
+      + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both'||!!(l.stool&&String(l.stool).trim()))?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel([...new Set([...stoolOptions(), ...(l.stool?[l.stool]:[])])], l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
     body += '<div class="grid-2"><div><label class="label">Duration (min)</label><input class="input" type="number" step="1" id="e-dur" value="'+esc(l.durationMin||'')+'"></div>'
@@ -3402,7 +3429,7 @@ function saveEditLog(id){
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
   if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
   else if(l.type === 'water'){ l.place = fv('e-place'); }
-  else if(l.type === 'potty'){ const t = document.querySelector('#e-potty-tags .tag.active'); l.result = t ? t.dataset.pr : l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
+  else if(l.type === 'potty'){ l.result = pottyResultFrom('e') || l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
   else if(l.type === 'weight'){ l.value = fv('e-w'); }
   logChange('edited', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,''));
@@ -4276,7 +4303,6 @@ function renderPottyCard(){
   const earliest = allMs.length ? Math.min(...allMs) : Date.now();
   const head = '<div class="card">'+panelHead(svgIcon('potty',18)+' Potty breakdown', rangeToggle('potty', pottyRange), 'potty-breakdown')+rangeSpanLine(pottyRange, earliest);
   if(!potty.length) return head + '<p style="font-size:12px;color:var(--text-secondary);margin:0">No potty breaks in the '+R.label+'.</p></div>';
-  const counts = {}; potty.forEach(p=>{ const r=p.result||'Pee'; counts[r]=(counts[r]||0)+1; });
   // Pee/poop classifiers — a recorded stool counts as a poop even if the result was tagged Pee.
   const isPee = p => { const r = p.result||''; return r==='Pee' || r==='Both'; };
   const isPoop = p => { const r = p.result||''; return r==='Poop' || r==='Both' || !!(p.stool && String(p.stool).trim()); };
@@ -4299,10 +4325,15 @@ function renderPottyCard(){
   });
   const spotList = Object.entries(spots).sort((a,b)=>b[1].total-a[1].total);
   const spotDigits = Math.max(1, ...spotList.flatMap(([,c])=>[c.pee,c.poop]).map(n=>String(n).length));
-  return head + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+Object.entries(counts).map(([k,v])=>'<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\''+esc(k)+'\')">'+esc(k)+': '+v+'</span>').join('')+'</div>'
+  const nothingN = potty.filter(p=>p.result==='Nothing').length;
+  return head + '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px">'
+    + '<span class="chip-2" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')">💧 Pees: '+peeN+'</span>'
+    + '<span class="chip-2" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')">💩 Poops: '+poopN+'</span>'
+    + (nothingN ? '<span class="chip-2" style="cursor:pointer" title="View these potty breaks" onclick="pottyResultDetail(\'Nothing\')">Nothing: '+nothingN+'</span>' : '')
+    + '</div>'
     + '<div class="grid-2"><div class="timing-box" style="cursor:pointer" title="View all pees" onclick="pottyTypeDetail(\'pee\')"><div class="timing-value" style="color:var(--accent-2)">'+fmtGap(peeGap)+'</div><div class="timing-label">💧 Avg between pees</div></div>'
     + '<div class="timing-box" style="cursor:pointer" title="View all poops" onclick="pottyTypeDetail(\'poop\')"><div class="timing-value" style="color:var(--accent)">'+fmtGap(poopGap)+'</div><div class="timing-label">💩 Avg between poops</div></div></div>'
-    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>'+R.label+'</strong> ('+peeN+' pee'+(peeN===1?'':'s')+', '+poopN+' poop'+(poopN===1?'':'s')+'). A "Both" — or any entry where you noted a stool — counts as a poop. Needs at least 2 of each.</p>'
+    + '<p style="font-size:11px;color:var(--text-secondary);margin-top:8px">Average time between consecutive potty breaks over the <strong>'+R.label+'</strong> ('+peeN+' pee'+(peeN===1?'':'s')+', '+poopN+' poop'+(poopN===1?'':'s')+'). Pee and poop count separately — one break tagged with both adds to each, and any entry with a noted stool counts as a poop. Needs at least 2 of each.</p>'
     + '<div style="font-size:13px;font-weight:600;margin:16px 0 8px">'+svgIcon('spots',15)+' Popular spots</div>'
     + spotList.map(([place, c]) => '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border)"><span style="flex:1;min-width:0;font-size:13px;font-weight:600">'+esc(place)+' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+c.total+' visit'+(c.total===1?'':'s')+'</span></span><span style="display:flex;gap:6px;flex-shrink:0"><span class="chip-2" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these pees" onclick="pottySpotDetail(\'pee\',\''+encArg(place)+'\')">💧<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.pee+'</span></span><span class="chip" style="cursor:pointer;display:inline-flex;align-items:center;gap:4px" title="View these poops" onclick="pottySpotDetail(\'poop\',\''+encArg(place)+'\')">💩<span style="font-family:\'JetBrains Mono\',ui-monospace,monospace;display:inline-block;min-width:'+spotDigits+'ch;text-align:right">'+c.poop+'</span></span></span></div>').join('')
     + '</div>';
