@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Ledger v1.0.0 — Collectibles Inventory</title>
+<title>The Ledger v1.1.0 — Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
@@ -39,7 +39,7 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=1.0.0" />
+<link rel="stylesheet" href="styles.css?v=1.1.0" />
 </head>
 <body>
 
@@ -150,6 +150,7 @@
         <div class="dropdown-menu" id="exportMenu">
           <button data-format="json"><strong>Full Backup</strong><small>JSON — re-importable</small></button>
           <button data-format="csv"><strong>Spreadsheet</strong><small>CSV — Excel / Sheets</small></button>
+          <button data-format="xlsx"><strong>Excel Workbook</strong><small>XLSX — opens directly</small></button>
           <button data-format="poshmark"><strong>Poshmark Listings</strong><small>TXT — ready to copy</small></button>
           <button data-format="ebay"><strong>eBay File Exchange</strong><small>CSV — direct upload</small></button>
         </div>
@@ -933,13 +934,16 @@
   <div class="modal-backdrop"></div>
   <div class="modal-card mini-card">
     <h3>Import Inventory</h3>
-    <p>Upload a previously-exported JSON backup, a Ledger CSV, or an <strong>eBay Seller Hub CSV</strong> export. Format is auto-detected from the headers.</p>
-    <input type="file" id="importFile" accept=".json,.csv" />
+    <p>Upload a JSON backup, an <strong>Excel workbook</strong> (.xlsx / .xls), a CSV, or an <strong>eBay Seller Hub</strong> export. Format is auto-detected from the headers &mdash; Google Sheets works too, just download it as .xlsx or .csv first.</p>
+    <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls,.xlsm" />
     <div class="import-options">
       <label><input type="radio" name="importMode" value="merge" checked /> Merge with existing</label>
       <label><input type="radio" name="importMode" value="replace" /> Replace all existing</label>
     </div>
-    <p class="import-template-note">Need a starting point? <a href="#" id="downloadTemplateLink" class="footer-link">Download a CSV template</a> with all the columns and one filled-in example row.</p>
+    <p class="import-template-note">Need a starting point? Grab a template with every column and one filled-in example row:
+      <a href="#" id="downloadXlsxTemplateLink" class="footer-link">Excel template</a> &middot;
+      <a href="#" id="downloadTemplateLink" class="footer-link">CSV template</a>
+    </p>
     <footer class="modal-footer">
       <button class="btn btn-ghost" id="importCancel">Cancel</button>
       <button class="btn btn-primary" id="importConfirm">Import</button>
@@ -1004,16 +1008,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.0.0</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.1.0</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=1.0.0"></script>
-<script defer src="beanie-db.js?v=1.0.0"></script>
-<script defer src="demo-data.js?v=1.0.0"></script>
-<script defer src="app.js?v=1.0.0"></script>
+<script type="module" src="firebase-config.js?v=1.1.0"></script>
+<script defer src="beanie-db.js?v=1.1.0"></script>
+<script defer src="demo-data.js?v=1.1.0"></script>
+<script defer src="app.js?v=1.1.0"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -973,6 +973,34 @@ function exportCSV() {
   toast('CSV exported', 'success');
 }
 
+// Same column set as exportCSV, but a real workbook — opens directly in
+// Excel / Numbers / Google Sheets with a frozen header row and sized columns.
+// Round-trips cleanly: the resulting .xlsx re-imports through doImport.
+async function exportXLSX() {
+  if (!state.items.length) { toast('No items to export', 'error'); return; }
+  try {
+    toast('Building workbook…', '');
+    const XLSX = await ensureXLSX();
+    const fields = Object.keys(DEFAULT_FIELDS).filter(f => f !== 'photos');
+    const rows = state.items.map(i => {
+      const o = {};
+      fields.forEach(f => { o[f] = i[f] == null ? '' : i[f]; });
+      return o;
+    });
+    const ws = XLSX.utils.json_to_sheet(rows, { header: fields });
+    ws['!cols'] = fields.map(f => ({ wch: Math.min(Math.max(f.length + 2, 12), 40) }));
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(out, `ledger-${todayStr()}.xlsx`, XLSX_MIME);
+    toast(`Excel workbook exported (${state.items.length} items)`, 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Excel export failed: ' + err.message, 'error');
+  }
+}
+
 function exportPoshmark() {
   const listable = state.items.filter(i => !['Sold','Shipped','Archived'].includes(i.status));
   if (!listable.length) { toast('No listable items', 'error'); return; }
@@ -1112,74 +1140,129 @@ function openImportModal() {
   document.getElementById('importFile').value = '';
 }
 
-function doImport() {
+// ============ SheetJS (xlsx) lazy loader ============
+// Only fetched the first time someone imports or exports a spreadsheet —
+// it's ~1 MB, so guests and CSV-only users never pay for it. Same pattern
+// as the barcode-detector polyfill.
+let _xlsxPromise = null;
+async function ensureXLSX() {
+  if (window.XLSX) return window.XLSX;
+  if (!_xlsxPromise) {
+    _xlsxPromise = import('https://cdn.sheetjs.com/xlsx-0.20.3/package/xlsx.mjs')
+      .then(mod => { window.XLSX = mod; return mod; })
+      .catch(err => { _xlsxPromise = null; throw err; });
+  }
+  return _xlsxPromise;
+}
+
+function readFileAs(file, how) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error('Could not read the file'));
+    if (how === 'buffer') reader.readAsArrayBuffer(file);
+    else reader.readAsText(file);
+  });
+}
+
+function isSpreadsheetFile(name) {
+  const n = (name || '').toLowerCase();
+  return n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.xlsm');
+}
+
+// Shared by CSV and spreadsheet paths — rows are {header: value} objects
+// either way, so eBay detection and column mapping work identically.
+function rowsToIncoming(rows, sourceLabel) {
+  if (rows.length && looksLikeEbayCsv(Object.keys(rows[0]))) {
+    return { incoming: rows.map(ebayRowToItem), formatLabel: 'eBay Seller Hub ' + sourceLabel };
+  }
+  return { incoming: rows, formatLabel: 'The Ledger ' + sourceLabel };
+}
+
+function applyImport(incoming, userBeanies, mode, formatLabel) {
+  if (!incoming.length) throw new Error('No items found in file');
+
+  incoming = incoming.map(raw => {
+    const item = { ...DEFAULT_FIELDS };
+    Object.entries(raw).forEach(([k, v]) => {
+      if (k in DEFAULT_FIELDS) item[k] = v;
+    });
+    item.id = item.id || uid();
+    item.created_at = item.created_at || nowISO();
+    item.updated_at = nowISO();
+    item.photos = Array.isArray(item.photos) ? item.photos : [];
+    return item;
+  });
+
+  if (mode === 'replace') {
+    state.items = incoming;
+  } else {
+    incoming.forEach(imp => {
+      const existingIdx = state.items.findIndex(i => i.id === imp.id || (imp.sku && i.sku === imp.sku));
+      if (existingIdx >= 0) state.items[existingIdx] = imp;
+      else state.items.push(imp);
+    });
+  }
+  saveState();
+  // Also restore user beanie entries
+  if (userBeanies && Array.isArray(userBeanies)) {
+    localStorage.setItem('theLedger.userBeanies.v1', JSON.stringify(userBeanies));
+  }
+  render();
+  document.getElementById('importModal').classList.remove('open');
+  toast(`Imported ${incoming.length} items from ${formatLabel} (${mode})`, 'success');
+}
+
+async function doImport() {
   const file = document.getElementById('importFile').files[0];
   if (!file) { toast('Choose a file first', 'error'); return; }
   const mode = document.querySelector('input[name="importMode"]:checked').value;
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      let incoming;
-      let userBeanies = null;
-      let formatLabel = 'CSV';
-      if (file.name.toLowerCase().endsWith('.json')) {
-        const data = JSON.parse(e.target.result);
-        incoming = Array.isArray(data) ? data : (data.items || []);
-        if (data.userBeanies) userBeanies = data.userBeanies;
-        formatLabel = 'JSON backup';
-      } else {
-        const rows = parseCSV(e.target.result);
-        if (rows.length && looksLikeEbayCsv(Object.keys(rows[0]))) {
-          incoming = rows.map(ebayRowToItem);
-          formatLabel = 'eBay Seller Hub CSV';
-        } else {
-          incoming = rows;
-          formatLabel = 'The Ledger CSV';
-        }
-      }
-      if (!incoming.length) throw new Error('No items found in file');
+  const name = file.name.toLowerCase();
+  const confirmBtn = document.getElementById('importConfirm');
+  const originalLabel = confirmBtn ? confirmBtn.textContent : '';
+  try {
+    let incoming, formatLabel;
+    let userBeanies = null;
 
-      incoming = incoming.map(raw => {
-        const item = { ...DEFAULT_FIELDS };
-        Object.entries(raw).forEach(([k, v]) => {
-          if (k in DEFAULT_FIELDS) item[k] = v;
-        });
-        item.id = item.id || uid();
-        item.created_at = item.created_at || nowISO();
-        item.updated_at = nowISO();
-        item.photos = Array.isArray(item.photos) ? item.photos : [];
-        return item;
-      });
-
-      if (mode === 'replace') {
-        state.items = incoming;
-      } else {
-        incoming.forEach(imp => {
-          const existingIdx = state.items.findIndex(i => i.id === imp.id || (imp.sku && i.sku === imp.sku));
-          if (existingIdx >= 0) state.items[existingIdx] = imp;
-          else state.items.push(imp);
-        });
-      }
-      saveState();
-      // Also restore user beanie entries
-      if (userBeanies && Array.isArray(userBeanies)) {
-        localStorage.setItem('theLedger.userBeanies.v1', JSON.stringify(userBeanies));
-      }
-      render();
-      document.getElementById('importModal').classList.remove('open');
-      toast(`Imported ${incoming.length} items from ${formatLabel} (${mode})`, 'success');
-    } catch (err) {
-      console.error(err);
-      toast('Import failed: ' + err.message, 'error');
+    if (name.endsWith('.json')) {
+      const data = JSON.parse(await readFileAs(file, 'text'));
+      incoming = Array.isArray(data) ? data : (data.items || []);
+      if (data.userBeanies) userBeanies = data.userBeanies;
+      formatLabel = 'JSON backup';
+    } else if (isSpreadsheetFile(name)) {
+      if (confirmBtn) { confirmBtn.disabled = true; confirmBtn.textContent = 'Loading reader…'; }
+      const XLSX = await ensureXLSX();
+      const buf = await readFileAs(file, 'buffer');
+      const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
+      const sheetName = wb.SheetNames[0];
+      if (!sheetName) throw new Error('That workbook has no sheets');
+      // defval keeps blank cells as '' (matching parseCSV); raw:false renders
+      // dates and numbers as display strings so downstream parsing is uniform.
+      const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '', raw: false });
+      ({ incoming, formatLabel } = rowsToIncoming(rows, 'spreadsheet'));
+      if (wb.SheetNames.length > 1) formatLabel += ` — sheet "${sheetName}"`;
+    } else {
+      const rows = parseCSV(await readFileAs(file, 'text'));
+      ({ incoming, formatLabel } = rowsToIncoming(rows, 'CSV'));
     }
-  };
-  reader.readAsText(file);
+
+    applyImport(incoming, userBeanies, mode, formatLabel);
+  } catch (err) {
+    console.error(err);
+    toast('Import failed: ' + err.message, 'error');
+  } finally {
+    if (confirmBtn) { confirmBtn.disabled = false; confirmBtn.textContent = originalLabel || 'Import'; }
+  }
 }
 
-// ============ Ledger CSV template (header + 1 example row) ============
-// Downloaded from the Import modal so users have a ready-to-fill template
-// matching exactly the columns parseCSV / doImport expect.
-function buildCsvTemplate() {
+// ============ Ledger import template (header + 1 example row) ============
+// Offered from the Import modal in both CSV and XLSX flavors so users have a
+// ready-to-fill template matching exactly the columns the importer expects.
+// Built from Object.keys(DEFAULT_FIELDS) at runtime so it never drifts from
+// the live schema — a new field added to an item shows up here automatically.
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+function templateFieldsAndExample() {
   const skip = new Set(['id', 'created_at', 'updated_at', 'photos']);
   const fields = Object.keys(DEFAULT_FIELDS).filter(f => !skip.has(f));
   // Plausible example values for the well-known fields — every column the
@@ -1228,6 +1311,11 @@ function buildCsvTemplate() {
     ship_cost: '4.50',
     private_notes: 'Source: estate sale',
   };
+  return { fields, example };
+}
+
+function buildCsvTemplate() {
+  const { fields, example } = templateFieldsAndExample();
   const header = fields.join(',');
   const row = fields.map(f => csvEscape(example[f] != null ? example[f] : ''));
   return header + '\n' + row.join(',') + '\n';
@@ -1236,7 +1324,35 @@ function buildCsvTemplate() {
 function downloadCsvTemplate(e) {
   if (e) e.preventDefault();
   downloadBlob(buildCsvTemplate(), 'the-ledger-import-template.csv', 'text/csv');
-  toast('Template downloaded — fill it in and re-upload via Import', 'success');
+  toast('CSV template downloaded — fill it in and re-upload via Import', 'success');
+}
+
+// Same columns + example row as the CSV template, but a real .xlsx so it
+// opens straight into Excel / Numbers / Google Sheets with sane column widths.
+async function downloadXlsxTemplate(e) {
+  if (e) e.preventDefault();
+  const link = document.getElementById('downloadXlsxTemplateLink');
+  const original = link ? link.textContent : '';
+  try {
+    if (link) link.textContent = 'Building…';
+    const XLSX = await ensureXLSX();
+    const { fields, example } = templateFieldsAndExample();
+    const row = {};
+    fields.forEach(f => { row[f] = example[f] != null ? example[f] : ''; });
+    const ws = XLSX.utils.json_to_sheet([row], { header: fields });
+    ws['!cols'] = fields.map(f => ({ wch: Math.min(Math.max(f.length + 2, 12), 40) }));
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
+    const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    downloadBlob(out, 'the-ledger-import-template.xlsx', XLSX_MIME);
+    toast('Excel template downloaded — fill it in and re-upload via Import', 'success');
+  } catch (err) {
+    console.error(err);
+    toast('Could not build the Excel template: ' + err.message, 'error');
+  } finally {
+    if (link) link.textContent = original || 'Excel template';
+  }
 }
 
 // ============ eBay Seller Hub CSV → The Ledger schema ============
@@ -2103,6 +2219,7 @@ function init() {
     exportMenu.classList.remove('open');
     if (format === 'json') exportJSON();
     else if (format === 'csv') exportCSV();
+    else if (format === 'xlsx') exportXLSX();
     else if (format === 'poshmark') exportPoshmark();
     else if (format === 'ebay') exportEbay();
   });
@@ -2113,6 +2230,8 @@ function init() {
   document.getElementById('importConfirm').onclick = doImport;
   const dlTpl = document.getElementById('downloadTemplateLink');
   if (dlTpl) dlTpl.onclick = downloadCsvTemplate;
+  const dlXlsxTpl = document.getElementById('downloadXlsxTemplateLink');
+  if (dlXlsxTpl) dlXlsxTpl.onclick = downloadXlsxTemplate;
   document.querySelector('#importModal .modal-backdrop').onclick = () => document.getElementById('importModal').classList.remove('open');
 
   // Restore view
