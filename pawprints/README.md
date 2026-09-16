@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.69.0**
+**Current Version: v0.70.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.70.0** — **"Where purchased" remembers your stores.** The supply form's store field is now
+  type-or-pick: every store you've entered on a past purchase automatically appears as a suggestion
+  (typeahead dropdown plus a "Pick a past store" selector), so "Chewy" only ever needs typing once.
+  A new **Stores** list in Settings → Lists & preferences shows the stores collected from your
+  purchases — hide any you don't want suggested (one tap brings them back) and add stores you plan
+  to use before the first purchase.
 - **v0.69.0** — **Potty logging drops "Both" — Pee and Poop are now separate toggles.** In the potty
   form (quick log and edit alike) you tap Pee, Poop, or both; the stool dropdown appears whenever
   Poop is selected. "Nothing" remains its own exclusive option. Old entries are untouched — a

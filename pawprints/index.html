@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.69.0';
+const APP_VERSION = 'v0.70.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -376,6 +376,10 @@ function foodPlaceOptions(){ const c = (data.settings && data.settings.customFoo
 // Water refills get their own bowl-location list (built-ins shared with food + custom bowls + any place already used on a water log).
 function waterPlaceOptions(){ const c = (data.settings && data.settings.customWaterPlaces) || []; const used = (data.logs||[]).filter(l=>l.type==='water' && l.place).map(l=>l.place); const base = notHidden('waterplace', FOOD_PLACES.filter(x => x !== 'Other')); return [...new Set([...base, ...c, ...used]), 'Other']; }
 function stoolOptions(){ const c = (data.settings && data.settings.customStoolTypes) || []; return [...new Set([...notHidden('stool', STOOL_QUALITY), ...c])]; }
+// "Where purchased" suggestions: every store used on a past supply purchase joins automatically
+// (minus any the user hid in Settings), plus custom additions from the Settings list.
+function usedStores(){ return [...new Set((data.inventory||[]).map(i=>(i.store||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
+function storeOptions(){ const c = (data.settings && data.settings.customStores) || []; return [...new Set([...notHidden('store', usedStores()), ...c])]; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...notHidden('groomservice', GROOM_SERVICES), ...c])]; }
 function addGroomService(){
@@ -521,6 +525,7 @@ const LIST_KINDS = {
   food:  { key:'customFoodPlaces',  input:'list-food',  word:'location' },
   waterplace: { key:'customWaterPlaces', input:'list-waterplace', word:'location' },
   stool: { key:'customStoolTypes', input:'list-stool', word:'type' },
+  store: { key:'customStores', input:'list-store', word:'store' },
   unit:  { key:'customUnits',       input:'list-unit',  word:'unit' },
   groomservice: { key:'customGroomServices', input:'list-groomservice', word:'service' },
   category: { key:'customCategories', input:'list-category', word:'category' }
@@ -1264,6 +1269,7 @@ function settingsListsHTML(){
   h += listEditor('Stool types', 'stool', s.customStoolTypes||[], STOOL_QUALITY, 'Shows up in the Stool dropdown when a potty break includes a poop — add your own descriptions beyond the built-in ones.');
   h += listEditor('Supply categories', 'category', s.customCategories||[], INV_CATEGORIES, 'Shows up in the Category dropdown when you add a supply, and as a filter tab on the Supplies list (e.g. Toys, Health, Apparel).');
   h += listEditor('Supply units', 'unit', s.customUnits||[], UNIT_OPTIONS, 'Shows up in the Unit dropdown when you add a supply (e.g. flat, roll, dose).');
+  h += listEditor('Stores / where purchased', 'store', s.customStores||[], usedStores(), 'Suggestions for the "Where purchased" field on supplies. Every store you\'ve used on a past purchase appears automatically — hide ones you don\'t want suggested, or add stores you plan to use.', 'From your past purchases — tap × to hide from suggestions, ↺ to bring one back:');
   h += listEditor('Grooming services', 'groomservice', s.customGroomServices||[], GROOM_SERVICES, 'Shows up as a service tag when you log grooming.');
   const favs = s.walkFavorites || [];
   h += '<div style="margin-bottom:8px"><div class="label" style="margin-bottom:4px">Favorite walk routes</div>'
@@ -1271,14 +1277,14 @@ function settingsListsHTML(){
     + '</div>';
   return h;
 }
-function listEditor(label, kind, custom, base, desc){
+function listEditor(label, kind, custom, base, desc, baseLabel){
   const inputId = LIST_KINDS[kind].input, word = LIST_KINDS[kind].word;
   let h = '<div style="margin-bottom:14px"><div class="label" style="margin-bottom:4px">'+label+'</div>';
   if(desc) h += '<div style="font-size:12px;color:var(--text-secondary);margin-bottom:6px">'+esc(desc)+'</div>';
   // Built-ins are hideable per list — hidden ones drop out of the logging dropdowns but can be restored here.
   const hid = hiddenDefaults(kind), isHid = v => hid.some(x=>String(x).toLowerCase()===String(v).toLowerCase());
-  h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Built-in — tap × to hide ones you don\'t use, ↺ to bring one back:</div>';
-  h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
+  if(base.length) h += '<div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">'+esc(baseLabel||'Built-in — tap × to hide ones you don\'t use, ↺ to bring one back:')+'</div>';
+  if(base.length) h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">'
     + base.filter(b=>b!=='Other').map(b => isHid(b)
         ? '<span class="chip" style="display:inline-flex;align-items:center;gap:6px;opacity:.5"><span style="text-decoration:line-through">'+esc(b)+'</span> <button onclick="restoreDefault(\''+kind+'\',\''+encArg(b)+'\')" title="Show this option again" style="background:none;border:none;color:var(--success);cursor:pointer;font-size:14px;line-height:1;padding:0">↺</button></span>'
         : '<span class="chip" style="display:inline-flex;align-items:center;gap:6px">'+esc(b)+' <button onclick="hideDefault(\''+kind+'\',\''+encArg(b)+'\')" title="Hide from the dropdown (restore any time)" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;line-height:1;padding:0">×</button></span>')
@@ -2591,7 +2597,7 @@ function invModal(id, pre){
     +'<label class="label">Package size (optional)'+tip('The amount inside the package — e.g. "5 lb", "30 ct", "12 oz". It\'s separate from Unit (the container), so a 5-lb bag of food is Qty 1, Unit bag, Size 5 lb.')+'</label><input class="input" id="iv-size" value="'+(it?esc(it.size||''):'')+'" placeholder="e.g. 5 lb, 30 ct">'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the item price before sales tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="iv-cost" value="'+(it?esc(it.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Where purchased</label><input class="input" id="iv-store" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"></div>'
+    +'<div class="grid-2"><div><label class="label">Where purchased'+(storeOptions().length?tip('Type a store or pick a past one — every store you\'ve used on a purchase shows up here automatically. Manage the list in Settings → Lists &amp; preferences → Stores.'):'')+'</label><input class="input" id="iv-store" list="iv-store-list" autocomplete="off" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"><datalist id="iv-store-list">'+storeOptions().map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+savedPick('iv-store', storeOptions(), 'Pick a past store')+'</div>'
     +'<div><label class="label">UPC / barcode'+tip('The product barcode number — handy for re-ordering the exact item.')+'</label><input class="input" id="iv-upc" inputmode="numeric" value="'+(it?esc(it.upc||''):'')+'" placeholder="012345678905"></div></div>'
     +'<div class="grid-2"><div><label class="label">Reorder link'+tip('Paste the product page URL (Chewy, Amazon, the store site). A "Reorder" link then shows on the item and — most usefully — next to it in the Restock list when it\'s running low, so you can re-buy the exact item in one tap.')+'</label><input class="input" type="url" id="iv-url" value="'+(it?esc(it.reorderUrl||''):'')+'" placeholder="https://…"></div>'
     +'<div><label class="label">Amazon ASIN'+tip('Amazon\'s 10-character product ID — it\'s in the product page URL right after "/dp/" (e.g. B01LP0U5X0), and under "Product information" on the listing. When set, an "Amazon" button appears next to Reorder linking straight to the product. Pasting the full Amazon URL here works too — the ASIN is pulled out automatically when you save.')+'</label><input class="input" id="iv-asin" autocapitalize="characters" autocomplete="off" value="'+(it?esc(it.asin||''):'')+'" placeholder="B01LP0U5X0"></div></div>'
