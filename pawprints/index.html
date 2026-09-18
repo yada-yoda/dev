@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.70.1';
+const APP_VERSION = 'v0.71.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -338,6 +338,7 @@ let vetSortAsc = false, groomSortAsc = false, illnessSortAsc = false; // Care li
 let suppliesCat = 'all';
 let suppliesSort = { key:'purchaseDate', dir:'desc' }; // Supplies list column sort
 let suppliesFilter = null; // {field,value} — click a Brand/Where tag to show only matching items
+let suppliesStatus = 'all'; // status chip filter: all | In use | Inventory | One-time | Finished
 let calMonth = null; // {y, m} for calendar view; null = current month
 let firebaseReady = false;
 let currentUser = null;
@@ -3070,6 +3071,7 @@ function promptAddDog(){
 function setLogSubtab(t){ logSubtab = t; render(); }
 function setCareSubtab(t){ careSubtab = t; render(); }
 function setSuppliesCat(c, enc){ suppliesCat = enc ? decodeURIComponent(c) : c; render(); }
+function setSuppliesStatus(s){ suppliesStatus = s; render(); }
 // Supplies column sort — text sorts ascending first, cost/date descending first; same column toggles direction.
 const SUP_SORTS = [{k:'name',l:'Item',t:'text'},{k:'brand',l:'Brand',t:'text'},{k:'store',l:'Where',t:'text'},{k:'category',l:'Category',t:'text'},{k:'cost',l:'Cost',t:'num'},{k:'purchaseDate',l:'Purchased',t:'date'},{k:'status',l:'Status',t:'status'}];
 function setSuppliesSort(key){
@@ -3973,11 +3975,21 @@ function renderSupplies(){
   const presentCats = all.map(i=>i.category).filter(Boolean);
   const cats = ['all', ...new Set([...catOptions(), ...presentCats])];
   html += '<div class="subtab">'+cats.map(c=>'<button class="'+(suppliesCat===c?'active':'')+'" onclick="setSuppliesCat(\''+c+'\')">'+esc(c==='all'?'All':c)+'</button>').join('')+'</div>';
-  let shown = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice();
-  if(suppliesFilter) shown = shown.filter(i => (i[suppliesFilter.field]||'') === suppliesFilter.value);
+  let base = (suppliesCat==='all'?all:all.filter(i=>i.category===suppliesCat)).slice();
+  if(suppliesFilter) base = base.filter(i => (i[suppliesFilter.field]||'') === suppliesFilter.value);
+  // Status filter chips — lifecycle slice (In use / Inventory / One-time / Finished), ANDs
+  // with the category tabs and brand/store pills. Counts reflect the current tab + pill filter.
+  const stCounts = {}; base.forEach(i=>{ const s=invStatus(i); stCounts[s]=(stCounts[s]||0)+1; });
+  const stChips = ['In use','Inventory','One-time','Finished'].filter(s=>stCounts[s]);
+  if(suppliesStatus !== 'all' && !stChips.includes(suppliesStatus)) stChips.push(suppliesStatus);
+  if(stChips.length > 1 || suppliesStatus !== 'all'){
+    html += '<div class="tag-grid" style="margin-bottom:10px"><button class="tag'+(suppliesStatus==='all'?' active':'')+'" type="button" onclick="setSuppliesStatus(\'all\')" title="Show every status">All · '+base.length+'</button>'
+      + stChips.map(s=>'<button class="tag'+(suppliesStatus===s?' active':'')+'" type="button" onclick="setSuppliesStatus(\''+s+'\')" title="Show only '+esc(s)+' items">'+esc(s)+' · '+(stCounts[s]||0)+'</button>').join('')+'</div>';
+  }
+  let shown = suppliesStatus==='all' ? base : base.filter(i=>invStatus(i)===suppliesStatus);
   shown = shown.sort(suppliesCompare);
   if(suppliesFilter) html += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;font-size:13px"><span style="color:var(--text-secondary)">Showing only</span><span class="chip-2" style="font-size:11px">'+esc(supFieldLabel(suppliesFilter.field))+': '+esc(suppliesFilter.value)+'</span><button class="btn btn-sm" onclick="clearSuppliesFilter()">✕ Clear filter</button></div>';
-  if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">'+(suppliesFilter?'No items match this filter.':('No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.'))+'</p></div>';
+  if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">'+((suppliesFilter||suppliesStatus!=='all')?'No items match this filter.':('No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.'))+'</p></div>';
   html += suppliesSortBar();
   const fActive = (f,v)=> (suppliesFilter && suppliesFilter.field===f && suppliesFilter.value===v) ? ' active' : '';
   const cols = [['name','Item'],['brand','Brand'],['store','Where'],['category','Category'],['cost','Cost'],['status','Status']];
@@ -3996,7 +4008,8 @@ function renderSupplies(){
     const costCell = '<div>'+(i.cost?money(i.cost):dash)
       + (bd && bd.perDay!=null ? '<div style="font-size:10px;color:var(--accent);font-weight:400">'+moneyRate(bd.perDay)+'/day</div>' : '')
       + (bd && bd.perUnit!=null ? '<div style="font-size:10px;color:var(--text-secondary);font-weight:400">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>' : '')+'</div>';
-    const statusCell = invStatusChip(i)+(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'');
+    const statusCell = '<span class="sup-tag'+(suppliesStatus===st?' active':'')+'" onclick="event.stopPropagation();setSuppliesStatus(\''+st+'\')" title="Show only '+st+' items">'+invStatusChip(i)+'</span>'
+      +(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'');
     const sub = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
     return '<tr onclick="invModal(\''+i.id+'\')">'
       + '<td class="sup-item" data-label="Item">'+esc(i.name)+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>'

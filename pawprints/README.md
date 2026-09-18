@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.70.1**
+**Current Version: v0.71.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.71.0** — **Supplies filter by lifecycle status.** A new chip row above the supplies table —
+  **All · In use · Inventory · One-time · Finished**, each with a live count — filters the list to
+  one lifecycle stage, and combines with the category tabs and the brand/store pills (e.g. "Food
+  that's In use"). Tapping the status chip on any row applies the same filter. Sorting by status was
+  already there via the Status column header; now the slicing is too.
 - **v0.70.1** — **Fixed phone entries sometimes never reaching the desktop.** Two related bugs:
   (1) if you logged something and immediately locked the phone, iOS could freeze the upload in a
   way that jammed the sync machinery for the rest of that session — the phone kept showing your
