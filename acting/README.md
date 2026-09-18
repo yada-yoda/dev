@@ -10,6 +10,15 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.15.1 - 2026-09-18
+
+Vocal range added to the stats (CMS: Stats > Physical > Vocal Range). It
+shows in the Physical panel on the site and as a cell in the stats row
+at the top of the printed resume, next to height, eyes and hair, where a
+musical-theater resume would carry it. The stats row now sizes its
+columns to however many cells it has, so an added stat widens the row
+instead of wrapping a lone cell onto a second line.
+
 ### v0.15.0 - 2026-09-15
 
 A headshot can now be downloaded as a print-ready PDF. A PDF tile sits at

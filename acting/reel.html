@@ -308,6 +308,7 @@ footer .hits[hidden]{display:none}
   }
 
   .rs-stats{
+    /* Column count is set inline by the build (one per cell); 6 is the fallback. */
     display:grid;grid-template-columns:repeat(6,1fr);gap:2px 10px;
     padding:4px 0 5px;
     border-bottom:1px solid #ccc;
@@ -525,7 +526,7 @@ footer .hits[hidden]{display:none}
 
 <!-- EDIT: footer — auto-generated from data/footer.yml. Version chip controlled by show_version. -->
 <footer>
-  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.15.0</span><span class="hits" id="hits" hidden></span>
+  © <span id="yr"></span> Rizzo.cc <span class="ver">v0.15.1</span><span class="hits" id="hits" hidden></span>
 </footer>
 <!-- /EDIT: footer -->
 
@@ -556,11 +557,12 @@ footer .hits[hidden]{display:none}
   <!-- /EDIT: print-header -->
 
   <!-- EDIT: print-stats — the row of physical stats below the name on the printed resume -->
-  <div class="rs-stats">
+  <div class="rs-stats" style="grid-template-columns:repeat(7,1fr)">
     <div><strong>Height</strong>6'0"</div>
     <div><strong>Eyes</strong>Blue</div>
     <div><strong>Hair</strong>Bald / Buzz / Brown</div>
     <div><strong>Age Range</strong>34–47</div>
+    <div><strong>Vocal Range</strong>B♭2–E4</div>
     <div><strong>Shoe</strong>12.5–13 US</div>
     <div><strong>Suit</strong>44R / L / 17.5"</div>
   </div>

@@ -110,7 +110,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.15.0"
+SITE_VERSION = "v0.15.1"
 
 
 # ---------- helpers ----------
@@ -999,12 +999,15 @@ def gen_physical(p):
         ("Height:", p["height"]),
         ("Eyes:", p["eyes"]),
         ("Hair:", p["hair"]),
+        # Optional: sits with the physical description, as on a musical
+        # theater resume's stats line. Skipped when blank.
+        ("Vocal Range:", p.get("vocal_range", "")),
         ("Tattoos:", p["tattoos"]),
         ("Piercings:", p["piercings"]),
     ]
     lis = "\n".join(
         f'          <li><span class="label">{esc(k)}</span> {esc(v)}</li>'
-        for k, v in items
+        for k, v in items if str(v or "").strip()
     )
     return (
         "\n      <div class=\"panel col-3\">\n"
@@ -1150,15 +1153,19 @@ def gen_print_stats(panels):
         ("Eyes", p["eyes"]),
         ("Hair", p["hair"]),
         ("Age Range", p["age_range"]),
+        ("Vocal Range", p.get("vocal_range", "")),  # optional, blank = no cell
         ("Shoe", m["shoe"]),
         ("Suit", f"{m['coat']} / {m['shirt']} / {m['neck']}"),
     ]
+    cells = [(k, v) for k, v in cells if str(v or "").strip()]
     divs = "\n".join(
         f"    <div><strong>{esc(label)}</strong>{esc(value)}</div>"
         for label, value in cells
     )
+    # One column per cell so the row never wraps a lone cell onto a second
+    # line; the CSS default (6) is only a fallback.
     return (
-        "\n  <div class=\"rs-stats\">\n"
+        f'\n  <div class="rs-stats" style="grid-template-columns:repeat({len(cells)},1fr)">\n'
         + divs + "\n"
         "  </div>\n  "
     )

@@ -71,7 +71,7 @@ GitHub&rsquo;s web editor has a search box at the top.
 | `EDIT: bio` | Centered short bio paragraph | &mdash; |
 | `EDIT: profile-intro` | Paragraph next to the headshot | &mdash; |
 | `EDIT: socials` | Instagram / Letterboxd / IMDb / Actors Access / Email links | &mdash; |
-| `EDIT: physical` | Age range, height, eyes, hair, tattoos, piercings | `EDIT: print-stats` |
+| `EDIT: physical` | Age range, height, eyes, hair, vocal range, tattoos, piercings | `EDIT: print-stats` |
 | `EDIT: languages` | Spoken languages list | `EDIT: print-languages` |
 | `EDIT: measurements` | Shoe / shirt / coat / etc. | `EDIT: print-stats` (Suit cell) |
 | `EDIT: licensing` | License, passport, TSA, union, local hire | `EDIT: print-licensing` |

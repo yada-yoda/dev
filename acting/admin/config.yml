@@ -471,6 +471,7 @@ collections:
           - { label: "Height", name: "height", widget: "string" }
           - { label: "Eyes", name: "eyes", widget: "string" }
           - { label: "Hair", name: "hair", widget: "string" }
+          - { label: "Vocal Range", name: "vocal_range", widget: "string", required: false, hint: "Lowest to highest note, e.g. B♭2–E4. Shows in the Physical panel on the site and in the stats row at the top of the printed resume. Leave blank to hide." }
           - { label: "Tattoos", name: "tattoos", widget: "string" }
           - { label: "Piercings", name: "piercings", widget: "string" }
 
