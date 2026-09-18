@@ -999,9 +999,6 @@ def gen_physical(p):
         ("Height:", p["height"]),
         ("Eyes:", p["eyes"]),
         ("Hair:", p["hair"]),
-        # Optional: sits with the physical description, as on a musical
-        # theater resume's stats line. Skipped when blank.
-        ("Vocal Range:", p.get("vocal_range", "")),
         ("Tattoos:", p["tattoos"]),
         ("Piercings:", p["piercings"]),
     ]
@@ -1093,6 +1090,20 @@ def gen_licensing_print(lic):
     )
 
 
+def skills_text(sk):
+    """The skills paragraph as rendered everywhere (site, PDF, and the
+    print-density estimate): vocal range first when set, then the list.
+    Range leads because on an on-camera resume that is where it lives -
+    under Special Skills, not in the header stats, which are for what the
+    camera sees. No voice type is added: that is a teacher's call."""
+    text = str(sk.get("text") or "").strip()
+    vr = str(sk.get("vocal_range") or "").strip()
+    if vr:
+        lead = f"Vocal Range: {vr}"
+        text = f"{lead} · {text}" if text else lead
+    return text
+
+
 def gen_skills(skills_str, web_only=""):
     """Site version of the skills paragraph. `web_only` is an optional tail
     that appears here but NOT on the printed resume - the light closer
@@ -1153,7 +1164,6 @@ def gen_print_stats(panels):
         ("Eyes", p["eyes"]),
         ("Hair", p["hair"]),
         ("Age Range", p["age_range"]),
-        ("Vocal Range", p.get("vocal_range", "")),  # optional, blank = no cell
         ("Shoe", m["shoe"]),
         ("Suit", f"{m['coat']} / {m['shirt']} / {m['neck']}"),
     ]
@@ -2020,7 +2030,8 @@ def main():
         "measurements":   _load_obj(DATA / "measurements.yml"),
         "languages":      _load_list(DATA / "languages.yml"),
         "licensing":      _load_obj(DATA / "licensing.yml"),
-        "skills":         _load_obj(DATA / "skills.yml").get("text", ""),
+        # Vocal range + list, already joined (see skills_text).
+        "skills":         skills_text(_load_obj(DATA / "skills.yml")),
         # Site-only tail for the skills paragraph; the PDF never sees it.
         "skills_web_only": _load_obj(DATA / "skills.yml").get("web_only", ""),
         "favorite_films": _load_list(DATA / "favorite-films.yml"),

@@ -71,12 +71,12 @@ GitHub&rsquo;s web editor has a search box at the top.
 | `EDIT: bio` | Centered short bio paragraph | &mdash; |
 | `EDIT: profile-intro` | Paragraph next to the headshot | &mdash; |
 | `EDIT: socials` | Instagram / Letterboxd / IMDb / Actors Access / Email links | &mdash; |
-| `EDIT: physical` | Age range, height, eyes, hair, vocal range, tattoos, piercings | `EDIT: print-stats` |
+| `EDIT: physical` | Age range, height, eyes, hair, tattoos, piercings | `EDIT: print-stats` |
 | `EDIT: languages` | Spoken languages list | `EDIT: print-languages` |
 | `EDIT: measurements` | Shoe / shirt / coat / etc. | `EDIT: print-stats` (Suit cell) |
 | `EDIT: licensing` | License, passport, TSA, union, local hire | `EDIT: print-licensing` |
 | `EDIT: training` | Acting / improv / school training entries | `EDIT: print-training` |
-| `EDIT: skills` | Long Special Skills list | `EDIT: print-skills` |
+| `EDIT: skills` | Special Skills list (vocal range leads it when set in `data/skills.yml`) | `EDIT: print-skills` |
 | `EDIT: favorite-films` | The five favorite films list | &mdash; |
 | `EDIT: inspirations` | The director-influences list | &mdash; |
 | `EDIT: film-credits` | Film credits table on the website | `EDIT: print-film-credits` |

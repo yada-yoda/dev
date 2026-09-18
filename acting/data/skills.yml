@@ -2,6 +2,12 @@
 # Separate items with " · " (space + middle dot + space).
 # Industry rule of thumb: 8–12 high-impact entries beats a long list.
 
+# Vocal range leads the skills list on the site and the printed resume
+# ("Vocal Range: B♭2–E4 · ..."). Lowest to highest note, no voice type -
+# a type (baritone, tenor) is for a voice teacher to assign, not to infer
+# from the notes. Blank hides it.
+vocal_range: "B♭2–E4"
+
 # The last item is the light closer - one true, specific line so the list
 # ends on a human note. Keep it last, keep it to one item.
 text: "Bike Riding · Chess · Finance · Frisbee Golf · Gaming (Video / Computer) · Guitar (General) · IT / Computer Science · Marketing · Music Industry · Music Management · Photographic Memory · Poker · Road Driving · Football · Ice Skating · Roller Skating · Running · Soccer · Track and Field (Discus / Shotput) · Weight Lifting · Yoga · Stock Market · Swimming · Tour Management · Good sport (lost to Paul Scheer in fantasy football two years in a row)"

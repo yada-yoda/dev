@@ -12,12 +12,13 @@ for agents). All are regenerated from `data/*.yml` by
 
 ### v0.15.1 - 2026-09-18
 
-Vocal range added to the stats (CMS: Stats > Physical > Vocal Range). It
-shows in the Physical panel on the site and as a cell in the stats row
-at the top of the printed resume, next to height, eyes and hair, where a
-musical-theater resume would carry it. The stats row now sizes its
-columns to however many cells it has, so an added stat widens the row
-instead of wrapping a lone cell onto a second line.
+Vocal range added (CMS: Key Skills > Vocal range). It leads the Special
+Skills list on the site and the printed resume as "Vocal Range: B♭2–E4",
+which is where an on-camera resume carries it - the header stats stay
+what the camera sees. Notes only, no voice type: that is for a voice
+teacher to assign, not to infer from the notes. The printed stats row
+also now sizes its columns to however many cells it has, so any stat
+added later widens the row instead of wrapping onto a second line.
 
 ### v0.15.0 - 2026-09-15
 
