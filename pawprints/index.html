@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.71.0';
+const APP_VERSION = 'v0.72.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3397,7 +3397,20 @@ function timelineRow(l){
     +'<div style="flex:1"><div style="font-weight:600;font-size:14px">'+logSummary(l)+'</div>'
     +(l.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic">'+esc(l.notes)+'</div>':'')
     +'<div class="tl-time">'+fmtTime(l.dateTime)+'</div></div>'
-    +(canLog()?'<div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="editLogModal(\''+l.id+'\')">Edit</button><button class="btn btn-sm btn-danger" onclick="delLog(\''+l.id+'\')" title="Delete">×</button></div>':'')+'</div>';
+    +(canLog()?'<div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="editLogModal(\''+l.id+'\')">Edit</button><button class="btn btn-sm" onclick="dupLog(\''+l.id+'\')" title="Duplicate — copies this entry (same time &amp; details) and opens it to tweak">⧉</button><button class="btn btn-sm btn-danger" onclick="delLog(\''+l.id+'\')" title="Delete">×</button></div>':'')+'</div>';
+}
+// Duplicate an activity entry — same time and details under a new id, then open it for
+// tweaking. Quick way to log a near-identical entry (e.g. both dogs fed the same meal,
+// or a second walk just like this morning's) without retyping everything.
+function dupLog(id){
+  if(denyLog()) return;
+  const src = data.logs.find(x=>x.id===id); if(!src) return;
+  const copy = { ...src, id: genId(), createdAt: new Date().toISOString() };
+  data.logs.unshift(copy);
+  logChange('logged', LOG_ENTITY[copy.type]||'activity', 'duplicated: '+(logSummary(copy)||'').replace(/<[^>]+>/g,''));
+  save();
+  editLogModal(copy.id);
+  showToast('⧉ Duplicated — adjust anything and Save');
 }
 // Edit an existing activity log entry (feed / water / potty / walk / weight), pre-filled.
 function editLogModal(id){

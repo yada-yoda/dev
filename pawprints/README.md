@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.71.0**
+**Current Version: v0.72.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,11 @@ covers both.
 
 ## Version History
 
+- **v0.72.0** — **Duplicate an activity entry.** Every activity row (Today's timeline, the Log tab
+  lists, and the by-day activity page) has a new **⧉** button next to Edit: it copies the entry —
+  same time, same details — and immediately opens the copy for tweaking. Handy for "same meal for
+  the other dog," a matching potty break, or re-logging yesterday's walk with one field changed,
+  without retyping everything.
 - **v0.71.0** — **Supplies filter by lifecycle status.** A new chip row above the supplies table —
   **All · In use · Inventory · One-time · Finished**, each with a live count — filters the list to
   one lifecycle stage, and combines with the category tabs and the brand/store pills (e.g. "Food
