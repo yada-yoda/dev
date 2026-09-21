@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.157';
+const VERSION = '1.0.158';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2586,11 +2586,32 @@ const INCOME_LIST_COL_LABELS = { date: 'Date', kind: 'Kind', category: 'Category
 const INCOME_LIST_ALL_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status', 'notes'];
 const INCOME_LIST_DEFAULT_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status'];
 let incomeListSort = { key: 'date', dir: 'desc' };
+// Category pill on the Income list: same look as the other list pages, and
+// clicking it narrows the table to that category. It drives the SAME filter as
+// the Category dropdown above rather than a second, competing one, so the two
+// can never disagree; clicking the active category clears it.
+function incomeCatBadge(catId, text) {
+  const b = badge(text, 'type');
+  b.style.cursor = 'pointer';
+  const on = incomeCatFilter === catId;
+  b.title = on ? 'Showing only “' + text + '” — click to clear'
+               : 'Click to show only “' + text + '”';
+  b.addEventListener('click', ev => {
+    ev.stopPropagation();
+    incomeCatFilter = on ? 'all' : catId;
+    renderView(currentRoute);
+  });
+  return b;
+}
 function buildIncomeListCol(store, key) {
   switch (key) {
     case 'date': return { label: 'Date', key: 'date', value: r => r.date || '', cell: r => el('td', null, fmtDate(r.date)) };
     case 'kind': return { label: 'Kind', key: 'kind', value: r => r.kind, cell: r => { const td = el('td'); td.appendChild(badge(r.kind === 'paycheck' ? 'Paycheck' : 'Income', r.kind === 'paycheck' ? 'green' : '')); return td; } };
-    case 'category': return { label: 'Category', key: 'category', value: r => r.catName, cell: r => el('td', null, r.catName) };
+    case 'category': return { label: 'Category', key: 'category', value: r => r.catName, cell: r => {
+        const td = el('td'); const n = r.catName;
+        if (!n || n === '—') { td.textContent = '—'; return td; }
+        td.appendChild(r.categoryId ? incomeCatBadge(r.categoryId, n) : badge(n, 'type'));
+        return td; } };
     case 'source': return { label: 'Source', key: 'source', value: r => r.source || '', cell: r => {
         const td = el('td');
         td.appendChild(document.createTextNode(r.source || '—'));
@@ -3753,6 +3774,7 @@ const HELP_SECTIONS = [
     points: [
       'Covers dividends, interest, rewards/cash-back, IRA & estate distributions, class-action payouts, selling, and anything under “Other.”',
       'Annual grid view totals income by category across the months; List view shows every entry — and now includes your paychecks.',
+      'Click a Category pill in List view to narrow the table to just that category — click it again (or set the dropdown back to All categories) to clear. It drives the same Category filter as the dropdown, so the two always match.',
       'In List view, each income row has a Duplicate button — a quick way to log something similar: it prefills a new entry from that row with the date set to today, so you just tweak what’s different. (Paychecks are duplicated from the Paychecks page.)',
       'Picking certain categories reveals tailored fields (e.g. a dividend’s ticker, a reward’s program/type, an IRA distribution’s withholdings).'
     ] },

@@ -45,6 +45,16 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.158 — Clickable Category pills on the Income list
+
+On the Income **List** view the Category column is now a colored pill, matching
+the other list pages. Click one to narrow the table to that category, and click
+it again to clear — handy for answering “how much came in from this
+category?” without reaching for the dropdown.
+
+It drives the *same* Category filter as the dropdown above the table rather than
+a second, competing filter, so the pill and the dropdown always agree.
+
 ### v1.0.157 — CD renewal: length and maturity date fill each other in
 
 In the **Renew CD** form, **New CD length** and **New maturity date** now update
