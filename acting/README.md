@@ -10,6 +10,20 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.16.0 - 2026-09-22
+
+The footer now carries a Blog link, pointing at the new section at
+rizzo.cc/blog. That link and a second `Sitemap:` line in `robots.txt` are
+the only ties between the acting pages and the blog - nothing about it
+shows up on the profile itself, which stays a single-purpose page for
+casting people.
+
+The links are data now: `data/footer.yml` takes a `links:` list, so the
+news section can be added later without touching the generator. They use
+absolute rizzo.cc URLs on purpose, so the dev mirror points at the live
+blog rather than a 404 under `/acting/`. `/reel` does not show them - it
+goes to agents and stays bare.
+
 ### v0.15.1 - 2026-09-18
 
 Vocal range added (CMS: Key Skills > Vocal range). It leads the Special

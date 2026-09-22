@@ -5,3 +5,13 @@
 
 text: "© {{year}} Rizzo.cc"
 show_version: true
+
+# Other sections of rizzo.cc, listed after the footer text. These are the
+# only place the acting pages point at them - nothing about the blog or the
+# news shows up anywhere else on the profile. Use absolute rizzo.cc URLs so
+# the dev mirror links to the live section rather than a 404 under /acting/.
+# The /reel page does not carry these: it goes to agents and stays bare.
+links:
+  - label: Blog
+    url: "https://rizzo.cc/blog/"
+    title: "Short posts on acting, comedy and the tools behind this site"

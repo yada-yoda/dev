@@ -110,7 +110,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.15.1"
+SITE_VERSION = "v0.16.0"
 
 
 # ---------- helpers ----------
@@ -1435,13 +1435,27 @@ def gen_section_visibility(site):
     return "\n<style>" + "".join(hidden_rules) + "</style>\n"
 
 
-def gen_footer(site):
+def gen_footer(site, show_links=True):
     f = site.get("footer", {})
     template = f.get("text", "© {{year}} Rizzo.cc")
     show_version = f.get("show_version", True)
 
     # Replace {{year}} with the dynamic year span (filled by JS at runtime)
     rendered = esc(template).replace("{{year}}", '<span id="yr"></span>')
+
+    # Links to the other sections of rizzo.cc (data/footer.yml > links).
+    # show_links=False keeps them off /reel, which is deliberately bare.
+    if show_links:
+        for link in f.get("links") or []:
+            url = str(link.get("url") or "").strip()
+            label = str(link.get("label") or "").strip()
+            if not url or not label:
+                continue
+            title = str(link.get("title") or label).strip()
+            rendered += (
+                f'<a class="flink" href="{esc(url)}" title="{esc(title)}">'
+                f"{esc(label)}</a>"
+            )
 
     # Append version chip if enabled (replaces {{version}} if present, else
     # appends as the next visible element)
@@ -1979,7 +1993,7 @@ def build_reel(site, credits, panels, contact, headshots):
     html = replace_block(html, "reel-video", gen_reel(contact))
     html = replace_block(html, "reel-chapters", gen_reel_chapters(page))
     html = replace_block(html, "reel-strip", gen_reel_strip(page, site, reel, panels, credits, contact, headshots))
-    html = replace_block(html, "footer", gen_footer(site))
+    html = replace_block(html, "footer", gen_footer(site, show_links=False))
     html = replace_block(html, "resume-sheet", "\n" + sheet + "\n")
     REEL.write_text(html, encoding="utf-8")
     n_ch = len(page.get("chapters") or [])
