@@ -80,6 +80,7 @@ jobs:
             --exclude='Thumbs.db' \
             --exclude='.git/' \
             --exclude='.gitignore' \
+            --exclude='.nojekyll' \
             dev/acting/ main-rcc/
 
       - name: Rewrite /acting/ path prefixes to /
