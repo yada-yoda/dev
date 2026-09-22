@@ -56,12 +56,23 @@ jobs:
         run: |
           # --delete removes files in main-rcc that are no longer in dev/acting,
           # but the --exclude list means CNAME, README.md, and .git are safe.
+          #
+          # The blog-src/blog and news-src/news folders are owned by main-rcc
+          # itself (rizzo.cc/blog and rizzo.cc/news, built by main-rcc's own
+          # Actions). They do not exist in dev/acting, so without these excludes
+          # --delete would wipe them on every sync. Same for main-rcc/.github/,
+          # which holds those build workflows.
           rsync -av --delete \
             --exclude='admin/' \
             --exclude='agencies/' \
             --exclude='data/' \
             --exclude='.scripts/' \
             --exclude='source/' \
+            --exclude='blog-src/' \
+            --exclude='blog/' \
+            --exclude='news-src/' \
+            --exclude='news/' \
+            --exclude='.github/' \
             --exclude='DECAP-SETUP.md' \
             --exclude='EDITING.md' \
             --exclude='README.md' \
@@ -83,6 +94,10 @@ jobs:
                -o -name '*.webmanifest' -o -name '*.json' \) \
             ! -name 'README.md' \
             ! -path './.git/*' \
+            ! -path './blog/*' \
+            ! -path './blog-src/*' \
+            ! -path './news/*' \
+            ! -path './news-src/*' \
             -exec sed -i \
               -e 's|https://dev\.rizzo\.cc/acting/|https://rizzo.cc/|g' \
               -e 's|dev\.rizzo\.cc/acting/|rizzo.cc/|g' \
