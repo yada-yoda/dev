@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.159';
+const VERSION = '1.0.160';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2582,10 +2582,15 @@ function incomeGrid(data) {
 // Income List: one unified table of income ENTRIES + PAYCHECKS (wages were
 // invisible here before — they only rolled into the grid), with the standard
 // column registry, 3-click sorting, and a per-user ⚙ Columns layout.
-const INCOME_LIST_COL_LABELS = { date: 'Date', kind: 'Kind', category: 'Category', source: 'Source', account: 'Account', via: 'Received via', gross: 'Gross', net: 'Net', person: 'Person', status: 'Status', notes: 'Notes' };
-const INCOME_LIST_ALL_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status', 'notes'];
+const INCOME_LIST_COL_LABELS = { date: 'Date', kind: 'Kind', category: 'Category', source: 'Source', account: 'Account', via: 'Received via', gross: 'Gross', net: 'Net', person: 'Person', status: 'Status', taxable: 'Taxable', notes: 'Notes' };
+const INCOME_LIST_ALL_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status', 'taxable', 'notes'];
 const INCOME_LIST_DEFAULT_COLS = ['date', 'kind', 'category', 'source', 'account', 'via', 'gross', 'net', 'person', 'status'];
 let incomeListSort = { key: 'date', dir: 'desc' };
+// Ticked rows in the Income list, as 'kind:id' so an income entry and a
+// paycheck can never collide. Pruned to what is on screen each render, so a
+// bulk action can only ever touch rows you can actually see.
+let incomeSel = new Set();
+const incRowKey = r => r.kind + ':' + ((r.raw && r.raw.id) || '');
 // Category pill on the Income list: same look as the other list pages, and
 // clicking it narrows the table to that category. It drives the SAME filter as
 // the Category dropdown above rather than a second, competing one, so the two
@@ -2624,9 +2629,32 @@ function buildIncomeListCol(store, key) {
     case 'net': return { label: 'Net', key: 'net', num: true, value: r => r.net, cell: r => numCell(r.net) };
     case 'person': return { label: 'Person', key: 'person', value: r => r.person, cell: r => el('td', null, r.person) };
     case 'status': return { label: 'Status', key: 'status', value: r => r.status, cell: r => { const td = el('td'); const st = r.status || 'Received'; td.appendChild(badge(st, /pend|expect|late|missing/i.test(st) ? 'amber' : /bounce/i.test(st) ? 'red' : 'green')); return td; } };
+    case 'taxable': return { label: 'Taxable', key: 'taxable', value: r => r.taxable || '', cell: r => {
+        const td = el('td'); const t = r.taxable;
+        if (!t) { td.textContent = '—'; return td; }
+        const lbl = t === 'yes' ? 'Yes' : t === 'no' ? 'No' : 'Unknown';
+        td.appendChild(badge(lbl, t === 'yes' ? 'green' : t === 'no' ? 'type' : 'amber'));
+        return td; } };
     case 'notes': return { label: 'Notes', key: 'notes', value: r => r.notes || '', cell: r => { const td = el('td', 'muted'); td.textContent = r.notes || '—'; return td; } };
   }
   return null;
+}
+// Confirm + run a bulk delete from the Income list. Spells out the two cases
+// worth knowing before you commit: paychecks also leave the Paychecks page,
+// and settlement-linked entries simply come back on the next sync.
+function bulkRemoveIncome(picked) {
+  const store = window.cloverStore;
+  const pcs = picked.filter(r => r.kind === 'paycheck').length;
+  const linked = picked.filter(r => r.kind !== 'paycheck' && r.raw.srcSettlement).length;
+  const body = el('div');
+  body.appendChild(el('p', null, 'Remove ' + picked.length + ' selected entr' + (picked.length === 1 ? 'y' : 'ies') + '? This can’t be undone.'));
+  if (pcs) body.appendChild(el('p', 'muted', pcs + ' of them ' + (pcs === 1 ? 'is a paycheck' : 'are paychecks') + ' — removing them here removes them from the Paychecks page too.'));
+  if (linked) body.appendChild(el('p', 'muted', linked + ' came from a Class Action payout — those come back the next time that settlement syncs. Remove the payout itself on the Class Actions page instead.'));
+  openModal({ title: 'Remove selected', body, confirmLabel: 'Remove', onConfirm: () => {
+    picked.forEach(r => { if (r.kind === 'paycheck') store.removePaycheck(yearOfPaycheck(r.raw), r.raw.id); else store.removeIncome(activeYear, r.raw.id); });
+    incomeSel.clear();
+    toast('Removed ' + picked.length + ' entr' + (picked.length === 1 ? 'y' : 'ies'));
+  } });
 }
 function incomeList(data) {
   const store = window.cloverStore;
@@ -2642,7 +2670,7 @@ function incomeList(data) {
       kind: 'income', raw: e, date: e.date, catName: store.incomeGroupName(e.categoryId),
       source, srcSub, reinvested: !!e.reinvested,
       account: store.accountName(e.accountId) || '', via: e.receivedVia || '', gross: amountOf(e), net: Number(e.net) || 0,
-      person: store.personName(e.personId), status: e.status === 'pending' ? 'Pending' : 'Received', notes: e.notes || '',
+      person: store.personName(e.personId), status: e.status === 'pending' ? 'Pending' : 'Received', notes: e.notes || '', taxable: e.taxable || 'unknown',
       categoryId: e.categoryId
     });
   });
@@ -2650,7 +2678,7 @@ function incomeList(data) {
     kind: 'paycheck', raw: pc, date: pc.payDate, catName: store.incomeGroupName(pc.incomeCategoryId) || 'Wages',
     source: pc.employer || '', srcSub: (n => n ? 'Period #' + n : '')(paycheckPeriodNum(store, pc)), reinvested: false,
     account: '', via: pc.method || '', gross: Number(pc.gross) || 0, net: paycheckNet(pc),
-    person: store.personName(pc.personId), status: pc.status || 'Received', notes: pc.notes || '',
+    person: store.personName(pc.personId), status: pc.status || 'Received', notes: pc.notes || '', taxable: '',
     categoryId: pc.incomeCategoryId
   }));
   let shown = rows;
@@ -2673,7 +2701,68 @@ function incomeList(data) {
     return wrap;
   }
 
+  // Only ever act on rows that are actually on screen.
+  const shownKeys = new Set(shown.map(incRowKey));
+  [...incomeSel].forEach(k => { if (!shownKeys.has(k)) incomeSel.delete(k); });
+  const picked = shown.filter(r => incomeSel.has(incRowKey(r)));
+  if (picked.length) {
+    const bulk = el('div', 'bulk-bar');
+    bulk.appendChild(el('span', 'bulk-count', picked.length + ' selected'));
+    const incOnly = picked.filter(r => r.kind !== 'paycheck');
+    const setTax = val => {
+      if (!incOnly.length) { toast('Taxable applies to income entries, not paychecks', 'warn'); return; }
+      incOnly.forEach(r => store.saveIncome(activeYear, Object.assign({}, r.raw, { taxable: val })));
+      const skip = picked.length - incOnly.length;
+      const lbl = val === 'yes' ? 'Yes' : val === 'no' ? 'No' : 'Unknown';
+      toast('Taxable set to ' + lbl + ' on ' + incOnly.length + ' entr' + (incOnly.length === 1 ? 'y' : 'ies')
+        + (skip ? ' (' + skip + ' paycheck' + (skip === 1 ? '' : 's') + ' skipped)' : ''));
+      incomeSel.clear(); renderView(currentRoute);
+    };
+    const grp = el('div', 'bulk-grp');
+    grp.appendChild(el('span', 'muted', 'Set taxable:'));
+    [['yes', 'Yes'], ['no', 'No'], ['unknown', 'Unknown']].forEach(pair => {
+      const b = el('button', 'btn-ghost', pair[1]);
+      b.title = 'Mark the selected income entries as ' + pair[1].toLowerCase() + ' for tax';
+      b.addEventListener('click', () => setTax(pair[0]));
+      grp.appendChild(b);
+    });
+    bulk.appendChild(grp);
+    const rm = el('button', 'btn-ghost danger', '✕ Remove selected');
+    rm.title = 'Delete every selected row';
+    rm.addEventListener('click', () => bulkRemoveIncome(picked));
+    bulk.appendChild(rm);
+    const clr = el('button', 'btn-ghost', 'Clear selection');
+    clr.addEventListener('click', () => { incomeSel.clear(); renderView(currentRoute); });
+    bulk.appendChild(clr);
+    wrap.appendChild(bulk);
+  }
+
   const cols = [
+    { label: '', sortable: false,
+      headCell: () => {
+        const cb = document.createElement('input'); cb.type = 'checkbox';
+        const keys = shown.map(incRowKey);
+        const allOn = keys.length > 0 && keys.every(k => incomeSel.has(k));
+        cb.checked = allOn;
+        cb.indeterminate = !allOn && keys.some(k => incomeSel.has(k));
+        cb.title = allOn ? 'Clear the selection'
+          : 'Select all ' + keys.length + ' row' + (keys.length === 1 ? '' : 's') + ' shown';
+        cb.addEventListener('change', () => {
+          if (cb.checked) keys.forEach(k => incomeSel.add(k)); else keys.forEach(k => incomeSel.delete(k));
+          renderView(currentRoute);
+        });
+        return cb;
+      },
+      cell: r => {
+        const td = el('td', 'sel-cell');
+        const cb = document.createElement('input'); cb.type = 'checkbox';
+        const k = incRowKey(r);
+        cb.checked = incomeSel.has(k);
+        cb.title = 'Select this row for a bulk change';
+        cb.addEventListener('change', () => { if (cb.checked) incomeSel.add(k); else incomeSel.delete(k); renderView(currentRoute); });
+        td.appendChild(cb);
+        return td;
+      } },
     ...tableColKeys(store, 'incomeList', INCOME_LIST_COL_LABELS, INCOME_LIST_DEFAULT_COLS).map(k => buildIncomeListCol(store, k)).filter(Boolean),
     { label: '', sortable: false, cell: r => {
         const act = el('td', 'row-actions');
@@ -3785,6 +3874,7 @@ const HELP_SECTIONS = [
     points: [
       'Covers dividends, interest, rewards/cash-back, IRA & estate distributions, class-action payouts, selling, and anything under “Other.”',
       'Annual grid view totals income by category across the months; List view shows every entry — and now includes your paychecks.',
+      'List view has a checkbox on every row, and one in the header that takes everything currently shown. Tick a few and a bar appears: set Taxable to Yes, No or Unknown on all of them at once, or remove them together. Paychecks are skipped by the taxable change since wages carry no taxable flag. Turn on the Taxable column via ⚙ Columns to see the values.',
       'Click a Category pill in List view to narrow the table to just that category — click it again (or set the dropdown back to All categories) to clear. It drives the same Category filter as the dropdown, so the two always match.',
       'In List view, each income row has a Duplicate button — a quick way to log something similar: it prefills a new entry from that row with the date set to today, so you just tweak what’s different. (Paychecks are duplicated from the Paychecks page.)',
       'Picking certain categories reveals tailored fields (e.g. a dividend’s ticker, a reward’s program/type, an IRA distribution’s withholdings).'

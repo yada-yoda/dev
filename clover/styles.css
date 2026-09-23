@@ -482,6 +482,11 @@ button { font-family: inherit; cursor: pointer; }
 .dph-w { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .dash-panel.dragging { opacity: .5; }
 .dash-add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+/* Bulk bar bits the Paychecks pattern did not already cover */
+.bulk-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.bulk-bar .btn-ghost { background: var(--surface); }
+.btn-ghost.danger { color: var(--expense); }
+.btn-ghost.danger:hover { background: var(--expense-soft); }
 /* Row action button when a note already exists on that row */
 .icon-btn.has-note { color: var(--accent); font-weight: 600; }
 /* Info banner inside a form (e.g. a linked Class Action income entry) */

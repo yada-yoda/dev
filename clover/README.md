@@ -45,6 +45,27 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.160 — Bulk edits and a Taxable column on the Income list
+
+Tagging income one row at a time was tedious, so the Income **List** now has a
+checkbox on every row plus one in the header that takes everything currently
+shown. Tick a few and an action bar appears:
+
+- **Set taxable** to Yes, No or Unknown on all of them at once.
+- **Remove selected** to delete them together.
+- **Clear selection** to start over.
+
+There is also a new optional **Taxable** column (turn it on with ⚙ Columns) showing
+Yes, No, or an amber Unknown so the ones still needing a decision stand out.
+
+Two deliberate guard rails: the selection only ever covers rows you can actually
+see, so changing a filter can never leave something selected off-screen; and the
+taxable change skips paychecks, since wages carry no taxable flag. Deleting asks
+first, and says so when the selection includes paychecks (which also leave the
+Paychecks page) or class-action payouts (which reappear on the next sync).
+
+## Changelog
+
 ### v1.0.159 — Record where you heard about a class action
 
 Each Class Action now has a **Found via** field — an email notice, a mailed
