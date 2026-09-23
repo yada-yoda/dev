@@ -45,6 +45,19 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.159 — Record where you heard about a class action
+
+Each Class Action now has a **Found via** field — an email notice, a mailed
+postcard, a news story, a friend. It offers a list of common sources plus
+anything you’ve typed before, so entries stay consistent.
+
+Turn on the **Found via** column (⚙ Columns) and it becomes a clickable pill like
+the others: click a source to see every claim that came from it. Over time that
+answers a useful question — which sources actually lead to payouts. Search finds
+it too.
+
+## Changelog
+
 ### v1.0.158 — Clickable Category pills on the Income list
 
 On the Income **List** view the Category column is now a colored pill, matching

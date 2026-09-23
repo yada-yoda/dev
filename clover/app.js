@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.158';
+const VERSION = '1.0.159';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -3458,6 +3458,9 @@ function renderBudget(view) {
 // ============================================================
 const SETTLE_STATUSES = ['Not submitted', 'Submitted', 'Approved', 'Paid', 'Denied', 'Excluded'];
 const SETTLE_METHODS = ['PayPal', 'Venmo', 'Check', 'ACH / Direct Deposit', 'Zelle', 'Virtual Debit Card', 'Prepaid Card', 'Digital Mastercard', 'Gift Card'];
+// How you first heard about a class action. Seeds the “Found via” picker;
+// anything you type there joins the list for next time (see settlementModal).
+const SETTLE_SOURCES = ['Email notice', 'Mailed notice / postcard', 'News article', 'Social media', 'Class-action website', 'Friend or family', 'Attorney / law firm', 'Employer', 'Bank or card issuer'];
 function firstLine(s) { s = (s || '').trim(); const i = s.indexOf('\n'); return i >= 0 ? s.slice(0, i) : s; }
 function settleReceived(s) { return (s.payments || []).reduce((a, p) => a + (Number(p.amount) || 0), 0); }
 function settleLastPayout(s) { const ds = (s.payments || []).map(p => p.date).filter(Boolean).sort(); return ds.length ? ds[ds.length - 1] : ''; }
@@ -3487,8 +3490,8 @@ function settleFilterBadge(key, text, tone) {
   });
   return b;
 }
-const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', duration: 'Duration', person: 'Person', notes: 'Notes' };
-const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'received', 'payouts', 'lastPayout', 'duration', 'person', 'notes'];
+const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', foundVia: 'Found via', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', duration: 'Duration', person: 'Person', notes: 'Notes' };
+const SETTLE_ALL_COLS = ['name', 'status', 'dateFiled', 'deadline', 'claimNumber', 'claimId', 'method', 'foundVia', 'received', 'payouts', 'lastPayout', 'duration', 'person', 'notes'];
 const SETTLE_DEFAULT_COLS = ['name', 'status', 'dateFiled', 'claimNumber', 'method', 'received', 'lastPayout', 'duration'];
 function buildSettleCol(store, key) {
   switch (key) {
@@ -3499,6 +3502,7 @@ function buildSettleCol(store, key) {
     case 'claimNumber': return { label: 'Claim / confirmation #', key: 'claimNumber', value: r => r.claimNumber || '', cell: r => { const td = el('td', 'mono-sm'); td.textContent = firstLine(r.claimNumber) || '—'; if (r.claimNumber) td.title = r.claimNumber; return td; } };
     case 'claimId': return { label: 'Claim ID', key: 'claimId', value: r => r.claimId || '', cell: r => el('td', 'mono-sm', r.claimId || '—') };
     case 'method': return { label: 'Method', key: 'method', value: r => r.method || '', cell: r => { const td = el('td'); if (r.method) td.appendChild(settleFilterBadge('method', r.method, 'type')); else td.textContent = '—'; return td; } };
+    case 'foundVia': return { label: 'Found via', key: 'foundVia', value: r => r.foundVia || '', cell: r => { const td = el('td'); if (r.foundVia) td.appendChild(settleFilterBadge('foundVia', r.foundVia, 'purple')); else td.textContent = '—'; return td; } };
     case 'received': return { label: 'Received', key: 'received', num: true, value: r => settleReceived(r), cell: r => numCell(settleReceived(r), true) };
     case 'payouts': return { label: 'Payouts', key: 'payouts', num: true, value: r => (r.payments || []).length, cell: r => el('td', 'num', String((r.payments || []).length || '—')) };
     case 'lastPayout': return { label: 'Last payout', key: 'lastPayout', value: r => settleLastPayout(r), cell: r => el('td', 'muted', settleLastPayout(r) ? fmtDate(settleLastPayout(r)) : '—') };
@@ -3530,12 +3534,12 @@ function renderSettlements(view) {
   if (settleStatusFilter !== 'all') rows = rows.filter(r => (r.status || 'Not submitted') === settleStatusFilter);
   if (settleBadgeFilter) {
     const f = settleBadgeFilter;
-    const valOf = r => f.key === 'status' ? (r.status || 'Not submitted') : f.key === 'method' ? (r.method || '') : f.key === 'person' ? store.personName(r.personId) : '';
+    const valOf = r => f.key === 'status' ? (r.status || 'Not submitted') : f.key === 'method' ? (r.method || '') : f.key === 'foundVia' ? (r.foundVia || '') : f.key === 'person' ? store.personName(r.personId) : '';
     rows = rows.filter(r => valOf(r) === f.value);
   }
   if (settleSearch.trim()) {
     const q = settleSearch.trim().toLowerCase();
-    rows = rows.filter(r => [r.name, r.caseName, r.claimNumber, r.claimId, r.method, r.notes, r.status, r.url].some(v => (v || '').toLowerCase().includes(q)));
+    rows = rows.filter(r => [r.name, r.caseName, r.claimNumber, r.claimId, r.method, r.foundVia, r.notes, r.status, r.url].some(v => (v || '').toLowerCase().includes(q)));
   }
   const narrowed = !!(settleBadgeFilter || settleStatusFilter !== 'all' || settleSearch.trim());
 
@@ -3684,6 +3688,11 @@ function settlementModal(existing) {
   const body = el('div', 'form-grid');
   const methList = el('datalist'); methList.id = 'settle-method-list'; SETTLE_METHODS.forEach(v => { const o = el('option'); o.value = v; methList.appendChild(o); }); body.appendChild(methList);
 
+  const srcList = el('datalist'); srcList.id = 'settle-source-list';
+  const usedSrc = (s.settlements || []).map(x => (x.foundVia || '').trim()).filter(Boolean);
+  [...new Set(SETTLE_SOURCES.concat(usedSrc))].sort((x, y) => x.localeCompare(y))
+    .forEach(v => { const o = el('option'); o.value = v; srcList.appendChild(o); });
+  body.appendChild(srcList);
   const fName = input(r.name || '', { placeholder: 'e.g. Facebook Biometric Privacy' });
   const fCase = document.createElement('textarea'); fCase.value = r.caseName || ''; fCase.rows = 2; fCase.placeholder = 'Full case name / number (optional)';
   const fStatus = select(SETTLE_STATUSES.map(v => ({ value: v, label: v })), r.status || 'Submitted');
@@ -3694,6 +3703,7 @@ function settlementModal(existing) {
   const fMethod = input(r.method || '', { placeholder: 'e.g. PayPal, Venmo, Check', list: 'settle-method-list' });
   const fExpected = moneyInput(r.expectedAmount, { placeholder: 'estimate (optional)' });
   const cProof = checkbox('Proof required', r.proofRequired, 'Tick if this claim required proof of purchase / documentation (vs. a “no proof” claim).');
+  const fFound = input(r.foundVia || '', { placeholder: 'e.g. Email notice, news article', list: 'settle-source-list' });
   const fUrl = input(r.url || '', { placeholder: 'https:// settlement site (optional)' });
   const fPerson = select(s.persons.map(p => ({ value: p.id, label: p.name })), r.personId || (s.persons[0] && s.persons[0].id));
   const fNotes = document.createElement('textarea'); fNotes.value = r.notes || ''; fNotes.rows = 2; fNotes.placeholder = 'Deadlines, correlation IDs, anything else';
@@ -3705,6 +3715,7 @@ function settlementModal(existing) {
   body.appendChild(field('Claim / confirmation #', fClaimNo, 'The claim ID and/or confirmation code(s) the settlement gave you.'));
   const row3 = el('div', 'two-col'); row3.appendChild(field('Settlement claim ID', fClaimId, 'A separate settlement-assigned ID, if any.')); row3.appendChild(field('Estimated payout', fExpected, 'A rough expected amount, if published (optional).')); body.appendChild(row3);
   const row4 = el('div', 'two-col'); row4.appendChild(field('Person', fPerson, 'Who the claim belongs to.')); const proofWrap = el('div', 'check-row'); proofWrap.appendChild(cProof); row4.appendChild(field('Flags', proofWrap)); body.appendChild(row4);
+  body.appendChild(field('Found via', fFound, 'Where you first heard about this class action — an email notice, a mailed postcard, a news story, a friend. Pick one you’ve used before or type your own; new entries join the list for next time.'));
   body.appendChild(field('Settlement URL', fUrl, 'Link to the settlement site (optional).'));
 
   const payWrap = el('div');
@@ -3741,7 +3752,7 @@ function settlementModal(existing) {
         name, caseName: fCase.value.trim(), status: fStatus.value, dateFiled: fFiled.value || '',
         deadline: fDeadline.value || '', claimNumber: fClaimNo.value.trim(), claimId: fClaimId.value.trim(),
         method: fMethod.value.trim(), expectedAmount: fExpected.value === '' ? null : parseFloat(fExpected.value),
-        proofRequired: cProof.__input.checked, url: fUrl.value.trim(), personId: fPerson.value, notes: fNotes.value.trim(),
+        proofRequired: cProof.__input.checked, url: fUrl.value.trim(), foundVia: fFound.value.trim(), personId: fPerson.value, notes: fNotes.value.trim(),
         payments: r.payments.filter(p => (p.amount != null && p.amount !== '') || p.date).map(p => ({ id: p.id || ('pay' + Math.random().toString(36).slice(2)), date: p.date || '', amount: Number(p.amount) || 0, method: p.method || '' }))
       });
       store.saveSettlement(item);
@@ -3795,6 +3806,7 @@ const HELP_SECTIONS = [
     points: [
       'Its first job: search to check whether you already submitted to a settlement before filing again.',
       'Track status (Submitted → Approved → Paid, plus Denied/Excluded), claim/confirmation numbers, deadlines, and each payout.',
+      'Record how you heard about each one in “Found via” (email notice, news story, a friend). It remembers what you’ve typed before, and turning on the Found via column via ⚙ Columns lets you click a source to see every claim that came from it — a quick read on which sources actually pay off.',
       'Each row has a Notes button (📝 when a note exists) for quick freeform notes on that class action — the same notes are on the Edit form and can be shown as a “Notes” column via ⚙ Columns.',
       'Each row has a Duplicate button — handy when a new settlement shares most of the same details. It prefills a fresh claim from that row with the filed date set to today and the status, payouts, and history reset, so you just adjust what’s different and save.',
       'Each payout you log on a settlement is posted to the Income grid automatically, under Other → Lawsuit, dated to the payout. It stays linked: edit or remove the payout and its income entry follows. (Opening that income entry shows a note pointing you back here to change the amount or date.)',
