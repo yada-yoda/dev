@@ -11,7 +11,7 @@ Almost all visible content has a **second option**: the Decap CMS at
 
 | Content | Decap CMS collection | Data file |
 |---|---|---|
-| Hero photos + quotes | Hero (Slideshow) | `data/hero.yml` |
+| Hero photos + quotes (per-slide Focus picks which part of a wide photo the crop keeps, desktop and phone) | Hero (Slideshow) | `data/hero.yml` |
 | Headshot looks (large photo + thumbnail row) and the optional downloadable headshot PDF per look | Headshots | `data/headshots.yml` (PDFs live in `assets/headshots/`; the PDF tile only renders once the file exists) |
 | Bio paragraph | Bio | `data/bio.md` |
 | RIZZO definition + pull quote | About | `data/about.yml` |

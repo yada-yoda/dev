@@ -21,10 +21,13 @@ slides:
     quote_line_2: ""
 
   # NICE SHIRT on the e.t.c. stage (the clock set), five-up scene. A wide
-  # panorama on purpose: the hero crops to the viewport from the center,
-  # and the center is where the user stands, so desktop keeps the whole
-  # group and a phone keeps him. No overlay text - the scene carries it.
+  # panorama, so the hero crops its sides. focus_x shifts the desktop crop
+  # toward the left edge so the castmate on the left stays in frame; the
+  # phone keeps the center (him). 0 = left edge, 50 = center, 100 = right.
+  # No overlay text - the scene carries it.
   - photo: "assets/slideshow/photos/nice-shirt-scene.jpg"
+    focus_x: 12
+    focus_x_phone: 50
     quote_line_1: ""
     quote_line_2: ""
 

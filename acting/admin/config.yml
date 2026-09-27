@@ -160,6 +160,8 @@ collections:
                 hint: "OR upload an MP4 reel clip. If set, video plays in place of photo. Keep clips short (8-15s) and small (< ~25MB)."
               - { label: "Quote line 1", name: "quote_line_1", widget: "string", required: false, hint: "First line of the overlaid quote. Leave blank for slides where the visual speaks for itself." }
               - { label: "Quote line 2", name: "quote_line_2", widget: "string", required: false, hint: "Second line of the overlaid quote." }
+              - { label: "Focus - desktop (0-100)", name: "focus_x", widget: "number", value_type: "int", min: 0, max: 100, required: false, hint: "Photos only. The hero crops a photo's sides to fit the screen; this is which horizontal point to keep. 50 = center (default), lower shows more of the left side, higher more of the right. Only matters for wide photos." }
+              - { label: "Focus - phone (0-100)", name: "focus_x_phone", widget: "number", value_type: "int", min: 0, max: 100, required: false, hint: "Same, for phones (which crop far more). Usually 50 so the subject stays centered." }
 
   # ============ HEADSHOTS ============
   - name: "headshots"

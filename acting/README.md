@@ -10,6 +10,15 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.16.1 - 2026-09-27
+
+Hero slides can now say which part of a wide photo to keep. The hero
+fills the screen, so a panoramic photo loses its sides; each slide has a
+Focus setting for desktop and one for phones (CMS: Hero > Slide > Focus),
+0 for the left edge through 100 for the right, 50 for center. Added for
+the new NICE SHIRT stage photo, which is shifted left on desktop so the
+castmate at the left edge stays in frame while phones keep the center.
+
 ### v0.16.0 - 2026-09-22
 
 The footer now carries a Blog link, pointing at the new section at

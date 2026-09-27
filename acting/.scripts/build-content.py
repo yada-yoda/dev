@@ -110,7 +110,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.16.0"
+SITE_VERSION = "v0.16.1"
 
 
 # ---------- helpers ----------
@@ -878,6 +878,25 @@ def active_hero_slides(hero):
     return kept
 
 
+def _hero_focus_style(s):
+    """Per-slide crop focus for photos. The hero fills the viewport with
+    background-size:cover, so a wide photo loses its edges; focus_x (desktop)
+    and focus_x_phone (phone) say which horizontal point to keep, 0 = left
+    edge, 50 = center, 100 = right edge. Emitted as CSS variables the .hero-
+    slide rules read (--fx / --fxm); unset = centered."""
+    out = ""
+    for key, var in (("focus_x", "--fx"), ("focus_x_phone", "--fxm")):
+        v = s.get(key)
+        if v is None or str(v).strip() == "":
+            continue
+        try:
+            n = max(0, min(100, int(round(float(v)))))
+        except (TypeError, ValueError):
+            continue
+        out += f"{var}:{n}%;"
+    return out
+
+
 def gen_hero_slides(hero):
     lines = []
     for s in active_hero_slides(hero):
@@ -885,6 +904,7 @@ def gen_hero_slides(hero):
         exp_attr = f' data-expires="{esc(expires)}"' if expires else ""
         video = s.get("video", "").strip() if s.get("video") else ""
         photo = s.get("photo", "").strip() if s.get("photo") else ""
+        focus = _hero_focus_style(s)
         if video:
             # Note: no `loop` attribute - the JS rotator waits for the
             # video's `ended` event before advancing to the next slide,
@@ -897,7 +917,7 @@ def gen_hero_slides(hero):
             )
         else:
             lines.append(
-                f'    <div class="hero-slide"{exp_attr} style="background-image:url(\'{esc(photo)}\')"></div>'
+                f'    <div class="hero-slide"{exp_attr} style="background-image:url(\'{esc(photo)}\');{focus}"></div>'
             )
     return "\n  <div class=\"hero-slides\" aria-hidden=\"true\">\n" + "\n".join(lines) + "\n  </div>\n  "
 
