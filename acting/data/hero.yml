@@ -20,6 +20,14 @@ slides:
     quote_line_1: ""
     quote_line_2: ""
 
+  # NICE SHIRT on the e.t.c. stage (the clock set), five-up scene. A wide
+  # panorama on purpose: the hero crops to the viewport from the center,
+  # and the center is where the user stands, so desktop keeps the whole
+  # group and a phone keeps him. No overlay text - the scene carries it.
+  - photo: "assets/slideshow/photos/nice-shirt-scene.jpg"
+    quote_line_1: ""
+    quote_line_2: ""
+
   - photo: "assets/slideshow/photos/stage.jpg"
     quote_line_1: "Separation is in"
     quote_line_2: "the preparation."
