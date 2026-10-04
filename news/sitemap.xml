@@ -569,12 +569,6 @@
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://rizzo.cc/news/s/90265cc31f/</loc>
-    <lastmod>2026-09-22</lastmod>
-    <changefreq>monthly</changefreq>
-    <priority>0.5</priority>
-  </url>
-  <url>
     <loc>https://rizzo.cc/news/s/7616a02da5/</loc>
     <lastmod>2026-09-21</lastmod>
     <changefreq>monthly</changefreq>
@@ -836,6 +830,11 @@
   </url>
   <url>
     <loc>https://rizzo.cc/news/who/andrew-scott/</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.4</priority>
+  </url>
+  <url>
+    <loc>https://rizzo.cc/news/who/aubrey-plaza/</loc>
     <changefreq>weekly</changefreq>
     <priority>0.4</priority>
   </url>
