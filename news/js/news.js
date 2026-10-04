@@ -228,8 +228,12 @@
 
       if (s.sources && s.sources.length) {
         bits.push('<p class="srcs">' + s.sources.slice(0, 3).map(function (src) {
+          // Say when a link travels through Google News rather than straight
+          // to the outlet named on it - about three in five of them do.
+          var via = (src.url || "").indexOf("news.google.com") >= 0
+            ? ' <span class="why">via Google News</span>' : "";
           return '<a href="' + esc(src.url) + '" rel="nofollow noopener" target="_blank">' +
-            esc(src.name) + "</a>";
+            esc(src.name) + "</a>" + via;
         }).join("") + "</p>");
       }
 
