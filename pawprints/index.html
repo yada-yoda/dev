@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.72.0';
+const APP_VERSION = 'v0.73.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1832,9 +1832,10 @@ function addLog(entry){
   logChange('logged', LOG_ENTITY[rec.type]||'activity', (logSummary(rec)||'').replace(/<[^>]+>/g,''));
   save();
   if(rec.type==='walk') checkWalkBadges(true);
+  if(typeof queueActivitySync==='function') queueActivitySync();
   return rec.id;
 }
-function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); }
+function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); queueActivitySync(); }
 
 // Quick buttons
 function quickWater(){
@@ -2790,7 +2791,7 @@ async function refreshGcalToken(){
 async function checkGcalConnection(){
   if(!currentUser) return;
   const got = await refreshGcalToken();
-  if(got){ if(currentView==='calendar' && (data.settings.gcalCalendarId || gcalChoosing)) loadCalendarList(); render(); }
+  if(got){ if(currentView==='calendar' && (data.settings.gcalCalendarId || gcalChoosing)) loadCalendarList(); render(); queueActivitySync(); }
 }
 function gcalConnected(){ return !!gcalAccessToken; }
 function connectGoogleCalendar(){
@@ -2912,6 +2913,96 @@ async function syncToGoogleCalendar(){
   }
   save();
   showToast('✅ Synced '+ok+' event'+(ok===1?'':'s')+' to Google Calendar'+(fail?' ('+fail+' failed)':''));
+}
+// ── Daily-activity calendar: a SECOND Google calendar for day-to-day logs ──
+// Feed / water / potty / walk / weight entries sync here as short timed events, kept apart
+// from the appointments calendar so the busy layer can be toggled off in Google Calendar
+// without hiding vet visits. Events are keyed act:<logId> in data.gcalEvents with the value
+// "<eventId>::<signature>", so re-sync only touches logs that actually changed; deleting a
+// log deletes its event on the next sweep. The sweep maintains the last 30 days — older
+// events are simply left in place as history.
+const ACT_SYNC_DAYS = 30;
+function activityEventBody(l){
+  const start = new Date(l.dateTime); if(isNaN(start)) return null;
+  const mins = (l.type==='walk' && num(l.durationMin)) ? Math.max(5, num(l.durationMin)) : 15;
+  const end = new Date(start.getTime() + mins*60000);
+  const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
+  const em = { feed:'🍖', water:'💧', potty:'🚪', walk:'🦮', weight:'⚖️' }[l.type] || '🐾';
+  const p = activePet();
+  const summary = em+' '+(p?p.name+': ':'')+String(logSummary(l)||l.type).replace(/<[^>]+>/g,'');
+  return { summary, description:(l.notes?l.notes+'\n\n':'')+'— via PawPrints', start:{ dateTime:iso(start), timeZone:appTimezone() }, end:{ dateTime:iso(end), timeZone:appTimezone() } };
+}
+async function ensureActivityCalendar(){
+  if(data.settings.gcalActivityCalendarId) return data.settings.gcalActivityCalendarId;
+  const p = activePet(); if(!p) return null;
+  const r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars', { method:'POST', body:JSON.stringify({ summary:'🐾 '+p.name+' — daily activity', description:'Day-to-day activity (meals, water, potty, walks) logged in PawPrints. Hide or show this whole calendar in Google Calendar any time — appointments live on the main PawPrints calendar.' }) });
+  if(!r.ok) return null;
+  const j = await r.json();
+  data.settings.gcalActivityCalendarId = j.id; save(false);
+  return j.id;
+}
+async function enableActivityCalendar(){
+  if(denyManage()) return;
+  if(!gcalAccessToken){ connectGoogleCalendar(); return; }
+  showToast('⏳ Setting up the activity calendar…');
+  try {
+    const id = await ensureActivityCalendar();
+    if(!id){ showToast('⚠️ Could not create the activity calendar'); return; }
+    render();
+    syncActivitiesToGcal();
+  } catch(err){ showToast(err.message==='auth-expired' ? '⚠️ Reconnect Google Calendar' : '⚠️ Could not create the activity calendar'); }
+}
+function disableActivityCalendar(){
+  if(denyManage()) return;
+  data.settings.gcalActivityCalendarId = '';
+  save(); showToast('Daily-activity sync off — hide or delete that calendar in Google Calendar if you like');
+}
+// Debounced auto-sync after logging — one quiet sweep ~3s after the last change.
+let _actSyncBusy = false, _actSyncTimer = null;
+function queueActivitySync(){
+  if(!data.settings.gcalActivityCalendarId || (!gcalAccessToken && !gcalPersistent)) return;
+  clearTimeout(_actSyncTimer);
+  _actSyncTimer = setTimeout(()=>syncActivitiesToGcal(true), 3000);
+}
+async function syncActivitiesToGcal(quiet){
+  const calId = data.settings.gcalActivityCalendarId; if(!calId) return;
+  if(!gcalAccessToken){ if(!(gcalPersistent && await refreshGcalToken())){ if(!quiet) showToast('⚠️ Connect Google Calendar first'); return; } }
+  if(_actSyncBusy) return;
+  _actSyncBusy = true;
+  if(!quiet) showToast('⏳ Syncing activity to Google Calendar…');
+  try {
+    data.gcalEvents = data.gcalEvents || {};
+    const cutoff = Date.now() - ACT_SYNC_DAYS*86400000;
+    const logs = petLogs().filter(l => l.dateTime && new Date(l.dateTime).getTime() >= cutoff);
+    let ok = 0, fail = 0, touched = 0;
+    for(const l of logs){
+      const body = activityEventBody(l); if(!body) continue;
+      const key = 'act:'+l.id;
+      const sig = [l.dateTime, l.type, body.summary, body.end.dateTime].join('|');
+      const [evId, oldSig] = String(data.gcalEvents[key]||'').split('::');
+      if(evId && oldSig === sig) continue; // unchanged since last sync
+      touched++;
+      try {
+        let r = null;
+        if(evId){ r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calId)+'/events/'+encodeURIComponent(evId), { method:'PATCH', body:JSON.stringify(body) }); if(r.status===404) r = null; }
+        if(!r){ r = await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calId)+'/events', { method:'POST', body:JSON.stringify(body) }); }
+        if(r && r.ok){ const j = await r.json(); data.gcalEvents[key] = j.id+'::'+sig; ok++; } else fail++;
+      } catch(err){ if(err.message==='auth-expired'){ if(!quiet) showToast('⚠️ Reconnect Google Calendar'); return; } fail++; }
+      await new Promise(r=>setTimeout(r,150));
+    }
+    // Logs deleted in the app → remove their calendar events too.
+    const liveIds = new Set((data.logs||[]).map(x=>x.id));
+    for(const key of Object.keys(data.gcalEvents)){
+      if(key.indexOf('act:') !== 0) continue;
+      if(liveIds.has(key.slice(4))) continue;
+      const evId = String(data.gcalEvents[key]).split('::')[0];
+      try { await gcalFetch('https://www.googleapis.com/calendar/v3/calendars/'+encodeURIComponent(calId)+'/events/'+encodeURIComponent(evId), { method:'DELETE' }); } catch(e){}
+      delete data.gcalEvents[key]; touched++;
+      await new Promise(r=>setTimeout(r,150));
+    }
+    if(touched) save(false);
+    if(!quiet) showToast(touched ? ('✅ Activity calendar updated ('+ok+' event'+(ok===1?'':'s')+(fail?', '+fail+' failed':'')+')') : '✅ Activity calendar already up to date');
+  } finally { _actSyncBusy = false; }
 }
 // ── Custom reminders / events (show on the calendar + sync to Google Calendar) ──
 function eventModal(id){
@@ -3408,7 +3499,7 @@ function dupLog(id){
   const copy = { ...src, id: genId(), createdAt: new Date().toISOString() };
   data.logs.unshift(copy);
   logChange('logged', LOG_ENTITY[copy.type]||'activity', 'duplicated: '+(logSummary(copy)||'').replace(/<[^>]+>/g,''));
-  save();
+  save(); queueActivitySync();
   editLogModal(copy.id);
   showToast('⧉ Duplicated — adjust anything and Save');
 }
@@ -3468,6 +3559,7 @@ function saveEditLog(id){
   logChange('edited', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,''));
   closeModal(); save(); showToast('✅ Updated');
   if(l.type==='walk') checkWalkBadges(true);
+  queueActivitySync();
 }
 function emptyState(){
   return '<div class="card empty"><div class="ico">🐾</div><h2 style="font-size:21px;font-weight:700;margin-bottom:8px">Welcome to PawPrints</h2>'
@@ -3703,7 +3795,17 @@ function renderCalendar(){
     html += '<p style="font-size:12px;color:'+(gcalPersistent?'var(--success)':'var(--text-secondary)')+';margin-top:10px">'
       + (gcalPersistent ? '✓ Connected — reconnects automatically on every device. ' : '⏱ Connected for this session only (set up pawprints-worker for permanent connect). ')
       + 'Syncs vet visits, follow-ups, grooming (+ next-due), and med due-dates'+(data.settings.gcalCalendarId?' to the calendar above':'')+'. Re-syncing updates the same events, no duplicates. (You can share the calendar with others from Google Calendar.)</p>';
-    if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:4px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
+    // Second calendar: the day-to-day layer, separate so it can be hidden in Google without hiding appointments.
+    const actOn = !!data.settings.gcalActivityCalendarId;
+    html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+      + '<div class="label" style="margin-bottom:6px">Daily activity calendar'+tip('A SECOND Google calendar just for the day-to-day — meals, water, potty breaks, walks, weigh-ins — as short timed events (walks use their real duration). Appointments stay on the main calendar above, so in Google Calendar you can show or hide the busy layer with its checkbox. Keeps the last 30 days updated automatically as you log; editing or deleting an entry updates Google on the next sync.')+'</div>'
+      + (actOn
+        ? '<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm" onclick="syncActivitiesToGcal()">🔄 Sync activity now</button><button class="btn btn-sm btn-danger" onclick="disableActivityCalendar()">Turn off</button></div>'
+          + '<p style="font-size:11px;color:var(--success);margin:8px 0 0">✓ On — feedings, water, potty, walks and weigh-ins sync automatically a few seconds after you log them.</p>'
+        : '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 10px">Want the day-to-day in Google too — without burying your appointments? This creates a separate "'+dog+' — daily activity" calendar you can toggle on/off in Google Calendar.</p>'
+          + '<button class="btn btn-outline" onclick="enableActivityCalendar()">➕ Create the daily-activity calendar</button>')
+      + '</div>';
+    if(gcalPersistent) html += '<button class="btn btn-sm btn-danger" style="margin-top:12px" onclick="disconnectGoogleCalendar()">Disconnect Google Calendar</button>';
   }
   html += '<div style="margin-top:12px"><button class="btn btn-sm" onclick="exportICS()">'+svgIcon('download',15)+' Download .ics</button></div>';
   html += '</div>';

@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.72.0**
+**Current Version: v0.73.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,16 @@ covers both.
 
 ## Version History
 
+- **v0.73.0** — **Optional second Google calendar for daily activity.** The Calendar tab's Google
+  section now offers a **"daily activity" calendar**: a separate Google calendar that receives
+  feedings, water refills, potty breaks, walks (with their real duration), and weigh-ins as short
+  timed events — while vet visits, follow-ups, grooming and med dues stay on the main PawPrints
+  calendar. Because it's its own calendar, one checkbox in Google Calendar shows or hides the whole
+  day-to-day layer without touching your appointments. Once created, new entries sync automatically
+  a few seconds after you log them; edits update the same event and deletions remove it. The sweep
+  maintains the last 30 days (older events remain as history), and "Sync activity now" forces a
+  refresh any time. Turn it off any time — the calendar itself is yours to keep, hide, or delete in
+  Google.
 - **v0.72.0** — **Duplicate an activity entry.** Every activity row (Today's timeline, the Log tab
   lists, and the by-day activity page) has a new **⧉** button next to Edit: it copies the entry —
   same time, same details — and immediately opens the copy for tweaking. Handy for "same meal for
