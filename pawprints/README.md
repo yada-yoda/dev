@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.73.0**
+**Current Version: v0.74.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.74.0** — **Visual "How to measure" guide for dog measurements.** The Measurements section of
+  the dog form already explained each field in its ⓘ tooltips; now there's also a clearly clickable
+  **📏 How to measure** button that expands a diagram — a side-view dog with the four measurements
+  drawn on it (A neck, B chest girth, C back length, D height at withers), each color-matched to
+  step-by-step instructions below, plus the general technique (soft tape, dog standing square, two
+  fingers under the tape).
 - **v0.73.0** — **Optional second Google calendar for daily activity.** The Calendar tab's Google
   section now offers a **"daily activity" calendar**: a separate Google calendar that receives
   feedings, water refills, potty breaks, walks (with their real duration), and weigh-ins as short
