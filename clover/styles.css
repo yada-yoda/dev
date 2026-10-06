@@ -646,7 +646,10 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
 .cdtl-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 10px; }
 .cdtl-controls .btn-ghost { padding: 4px 10px; font-size: 12.5px; }
 .cdtl-body { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
-.cdtl-names { flex: 0 0 200px; max-width: 200px; border-right: 1px solid var(--border); background: var(--surface-2); }
+.cdtl-names { flex: 0 0 240px; max-width: 240px; border-right: 1px solid var(--border); background: var(--surface-2); }
+/* Owner pill on a timeline row: compact, and first on the line so a narrow
+   column truncates the institution instead of hiding who owns the CD. */
+.cdtl-owner { font-size: 10px; padding: 1px 6px; margin-right: 5px; vertical-align: 1px; }
 .cdtl-name { padding: 5px 10px; border-top: 1px solid var(--border); overflow: hidden; }
 .cdtl-name.hl { background: var(--accent-soft); }
 .cdtl-name-1 { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -694,7 +697,10 @@ select.attn-empty, .inline-field select.attn-empty { border-color: #d97706; box-
   .cdtl-q-bar { width: 20px; }
   .cdtl-q-amt { font-size: 11px; }
 }
-@media (max-width: 640px) { .cdtl-names { flex-basis: 130px; max-width: 130px; } .cdtl-name-2 { display: none; } }
+@media (max-width: 640px) { .cdtl-names { flex-basis: 150px; max-width: 150px; }
+  .cdtl-name-2 { font-size: 0; }
+  .cdtl-name-2 .cdtl-status { display: none; }
+  .cdtl-name-2 .cdtl-owner { font-size: 10px; } }
 .cal-more { color: var(--text-faint); font-size: 10px; }
 .cal-month { font-weight: 600; font-size: 15px; padding: 0 6px; }
 

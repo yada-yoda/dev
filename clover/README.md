@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.161 — Owner pills on the CD timeline
+
+Every row of the CD maturity timeline now shows a colored pill with the account
+owner’s first name, sitting on the detail line next to the institution and status.
+Each owner gets their own color, so whose money is where reads at a glance.
+
+Click a pill to show only that owner’s CDs — the timeline, the principal chart
+and the maturing-by-quarter ladder all narrow together. Click it again to clear.
+The colors match the owner badges in the table below, so the two stay readable
+as one set.
+
+The names column is a little wider to fit, and the pill is placed first on the
+line so a long institution name truncates instead of pushing the owner out of
+view — including on a phone, where it is now the one detail kept.
+
+## Changelog
+
 ### v1.0.160 — Bulk edits and a Taxable column on the Income list
 
 Tagging income one row at a time was tedious, so the Income **List** now has a

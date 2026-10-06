@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.160';
+const VERSION = '1.0.161';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -1200,14 +1200,14 @@ const BADGE_HUES = {
 const _badgeShadeIdx = {};
 function tableFilterGet(scope) { return scope === 'subs' ? subsBadgeFilter : accountsFilter; }
 function tableFilterSet(scope, f) { if (scope === 'subs') subsBadgeFilter = f; else accountsFilter = f; }
-function valueBadge(scope, colKey, text) {
+function valueBadge(scope, colKey, text, label) {
   if (!text) return el('span', 'muted', '—');
   const full = scope + '.' + colKey;
   const m = _badgeShadeIdx[full] = _badgeShadeIdx[full] || new Map();
   if (!m.has(text)) m.set(text, m.size);
   const hue = BADGE_HUES[full] || 200;
   const light = 90 - (m.get(text) % 6) * 6;   // 90 -> 60 in 6 steps
-  const b = el('span', 'badge val-badge', text);
+  const b = el('span', 'badge val-badge', label || text);
   b.style.background = 'hsl(' + hue + ', 45%, ' + light + '%)';
   b.style.color = 'hsl(' + hue + ', 55%, 24%)';
   b.title = 'Click to show only “' + text + '”';
@@ -1548,6 +1548,14 @@ function cdTimelinePanel(store, accts) {
     const l1 = el('div', 'cdtl-name-1', r.a.name + (r.a.last4 ? ' ••' + r.a.last4 : ''));
     const l2 = el('div', 'cdtl-name-2');
     const stat = el('span', 'cdtl-status s-' + r.status, badge2.label + (r.du != null && r.du >= 0 && r.du <= 90 ? ' · ' + r.du + 'd' : ''));
+    const owner = store.personName(r.a.personId);
+    if (owner && owner !== '—') {
+      const first = String(owner).trim().split(/\s+/)[0];
+      const pill = valueBadge('accounts', 'owner', owner, first);
+      pill.classList.add('cdtl-owner');
+      pill.title = 'Owner: ' + owner + ' — click to show only their CDs';
+      l2.appendChild(pill);
+    }
     l2.appendChild(document.createTextNode(r.a.institution ? r.a.institution + ' · ' : ''));
     l2.appendChild(stat);
     n.appendChild(l1); n.appendChild(l2);
@@ -3932,7 +3940,7 @@ const HELP_SECTIONS = [
       'Once a CD passes its maturity date Clover never closes or renews it for you — it waits. A 🔔 bell (top right) and a Dashboard flag list any matured CDs, and an email (from notify.rizzo.cc, no Google needed) reminds you once per matured CD. Manage all of this under Settings → Notifications — the bell, the matured-CD email, and the 7-days-ahead calendar email.',
       'Renewing can also consolidate: tick other CDs whose money rolled into the renewal and they\u2019re closed and linked, so nothing is counted twice. CDs also carry an optional Principal $ and a Start / opened date \u2014 if the start is blank, Clover estimates it (maturity \u2212 term); if the term is blank but both dates are known, it\u2019s calculated from them. Anything calculated rather than typed carries an \u2248 marker whose tooltip explains exactly how it was derived \u2014 so an automatic assumption can never pass as something you entered. Editing the value by hand clears the marker.',
       'Accounts can carry a Balance $ stamped with an as-of date (a CD’s Principal $ is its balance) — every change lands in the History tab, and each history entry shows the account number that was in effect when the edit was made. History always stays with the account through renewals; a consolidation logs a “Consolidated in” entry on the combined CD while each source keeps its own history under Closed.',
-      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. With it open, click an institution, owner, or beneficiary label in the table to narrow the timeline and its charts to just that group. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
+      'Use the \u29d7 CD timeline tab (next to Open/Closed — or click the CD type badge in the table) to open the CD maturity timeline: every term and renewal drawn to its real dates, consolidation arrows, a Today line, a maturing-by-quarter ladder, estimated interest (per year and year-to-date) in the summary cards — estimates only, never added to the Income page — and a “CD principal over time” chart that steps up whenever you enter or update a principal. Each row on the timeline carries a colored owner pill (their first name) next to the institution — click it to show only that owner’s CDs, click again to clear. The same colors are used by the owner badges in the table, and clicking an institution, owner, or beneficiary label there narrows the timeline and its charts too. Drag to pan, scroll to zoom at the cursor, double-click to reset.',
       'List beneficiaries so you can spot accounts that don’t have them set.',
       'Editing an account lets you Close it — with a warning of what’s tied to it (auto-pay and other bills) — and the date is tracked. Closed accounts move to the Closed tab and can be reopened.'
     ] },
