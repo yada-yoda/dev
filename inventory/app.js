@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -14,6 +14,16 @@ const SETTINGS_KEY = 'theLedger.settings.v1';
 // every load when there's no inventory data and the user hasn't signed in,
 // so visitors keep seeing the populated app even on repeat visits.
 const DEMO_DISMISSED_KEY = 'theLedger.demoDismissed.v1';
+
+// Backend for "Import from an eBay listing" (the inven-worker repo). A static
+// page can't reach eBay itself: listing pages 403 anything that isn't a real
+// browser, and the Browse API needs an app secret. The Worker does the lookup
+// and proxies the photos; until its eBay keys are configured it answers
+// not_configured and the card says so instead of failing.
+const EBAY_WORKER_URL = 'https://inven-worker.sevendwarfs.workers.dev';
+// eBay allows up to 24 photos per listing; the form keeps the first few so a
+// single import doesn't push a dozen 900px images into local storage.
+const EBAY_IMPORT_MAX_PHOTOS = 8;
 
 const DEFAULT_FIELDS = {
   id: '', name: '', category: 'Beanie Baby', sku: '', upc: '',
@@ -438,6 +448,7 @@ function openEditor(id = null) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === 'basics'));
   document.getElementById('upcStatus').textContent = '';
   document.getElementById('upcStatus').className = 'lookup-status';
+  setEbayImportStatus('');
   document.getElementById('beanieLookupResults').classList.remove('open');
 
   let item;
@@ -687,20 +698,203 @@ function applyProductData(data) {
   }
 }
 
+// Resolves true once the photo is in state.currentPhotos (false on any
+// failure, never throws) so callers can add several in a known order.
 async function addPhotoFromUrl(url) {
   try {
     const res = await fetch(url);
-    if (!res.ok) return;
+    if (!res.ok) return false;
     const blob = await res.blob();
-    const reader = new FileReader();
-    reader.onload = e => {
-      downscaleImage(e.target.result, 900).then(data => {
-        state.currentPhotos.push(data);
-        renderPhotoPreview();
-      });
-    };
-    reader.readAsDataURL(blob);
-  } catch (e) { /* CORS or network issue — ignore silently */ }
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    const data = await downscaleImage(dataUrl, 900);
+    state.currentPhotos.push(data);
+    renderPhotoPreview();
+    return true;
+  } catch (e) { return false; /* CORS or network issue — caller decides */ }
+}
+
+// Sequential on purpose: the gallery order on eBay is the order the seller
+// chose, and the first photo becomes the card thumbnail.
+async function addPhotosFromUrls(urls) {
+  let added = 0;
+  for (const u of urls) {
+    if (await addPhotoFromUrl(u)) added++;
+  }
+  return added;
+}
+
+// ============ EBAY LISTING IMPORT ============
+
+function setEbayImportStatus(html, cls = '') {
+  const el = document.getElementById('ebayImportStatus');
+  if (!el) return;
+  el.innerHTML = html;
+  el.className = 'lookup-status' + (cls ? ' ' + cls : '');
+}
+
+async function importFromEbay(raw) {
+  const input = String(raw || '').trim();
+  const btn = document.getElementById('ebayImportBtn');
+  if (!input) {
+    setEbayImportStatus('Paste an eBay listing link or item number first', 'error');
+    return;
+  }
+  btn.disabled = true;
+  setEbayImportStatus('Fetching the listing from eBay…', 'loading');
+  try {
+    const res = await fetch(`${EBAY_WORKER_URL}/ebay/item?id=${encodeURIComponent(input)}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      const msg = data.error === 'not_configured'
+        ? 'eBay import is not switched on yet — the lookup service is still waiting for its eBay API keys.'
+        : (data.message || `eBay lookup failed (${res.status})`);
+      setEbayImportStatus(escapeHtml(msg), 'error');
+      return;
+    }
+    const item = data.item;
+    const filled = applyEbayListing(item);
+    const title = `<strong>${escapeHtml(item.title)}</strong>`;
+    const endedNote = item.ended ? ' Note: this listing has already ended on eBay.' : '';
+
+    let photoNote = '';
+    const wanted = (item.photos || []).slice(0, EBAY_IMPORT_MAX_PHOTOS);
+    if (wanted.length && state.currentPhotos.length === 0) {
+      setEbayImportStatus(`✓ Imported ${title} — pulling ${wanted.length} photo${wanted.length === 1 ? '' : 's'}…`, 'loading');
+      const added = await addPhotosFromUrls(wanted);
+      photoNote = added
+        ? `, ${added} photo${added === 1 ? '' : 's'}`
+        : ' (photos could not be downloaded)';
+    }
+    setEbayImportStatus(`✓ Imported ${title} — ${filled} field${filled === 1 ? '' : 's'}${photoNote} filled. Review before saving.${endedNote}`, 'success');
+  } catch (err) {
+    console.error('eBay import failed:', err);
+    setEbayImportStatus('Could not reach the eBay lookup service — check your connection and try again.', 'error');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// eBay condition names -> the form's 8-level scale. Order matters: the
+// specific phrases sit above the generic ones they contain.
+const EBAY_CONDITION_MAP = [
+  [/new with tags|\bnwt\b/i, 'New With Tags (NWT)'],
+  [/new without tags|\bnwot\b|new without box|new \(other\)|new other|open box/i, 'New Without Tags (NWOT)'],
+  [/with defects|with imperfections|refurbished/i, 'New With Defects'],
+  [/^new$|brand new|new in box|new with box/i, 'New With Tags (NWT)'],
+  [/like new|excellent|\bmint\b/i, 'Like New / Excellent Used'],
+  [/very good/i, 'Very Good'],
+  [/\bgood\b/i, 'Good'],
+  [/acceptable|\bfair\b/i, 'Fair'],
+  [/parts|not working|\bpoor\b/i, 'Poor / For Parts'],
+  [/used|pre-owned/i, 'Good'],
+];
+
+function mapEbayCondition(text) {
+  const t = String(text || '').trim();
+  if (!t) return '';
+  for (const [re, value] of EBAY_CONDITION_MAP) {
+    if (re.test(t)) return value;
+  }
+  return '';
+}
+
+// eBay category path (e.g. "Toys & Hobbies|Beanbag Plush|Ty|Beanie Babies-Original")
+// plus the title -> one of the form's categories. Empty string = no opinion.
+function mapEbayCategory(item) {
+  const text = `${item.title || ''} ${item.category_path || ''}`.toLowerCase();
+  const segs = String(item.category_path || '').toLowerCase().split('|').map(s => s.trim()).filter(Boolean);
+  const top = segs[0] || '';
+  const sub = segs.slice(1).join(' | ');
+  const all = segs.join(' | ');
+  if (/beanie bab|ty beanie|beanie buddies|teenie beanie/.test(text)) return 'Beanie Baby';
+  if (/plush|stuffed animal|beanbag/.test(text)) return 'Plush / Stuffed Animal';
+  if (/trading card|sports cards|ccg|non-sport/.test(all)) return 'Trading Cards';
+  // Shoes / accessories only exist as sub-categories of the clothing umbrella;
+  // tested anywhere else, "Action Figures & Accessories" would match too.
+  if (/clothing, shoes & accessories/.test(top)) {
+    if (/\bshoes\b|footwear|sneakers|boots/.test(sub)) return 'Shoes';
+    if (/jewelry|watches/.test(sub)) return 'Jewelry';
+    if (/accessor|handbag|\bbags\b|wallet|\bhats\b|belts|sunglasses/.test(sub)) return 'Accessories';
+    return 'Clothing';
+  }
+  if (/jewelry/.test(all)) return 'Jewelry';
+  if (/books|movies|music|dvd|blu-ray|vinyl|magazines/.test(all)) return 'Books / Media';
+  if (/electronics|cell phones|computers|cameras|video games|audio/.test(all)) return 'Electronics';
+  if (/home & garden|home decor|home décor|kitchen|furniture/.test(all)) return 'Home & Decor';
+  if (/vintage|antiques/.test(all)) return 'Vintage';
+  if (/toys|collectibles|dolls|action figures/.test(all)) return 'Toys & Collectibles';
+  return '';
+}
+
+// Fills the open editor from a normalized listing. Empty fields are filled;
+// anything the user already typed is left alone, except the eBay identifiers
+// (always overwritten — they ARE the listing) and status, which steps up to
+// "Listed" because the item is demonstrably live on eBay. Selects with a
+// default value (condition, category) are only overridden on a NEW entry;
+// on an existing item the user chose those on purpose. Returns the count.
+function applyEbayListing(item) {
+  const form = document.getElementById('itemForm');
+  const isNew = !state.currentEditId;
+  let filled = 0;
+
+  const set = (name, value, overwrite = false) => {
+    if (value == null || value === '') return;
+    const el = form.elements[name];
+    if (!el || el.type === 'checkbox' || el.type === 'file') return;
+    if (!overwrite && el.value) return;
+    if (el.tagName === 'SELECT' && ![...el.options].some(o => o.value === value)) return;
+    el.value = value;
+    filled++;
+  };
+
+  // Category first: it drives the SKU prefix and the Beanie tab, and the
+  // default "Beanie Baby" only wins when the listing actually looks like one.
+  const cat = mapEbayCategory(item);
+  if (isNew && cat && cat !== form.elements.category.value) {
+    form.elements.category.value = cat;
+    filled++;
+    toggleBeanieTab(cat);
+    form.elements.sku.value = nextSku(cat);
+  }
+
+  set('name', item.title);
+  set('listing_title', item.title);
+  set('price', item.price);
+  set('brand', item.brand);
+  set('model', item.model);
+  set('size', item.size);
+  set('color', item.color);
+  set('material', item.material);
+  set('country', item.country);
+  set('upc', item.upc);
+  set('listing_desc_ebay', item.description);
+  set('date_listed', item.date_listed);
+  if (isNew && Number(item.quantity) > 1) set('quantity', String(item.quantity), true);
+
+  const cond = mapEbayCondition(item.condition);
+  if (cond) set('condition', cond, isNew);
+  const condNote = [item.condition, item.condition_description].filter(Boolean).join(' — ');
+  if (condNote && (!cond || item.condition_description)) set('condition_notes', 'eBay: ' + condNote);
+
+  set('ebay_item_number', item.ebay_item_number, true);
+  set('url_ebay', item.url_ebay, true);
+
+  const status = form.elements.status;
+  const next = status.value === 'Listed - Poshmark' ? 'Listed - Both'
+    : (status.value === 'Draft' || status.value === 'Ready to List') ? 'Listed - eBay'
+    : '';
+  if (next) { status.value = next; filled++; }
+
+  updateTitleCount();
+  updatePnl();
+  updateResearchSummary();
+  syncVariationFieldVisibility();
+  return filled;
 }
 
 // ============ BARCODE SCANNER ============
@@ -2228,6 +2422,18 @@ function init() {
   document.getElementById('importBtn').onclick = openImportModal;
   document.getElementById('importCancel').onclick = () => document.getElementById('importModal').classList.remove('open');
   document.getElementById('importConfirm').onclick = doImport;
+  document.getElementById('importFromEbayLink').onclick = e => {
+    e.preventDefault();
+    document.getElementById('importModal').classList.remove('open');
+    openEditor();
+    setTimeout(() => document.getElementById('ebayImportInput').focus(), 150);
+  };
+  document.getElementById('ebayImportBtn').onclick = () => {
+    importFromEbay(document.getElementById('ebayImportInput').value);
+  };
+  document.getElementById('ebayImportInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); document.getElementById('ebayImportBtn').click(); }
+  });
   const dlTpl = document.getElementById('downloadTemplateLink');
   if (dlTpl) dlTpl.onclick = downloadCsvTemplate;
   const dlXlsxTpl = document.getElementById('downloadXlsxTemplateLink');
