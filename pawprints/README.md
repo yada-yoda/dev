@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.74.0**
+**Current Version: v0.75.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,16 @@ covers both.
 
 ## Version History
 
+- **v0.75.0** — **Feeding form: pick the type, then the product.** The old single Food dropdown
+  mixed treats from Supplies into the food list. Now you pick the **Type of food** first (Dry
+  kibble, Wet, Treat, …) and a second dropdown appears with the matching products from your
+  Supplies — Treat shows your treats, food types show your foods — with the most recently fed one
+  pre-selected. Leaving it on "just the type" still works for anything not in Supplies. The
+  amount-memory now remembers per product, and timelines/exports show the product name. **Past
+  entries line up too:** older generic logs (like plain "Dry kibble") are automatically attributed
+  to your specific food when your inventory makes that unambiguous — if all your food purchases are
+  the same kibble, your whole feeding history now points at that product, so Insights group past
+  and future feedings together. Ambiguous cases are left untouched.
 - **v0.74.0** — **Visual "How to measure" guide for dog measurements.** The Measurements section of
   the dog form already explained each field in its ⓘ tooltips; now there's also a clearly clickable
   **📏 How to measure** button that expands a diagram — a side-view dog with the four measurements

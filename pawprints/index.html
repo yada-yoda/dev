@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.74.0';
+const APP_VERSION = 'v0.75.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -618,7 +618,9 @@ function activePet(){ return data.pets.find(p => p.id === data.activePetId) || d
 function petLogs(type){ const pid = data.activePetId; return data.logs.filter(l => l.petId === pid && (!type || l.type === type)); }
 function lastLog(type){ const ls = petLogs(type).filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
 // Most recent feeding of a specific food that had an amount — powers the per-food amount default.
-function lastFeedFor(foodType){ if(!foodType) return null; const ls = petLogs('feed').filter(l=>l.dateTime && l.foodType===foodType && l.amount!=='' && l.amount!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
+// Keyed by the specific product when known, else the generic type — so "Science Diet" and
+// a plain "Dry kibble" each remember their own last amount.
+function lastFeedFor(key){ if(!key) return null; const ls = petLogs('feed').filter(l=>l.dateTime && ((l.foodItem||l.foodType)===key) && l.amount!=='' && l.amount!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ls[0] || null; }
 // "Last potty" skips trips where the dog did nothing — those shouldn't reset the timer.
 function lastRealPotty(){ return petLogs('potty').filter(l=>l.dateTime && (l.result||'') !== 'Nothing').sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0] || null; }
 function latestWeight(){ const ws = petLogs('weight').filter(l=>num(l.value)!=null).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); return ws[0] || null; }
@@ -835,7 +837,7 @@ async function loadFromFirestore(quiet){
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
-      backfillVetContacts(); seedWalkBadges(); saveLocal(); render();
+      backfillVetContacts(); migrateFeedItems(); seedWalkBadges(); saveLocal(); render();
       if(!quiet) showToast('✅ Synced from cloud');
       else if(pulled) showToast('⬇️ Synced '+pulled+' item'+(pulled===1?'':'s')+' from your other devices');
     } else if(shared){
@@ -1906,33 +1908,83 @@ function saveWater(){
   closeModal(); showToast('💧 Fresh water given');
 }
 // Food choices for the feed form = your Food/Treats from inventory (specific brands first) + the generic types.
-function feedFoodOptions(){
-  const inv = petArr('inventory').filter(i => i.category==='Food' || i.category==='Treats').map(i => ((i.brand?i.brand+' ':'')+(i.name||'')).trim()).filter(Boolean);
-  return [...new Set([...inv, ...FOOD_TYPES])];
+// ── Feeding food pickers: TYPE first (Dry kibble / Wet / Treat / …), then a second
+// dropdown with the matching inventory products (Treat-ish types list your Treats,
+// everything else lists your Food items). Logs store both: foodType + foodItem.
+function foodItemsForType(t){
+  const cat = /treat|chew/i.test(t||'') ? 'Treats' : 'Food';
+  const rank = i => invStatus(i)==='In use' ? 0 : invStatus(i)==='Inventory' ? 1 : 2;
+  const seen = new Set(), out = [];
+  petArr('inventory').filter(i => i.category===cat)
+    .sort((a,b)=> rank(a)-rank(b) || String(b.purchaseDate||'').localeCompare(String(a.purchaseDate||'')))
+    .forEach(i => { const n = ((i.brand?i.brand+' ':'')+(i.name||'')).trim(); if(n && !seen.has(n)){ seen.add(n); out.push(n); } });
+  return out;
+}
+// Fill the product dropdown for the currently-selected type; hidden when nothing matches.
+function populateFoodItems(prefix, selected){
+  const wrap = document.getElementById(prefix+'-fooditem-wrap'), selEl = document.getElementById(prefix+'-fooditem');
+  if(!wrap || !selEl) return;
+  const t = fv(prefix+'-food');
+  const items = foodItemsForType(t);
+  if(selected && !items.includes(selected)) items.unshift(selected); // legacy product names stay selectable
+  if(!items.length){ wrap.style.display = 'none'; selEl.innerHTML = '<option value=""></option>'; return; }
+  wrap.style.display = '';
+  selEl.innerHTML = '<option value="">— just “'+esc(t)+'” —</option>' + items.map(n=>'<option value="'+esc(n)+'"'+(n===selected?' selected':'')+'>'+esc(n)+'</option>').join('');
+}
+// Type changed → repopulate products (defaulting to the one most recently fed of that
+// type) and refill amount/unit from the matching feeding history.
+function onFeedTypeChange(prefix){
+  const t = fv(prefix+'-food');
+  const prevOfType = petLogs('feed').filter(l=>l.dateTime && l.foodType===t).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0];
+  populateFoodItems(prefix, prevOfType ? (prevOfType.foodItem||'') : '');
+  if(prefix==='q') onFeedFoodChange();
+}
+// When either dropdown changes, refill amount/unit with what was last given for that food.
+function onFeedFoodChange(){
+  const prev = lastFeedFor(fv('q-fooditem') || fv('q-food')); if(!prev) return;
+  const a = document.getElementById('q-amt'), u = document.getElementById('q-unit');
+  if(a) a.value = prev.amount || '';
+  if(u && prev.unit) u.value = prev.unit;
+}
+// Idempotent load-time migration: attribute older feed logs to the specific inventory
+// product when the attribution is unambiguous, so past and future feedings group
+// together in Insights. (1) A log whose foodType IS an inventory product name gets it
+// copied into foodItem. (2) A generic kibble/wet log gets the Food-category product when
+// the inventory has exactly ONE distinct one (e.g. all purchases are the same kibble);
+// same for Treat / Dental chew against the Treats category. Ambiguous histories are left alone.
+function migrateFeedItems(){
+  let changed = 0;
+  const names = cat => { const s = new Set(); (data.inventory||[]).filter(i=>i.category===cat).forEach(i=>{ const n=((i.brand?i.brand+' ':'')+(i.name||'')).trim(); if(n) s.add(n); }); return [...s]; };
+  const foodNames = names('Food'), treatNames = names('Treats');
+  const allNames = new Set([...foodNames, ...treatNames]);
+  (data.logs||[]).forEach(l => {
+    if(l.type!=='feed' || l.foodItem) return;
+    const t = l.foodType||'';
+    if(allNames.has(t)){ l.foodItem = t; changed++; }
+    else if(/^(dry kibble|wet food)$/i.test(t) && foodNames.length===1){ l.foodItem = foodNames[0]; changed++; }
+    else if(/^(treat|dental chew)$/i.test(t) && treatNames.length===1){ l.foodItem = treatNames[0]; changed++; }
+  });
+  return changed;
 }
 function quickFeed(){
   if(denyLog()) return;
   if(!activePet()){ promptAddDog(); return; }
   const last = lastLog('feed');
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
-  const foods = feedFoodOptions();
-  const initFood = last ? last.foodType : (foods.includes('Dry kibble')?'Dry kibble':foods[0]);
-  const initFed = lastFeedFor(initFood) || last; // default the amount/unit to what was last used for the pre-selected food
+  const types = [...new Set([...(last && last.foodType && !FOOD_TYPES.includes(last.foodType) ? [last.foodType] : []), ...FOOD_TYPES])];
+  const initType = last ? last.foodType : 'Dry kibble';
+  const initItem = last ? (last.foodItem||'') : '';
+  const initFed = lastFeedFor(initItem || initType) || last; // amount/unit default to what was last given for this food
   openModal('<h3>🍖 Log feeding</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">Food'+tip('Your Food & Treats from the Supplies tab show up here automatically, plus the generic types. Amount fills in with what you last gave for the chosen food.')+'</label><select class="select" id="q-food" onchange="onFeedFoodChange()">'+sel(foods, initFood)+'</select>'
+    +'<label class="label">Type of food'+tip('The kind of feeding. Once picked, a second dropdown lists the matching products from your Supplies — treats for Treat, your foods for the rest.')+'</label><select class="select" id="q-food" onchange="onFeedTypeChange(\'q\')">'+sel(types, initType)+'</select>'
+    +'<div id="q-fooditem-wrap" style="display:none"><label class="label">Which one'+tip('The specific product from your Supplies inventory. Pick it so Insights and the amount memory track each product separately — or leave the plain type if it isn\'t in Supplies.')+'</label><select class="select" id="q-fooditem" onchange="onFeedFoodChange()"><option value=""></option></select></div>'
     +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(initFed?esc(initFed.amount||''):'')+'" placeholder="1"></div>'
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, initFed?(initFed.unit||'cups'):'cups')+'</select></div></div>'
     +'<label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
-}
-// When the food dropdown changes, refill amount/unit with what was last given for that food.
-function onFeedFoodChange(){
-  const prev = lastFeedFor(fv('q-food')); if(!prev) return; // no prior feeding of this food → leave current values
-  const a = document.getElementById('q-amt'), u = document.getElementById('q-unit');
-  if(a) a.value = prev.amount || '';
-  if(u && prev.unit) u.value = prev.unit;
+    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+  populateFoodItems('q', initItem);
 }
 function quickPotty(){
   if(denyLog()) return;
@@ -3481,7 +3533,7 @@ function renderToday(){
 }
 const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'} };
 function logSummary(l){
-  if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
+  if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodItem||l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water'+(l.place?' @ '+esc(l.place):'');
   if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result==='Both'?'Pee + Poop':(l.result||'Potty')) + (rest.length ? ' — ' + rest.join(' · ') : ''); }
   if(l.type==='walk'){
@@ -3562,7 +3614,9 @@ function editLogModal(id){
   let title = '', body = '<label class="label">When</label><input class="input" type="datetime-local" id="e-dt" value="'+esc(dt)+'">';
   if(l.type === 'feed'){
     title = '🍖 Edit feeding';
-    body += '<label class="label">Food</label><select class="select" id="e-food">'+sel(feedFoodOptions(), l.foodType||'')+'</select>'
+    const eTypes = [...new Set([...(l.foodType && !FOOD_TYPES.includes(l.foodType) ? [l.foodType] : []), ...FOOD_TYPES])];
+    body += '<label class="label">Type of food</label><select class="select" id="e-food" onchange="onFeedTypeChange(\'e\')">'+sel(eTypes, l.foodType||'')+'</select>'
+      + '<div id="e-fooditem-wrap" style="display:none"><label class="label">Which one</label><select class="select" id="e-fooditem"><option value=""></option></select></div>'
       + '<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="e-amt" value="'+esc(l.amount||'')+'"></div>'
       + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>'
       + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...foodPlaceOptions(), ...(l.foodPlace?[l.foodPlace]:[])])], l.foodPlace||'')+'</select>';
@@ -3597,12 +3651,13 @@ function editLogModal(id){
     + '<div style="display:flex;gap:10px;margin-top:6px"><button class="btn-primary" onclick="saveEditLog(\''+id+'\')">Save</button>'
     + '<button class="btn btn-danger" onclick="closeModal();delLog(\''+id+'\')">Delete</button>'
     + '<button class="btn" onclick="closeModal()">Cancel</button></div>');
+  if(l.type === 'feed') populateFoodItems('e', l.foodItem||'');
 }
 function saveEditLog(id){
   if(denyLog()) return;
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
-  if(l.type === 'feed'){ l.foodType = fv('e-food'); l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
+  if(l.type === 'feed'){ l.foodType = fv('e-food'); l.foodItem = fv('e-fooditem')||''; l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
   else if(l.type === 'water'){ l.place = fv('e-place'); }
   else if(l.type === 'potty'){ l.result = pottyResultFrom('e') || l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
@@ -4730,7 +4785,7 @@ applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.set
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 seedWalkBadges();
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
-else { backfillVetContacts(); render(); }
+else { backfillVetContacts(); if(migrateFeedItems()) saveLocal(); render(); }
 initAnalytics();
 if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather();
 setInterval(() => { if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather(); }, 1800000);
