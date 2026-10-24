@@ -1,0 +1,38 @@
+# Watch rizzo.cc: is it up, and is its certificate going to keep it up?
+#
+# Added 2026-10-24 after the whole domain - the /reel link sent to agents
+# included - served errors for an unknown length of time without anyone
+# knowing. The certificate had failed to renew and then expired. That was
+# visible weeks in advance to anything that looked.
+#
+# A failed run is the alarm: GitHub emails the account that owns this
+# schedule. Check that those emails actually reach you - a watchdog nobody
+# hears is the same as no watchdog.
+#
+# Lives in the dev repo rather than main-rcc so it keeps running regardless
+# of what is or is not pushed to production, and needs no secrets: it only
+# looks at what the public sees.
+
+name: rizzo.cc watchdog
+
+on:
+  schedule:
+    # Every six hours. Daily would leave up to a day of unnoticed downtime;
+    # the certificate check gives three weeks of warning either way.
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check rizzo.cc
+        run: python .scripts/watchdog.py
