@@ -6,9 +6,13 @@ account that owns the schedule.
 
 Written after 2026-10-24, when the whole domain - including the /reel link
 that goes to agents - returned errors for an unknown length of time and
-nobody knew. The certificate had quietly failed to renew behind the
+nobody knew. GitHub's certificate had quietly failed to renew behind the
 Cloudflare proxy, expired, and Cloudflare's strict mode refused to serve the
 site without it. All of that was detectable weeks in advance.
+
+The settled setup since then: apex proxied, Cloudflare SSL mode Full (not
+strict). Visitors get Cloudflare's certificate, which Cloudflare renews on
+its own; GitHub's is ignored. So the certificate this checks is Cloudflare's.
 
 Two kinds of check:
 
@@ -108,10 +112,18 @@ def main():
         for p in problems:
             print("  -", p)
         print(
-            "\nIf this is the certificate: check `gh api repos/yada-yoda/main-rcc/pages`"
-            " for https_certificate.state, and confirm the rizzo.cc and www A"
-            " records in Cloudflare are DNS-only (grey cloud). GitHub cannot renew"
-            " its certificate while they are proxied."
+            "\nIf this is a 526 or a certificate error, check the Cloudflare SSL/TLS"
+            " mode for rizzo.cc FIRST. It must be Full - NOT Full (strict).\n"
+            "\n"
+            "Why: rizzo.cc is proxied through Cloudflare, so visitors get Cloudflare's"
+            " certificate, which Cloudflare renews itself. GitHub's own certificate"
+            " for the domain cannot renew behind the proxy and has been dead since"
+            " October 2026. Full mode does not look at it. Full (strict) does, and"
+            " refuses to serve the site - which is exactly the 2026-10-24 outage.\n"
+            "\n"
+            "Do not try to fix it by un-proxying the DNS. That was tried: GitHub"
+            " would not re-issue from its failed state in 40 minutes, and visitors"
+            " got an expired-certificate warning the whole time."
         )
         return 1
 
