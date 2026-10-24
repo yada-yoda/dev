@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.75.2**
+**Current Version: v0.76.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.76.0** — **Year-at-a-glance heatmap.** The Insights → Trends chart gains a "Heatmap"
+  style: a GitHub-contributions-style grid of the last 365 days, one square per day, shaded
+  Less→More in the metric's own color (feedings, potty breaks, walk minutes, miles, weigh-ins).
+  Month labels on top, weekday labels on the left, a hover tooltip on every day, and the grid
+  scrolls sideways on phones (starting at today). Inspired by the habit-tracker view you shared —
+  trends are easier to *feel* across a whole year than on a 7-day line.
 - **v0.75.2** — **Light-mode readability fixes** (from an accessibility contrast audit; dark mode
   passed everywhere). The Supplies Brand/Where/Category pills were nearly invisible in light mode
   (they used dark-theme text colors) and now get proper light-theme colors; the active segment in

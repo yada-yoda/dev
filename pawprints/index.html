@@ -277,7 +277,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.75.2';
+const APP_VERSION = 'v0.76.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -4457,7 +4457,7 @@ function renderInsights(){
   // container so changing an option refreshes only this chart, not the weight chart above.
   html += '<div class="card">'+panelHead(svgIcon('insights',18)+' Trends', '', 'trends')
     + '<div id="trend-controls">'+trendControlsHTML()+'</div>'
-    + '<div style="height:260px"><canvas class="trend-chart"></canvas></div>'
+    + '<div id="trend-chart-wrap" style="height:260px"><canvas class="trend-chart"></canvas></div>'
     + '<p id="trend-hint" style="font-size:11px;color:var(--text-secondary);margin-top:8px">'+esc(TREND_METRICS.find(m=>m.k===trendMetric).hint)+'</p>'
     + '</div>';
   // spend breakdown (range-selectable: 30d / 90d / YTD)
@@ -4633,12 +4633,16 @@ function maybeDrawWeightChart(){
 function trendControlsHTML(){
   const metricBtns = TREND_METRICS.map(m=>'<button class="'+(trendMetric===m.k?'active':'')+'" onclick="setTrend(\'metric\',\''+m.k+'\')">'+svgIcon(m.icon,16)+' '+m.label+'</button>').join('');
   const seg = (kind,val,label)=>'<button class="'+(String((kind==='style'?trendStyle:trendRange))===String(val)?'active':'')+'" onclick="setTrend(\''+kind+'\',\''+val+'\')">'+label+'</button>';
-  const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area']].map(([v,l])=>seg('style',v,l)).join('');
+  const styleBtns = [['auto','Auto'],['line','Line'],['bar','Bar'],['area','Area'],['heat','Heatmap']].map(([v,l])=>seg('style',v,l)).join('');
   const rangeBtns = [['7','7d'],['14','14d'],['30','30d'],['90','90d'],['all','Lifetime']].map(([v,l])=>seg('range',v,l)).join('');
-  const days = trendSpanDays();
+  // Heatmap is a fixed year-at-a-glance view, so the range toggle gives way to a static label.
+  const rangeBlock = trendStyle==='heat'
+    ? '<div class="range-span" style="margin:0 0 0 auto;align-self:center">Last 365 days</div>'
+    : '<div class="range-seg" style="margin-left:auto">'+rangeBtns+'</div>';
+  const days = trendStyle==='heat' ? 365 : trendSpanDays();
   const spanLine = '<div class="range-span" style="margin:0 0 10px">'+fmtSpan(Date.now()-(days-1)*86400000, Date.now())+'</div>';
   return '<div class="subtab" style="margin-bottom:10px">'+metricBtns+'</div>'
-    + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px"><div class="range-seg">'+styleBtns+'</div><div class="range-seg" style="margin-left:auto">'+rangeBtns+'</div></div>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:8px"><div class="range-seg">'+styleBtns+'</div>'+rangeBlock+'</div>'
     + spanLine;
 }
 // Resolve trendRange to a day count — 'all' spans from the first entry OF THE CHARTED METRIC to
@@ -4687,9 +4691,68 @@ function trendData(){
   }
   return { days, datasets, auto:meta.auto };
 }
+// GitHub-style year heatmap: one cell per day, last 365 days, weeks as columns.
+function trendHeatValues(days){
+  const idx={}; days.forEach((d,i)=>idx[d]=i);
+  const vals=days.map(()=>0);
+  const bump=(l,amt)=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx) vals[idx[d]]+=amt; };
+  if(trendMetric==='feeding'){ petLogs('feed').forEach(l=>bump(l,1)); return {vals, unit:n=>n+' feeding'+(n===1?'':'s')}; }
+  if(trendMetric==='potty'){ petLogs('potty').forEach(l=>bump(l,1)); return {vals, unit:n=>n+' potty break'+(n===1?'':'s')}; }
+  if(trendMetric==='walk'){ petLogs('walk').forEach(l=>bump(l,num(l.durationMin)||0)); return {vals, unit:n=>Math.round(n)+' min walked'}; }
+  if(trendMetric==='walkdist'){ petLogs('walk').forEach(l=>bump(l,num(l.distance)||0)); return {vals, unit:n=>(Math.round(n*10)/10)+' mi walked'}; }
+  // Weight is sparse — a weigh-in day lights up fully and the tooltip carries the value.
+  const unit=(activePet()||{}).weightUnit||'lb';
+  petLogs('weight').forEach(l=>{ const d=(l.dateTime||'').slice(0,10); if(d in idx && num(l.value)!=null) vals[idx[d]]=num(l.value); });
+  return {vals, unit:n=>'weighed '+n+' '+unit, binary:true};
+}
+function trendHeatmapHTML(){
+  const css=getComputedStyle(document.documentElement);
+  const colorVar={feeding:'--accent-2',potty:'--accent',walk:'--accent-purple',walkdist:'--accent-2',weight:'--accent'}[trendMetric]||'--accent-2';
+  const col=css.getPropertyValue(colorVar).trim()||'#2dd4bf';
+  const today=new Date(); today.setHours(12,0,0,0);
+  const start=new Date(today.getTime()-364*86400000);
+  const padDays=(start.getDay()+6)%7;              // back up to the Monday on/before the window start
+  const first=new Date(start.getTime()-padDays*86400000);
+  const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  const days=[]; for(let d=new Date(first); d<=today; d.setDate(d.getDate()+1)) days.push(iso(d));
+  const windowStart=iso(start);
+  const {vals,unit,binary}=trendHeatValues(days);
+  const inWin=days.map(d=>d>=windowStart);
+  const max=vals.reduce((m,v,i)=>inWin[i]&&v>m?v:m,0);
+  const lvl=v=> v<=0||max<=0 ? 0 : binary ? 4 : v>=max*0.75?4 : v>=max*0.5?3 : v>=max*0.25?2 : 1;
+  const mix=p=>'color-mix(in srgb, '+col+' '+p+'%, var(--bg-tertiary))';
+  const LV=['var(--bg-tertiary)',mix(30),mix(55),mix(78),col];
+  const CELL=10, GAP=3, STEP=CELL+GAP;
+  let cells='';
+  days.forEach((d,i)=>{
+    const t=new Date(d+'T12:00').toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    const tip=t+(vals[i]>0?' · '+unit(vals[i]):' · nothing logged');
+    cells+='<div title="'+tip+'" style="width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+LV[lvl(vals[i])]+(inWin[i]?'':';visibility:hidden')+'"></div>';
+  });
+  const weeks=Math.ceil(days.length/7), mlabels=Array(weeks).fill('');
+  days.forEach((d,i)=>{ if(d.slice(8)==='01' && d>=windowStart){ const w=Math.floor(i/7); if(!mlabels[w]) mlabels[w]=new Date(d+'T12:00').toLocaleDateString('en-US',{month:'short'}); } });
+  const monthRow=mlabels.map(m=>'<div style="font-size:9px;color:var(--text-secondary);white-space:nowrap;overflow:visible">'+m+'</div>').join('');
+  const dayLab=['Mon','','Wed','','Fri','',''].map(t=>'<div style="height:'+CELL+'px;line-height:'+CELL+'px;font-size:9px;color:var(--text-secondary)">'+t+'</div>').join('');
+  const legend='<div style="display:flex;align-items:center;gap:4px;justify-content:flex-end;margin-top:8px;font-size:10px;color:var(--text-secondary)">Less '
+    +LV.map(c=>'<span style="width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+c+';display:inline-block"></span>').join('')+' More</div>';
+  return '<div data-heat-scroll style="overflow-x:auto;padding-bottom:4px"><div style="display:flex;gap:6px;width:max-content">'
+    +'<div style="display:grid;grid-template-rows:repeat(7,'+CELL+'px);row-gap:'+GAP+'px;margin-top:'+(12+GAP)+'px">'+dayLab+'</div>'
+    +'<div><div style="display:grid;grid-auto-flow:column;grid-auto-columns:'+STEP+'px;height:12px;margin-bottom:'+GAP+'px">'+monthRow+'</div>'
+    +'<div style="display:grid;grid-template-rows:repeat(7,'+CELL+'px);grid-auto-flow:column;grid-auto-columns:'+CELL+'px;gap:'+GAP+'px">'+cells+'</div></div>'
+    +'</div></div>'+legend;
+}
 function drawTrendChart(){
   const view=document.getElementById('view-'+currentView); if(!view) return;
-  if(!view.querySelector('.trend-chart')) return;
+  const wrap=view.querySelector('#trend-chart-wrap'); if(!wrap) return;
+  if(trendStyle==='heat'){
+    if(trendsChart){ try{trendsChart.destroy();}catch(e){} trendsChart=null; }
+    wrap.style.height='auto';
+    wrap.innerHTML=trendHeatmapHTML();
+    const sc=wrap.querySelector('[data-heat-scroll]'); if(sc) sc.scrollLeft=sc.scrollWidth;
+    return;
+  }
+  wrap.style.height='260px';
+  if(!wrap.querySelector('.trend-chart')) wrap.innerHTML='<canvas class="trend-chart"></canvas>';
   loadChart().then(()=>{
     const v2=document.getElementById('view-'+currentView), c2=v2?v2.querySelector('.trend-chart'):null; if(!c2) return;
     if(trendsChart){ try{trendsChart.destroy();}catch(e){} trendsChart=null; }
