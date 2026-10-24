@@ -156,6 +156,13 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .auth-banner .user-info{display:flex;align-items:center;gap:10px}.auth-banner .user-avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
 /* Quick-log buttons */
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+/* Wide desktops: Today + Insights split their card stacks into two columns; forms/list views stay a readable width. */
+.view-cols{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
+@media(min-width:1180px){
+  .content{max-width:1200px}
+  .view-cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 14px}
+  #view-log,#view-care,#view-profile,#view-history,#view-activity,#view-settings{max-width:820px;margin:0 auto}
+}
 .quick-btn{padding:16px 8px;border-radius:14px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:transform .15s,border-color .2s}
 .quick-btn:hover{transform:translateY(-2px);border-color:var(--accent)}
 .quick-btn .qi{font-size:26px;display:flex;align-items:center;justify-content:center;height:28px}.quick-btn .qi .msi{width:27px;height:27px}
@@ -277,7 +284,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.76.0';
+const APP_VERSION = 'v0.77.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3496,6 +3503,8 @@ function renderToday(){
   if(cloudSaveOk === false && currentUser && !sharedOwnerUid){
     html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Last cloud sync didn’t go through.</strong> Your entries are safe on <strong>this device</strong> and will retry automatically the next time you log something or reopen the app. If this message never goes away, check your connection — or the Firestore security rule isn’t set up yet.</div></div>';
   }
+  // Two columns on wide desktops (status/logging left, feed right); single stack below 1180px.
+  html += '<div class="view-cols"><div>';
   // header summary
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)">':'<div class="logo" style="width:64px;height:64px;font-size:32px">🐾</div>')
@@ -3524,6 +3533,7 @@ function renderToday(){
   const feedC = renderFeedingCard(), badgeC = renderNextBadgeToday();
   if(feedC && badgeC) html += '<div class="grid-2" style="margin-bottom:12px">'+feedC+badgeC+'</div>';
   else html += feedC + badgeC;
+  html += '</div><div>';
   // reminders
   const rem = getReminders();
   if(rem.length) html += '<div class="card"><h3 class="section-title">'+svgIcon('schedule',18)+' Reminders</h3>'+rem.map(r=>'<div class="reminder '+(r.over?'over':'due')+'"><span style="font-size:17px;display:inline-flex">'+iconFor(r.icon,18)+'</span><span style="flex:1;min-width:0">'+esc(r.text)+'</span>'+(r.act||'')+'</div>').join('')+'</div>';
@@ -3537,6 +3547,7 @@ function renderToday(){
     + (todays.length ? todays.map(l=>timelineRow(l)).join('') : '<p style="color:var(--text-secondary);font-size:14px">Nothing logged yet today'+(totalLogs?'.':' — tap a quick-log button above.')+'</p>')
     + (totalLogs > todays.length ? '<div style="text-align:center;margin-top:10px"><button class="btn btn-outline" onclick="openActivity()">'+svgIcon('log',16)+' View all activity by day ('+totalLogs+') →</button></div>' : '')
     + '</div>';
+  html += '</div></div>';
   return html;
 }
 const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'} };
@@ -4448,11 +4459,14 @@ function renderInsights(){
       + sc(money(treatsYtd/daysThisYear), 'Treats $/day', 'var(--accent-2)', 'This year\'s treats spend spread over days so far ('+money(treatsYtd)+' ÷ '+daysThisYear+' days)')
       + '</div>';
   }
+  // Two columns on wide desktops (badges/weight left, trends/spend right); single stack below 1180px.
+  html += '<div class="view-cols"><div>';
   // Walking milestone badges
   html += renderBadgesCard();
   // Weight trend — the original dedicated chart, kept above the selectable Trends chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
   if(weights.length>=2) html += '<div class="card">'+panelHead(svgIcon('weight',18)+' Weight trend', '', 'weight-trend')+'<div style="height:220px"><canvas class="weight-chart"></canvas></div></div>';
+  html += '</div><div>';
   // Trends — selectable chart (feeding / potty / walks / weight). Controls live in their own
   // container so changing an option refreshes only this chart, not the weight chart above.
   html += '<div class="card">'+panelHead(svgIcon('insights',18)+' Trends', '', 'trends')
@@ -4466,6 +4480,7 @@ function renderInsights(){
   html += '<div id="potty-card-wrap">'+renderPottyCard()+'</div>';
   // Year in review launcher
   if(petLogs().some(l=>l.dateTime)) html += '<div class="card" style="text-align:center;padding:18px"><button class="btn" style="max-width:320px" onclick="yearReviewModal()" title="A shareable card of the year — miles, meals, badges, milestones, spending">🎁 '+new Date().getFullYear()+' in review</button></div>';
+  html += '</div></div>';
   if(!feeds.length && !walks.length && weights.length<2 && !anySpend) html += '<div class="card empty"><div class="ico">'+svgIcon('insights',46)+'</div><p style="color:var(--text-secondary)">Log a few days of activity to see patterns and spending here.</p></div>';
   return html;
 }

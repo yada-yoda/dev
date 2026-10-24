@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.76.0**
+**Current Version: v0.77.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.77.0** — **Desktop layout that uses the screen.** On wide monitors the app no longer sits
+  in one skinny centered column. Today splits into two columns (quick log + status on the left,
+  reminders + today's activity on the right) and Insights does the same (badges + weight chart
+  left, trends + spending + potty right), with the stat tiles spreading across the full width.
+  Phones and tablets are untouched — below 1180px everything stacks exactly as before. Form-heavy
+  tabs (Log, Care, Profile) stay at a readable width on purpose.
 - **v0.76.0** — **Year-at-a-glance heatmap.** The Insights → Trends chart gains a "Heatmap"
   style: a GitHub-contributions-style grid of the last 365 days, one square per day, shaded
   Less→More in the metric's own color (feedings, potty breaks, walk minutes, miles, weigh-ins).
