@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.75.0**
+**Current Version: v0.75.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.75.1** — **Quick-log form polish.** (1) Treats no longer ask where they were fed — the
+  "Where" field hides when the food type is Treat or Dental chew (and clears, so nothing stale is
+  saved), reappearing for real meals. (2) The potty form no longer pre-selects Pee — nothing is
+  selected until you tap, and Save still insists on a choice. (3) In the potty form, the Home /
+  Somewhere-else location now sits **above** the specific spot picker, so you answer the broad
+  question first.
 - **v0.75.0** — **Feeding form: pick the type, then the product.** The old single Food dropdown
   mixed treats from Supplies into the food list. Now you pick the **Type of food** first (Dry
   kibble, Wet, Treat, …) and a second dropdown appears with the matching products from your

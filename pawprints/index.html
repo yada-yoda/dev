@@ -272,7 +272,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.75.0';
+const APP_VERSION = 'v0.75.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -1937,6 +1937,9 @@ function onFeedTypeChange(prefix){
   const t = fv(prefix+'-food');
   const prevOfType = petLogs('feed').filter(l=>l.dateTime && l.foodType===t).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))[0];
   populateFoodItems(prefix, prevOfType ? (prevOfType.foodItem||'') : '');
+  // Treats don't need a feeding location — hide Where and clear it so nothing stale saves.
+  const pw = document.getElementById(prefix+'-place-wrap');
+  if(pw){ const hide = /treat|chew/i.test(t); pw.style.display = hide ? 'none' : ''; if(hide){ const ps = document.getElementById(prefix+'-place'); if(ps) ps.value = ''; } }
   if(prefix==='q') onFeedFoodChange();
 }
 // When either dropdown changes, refill amount/unit with what was last given for that food.
@@ -1981,7 +1984,7 @@ function quickFeed(){
     +'<div id="q-fooditem-wrap" style="display:none"><label class="label">Which one'+tip('The specific product from your Supplies inventory. Pick it so Insights and the amount memory track each product separately — or leave the plain type if it isn\'t in Supplies.')+'</label><select class="select" id="q-fooditem" onchange="onFeedFoodChange()"><option value=""></option></select></div>'
     +'<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="q-amt" value="'+(initFed?esc(initFed.amount||''):'')+'" placeholder="1"></div>'
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, initFed?(initFed.unit||'cups'):'cups')+'</select></div></div>'
-    +'<label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select>'
+    +'<div id="q-place-wrap"'+(/treat|chew/i.test(initType)?' style="display:none"':'')+'><label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
   populateFoodItems('q', initItem);
@@ -1992,9 +1995,9 @@ function quickPotty(){
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
   openModal('<h3>🚪 Potty break</h3>'
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
-    +'<label class="label">What did they do?'+tip('Pee and Poop toggle separately — tap both when they did both. Picking Poop opens the stool dropdown.')+'</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map((r,i)=>'<button class="tag'+(i===0?' active':'')+'" data-pr="'+esc(r)+'" onclick="pottyTagToggle(this,\'q\')">'+esc(r)+'</button>').join('')+'</div>'
-    +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
+    +'<label class="label">What did they do?'+tip('Pee and Poop toggle separately — tap both when they did both. Picking Poop opens the stool dropdown.')+'</label><div class="tag-grid" id="q-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag" data-pr="'+esc(r)+'" onclick="pottyTagToggle(this,\'q\')">'+esc(r)+'</button>').join('')+'</div>'
     +pottyLocationField('home','q-loc')
+    +'<label class="label">Where</label><select class="select" id="q-place">'+sel(pottyPlaceOptions(),'Backyard')+'</select>'
     +'<div id="q-stool-wrap" style="display:none"><label class="label">Stool'+tip('Stool quality is an easy health signal to track. Add your own types in Settings → Lists &amp; preferences → Stool types.')+'</label><select class="select" id="q-stool"><option value="">—</option>'+sel(stoolOptions(),'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
     +'<button class="btn-primary" onclick="savePotty()">Save</button>');
@@ -3619,7 +3622,7 @@ function editLogModal(id){
       + '<div id="e-fooditem-wrap" style="display:none"><label class="label">Which one</label><select class="select" id="e-fooditem"><option value=""></option></select></div>'
       + '<div class="grid-2"><div><label class="label">Amount</label><input class="input" type="number" step="0.05" id="e-amt" value="'+esc(l.amount||'')+'"></div>'
       + '<div><label class="label">Unit</label><select class="select" id="e-unit">'+sel(AMOUNT_UNITS, l.unit||'cups')+'</select></div></div>'
-      + '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...foodPlaceOptions(), ...(l.foodPlace?[l.foodPlace]:[])])], l.foodPlace||'')+'</select>';
+      + '<div id="e-place-wrap"'+(/treat|chew/i.test(l.foodType||'')?' style="display:none"':'')+'><label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...foodPlaceOptions(), ...(l.foodPlace?[l.foodPlace]:[])])], l.foodPlace||'')+'</select></div>';
   } else if(l.type === 'water'){
     title = '💧 Edit water';
     body += '<label class="label">Where</label><select class="select" id="e-place"><option value="">—</option>'+sel([...new Set([...waterPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'')+'</select>';
@@ -3631,8 +3634,8 @@ function editLogModal(id){
       const isOn = r => r==='Pee' ? peeOn : r==='Poop' ? poopOn : l.result==='Nothing';
       return '<label class="label">What did they do?'+tip('Pee and Poop toggle separately — tap both when they did both. Picking Poop opens the stool dropdown.')+'</label><div class="tag-grid" id="e-potty-tags">'+POTTY_RESULTS.map(r=>'<button class="tag'+(isOn(r)?' active':'')+'" data-pr="'+esc(r)+'" onclick="pottyTagToggle(this,\'e\')">'+esc(r)+'</button>').join('')+'</div>';
     })()
-      + '<label class="label">Where</label><select class="select" id="e-place">'+sel([...new Set([...pottyPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'Backyard')+'</select>'
       + pottyLocationField(l.location, 'e-loc')
+      + '<label class="label">Where</label><select class="select" id="e-place">'+sel([...new Set([...pottyPlaceOptions(), ...(l.place?[l.place]:[])])], l.place||'Backyard')+'</select>'
       + '<div id="e-stool-wrap" style="display:'+((l.result==='Poop'||l.result==='Both'||!!(l.stool&&String(l.stool).trim()))?'':'none')+'"><label class="label">Stool</label><select class="select" id="e-stool"><option value="">—</option>'+sel([...new Set([...stoolOptions(), ...(l.stool?[l.stool]:[])])], l.stool||'')+'</select></div>';
   } else if(l.type === 'walk'){
     title = '🦮 Edit walk';
