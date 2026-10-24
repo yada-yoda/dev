@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.75.1**
+**Current Version: v0.75.2**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,12 @@ covers both.
 
 ## Version History
 
+- **v0.75.2** — **Light-mode readability fixes** (from an accessibility contrast audit; dark mode
+  passed everywhere). The Supplies Brand/Where/Category pills were nearly invisible in light mode
+  (they used dark-theme text colors) and now get proper light-theme colors; the active segment in
+  range toggles, the "low" chip, and small teal text/links all fell below the WCAG contrast bar in
+  light mode and now pass — the light theme's teal and amber-warning tones went one shade deeper.
+  Every replacement color was verified at 4.5:1 or better.
 - **v0.75.1** — **Quick-log form polish.** (1) Treats no longer ask where they were fed — the
   "Where" field hides when the food type is Treat or Dental chew (and clears, so nothing stale is
   saved), reappearing for real meals. (2) The potty form no longer pre-selects Pee — nothing is
