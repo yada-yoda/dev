@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.77.0**
+**Current Version: v0.77.1**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,7 @@ covers both.
 
 ## Version History
 
+- **v0.77.1** — Status tiles arrange 2×2 inside the new desktop column instead of wrapping 3+1.
 - **v0.77.0** — **Desktop layout that uses the screen.** On wide monitors the app no longer sits
   in one skinny centered column. Today splits into two columns (quick log + status on the left,
   reminders + today's activity on the right) and Insights does the same (badges + weight chart
