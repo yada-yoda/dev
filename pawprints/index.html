@@ -286,7 +286,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.78.0';
+const APP_VERSION = 'v0.79.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -341,7 +341,7 @@ function iconFor(e, px){ return EMOJI_ICON[e] ? svgIcon(EMOJI_ICON[e], px) : (e|
 // ═══════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════
-const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], records:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'', deleted:{} };
+const DATA_DEFAULTS = { pets:[], activePetId:null, logs:[], vetVisits:[], grooming:[], illnesses:[], meds:[], records:[], inventory:[], contacts:[], customEvents:[], journal:[], drafts:[], trash:[], gcalEvents:{}, settings:{}, auditLog:[], collaborators:[], sharedWith:[], sharedRead:[], sharedWrite:[], ownerName:'', deleted:{} };
 let data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
 let currentView = 'today';
 let logSubtab = 'feed';
@@ -662,7 +662,7 @@ function closeModal(){
   const wasDraft = openDraft;
   if(wasDraft){
     draftClearTimer();
-    if(wasDraft.committed){ if(wasDraft.id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==wasDraft.id); save(false); } }
+    if(wasDraft.committed){ if(wasDraft.id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==wasDraft.id); markDeleted(wasDraft.id); save(false); } }
     else { draftSnapshot(); }
     openDraft = null;
   }
@@ -720,12 +720,13 @@ function resumeDraft(id){
   if(d.tags){ Object.keys(d.tags).forEach(gid => { const grid = document.getElementById(gid); if(!grid) return; const want = d.tags[gid]||[]; grid.querySelectorAll('.tag').forEach(t => t.classList.toggle('active', want.indexOf(t.dataset.s)>-1)); want.forEach(s => { if(![...grid.querySelectorAll('.tag')].some(t=>t.dataset.s===s)){ const b=document.createElement('button'); b.className='tag active'; b.type='button'; b.dataset.s=s; b.textContent=s; b.onclick=function(){ this.classList.toggle('active'); }; grid.appendChild(b); } }); }); }
   if(openDraft) openDraft.id = d.id;
 }
-function deleteDraft(id){ data.drafts = (data.drafts||[]).filter(d=>d.id!==id); save(false); render(); }
+function deleteDraft(id){ const d = (data.drafts||[]).find(x=>x.id===id); if(d) trashRecord('drafts', d, (DRAFT_KINDS[d.kind] ? DRAFT_KINDS[d.kind].name+': ' : '')+d.label); data.drafts =(data.drafts||[]).filter(d=>d.id!==id); markDeleted(id); save(false); render(); }
 function draftStrip(section){
   const ds = (data.drafts||[]).filter(d => d.petId===data.activePetId && DRAFT_KINDS[d.kind] && DRAFT_KINDS[d.kind].section===section);
   if(!ds.length || !canManage()) return '';
   return '<div class="card" style="border-color:var(--warning);background:rgba(210,153,34,.06)"><div class="label" style="margin-top:0;color:var(--warning)">📝 Unsaved draft'+(ds.length===1?'':'s')+'</div>'
     + ds.map(d=>'<div class="entry-row"><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(DRAFT_KINDS[d.kind].name)+': '+esc(d.label)+'</div><div class="tl-time">saved '+fmtDateTime(d.savedAt)+'</div></div><div style="display:flex;gap:6px;align-self:center"><button class="btn btn-sm btn-accent" onclick="resumeDraft(\''+d.id+'\')">Resume</button><button class="btn btn-sm btn-danger" onclick="deleteDraft(\''+d.id+'\')" title="Discard draft">×</button></div></div>').join('')
+    + '<div style="font-size:11px;color:var(--text-secondary);margin-top:8px">Drafts keep for 30 days, then clear automatically.</div>'
     + '</div>';
 }
 function fv(id){ const el = document.getElementById(id); return el ? el.value : ''; }
@@ -794,13 +795,43 @@ function signIn(withCalendar, after){
 function signOut(){ if(!firebaseReady) return; firebase.auth().signOut(); gcalAccessToken = null; showToast('Signed out'); }
 
 // Record collections that sync as id'd arrays (merged per id, unlike settings/gcalEvents).
-const SYNC_COLLECTIONS = ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','auditLog'];
+const SYNC_COLLECTIONS = ['pets','logs','vetVisits','grooming','illnesses','meds','records','inventory','contacts','customEvents','journal','drafts','trash','auditLog'];
 // ── Deletion tombstones ──
 // The id-union merges above can't tell "deleted on another device" from "added on this
 // device", so deletes leave a marker in data.deleted {id: deletedAtMs}. Merges then drop
 // any record whose id is tombstoned instead of resurrecting it. Pruned after 120 days
 // (long past any realistic device staleness) to keep the doc small.
 function markDeleted(ids){ data.deleted = data.deleted || {}; (Array.isArray(ids)?ids:[ids]).forEach(id => { if(id) data.deleted[id] = Date.now(); }); }
+// ── Recently deleted bin ──
+// Deletes copy the record into data.trash for 30 days so a mis-tap can be undone from
+// Settings. A restore gets a NEW id: the old one is tombstoned, and tombstones union-merge
+// across devices, so reusing it would get the restored record deleted again on next sync.
+function trashRecord(coll, rec, label){ if(!rec) return; data.trash = data.trash || []; data.trash.unshift({ id: genId(), coll, rec: JSON.parse(JSON.stringify(rec)), label: String(label||'').slice(0,120), deletedAt: Date.now(), petId: rec.petId || data.activePetId || null }); }
+// Age-based, so every device drops the same entries without needing tombstones.
+function pruneAged(){
+  const now = Date.now(), max = 30*86400000;
+  data.trash = (data.trash||[]).filter(t => t && t.deletedAt && now-t.deletedAt < max);
+  data.drafts = (data.drafts||[]).filter(d => d && d.savedAt && now-d.savedAt < max);
+}
+const TRASH_NAMES = { logs:'activity', vetVisits:'vet visit', grooming:'grooming', meds:'medication', records:'record', illnesses:'illness', inventory:'supply', contacts:'contact', journal:'journal entry', customEvents:'event', drafts:'draft' };
+function trashGate(entry){ return entry.coll==='logs' ? denyLog() : denyManage(); }
+function restoreTrash(id){
+  const entry = (data.trash||[]).find(t=>t.id===id); if(!entry || trashGate(entry)) return;
+  if(!Array.isArray(data[entry.coll])){ showToast('⚠️ Can\'t restore that item'); return; }
+  const rec = JSON.parse(JSON.stringify(entry.rec||{}));
+  if(rec.petId && !data.pets.some(p=>p.id===rec.petId)){ showToast('⚠️ That dog was removed — can\'t restore'); return; }
+  rec.id = genId();
+  data[entry.coll].push(rec);
+  data.trash = data.trash.filter(t=>t.id!==id); markDeleted(id);
+  logChange('restored', TRASH_NAMES[entry.coll]||entry.coll, entry.label);
+  save(); if(entry.coll==='logs') queueActivitySync();
+  showToast('↺ Restored'); refreshSettingsSection('settings-trash', settingsTrashHTML);
+}
+function purgeTrash(id){
+  const entry = (data.trash||[]).find(t=>t.id===id); if(!entry || trashGate(entry)) return;
+  data.trash = data.trash.filter(t=>t.id!==id); markDeleted(id);
+  save(); refreshSettingsSection('settings-trash', settingsTrashHTML);
+}
 function mergeTombstones(remoteDel){
   const tomb = Object.assign({}, remoteDel||{}, data.deleted||{});
   const cutoff = Date.now() - 120*86400000;
@@ -847,6 +878,7 @@ async function loadFromFirestore(quiet){
         const localOnly = (data[k]||[]).filter(x => !remoteIds.has(x.id) && !tomb[x.id]);
         data[k] = [...remote, ...localOnly];
       });
+      pruneAged();
       data.gcalEvents = Object.assign({}, d.gcalEvents||{}, data.gcalEvents||{});
       data.settings = Object.assign({}, d.settings||{}, data.settings||{});
       if(d.sharedWith) data.sharedWith = d.sharedWith;
@@ -908,6 +940,7 @@ async function saveToFirestore(){
             const remoteOnly = (remote[k]||[]).filter(x => x && x.id && !localIds.has(x.id) && !tomb[x.id]);
             if(remoteOnly.length){ data[k] = [...(data[k]||[]), ...remoteOnly]; rescued += remoteOnly.length; }
           });
+          pruneAged();
           data.gcalEvents = Object.assign({}, remote.gcalEvents||{}, data.gcalEvents||{});
         }
       } catch(e){ /* pre-read failed (offline?) — still save what we have */ }
@@ -1009,7 +1042,7 @@ function exitSharedProfile(silent){
 // PERSISTENCE
 // ═══════════════════════════════════════════════
 function saveLocal(){ if(demoMode || sharedOwnerUid) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
-function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); } } catch(e){} }
+function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); pruneAged(); } } catch(e){} }
 function persist(){ if(!demoMode) setCloudDirty(true); saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(rerender !== false) render(); }
 
@@ -1023,7 +1056,7 @@ function importJSON(evt){
     const d = JSON.parse(e.target.result);
     if(d && d.pets){
       if(!confirm('Restore this backup? It replaces everything currently in PawPrints on this device.')){ evt.target.value=''; return; }
-      data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
+      data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); pruneAged();
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       logChange('restored','backup', data.pets.length+' dog'+(data.pets.length===1?'':'s')+' from file');
       persist(); closeModal(); render(); showToast('✅ Backup restored');
@@ -1097,9 +1130,9 @@ function exportHistoryCSV(){
   showToast('📄 History CSV saved');
 }
 // Entity deletes (with audit logging) — used by the edit modals.
-function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); markDeleted(id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); data.grooming=data.grooming.filter(x=>x.id!==id); markDeleted(id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); data.meds=data.meds.filter(x=>x.id!==id); markDeleted(id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteVet(id){ if(denyManage()) return; const v=data.vetVisits.find(x=>x.id===id); if(v) trashRecord('vetVisits', v, (v.reason||'visit')+' · '+fmtDate(v.date)); data.vetVisits=data.vetVisits.filter(x=>x.id!==id); markDeleted(id); if(v) logChange('deleted','vet visit',(v.reason||'visit')+' · '+fmtDate(v.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteGroom(id){ if(denyManage()) return; const g=data.grooming.find(x=>x.id===id); if(g) trashRecord('grooming', g, fmtDate(g.date)); data.grooming=data.grooming.filter(x=>x.id!==id); markDeleted(id); if(g) logChange('deleted','grooming',fmtDate(g.date)); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteMed(id){ if(denyManage()) return; const m=data.meds.find(x=>x.id===id); if(m) trashRecord('meds', m, m.name||''); data.meds=data.meds.filter(x=>x.id!==id); markDeleted(id); if(m) logChange('deleted','medication',m.name||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 // ── Medical records (vaccinations, surgeries, tests, etc.) ─────────
 function toggleRecordSort(){ recordSortAsc = !recordSortAsc; render(); }
@@ -1197,10 +1230,10 @@ function saveRecord(id){
   if(gcalAccessToken) syncToGoogleCalendar();
 }
 
-function deleteRecord(id){ if(denyManage()) return; const r=data.records.find(x=>x.id===id); data.records=data.records.filter(x=>x.id!==id); markDeleted(id); if(r) logChange('deleted','record',[r.type,r.name].filter(Boolean).join(' · ')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); data.illnesses=data.illnesses.filter(x=>x.id!==id); markDeleted(id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); data.inventory=data.inventory.filter(x=>x.id!==id); markDeleted(id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
-function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); data.contacts=data.contacts.filter(x=>x.id!==id); markDeleted(id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteRecord(id){ if(denyManage()) return; const r=data.records.find(x=>x.id===id); if(r) trashRecord('records', r, [r.type,r.name].filter(Boolean).join(' · ')); data.records=data.records.filter(x=>x.id!==id); markDeleted(id); if(r) logChange('deleted','record',[r.type,r.name].filter(Boolean).join(' · ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteIllness(id){ if(denyManage()) return; const e=data.illnesses.find(x=>x.id===id); if(e) trashRecord('illnesses', e, e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); data.illnesses=data.illnesses.filter(x=>x.id!==id); markDeleted(id); if(e) logChange('deleted','illness',e.diagnosis||(e.symptoms||[]).slice(0,2).join(', ')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteInv(id){ if(denyManage()) return; const it=data.inventory.find(x=>x.id===id); if(it) trashRecord('inventory', it, (it.brand?it.brand+' ':'')+(it.name||'')); data.inventory=data.inventory.filter(x=>x.id!==id); markDeleted(id); if(it) logChange('deleted','supply',(it.brand?it.brand+' ':'')+(it.name||'')); closeModal(); save(); showToast('🗑️ Deleted'); }
+function deleteContact(id){ if(denyManage()) return; const c=data.contacts.find(x=>x.id===id); if(c) trashRecord('contacts', c, c.name||c.org||''); data.contacts=data.contacts.filter(x=>x.id!==id); markDeleted(id); if(c) logChange('deleted','contact',c.name||c.org||''); closeModal(); save(); showToast('🗑️ Deleted'); }
 
 // Settings is a full page (view-settings). The gear + other callers just navigate to it.
 function settingsModal(){ switchView('settings'); }
@@ -1240,7 +1273,18 @@ function settingsPageHTML(){
       + '<button class="btn" onclick="openHistory()">🕘 Activity &amp; change history'+((data.auditLog&&data.auditLog.length)?' <span class="chip-2" style="font-size:10px;margin-left:4px">'+data.auditLog.length+'</span>':'')+'</button></div>'
     + (sharedOwnerUid ? '' : '<div class="card"><div id="settings-lists">'+settingsListsHTML()+'</div></div>')
     + '<div class="card"><div id="settings-sharing">'+(currentUser ? settingsSharingHTML() : '<div class="label" style="margin-top:0">Sharing</div><p style="font-size:12px;color:var(--text-secondary)">Sign in (top of the page) to share access with a sitter or family member.</p>')+'</div></div>'
+    + '<div class="card"><div id="settings-trash">'+settingsTrashHTML()+'</div></div>'
     + '<div style="text-align:center;color:var(--text-secondary);font-size:12px;margin-top:6px">PawPrints '+APP_VERSION+'</div>';
+}
+// ── Recently deleted bin (all dogs, newest first) ──
+function settingsTrashHTML(){
+  const items = (data.trash||[]).slice().sort((a,b)=>(b.deletedAt||0)-(a.deletedAt||0)).slice(0,50);
+  const multi = data.pets.length > 1;
+  const petName = id => { const p = data.pets.find(x=>x.id===id); return p ? p.name+' · ' : ''; };
+  return '<div class="label" style="margin-top:0">🗑️ Recently deleted</div>'
+    + '<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">Deleted items stay here for 30 days, then clear for good.</p>'
+    + (items.length ? items.map(t=>'<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.label||TRASH_NAMES[t.coll]||'Item')+'</div><div class="tl-time">'+(multi?esc(petName(t.petId)):'')+esc(TRASH_NAMES[t.coll]||t.coll)+' · deleted '+fmtDateTime(t.deletedAt)+'</div></div><div style="display:flex;gap:6px;align-self:center;flex:none"><button class="btn btn-sm btn-accent" onclick="restoreTrash(\''+t.id+'\')">Restore</button><button class="btn btn-sm btn-danger" onclick="purgeTrash(\''+t.id+'\')" title="Delete forever">×</button></div></div>').join('')
+      : '<div style="font-size:13px;color:var(--text-secondary)">Nothing deleted recently.</div>');
 }
 // Re-render one section of the open Settings modal in place — no overlay re-animation, scroll preserved.
 function refreshSettingsSection(id, htmlFn, focusId){
@@ -1904,7 +1948,7 @@ function addLog(entry){
   if(typeof queueActivitySync==='function') queueActivitySync();
   return rec.id;
 }
-function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); data.logs = data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); queueActivitySync(); }
+function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); if(l) trashRecord('logs', l, (logSummary(l)||'').replace(/<[^>]+>/g,'')); data.logs =data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); queueActivitySync(); }
 
 // Quick buttons
 function quickWater(){
@@ -2728,7 +2772,7 @@ function invModal(id, pre){
     +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(catList, it?it.category:'Food')+'</select></div>'
     +'<div><label class="label">Brand</label><input class="input" id="iv-brand" value="'+(it?esc(it.brand||''):'')+'" placeholder="Blue Buffalo"></div></div>'
     +'<label class="label">Item name</label><input class="input" id="iv-name" value="'+(it?esc(it.name||''):'')+'" placeholder="Chicken & rice 30lb bag">'
-    +'<div class="grid-2"><div><label class="label">Qty</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
+    +'<div class="grid-2"><div><label class="label">Qty'+tip('How many you bought — usually 1 (one bag, one box), with the amount inside in Package size below. Tracking by piece works too (65 treats = Qty 65, Unit count, no package size); cost breakdown then shows per piece.')+'</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
     +'<div><label class="label">Unit'+tip('The container or measure. Add your own units in Settings → Lists &amp; preferences.')+'</label><select class="select" id="iv-unit"><option value="">—</option>'+sel(unitList, it?(it.unit||''):'')+'</select></div></div>'
     +'<label class="label">Package size (optional)'+tip('The amount inside the package — e.g. "5 lb", "30 ct", "12 oz". It\'s separate from Unit (the container), so a 5-lb bag of food is Qty 1, Unit bag, Size 5 lb.')+'</label><input class="input" id="iv-size" value="'+(it?esc(it.size||''):'')+'" placeholder="e.g. 5 lb, 30 ct">'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the item price before sales tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="iv-cost" value="'+(it?esc(it.cost||''):'')+'" placeholder="0.00"></div>'
@@ -3161,6 +3205,7 @@ function saveEvent(id){
 function deleteEvent(id){
   if(denyManage()) return;
   const e = (data.customEvents||[]).find(x=>x.id===id);
+  if(e) trashRecord('customEvents', e, e.title||'');
   data.customEvents = (data.customEvents||[]).filter(x=>x.id!==id);
   markDeleted(id);
   if(e) logChange('deleted','reminder', e.title||'');
@@ -3832,6 +3877,8 @@ function saveNote(id){
 }
 function deleteNote(id){
   if(denyManage()) return;
+  const n = (data.journal||[]).find(x=>x.id===id);
+  if(n) trashRecord('journal', n, ((JOURNAL_KINDS[n.kind] ? JOURNAL_KINDS[n.kind].label+': ' : '')+(n.title||n.text||'')).slice(0,60));
   data.journal = (data.journal||[]).filter(x=>x.id!==id);
   markDeleted(id);
   logChange('deleted','note','');

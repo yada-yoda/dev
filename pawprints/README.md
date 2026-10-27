@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.78.0**
+**Current Version: v0.79.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,7 @@ covers both.
 
 ## Version History
 
+- **v0.79.0** — **Nothing is lost by accident anymore.** Every delete — an activity entry, a vet visit, a supply, a journal note, even a discarded draft — now goes to a **Recently deleted** bin in Settings, where it can be restored with one tap for 30 days before clearing for good. That keeps quick one-tap deleting fast without needing "are you sure?" popups everywhere. Unsaved drafts also tidy themselves up after 30 days, and the supply form's Qty field finally explains the Qty / Unit / Package-size trio (one 65-ct bag of treats = Qty 1, Unit bag, Size 65 ct — or track by piece if you prefer).
 - **v0.78.0** — **Big-screen polish + iPhone Safari fix.** On desktop the dog summary now runs full-width above the two columns, and very wide monitors (1560px+) get a wider, airier layout. On iPhones, modals now size themselves to the *visible* screen — Safari's appearing address bar can no longer hide the Save button — and the page behind an open modal no longer scrolls.
 - **v0.77.1** — Status tiles arrange 2×2 inside the new desktop column instead of wrapping 3+1.
 - **v0.77.0** — **Desktop layout that uses the screen.** On wide monitors the app no longer sits
