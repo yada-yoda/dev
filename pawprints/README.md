@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.77.1**
+**Current Version: v0.78.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,7 @@ covers both.
 
 ## Version History
 
+- **v0.78.0** — **Big-screen polish + iPhone Safari fix.** On desktop the dog summary now runs full-width above the two columns, and very wide monitors (1560px+) get a wider, airier layout. On iPhones, modals now size themselves to the *visible* screen — Safari's appearing address bar can no longer hide the Save button — and the page behind an open modal no longer scrolls.
 - **v0.77.1** — Status tiles arrange 2×2 inside the new desktop column instead of wrapping 3+1.
 - **v0.77.0** — **Desktop layout that uses the screen.** On wide monitors the app no longer sits
   in one skinny centered column. Today splits into two columns (quick log + status on the left,
