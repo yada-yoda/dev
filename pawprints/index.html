@@ -156,12 +156,19 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .auth-banner .user-info{display:flex;align-items:center;gap:10px}.auth-banner .user-avatar{width:28px;height:28px;border-radius:50%;border:2px solid var(--accent)}
 /* Quick-log buttons */
 .quick-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:6px}
+/* Walk helper: full-width card below Status on phones; compact chip inside the dog summary bar on wide desktops. */
+.walk-chip-wrap{display:none}
+.walk-chip{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text-primary);background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:8px 12px;min-width:0}
+.walk-chip.tone-hot{border-color:var(--danger);background:rgba(248,81,73,.07)}.walk-chip.tone-cold{border-color:var(--blue);background:rgba(88,166,255,.07)}
+.walk-chip-ic{flex:none;font-size:16px}.walk-chip-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Wide desktops: Today + Insights split their card stacks into two columns; forms/list views stay a readable width. */
 .view-cols{display:grid;grid-template-columns:minmax(0,1fr);align-items:start}
 @media(min-width:1180px){
   .content{max-width:1200px}
   .view-cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 16px}
   .view-cols .status-grid{grid-template-columns:repeat(2,minmax(0,1fr))} /* 2x2, not 3+1, in a half-width column */
+  .walk-chip-wrap{display:flex;min-width:0;max-width:46%;flex:0 1 auto}.walk-stack-wrap{display:none}
+  #view-today .view-cols .card{padding:18px 22px;margin-bottom:10px} /* tighter Today columns so a typical day fits without scrolling */
   #view-log,#view-care,#view-profile,#view-history,#view-activity,#view-settings{max-width:820px;margin:0 auto}
 }
 @media(min-width:1560px){.content{max-width:1400px}.view-cols{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 22px}}
@@ -286,7 +293,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.79.0';
+const APP_VERSION = 'v0.80.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3491,9 +3498,10 @@ function renderOnThisDay(){
   }).join('') + '</div>';
 }
 // ── Walk helper — paw-safety warnings + the nicest walk window, from the cached header weather ──
-function renderWalkHelper(){
+// Returns null or {icon, head, body, tone}; tone is 'hot' | 'cold' | 'nice'. Shared by the stacked card and the desktop chip.
+function walkHelperMsg(){
   const w = headerWeather;
-  if(!w || w.tempF == null) return '';
+  if(!w || w.tempF == null) return null;
   const fmtHour = t => { const d = new Date(t); if(Math.abs(d.getTime()-Date.now()) < 45*60000) return 'right now'; let hh = d.getHours(); const ap = hh>=12?'PM':'AM'; return ((hh%12)||12)+' '+ap; };
   // pick the most pleasant upcoming daylight hour: closest to 65°F, precip-heavy hours penalized
   let best = null, bs = Infinity;
@@ -3503,15 +3511,29 @@ function renderWalkHelper(){
     if(s < bs){ bs = s; best = h; }
   });
   if(w.tempF >= 85){
-    return '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07);font-size:13px;line-height:1.5"><strong>🔥 '+w.tempF+'° — check the pavement before walking.</strong> Sunny asphalt can reach paw-burning temps from about 85° air. Back-of-hand test: hold it on the pavement for 7 seconds — too hot for your hand means too hot for paws. Stick to grass and shade'+(best && best.tempF <= w.tempF-6 ? ', or wait for '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.</div>';
+    return { tone:'hot', icon:'🔥', head:w.tempF+'° — check the pavement before walking.', body:'Sunny asphalt can reach paw-burning temps from about 85° air. Back-of-hand test: hold it on the pavement for 7 seconds — too hot for your hand means too hot for paws. Stick to grass and shade'+(best && best.tempF <= w.tempF-6 ? ', or wait for '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.' };
   }
   if(w.tempF <= 15){
-    return '<div class="card" style="border-color:var(--blue);background:rgba(88,166,255,.07);font-size:13px;line-height:1.5"><strong>🥶 '+w.tempF+'° — short-walk weather.</strong> Watch for paw lifting or shivering, and rinse paws after — road salt and ice-melt irritate pads'+(best && best.tempF >= w.tempF+6 ? '. Warmest window: '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.</div>';
+    return { tone:'cold', icon:'🥶', head:w.tempF+'° — short-walk weather.', body:'Watch for paw lifting or shivering, and rinse paws after — road salt and ice-melt irritate pads'+(best && best.tempF >= w.tempF+6 ? '. Warmest window: '+fmtHour(best.t)+' ('+best.tempF+'°)' : '')+'.' };
   }
   if(best && Math.abs(best.tempF - 65) <= 13){
-    return '<div class="card" style="font-size:13px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">'+(best.emoji||'🌤️')+'</span><div><strong>Nice walk window:</strong> '+fmtHour(best.t)+' — '+best.tempF+'°'+((best.pop!=null&&best.pop>0)?' · '+best.pop+'% precip':'')+'</div></div>';
+    return { tone:'nice', icon:(best.emoji||'🌤️'), head:'Nice walk window:', body:fmtHour(best.t)+' — '+best.tempF+'°'+((best.pop!=null&&best.pop>0)?' · '+best.pop+'% precip':'') };
   }
-  return '';
+  return null;
+}
+// Stacked full-width card (phones / narrow screens; hidden by CSS on wide desktops)
+function renderWalkHelper(){
+  const m = walkHelperMsg();
+  if(!m) return '';
+  if(m.tone === 'hot') return '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07);font-size:13px;line-height:1.5"><strong>'+m.icon+' '+m.head+'</strong> '+m.body+'</div>';
+  if(m.tone === 'cold') return '<div class="card" style="border-color:var(--blue);background:rgba(88,166,255,.07);font-size:13px;line-height:1.5"><strong>'+m.icon+' '+m.head+'</strong> '+m.body+'</div>';
+  return '<div class="card" style="font-size:13px;display:flex;align-items:center;gap:10px"><span style="font-size:20px">'+m.icon+'</span><div><strong>'+m.head+'</strong> '+m.body+'</div></div>';
+}
+// One-line chip for the dog summary bar on wide desktops; full message in the tooltip when it truncates
+function walkHelperChip(){
+  const m = walkHelperMsg();
+  if(!m) return '';
+  return '<div class="walk-chip tone-'+m.tone+'" title="'+esc(m.head+' '+m.body).replace(/"/g,'&quot;')+'"><span class="walk-chip-ic">'+m.icon+'</span><span class="walk-chip-text"><strong>'+m.head+'</strong> '+m.body+'</span></div>';
 }
 // ── Daily routine checklist (opt-in via Settings) — ticks itself off from today's logs ──
 function renderRoutineCard(){
@@ -3552,11 +3574,13 @@ function renderToday(){
   if(cloudSaveOk === false && currentUser && !sharedOwnerUid){
     html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Last cloud sync didn’t go through.</strong> Your entries are safe on <strong>this device</strong> and will retry automatically the next time you log something or reopen the app. If this message never goes away, check your connection — or the Firestore security rule isn’t set up yet.</div></div>';
   }
-  // header summary
+  // header summary (walk chip shows here on wide desktops only)
+  const walkChip = walkHelperChip();
   html += '<div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">'
     + (p.photo?'<img src="'+p.photo+'" style="width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--accent)">':'<div class="logo" style="width:64px;height:64px;font-size:32px">🐾</div>')
     + '<div style="flex:1;min-width:140px"><div style="font-size:20px;font-weight:700">'+esc(p.name)+'</div>'
     + '<div style="font-size:13px;color:var(--text-secondary)">'+[ageStr(p.birthday, p.birthdayEstimated), p.breed, w?(esc(w.value)+' '+esc(w.unit||'lb')):null].filter(Boolean).map(esc).join(' · ')+'</div></div>'
+    + (walkChip ? '<div class="walk-chip-wrap">'+walkChip+'</div>' : '')
     + '<button class="btn btn-sm" onclick="switchView(\'profile\')">Profile</button></div>';
   // Two columns on wide desktops (status/logging left, feed right); single stack below 1180px.
   html += '<div class="view-cols"><div>';
@@ -3577,7 +3601,7 @@ function renderToday(){
     + statusCard('Last walk',svgIcon('walk',16),walk?walk.dateTime:null,null)
     + '</div></div>';
   // paw-safety / best-walk-window strip (needs the header weather, i.e. a home ZIP)
-  html += renderWalkHelper();
+  html += '<div class="walk-stack-wrap">'+renderWalkHelper()+'</div>';
   // fed-today progress + next walking badge, side by side
   const feedC = renderFeedingCard(), badgeC = renderNextBadgeToday();
   if(feedC && badgeC) html += '<div class="grid-2" style="margin-bottom:12px">'+feedC+badgeC+'</div>';
