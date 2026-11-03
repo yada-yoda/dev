@@ -201,11 +201,13 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .hidden{display:none !important}
 /* Modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(1,4,9,.7);z-index:150;display:flex;align-items:center;justify-content:center;padding:16px 16px calc(16px + env(safe-area-inset-bottom,0px));animation:fadeIn .2s ease}
-.modal{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;max-width:480px;width:100%;max-height:85vh;max-height:92dvh;overflow:hidden;display:flex;flex-direction:column}
+.modal{position:relative;background:var(--bg-card);border:1px solid var(--border);border-radius:16px;max-width:480px;width:100%;max-height:85vh;max-height:min(92dvh, calc(var(--vvh, 92dvh + 32px) - 32px));overflow:hidden;display:flex;flex-direction:column}
 .modal-wide{max-width:760px}
 .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border);background:var(--bg-card);flex-shrink:0}
 .modal-head h3{font-size:17px;font-weight:700;margin:0;display:flex;align-items:center;gap:8px;min-width:0}
 .modal-body{overflow-y:auto;overflow-x:hidden;padding:18px 22px 22px}
+/* Trailing button row (tagged by openModal) pins to the modal's bottom edge; offsets cancel the body's 22px padding */
+.modal-body .modal-actions{position:sticky;bottom:-22px;z-index:5;background:var(--bg-card);border-top:1px solid var(--border);margin:14px -22px -22px;padding:12px 22px calc(14px + env(safe-area-inset-bottom,0px))}
 .modal-x{width:30px;height:30px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-secondary);font-size:20px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .modal-x:hover{color:var(--text-primary);border-color:var(--accent)}
 .tip{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--border);color:var(--text-secondary);font-size:9px;font-weight:700;font-style:normal;text-transform:none;letter-spacing:0;margin-left:5px;cursor:help;position:relative;vertical-align:middle}
@@ -216,7 +218,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .png-card{position:absolute;left:-9999px;top:0;width:600px;background:#161b22;color:#e6edf3;font-family:'DM Sans','Segoe UI',sans-serif;padding:28px;border-radius:16px;border:2px solid #30363d}
 .empty{text-align:center;padding:42px 20px}
 .empty .ico{font-size:46px;margin-bottom:14px}
-@media(max-width:600px){.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.quick-grid{grid-template-columns:repeat(2,1fr)}.header{padding:12px 14px}.content{padding:14px}.header-actions{width:100%;flex-wrap:nowrap}.header-actions .pet-select{flex:1 1 auto;min-width:0}.header-actions>.btn,.header-actions .weather-pill{flex-shrink:0}}
+@media(max-width:600px){.grid-2,.grid-3{grid-template-columns:minmax(0,1fr)}.quick-grid{grid-template-columns:repeat(2,1fr)}.header{padding:12px 14px}.content{padding:14px}.header-actions{width:100%;flex-wrap:nowrap}.header-actions .pet-select{flex:1 1 auto;min-width:0}.header-actions>.btn,.header-actions .weather-pill{flex-shrink:0}.input,.select,.textarea,.pet-select{font-size:16px !important}.modal-overlay{align-items:flex-start;padding-top:max(16px, env(safe-area-inset-top,0px));top:var(--vvt,0px)}.modal{max-height:min(92dvh, calc(var(--vvh, 92dvh + 32px) - max(16px, env(safe-area-inset-top,0px)) - 16px))}}
 </style>
 </head>
 <body>
@@ -293,7 +295,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.80.0';
+const APP_VERSION = 'v0.81.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -652,6 +654,7 @@ function petArr(key){ const pid = data.activePetId; return (data[key]||[]).filte
 // ═══════════════════════════════════════════════
 // Modals close ONLY via the X, Cancel, or the confirming action — never on an
 // outside/backdrop click — so a stray click or paste can't lose a half-filled form.
+let modalVV = null; // the one visualViewport listener while a modal is open
 function openModal(html, opts){
   // Pull a leading <h3>…</h3> title out so the title + ✕ live in a sticky header
   // while the rest scrolls in the body.
@@ -663,7 +666,29 @@ function openModal(html, opts){
     '<div class="modal-overlay"><div class="modal'+wide+'">'
     + '<div class="modal-head"><h3>'+title+'</h3><button class="modal-x" type="button" onclick="closeModal()" aria-label="Close" title="Close">×</button></div>'
     + '<div class="modal-body">'+body+'</div></div></div>';
+  // Pin the trailing button row so Save never scrolls away. A bare trailing button gets wrapped in a
+  // row first; anything else last (results list, centered celebration block) is left alone.
+  const mb = document.querySelector('#modal-root .modal-body'), lastEl = mb && mb.lastElementChild;
+  if(lastEl && lastEl.matches('button.btn-primary, button.btn-danger, button.btn')){
+    const row = document.createElement('div');
+    row.className = 'modal-actions'; row.style.cssText = 'display:flex;gap:10px;flex-wrap:wrap';
+    mb.insertBefore(row, lastEl); row.appendChild(lastEl);
+  } else if(lastEl && lastEl.tagName === 'DIV' && lastEl.children.length && [...lastEl.children].every(c => c.tagName === 'BUTTON') && lastEl.querySelector('button.btn-primary, button.btn-danger, button.btn')){
+    lastEl.classList.add('modal-actions');
+  }
   document.body.style.overflow = 'hidden'; // lock the page behind the modal (iOS keeps scrolling it otherwise)
+  // dvh ignores the iOS keyboard; track the visual viewport so CSS can clamp the modal above it.
+  modalVVOff();
+  if(window.visualViewport){
+    modalVV = () => { const s = document.documentElement.style; s.setProperty('--vvh', Math.round(visualViewport.height)+'px'); s.setProperty('--vvt', Math.round(visualViewport.offsetTop)+'px'); };
+    visualViewport.addEventListener('resize', modalVV); visualViewport.addEventListener('scroll', modalVV);
+    modalVV();
+  }
+}
+function modalVVOff(){
+  if(modalVV && window.visualViewport){ visualViewport.removeEventListener('resize', modalVV); visualViewport.removeEventListener('scroll', modalVV); }
+  modalVV = null;
+  document.documentElement.style.removeProperty('--vvh'); document.documentElement.style.removeProperty('--vvt');
 }
 function closeModal(){
   const wasDraft = openDraft;
@@ -674,7 +699,7 @@ function closeModal(){
     openDraft = null;
   }
   document.getElementById('modal-root').innerHTML = '';
-  if(!document.querySelector('.modal-overlay')) document.body.style.overflow = '';
+  if(!document.querySelector('.modal-overlay')){ document.body.style.overflow = ''; modalVVOff(); }
   if(wasDraft) render();
 }
 // ── Auto-save drafts: while a NEW record form is open with input, snapshot it (timer + on close) ──
