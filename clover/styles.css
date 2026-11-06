@@ -511,12 +511,17 @@ button { font-family: inherit; cursor: pointer; }
 .modal-host { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
 #signin-gate { padding-top: calc(24px + env(safe-area-inset-top)); padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 
+.install-steps { margin: 10px 0 0 18px; display: flex; flex-direction: column; gap: 7px;
+  font-size: 13px; color: var(--text); line-height: 1.5; }
+.install-steps li { padding-left: 2px; }
+
 /* Touch targets. A fingertip needs about 44px; a mouse cursor does not, and
    these tables are dense on purpose, so the bigger targets apply only to
    coarse pointers. Pills grow an invisible hit area instead of real height,
    because taller pills would push every table row taller on a phone. */
 @media (pointer: coarse) {
   .icon-btn { min-height: 44px; }
+  .btn-primary, .btn-ghost { min-height: 44px; }
   .row-actions .icon-btn + .icon-btn { margin-left: 8px; }   /* targets must not touch */
   .dash-nav-btn { width: 44px; height: 44px; font-size: 20px; }
   .dash-nav-today { min-height: 44px; }

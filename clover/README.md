@@ -45,6 +45,26 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.163 — An “Add to home screen” card in Settings
+
+Getting Clover onto a phone home screen meant knowing where your browser hides
+it. Settings now has a card that handles it, and it shows the right thing for
+the device you are on:
+
+- **Android, Windows, macOS (Chrome or Edge):** a single **Install Clover**
+  button that opens the browser's own install dialog.
+- **iPhone and iPad (Safari):** Apple gives websites no way to do this, so the
+  card lists the three taps (Share, Add to Home Screen, Add) rather than
+  showing a button that could not work.
+- **Chrome or Firefox on iOS:** these cannot add to the home screen at all, so
+  the card says to open Clover in Safari first.
+- **Already installed:** it just tells you so, instead of offering again.
+
+Also fixed from the same pass: the main buttons now take a finger-sized tap
+area on touch screens, which the previous release had missed.
+
+## Changelog
+
 ### v1.0.162 — Keyboard access, readable colors, finger-sized targets, and iOS home screen
 
 An accessibility and mobile pass over the recent work, from the anti-slop audit

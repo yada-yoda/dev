@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.162';
+const VERSION = '1.0.163';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -54,6 +54,8 @@ let incomeAmountMode = 'gross';     // annual grid shows 'gross' | 'net' amounts
 let incomeCatFilter = 'all';
 let accountsSort = { key: 'name', dir: 'asc' };
 let accountsFilter = null;   // { key, value } from clicking a value badge
+let deferredInstall = null;      // the browser's install prompt, saved for the Settings button
+let installedApp = false;        // set when the app is actually installed
 let accountsCdTimeline = false;   // CD maturity timeline shown (separate from the value filter)
 let accountsTab = 'open';    // Accounts page: 'open' | 'closed'
 let subsSort = { key: 'monthly', dir: 'desc' };
@@ -461,6 +463,23 @@ function yearTabs(store, section) {
 }
 
 // ---------- chrome wiring ----------
+// Is Clover already running from a home-screen icon rather than a browser tab?
+function isStandalone() {
+  try {
+    return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  } catch (e) { return false; }
+}
+// Which install route this device actually has. iOS has no install API at
+// all, so the only honest options there are instructions or, in a non-Safari
+// iOS browser, telling the user to switch to Safari first.
+function installRoute() {
+  if (installedApp || isStandalone()) return 'installed';
+  const ua = navigator.userAgent || '';
+  const iOS = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  if (iOS) return /CriOS|FxiOS|EdgiOS|OPiOS/i.test(ua) ? 'ios-other' : 'ios-safari';
+  if (deferredInstall) return 'prompt';
+  return 'unsupported';
+}
 function wireChrome() {
   const errEl = document.getElementById('gate-error');
   document.getElementById('btn-signin').addEventListener('click', async () => {
@@ -477,6 +496,18 @@ function wireChrome() {
   document.getElementById('sidebar-backdrop').addEventListener('click', closeDrawer);
   document.getElementById('sel-year').addEventListener('change', onPeriodChange);
   document.getElementById('sel-month').addEventListener('change', onPeriodChange);
+  // Stash the install prompt and re-render, so the Settings button can appear
+  // the moment the browser decides the app is installable.
+  window.addEventListener('beforeinstallprompt', ev => {
+    ev.preventDefault();
+    deferredInstall = ev;
+    if (currentRoute && currentRoute.id === 'settings') renderView(currentRoute);
+  });
+  window.addEventListener('appinstalled', () => {
+    deferredInstall = null; installedApp = true;
+    toast('Clover added to your home screen');
+    if (currentRoute && currentRoute.id === 'settings') renderView(currentRoute);
+  });
   const bell = document.getElementById('notif-bell');
   if (bell) {
     bell.addEventListener('click', ev => { ev.stopPropagation(); document.getElementById('notif-panel').classList.toggle('hidden'); });
@@ -960,6 +991,7 @@ function renderSettings(view) {
   grid.appendChild(collapsibleCard(accountDefaultsCard(), 'set-acctDefaults'));
   grid.appendChild(collapsibleCard(yearsCard(), 'set-years'));
   grid.appendChild(collapsibleCard(timeZoneCard(), 'set-timezone'));
+  grid.appendChild(collapsibleCard(installCard(), 'set-install'));
   grid.appendChild(collapsibleCard(notificationsCard(), 'set-notifications'));
   grid.appendChild(collapsibleCard(calendarRemindersCard(), 'set-calReminders'));
   view.appendChild(grid);
@@ -971,6 +1003,75 @@ function renderSettings(view) {
 // with or without Google. The 7-days-AHEAD email rides the Google Calendar you
 // connect on the Calendar page, so that one only bites once you've connected and
 // applies on the next sync.
+// Add to Home Screen. Android and desktop Chrome expose a real install
+// prompt; iOS exposes nothing, so there it has to be instructions rather
+// than a button that could not work.
+function installCard() {
+  const card = el('div', 'card');
+  card.appendChild(sectionHead('Add to home screen', 'Open Clover from an icon, like an app, instead of a browser tab'));
+  const route = installRoute();
+
+  if (route === 'installed') {
+    const ok = el('p', 'muted');
+    ok.textContent = 'Clover is already running from your home screen. Nothing to do here.';
+    card.appendChild(ok);
+    return card;
+  }
+
+  if (route === 'prompt') {
+    const p = el('p', 'muted');
+    p.textContent = 'Your browser can install Clover as an app. It opens in its own window, with no address bar.';
+    card.appendChild(p);
+    const b = el('button', 'btn-primary', 'Install Clover');
+    b.style.marginTop = '12px';
+    b.title = 'Adds a Clover icon to your home screen or desktop';
+    b.addEventListener('click', async () => {
+      const ev = deferredInstall;
+      if (!ev) { toast('The install prompt is no longer available, reload and try again', 'warn'); return; }
+      deferredInstall = null;
+      b.disabled = true;
+      try {
+        ev.prompt();
+        const res = await ev.userChoice;
+        if (res && res.outcome === 'dismissed') { toast('Install cancelled'); b.disabled = false; }
+      } catch (e) { toast('Could not open the install prompt', 'warn'); b.disabled = false; }
+      renderView(currentRoute);
+    });
+    card.appendChild(b);
+    return card;
+  }
+
+  if (route === 'ios-other') {
+    const p = el('p', 'muted');
+    p.textContent = 'On an iPhone or iPad, only Safari can add a site to the home screen. '
+      + 'Open dev.rizzo.cc/clover in Safari, then come back to this page for the steps.';
+    card.appendChild(p);
+    return card;
+  }
+
+  if (route === 'ios-safari') {
+    const p = el('p', 'muted');
+    p.textContent = 'Safari has no button for this, so it takes three taps:';
+    card.appendChild(p);
+    const steps = el('ol', 'install-steps');
+    ['Tap the Share button at the bottom of Safari (a square with an arrow pointing up).',
+     'Scroll down the list and tap \u201cAdd to Home Screen\u201d.',
+     'Tap Add. A Clover icon appears on your home screen.'
+    ].forEach(t => steps.appendChild(el('li', null, t)));
+    card.appendChild(steps);
+    const note = el('p', 'muted'); note.style.marginTop = '10px';
+    note.textContent = 'Opened from the icon, Clover fills the screen with no address bar.';
+    card.appendChild(note);
+    return card;
+  }
+
+  const p = el('p', 'muted');
+  p.textContent = 'This browser has not offered an install option. Chrome and Edge on Android, Windows or macOS '
+    + 'can install Clover: look for an install icon in the address bar, or use the browser menu. '
+    + 'On an iPhone or iPad, use Safari and its Share button.';
+  card.appendChild(p);
+  return card;
+}
 function notificationsCard() {
   const store = window.cloverStore;
   const g = store.state.settings.gcal || {};
@@ -3896,6 +3997,7 @@ const HELP_SECTIONS = [
       'Covers dividends, interest, rewards/cash-back, IRA & estate distributions, class-action payouts, selling, and anything under “Other.”',
       'Annual grid view totals income by category across the months; List view shows every entry — and now includes your paychecks.',
       'List view has a checkbox on every row, and one in the header that takes everything currently shown. Tick a few and a bar appears: set Taxable to Yes, No or Unknown on all of them at once, or remove them together. Paychecks are skipped by the taxable change since wages carry no taxable flag. Turn on the Taxable column via ⚙ Columns to see the values.',
+      'Settings has an \u201cAdd to home screen\u201d card for opening Clover from an icon instead of a browser tab. On Android, Windows or macOS Chrome it is a single Install button. On an iPhone or iPad, Safari gives no button for this, so the card lists the three taps instead, and says so plainly rather than showing something that cannot work.',
       'Click a Category pill in List view to narrow the table to just that category — click it again (or set the dropdown back to All categories) to clear. It drives the same Category filter as the dropdown, so the two always match.',
       'In List view, each income row has a Duplicate button — a quick way to log something similar: it prefills a new entry from that row with the date set to today, so you just tweak what’s different. (Paychecks are duplicated from the Paychecks page.)',
       'Picking certain categories reveals tailored fields (e.g. a dividend’s ticker, a reward’s program/type, an IRA distribution’s withholdings).'
