@@ -45,6 +45,41 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.162 — Keyboard access, readable colors, finger-sized targets, and iOS home screen
+
+An accessibility and mobile pass over the recent work, from the anti-slop audit
+in `anti-slop/audit-001-2026-11-03.md`.
+
+**Filter pills work without a mouse.** Every colored pill that filters a table
+(category, owner, institution, source, status, paid-from) was a plain label with
+a click handler, so the keyboard could never reach one. They are now real
+buttons: Tab to them, press Enter or Space, and a focus ring shows where you
+are.
+
+**Colors that were hard to read are fixed.** Thirteen text-on-tint pairings sat
+under the WCAG AA minimum. The worst was the amber "Unknown" tax pill at 2.83:1,
+which is the one most meant to catch your eye. The generated pill colors were
+worse the more values a column had: the 5th and 6th bank or owner fell below the
+bar. Every pairing now clears it, verified by computing the ratios rather than
+eyeballing them.
+
+**Touch targets.** On a phone the pills, row buttons, month arrows and bulk
+checkboxes now take a finger-sized area (about 44px) while looking the same
+size, so table rows stay compact. Row buttons no longer sit flush against each
+other.
+
+**Add to Home Screen on iOS.** Clover now declares itself properly as a
+home-screen app: it opens full-screen with the right icon and the label
+"Clover" (previously the label could pick up the version number from the page
+title), and the header, sidebar, toasts and modals hold clear of the notch, the
+Dynamic Island and the home indicator.
+
+_Known gap: sign-in still uses a popup, which iOS can block inside a home-screen
+app. If signing in from the icon fails, that is why, and the fix is a redirect
+flow._
+
+## Changelog
+
 ### v1.0.161 — Owner pills on the CD timeline
 
 Every row of the CD maturity timeline now shows a colored pill with the account

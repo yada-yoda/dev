@@ -27,6 +27,15 @@
   --warn-soft:     #fdf0dd;
   --neutral-soft:  #eef1ef;
 
+  /* Text sitting on a soft tint needs to be darker than the fill color to
+     clear WCAG AA. Solved per pairing, see anti-slop/audit-001. */
+  --accent-ink:    #147b3a;   /* on accent-soft 4.78:1, on white 5.35:1 */
+  --warn-ink:      #a45a05;   /* on warn-soft 4.62:1 */
+  --expense-ink:   #ce2121;   /* on expense-soft 4.69:1, on accent-soft 4.85:1 */
+  --note-ink:      #12873d;   /* on white 4.61:1 */
+  --border-ctl:    #7f9985;   /* control boundary, 3.09:1 on white */
+  --bulk-edge:     #459c61;   /* selection-mode edge, 3.15:1 on the page */
+
   --shadow-sm: 0 1px 2px rgba(16,32,24,0.05);
   --shadow-md: 0 4px 14px rgba(16,32,24,0.08);
 
@@ -291,9 +300,9 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--neutral-soft); color: var(--text-muted);
 }
 .badge.type { background: #eef2f7; color: #45566b; }
-.badge.green { background: var(--accent-soft); color: var(--accent-hover); }
-.badge.red { background: var(--expense-soft); color: var(--expense); }
-.badge.amber { background: var(--warn-soft); color: var(--warn); }
+.badge.green { background: var(--accent-soft); color: var(--accent-ink); }
+.badge.red { background: var(--expense-soft); color: var(--expense-ink); }
+.badge.amber { background: var(--warn-soft); color: var(--warn-ink); }
 .badge.teal { background: #e2f4f1; color: #0f766e; }
 
 /* ---------- Empty state ---------- */
@@ -418,8 +427,8 @@ button { font-family: inherit; cursor: pointer; }
 .ytab:hover:not(.active) { background: var(--surface-2); color: var(--text); }
 
 /* Bulk edit bar + selection column */
-.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--accent-soft); border: 1px solid #cde9d6; border-radius: var(--radius); }
-.bulk-count { font-weight: 600; color: var(--accent-hover); font-size: 13px; }
+.bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; padding: 10px 14px; background: var(--accent-soft); border: 1px solid var(--bulk-edge); border-radius: var(--radius); }
+.bulk-count { font-weight: 600; color: var(--accent-ink); font-size: 13px; }
 .bulk-bar select { height: 32px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); font-size: 13px; color: var(--text); }
 .sel-cell { width: 28px; text-align: center; }
 .sel-cell input, .data-table th:first-child input { width: 15px; height: 15px; accent-color: var(--accent); cursor: pointer; }
@@ -482,18 +491,58 @@ button { font-family: inherit; cursor: pointer; }
 .dph-w { color: var(--text-muted); font-size: 11px; white-space: nowrap; }
 .dash-panel.dragging { opacity: .5; }
 .dash-add-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+/* Added to the Home Screen on iOS the app runs full-bleed (viewport-fit=cover),
+   so every fixed or sticky edge has to hold itself clear of the notch, the
+   Dynamic Island and the home indicator. env() is 0 in a normal browser tab,
+   so these calc()s change nothing on desktop. */
+.topbar {
+  padding-top: env(safe-area-inset-top);
+  height: calc(var(--topbar-h) + env(safe-area-inset-top));
+  padding-left: calc(22px + env(safe-area-inset-left));
+  padding-right: calc(22px + env(safe-area-inset-right));
+}
+.sidebar { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+.view {
+  padding-left: calc(26px + env(safe-area-inset-left));
+  padding-right: calc(26px + env(safe-area-inset-right));
+  padding-bottom: calc(24px + env(safe-area-inset-bottom));
+}
+.toast-host { top: calc(16px + env(safe-area-inset-top)); }
+.modal-host { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+#signin-gate { padding-top: calc(24px + env(safe-area-inset-top)); padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+/* Touch targets. A fingertip needs about 44px; a mouse cursor does not, and
+   these tables are dense on purpose, so the bigger targets apply only to
+   coarse pointers. Pills grow an invisible hit area instead of real height,
+   because taller pills would push every table row taller on a phone. */
+@media (pointer: coarse) {
+  .icon-btn { min-height: 44px; }
+  .row-actions .icon-btn + .icon-btn { margin-left: 8px; }   /* targets must not touch */
+  .dash-nav-btn { width: 44px; height: 44px; font-size: 20px; }
+  .dash-nav-today { min-height: 44px; }
+  .sel-cell { width: 44px; }
+  .sel-cell input, .data-table th:first-child input { width: 22px; height: 22px; }
+  .badge[role="button"] { position: relative; }
+  .badge[role="button"]::after {
+    content: ''; position: absolute; left: 0; right: 0;
+    top: 50%; transform: translateY(-50%); height: 44px;
+  }
+  /* A CD timeline row is a fixed 40px and has to stay aligned with the SVG
+     beside it, so the owner pill takes the row height rather than 44px. */
+  .cdtl-owner::after { height: 40px; }
+}
 /* Bulk bar bits the Paychecks pattern did not already cover */
 .bulk-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .bulk-bar .btn-ghost { background: var(--surface); }
-.btn-ghost.danger { color: var(--expense); }
+.btn-ghost.danger { color: var(--expense-ink); }
 .btn-ghost.danger:hover { background: var(--expense-soft); }
 /* Row action button when a note already exists on that row */
-.icon-btn.has-note { color: var(--accent); font-weight: 600; }
+.icon-btn.has-note { color: var(--note-ink); font-weight: 600; }
 /* Info banner inside a form (e.g. a linked Class Action income entry) */
 .form-hint-banner { background: var(--surface-2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 9px 12px; font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
 /* Dashboard month navigator (‹ Aug 2026 › · This month) */
 .dash-month-nav { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.dash-nav-btn { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; padding: 0; }
+.dash-nav-btn { width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center; font-size: 17px; line-height: 1; border: 1px solid var(--border-ctl); border-radius: 6px; background: var(--surface); color: var(--text); cursor: pointer; padding: 0; }
 .dash-nav-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .dash-nav-btn:disabled { opacity: 0.4; cursor: default; }
 .dash-nav-label { font-size: 13px; font-weight: 600; min-width: 96px; text-align: center; }
@@ -515,6 +564,8 @@ input.mirrored[readonly] { background: var(--surface-2); color: var(--text-muted
 .pc-count { display: inline-block; margin-left: 5px; padding: 0 5px; border-radius: 8px; font-size: 10px; background: var(--neutral-soft); color: var(--text-muted); font-variant-numeric: tabular-nums; vertical-align: middle; }
 .pc-count.hot { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .val-badge { cursor: pointer; border: none; }
+.badge[role="button"] { cursor: pointer; }
+.badge[role="button"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .val-badge:hover { filter: brightness(0.95); }
 .table-tools { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; }
 .grid-table .emp-row .sub-name { padding-left: 40px; color: var(--text-muted); font-style: italic; }

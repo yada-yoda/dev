@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.161';
+const VERSION = '1.0.162';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -693,6 +693,19 @@ function checkbox(label, checked, hint) {
   w.__input = c; return w;
 }
 function badge(text, tone) { return el('span', 'badge ' + (tone || ''), text); }
+// Filter pills were spans with a click handler, so a keyboard could never
+// reach or fire them. This gives one the button contract: focusable, Enter
+// and Space activate, and a focus ring (see .badge[role="button"] in CSS).
+function clickableBadge(b, onActivate, hint) {
+  b.setAttribute('role', 'button');
+  b.setAttribute('tabindex', '0');
+  if (hint) b.setAttribute('aria-label', hint);
+  b.addEventListener('click', onActivate);
+  b.addEventListener('keydown', ev => {
+    if (ev.key === 'Enter' || ev.key === ' ' || ev.key === 'Spacebar') { ev.preventDefault(); onActivate(ev); }
+  });
+  return b;
+}
 
 // A day-of-month field (1–31) with a "Last day" checkbox. Value is a number,
 // the string 'last', or null. Read via the returned element's __value().
@@ -1209,9 +1222,9 @@ function valueBadge(scope, colKey, text, label) {
   const light = 90 - (m.get(text) % 6) * 6;   // 90 -> 60 in 6 steps
   const b = el('span', 'badge val-badge', label || text);
   b.style.background = 'hsl(' + hue + ', 45%, ' + light + '%)';
-  b.style.color = 'hsl(' + hue + ', 55%, 24%)';
+  b.style.color = 'hsl(' + hue + ', 55%, 12%)';   // 12% keeps every shade >= 4.6:1
   b.title = 'Click to show only “' + text + '”';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     if (scope === 'accounts' && colKey === 'type' && text === 'CD') {
       goAccountsView(!accountsCdTimeline); return;
@@ -1220,7 +1233,7 @@ function valueBadge(scope, colKey, text, label) {
     const cur = tableFilterGet(scope);
     tableFilterSet(scope, (cur && cur.key === colKey && cur.value === text) ? null : { key: colKey, value: text });
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + text);
   return b;
 }
 // Latest recorded savings APY for an account's institution (from Credit & Rates).
@@ -2609,11 +2622,11 @@ function incomeCatBadge(catId, text) {
   const on = incomeCatFilter === catId;
   b.title = on ? 'Showing only “' + text + '” — click to clear'
                : 'Click to show only “' + text + '”';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     incomeCatFilter = on ? 'all' : catId;
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + text);
   return b;
 }
 function buildIncomeListCol(store, key) {
@@ -3167,12 +3180,12 @@ function subsFilterBadge(colKey, text, tone) {
   const b = badge(text, tone);
   b.style.cursor = 'pointer';
   b.title = 'Click to show only “' + text + '”';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     const cur = subsBadgeFilter;
     subsBadgeFilter = (cur && cur.key === colKey && cur.value === text) ? null : { key: colKey, value: text };
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + text);
   return b;
 }
 const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', checkNo: 'Check #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
@@ -3579,12 +3592,12 @@ function settleFilterBadge(key, text, tone) {
   const b = badge(text, tone);
   b.style.cursor = 'pointer';
   b.title = 'Click to show only “' + text + '”';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     const cur = settleBadgeFilter;
     settleBadgeFilter = (cur && cur.key === key && cur.value === text) ? null : { key, value: text };
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + text);
   return b;
 }
 const SETTLE_COL_LABELS = { name: 'Settlement', status: 'Status', dateFiled: 'Filed', deadline: 'Deadline', claimNumber: 'Claim / confirmation #', claimId: 'Claim ID', method: 'Method', foundVia: 'Found via', received: 'Received', payouts: 'Payouts', lastPayout: 'Last payout', duration: 'Duration', person: 'Person', notes: 'Notes' };
@@ -3986,6 +3999,7 @@ function renderHelp(view) {
   const tips = el('ul', 'help-tips');
   [
     'Tables can be sorted (click a header) and their columns customized (the ⚙ Columns button).',
+    'Every colored pill that filters a table (category, owner, institution, source, status) is a real button: Tab to it and press Enter or Space, and it shows a focus ring so you can see where you are. On a phone the pills, row buttons and checkboxes take a finger-sized tap area even though they look the same size.',
     'Many list pages have a live search box (Expenses, Bills, Class Actions); the top-right search drives whichever of those you’re on. Forms explain each field with an ⓘ tooltip.',
     'The year and month selectors at the top control what most pages show.',
     'Editing an expense, income entry, paycheck, bill, account, or settlement? Its form has a “History” tab showing exactly what changed and when — e.g. “Amount $42.80 → $51.25”.'
@@ -4399,12 +4413,12 @@ function expenseFilterBadge(key, text, tone) {
   const b = badge(text, tone);
   b.style.cursor = 'pointer';
   b.title = 'Click to show only “' + text + '”';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     const cur = expenseBadgeFilter;
     expenseBadgeFilter = (cur && cur.key === key && cur.value === text) ? null : { key, value: text };
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + text);
   return b;
 }
 const EXPLIST_COL_LABELS = { date: 'Date', description: 'Description', category: 'Category', source: 'Source', account: 'Paid from', amount: 'Amount', person: 'Person', forDate: 'Applies to', checkNo: 'Check #', gallons: 'Gallons', pricePerGallon: 'Price / gallon', notes: 'Notes' };
@@ -5682,12 +5696,12 @@ function yoyFilterBadge(key, value, label, tone) {
   const b = badge(label, tone || '');
   b.style.cursor = 'pointer';
   b.title = 'Click to show only “' + label + '” — the raise % chain recomputes over what’s shown';
-  b.addEventListener('click', ev => {
+  clickableBadge(b, ev => {
     ev.stopPropagation();
     const cur = raiseYoYFilter;
     raiseYoYFilter = (cur && cur.key === key && cur.value === value) ? null : { key, value };
     renderView(currentRoute);
-  });
+  }, 'Filter by ' + label);
   return b;
 }
 function buildRaiseYoYCol(key) {
