@@ -295,7 +295,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.82.0';
+const APP_VERSION = 'v0.83.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -782,7 +782,12 @@ function ensureFirestore(){
   if(_firestoreLoading) return _firestoreLoading;
   _firestoreLoading = new Promise((resolve, reject) => {
     if(typeof firebase === 'undefined'){ _firestoreLoading = null; return reject(new Error('firebase not loaded')); }
-    const init = () => { try { db = firebase.firestore(); resolve(db); } catch(e){ _firestoreLoading = null; reject(e); } };
+    // enablePersistence must precede every other call on the instance. The Firestore SDK is
+    // lazy-loaded, so this (not initFirebase) is the first firebase.firestore() call. It makes
+    // the SDK's write queue durable in IndexedDB: a set() issued on dying wifi is delivered
+    // when the connection returns, even across page loads. cloudDirty replay still backs it.
+    // Weighed and accepted: a queued whole-doc set() can briefly drop other devices' newer records; id-union + tombstones on every device restore them on their next save.
+    const init = () => { try { db = firebase.firestore(); try { db.enablePersistence({ synchronizeTabs:true }).catch(function(e){ /* multi-tab or unsupported: fine, custom replay still covers us */ }); } catch(e){} resolve(db); } catch(e){ _firestoreLoading = null; reject(e); } };
     if(firebase.firestore) return init();
     const s = document.createElement('script');
     s.src = 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js';
@@ -1077,8 +1082,77 @@ function exitSharedProfile(silent){
 // ═══════════════════════════════════════════════
 // PERSISTENCE
 // ═══════════════════════════════════════════════
-function saveLocal(){ if(demoMode || sharedOwnerUid) return; try { localStorage.setItem('pawprints_data', JSON.stringify(data)); } catch(e){} }
-function loadLocal(){ try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); pruneAged(); } } catch(e){} }
+// iOS can resurrect a frozen page with an OLD `data` in memory while localStorage holds
+// newer entries (logged before the freeze, never uploaded). Overwriting the blob from
+// stale memory used to erase them everywhere, so every write first adopts stored records
+// memory doesn't have. Memory wins per id (it holds the user's latest edits); tombstoned
+// ids stay dead. auditLog only adopts entries newer than memory's oldest, so "Clear
+// history" and the 500 cap aren't undone. Returns the number of records adopted.
+function mergeFromLocalStorage(){
+  if(demoMode || sharedOwnerUid) return 0;
+  let stored = null;
+  try { const r = localStorage.getItem('pawprints_data'); if(r) stored = JSON.parse(r); } catch(e){ stored = null; }
+  let adopted = 0;
+  if(stored && typeof stored === 'object'){
+    const tomb = mergeTombstones(stored.deleted);
+    SYNC_COLLECTIONS.forEach(k => {
+      const src = Array.isArray(stored[k]) ? stored[k] : []; if(!src.length) return;
+      const mem = Array.isArray(data[k]) ? data[k] : [], ids = new Set(mem.map(x => x && x.id));
+      let add = src.filter(x => x && x.id && !ids.has(x.id) && !tomb[x.id]);
+      if(k === 'auditLog' && add.length){
+        const oldest = mem.reduce((m,x) => (x && x.ts && (!m || x.ts < m)) ? x.ts : m, '');
+        add = oldest ? add.filter(x => (x.ts||'') > oldest) : add;
+      }
+      if(!add.length) return;
+      data[k] = mem.concat(JSON.parse(JSON.stringify(add))); adopted += add.length;
+      if(k === 'auditLog') data.auditLog = data.auditLog.sort((a,b) => String(b.ts||'').localeCompare(String(a.ts||''))).slice(0, 500);
+    });
+    if(adopted) pruneAged();
+  }
+  adopted += reconcileJournal();
+  // A stale resumed page must re-adopt the pending-upload duty the newer page left behind.
+  try { if(localStorage.getItem('pawprints_dirty') && !cloudDirty) setCloudDirty(true); } catch(e){}
+  return adopted;
+}
+// Safety-net journal: every new activity entry also goes to a small separate key (newest
+// first, capped at 50). A small write can succeed when the big blob hits the storage
+// quota. Reconcile re-inserts entries missing from data.logs unless tombstoned; only
+// entries from the last 90 days, so a deleted log whose 120-day tombstone has been
+// pruned can't come back. The journal is never cleared except by the cap.
+const JOURNAL_KEY = 'pawprints_journal';
+function journalLog(rec){
+  if(demoMode || sharedOwnerUid || !rec) return;
+  try {
+    const c = {}; Object.keys(rec).forEach(f => { const v = rec[f]; if(!(typeof v === 'string' && v.length > 4000)) c[f] = v; }); // drop photo-sized strings
+    let j = []; try { j = JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]'); } catch(e){ j = []; }
+    if(!Array.isArray(j)) j = [];
+    j = [c].concat(j.filter(x => x && x.id !== c.id)).slice(0, 50);
+    localStorage.setItem(JOURNAL_KEY, JSON.stringify(j));
+  } catch(e){}
+}
+function reconcileJournal(){
+  if(demoMode || sharedOwnerUid) return 0;
+  let j = []; try { j = JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]'); } catch(e){ return 0; }
+  if(!Array.isArray(j) || !j.length) return 0;
+  data.logs = Array.isArray(data.logs) ? data.logs : [];
+  const tomb = data.deleted || {}, ids = new Set(data.logs.map(x => x && x.id)), cutoff = Date.now() - 90*86400000;
+  const add = j.filter(x => x && x.id && !ids.has(x.id) && !tomb[x.id] && !(Date.parse(x.createdAt||'') < cutoff));
+  if(add.length) data.logs = add.map(x => JSON.parse(JSON.stringify(x))).concat(data.logs);
+  return add.length;
+}
+let localSaveFailed = false, localSaveWarned = false; // shown as a danger card on Today
+let skipLocalMergeOnce = false; // set only by importJSON: a restore REPLACES the stored blob, so its one write skips the merge
+function saveLocal(){
+  if(demoMode || sharedOwnerUid) return;
+  if(skipLocalMergeOnce) skipLocalMergeOnce = false; else mergeFromLocalStorage();
+  try { localStorage.setItem('pawprints_data', JSON.stringify(data)); localSaveFailed = false; }
+  catch(e){ localSaveFailed = true; if(!localSaveWarned){ localSaveWarned = true; console.warn('PawPrints: local save failed (storage full?):', e); } }
+}
+function loadLocal(){
+  try { const r = localStorage.getItem('pawprints_data'); if(r){ const d = JSON.parse(r); data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); pruneAged(); } } catch(e){}
+  // Entries only the journal kept never made it into the blob, so they likely never reached the cloud either.
+  if(reconcileJournal()) setCloudDirty(true);
+}
 function persist(){ if(!demoMode) setCloudDirty(true); saveLocal(); saveToFirestore(); }
 function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(rerender !== false) render(); }
 
@@ -1095,7 +1169,7 @@ function importJSON(evt){
       data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d); pruneAged();
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       logChange('restored','backup', data.pets.length+' dog'+(data.pets.length===1?'':'s')+' from file');
-      persist(); closeModal(); render(); showToast('✅ Backup restored');
+      skipLocalMergeOnce = true; persist(); closeModal(); render(); showToast('✅ Backup restored');
     } else showToast('⚠️ Not a PawPrints backup file');
   } catch { showToast('⚠️ Invalid file'); } };
   r.readAsText(f); evt.target.value = '';
@@ -1978,6 +2052,7 @@ function addLog(entry){
   if(!data.activePetId){ promptAddDog(); return; }
   const rec = { id:genId(), petId:data.activePetId, createdAt:new Date().toISOString(), ...entry };
   data.logs.unshift(rec);
+  journalLog(rec);
   logChange('logged', LOG_ENTITY[rec.type]||'activity', (logSummary(rec)||'').replace(/<[^>]+>/g,''));
   save();
   if(rec.type==='walk') checkWalkBadges(true);
@@ -2598,7 +2673,9 @@ function saveVet(id){
   let visitId = id;
   if(id){ data.vetVisits = data.vetVisits.map(v => v.id===id ? {...v, ...f} : v); }
   else { visitId = genId(); data.vetVisits.unshift({ id:visitId, petId:data.activePetId, ...f }); }
-  // weight recorded at a visit feeds the weight history
+  // weight recorded at a visit feeds the weight history (the replaced log is tombstoned so
+  // id-union merges, local or cloud, can't bring the old copy back as a duplicate)
+  markDeleted(data.logs.filter(l => l.type==='weight' && l.source===visitId).map(l => l.id));
   data.logs = data.logs.filter(l => !(l.type==='weight' && l.source===visitId));
   if(num(f.weight) != null){
     data.logs.unshift({ id:genId(), petId:data.activePetId, type:'weight', dateTime:(f.date||todayISO())+'T12:00', value:f.weight, unit:activePet().weightUnit||'lb', source:visitId, notes:'At vet visit' });
@@ -3636,6 +3713,10 @@ function renderToday(){
   // cloud-sync-off warning (signed in but writes are being denied — usually the Firestore rule isn't set)
   if(cloudSaveOk === false && currentUser && !sharedOwnerUid){
     html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ Last cloud sync didn’t go through.</strong> Your entries are safe on <strong>this device</strong> and will retry automatically the next time you log something or reopen the app. If this message never goes away, check your connection — or the Firestore security rule isn’t set up yet.</div></div>';
+  }
+  // local-save failure (usually storage quota) — the offline copy has stopped updating
+  if(localSaveFailed && !demoMode && !sharedOwnerUid){
+    html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ This device couldn’t save locally.</strong> Your entries still sync to the cloud when you’re online, but this device’s offline copy isn’t updating — usually the browser’s storage is full. Freeing space or reinstalling the home-screen app fixes it.</div></div>';
   }
   // header summary (walk chip shows here on wide desktops only)
   const walkChip = walkHelperChip();
@@ -5042,13 +5123,17 @@ function resyncFromCloud(){
   if(Date.now() - lastCloudPull < 30000) return;
   loadFromFirestore(true);
 }
+// A resurrected page wakes with stale memory: adopt stored entries (and the dirty flag)
+// BEFORE the cloud push/pull, so a stranded entry rides the next upload instead of being
+// overwritten by the next save.
+function adoptOnResume(){ if(demoMode || sharedOwnerUid) return; const adopted = mergeFromLocalStorage(); if(adopted){ render(); } }
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'visible') resyncFromCloud();
+  if(document.visibilityState === 'visible'){ adoptOnResume(); resyncFromCloud(); }
   // Going to background with unconfirmed changes: fire one last attempt — it often
   // completes in the grace window, and the dirty flag covers it if it doesn't.
   else if(cloudDirty && currentUser && firebaseReady && !demoMode) saveToFirestore();
 });
-window.addEventListener('pageshow', e => { if(e.persisted) resyncFromCloud(); });
+window.addEventListener('pageshow', e => { if(e.persisted){ adoptOnResume(); resyncFromCloud(); } });
 
 function bootFirebase(){ if(typeof firebase==='undefined'){ setTimeout(bootFirebase,200); return; } initFirebase(); }
 if('requestIdleCallback' in window) requestIdleCallback(bootFirebase,{timeout:3000});

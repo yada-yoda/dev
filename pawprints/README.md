@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.82.0**
+**Current Version: v0.83.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -85,6 +85,8 @@ covers both.
 4. `dev.rizzo.cc` is already an authorized Firebase domain, so sign-in works as-is.
 
 ## Version History
+
+- **v0.83.0** — **Entries can't vanish on bad wifi anymore.** Fixed a data-loss chain where an entry logged on a weak connection (the backyard problem) could be erased later: iOS sometimes resurrects the app with an old copy in memory, and saving anything new overwrote the newer entries sitting in local storage. Local saves now merge with what's already stored instead of overwriting it, the app re-adopts any orphaned entries the moment it wakes up, Firestore's own offline queue now delivers failed uploads when the connection returns, new activity entries also go to a separate 50-entry safety journal that's reconciled at startup, and if this device's local storage ever stops working you get told instead of silently losing the offline copy.
 
 - **v0.82.0** — **Med doses are real history now.** Marking a med given now writes an entry to the activity log — it shows up in Today's activity and the by-day view, can be edited, duplicated or deleted like any entry (and restored from Recently deleted), syncs to the daily-activity calendar, and each med's card grows a "History" list of past doses. The med's "Last given" follows the history: delete today's dose by mistake and it falls back to the previous one. Your existing meds get a starter history entry from their current last-given date.
 - **v0.81.0** — **Phone forms that stop fighting you.** Three iPhone fixes from the field: form fields are 16px on phones so iOS stops auto-zooming the page every time you tap one; the Save / Cancel row is now pinned to the bottom of every form modal, always visible instead of hiding below seven fields of scroll; and modals now size themselves to the space the keyboard actually leaves, instead of hiding their bottom edge behind it. Modals also anchor to the top on phones so the fields you're typing in stay put.
