@@ -295,7 +295,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.81.0';
+const APP_VERSION = 'v0.82.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -852,8 +852,12 @@ function restoreTrash(id){
   if(!Array.isArray(data[entry.coll])){ showToast('⚠️ Can\'t restore that item'); return; }
   const rec = JSON.parse(JSON.stringify(entry.rec||{}));
   if(rec.petId && !data.pets.some(p=>p.id===rec.petId)){ showToast('⚠️ That dog was removed — can\'t restore'); return; }
+  const oldId = rec.id;
   rec.id = genId();
   data[entry.coll].push(rec);
+  // A restored med gets a new id: re-point its dose logs so the history follows it.
+  if(entry.coll==='meds' && oldId) (data.logs||[]).forEach(l => { if(l.type==='med' && l.medId===oldId) l.medId = rec.id; });
+  if(entry.coll==='logs' && rec.type==='med') recomputeMedLastGiven(rec.medId);
   data.trash = data.trash.filter(t=>t.id!==id); markDeleted(id);
   logChange('restored', TRASH_NAMES[entry.coll]||entry.coll, entry.label);
   save(); if(entry.coll==='logs') queueActivitySync();
@@ -917,7 +921,7 @@ async function loadFromFirestore(quiet){
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
       if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
-      backfillVetContacts(); migrateFeedItems(); seedWalkBadges(); saveLocal(); render();
+      backfillVetContacts(); migrateFeedItems(); migrateMedDoses(); seedWalkBadges(); saveLocal(); render();
       if(!quiet) showToast('✅ Synced from cloud');
       else if(pulled) showToast('⬇️ Synced '+pulled+' item'+(pulled===1?'':'s')+' from your other devices');
     } else if(shared){
@@ -1622,7 +1626,7 @@ async function exportXLSX(){
   add('Dogs', ['Name','Breed','Sex','Spayed/Neutered','Date fixed','Birthday','Birthday estimated','Gotcha day','Color','Weight unit','Neck','Chest girth','Back length','Height (withers)','Measure unit','Measured on','Microchip','Microchip type','License','How acquired','From','Address','Source phone','Fee/Price','Source contact','Shelter ARN #','Animal ID','Shelter intake','Transferred from','Previous name','Registration #','Registered name','Vet clinic','Vet doctor','Vet phone','Vet email','2nd vet clinic','2nd vet doctor','2nd vet phone','2nd vet email','Notes'],
     data.pets.map(p => [p.name,p.breed,p.sex,p.fixed,p.fixedDate,p.birthday,(p.birthdayEstimated?'Yes':''),p.gotchaDay,p.color,p.weightUnit,(p.measNeck||''),(p.measChest||''),(p.measLength||''),(p.measHeight||''),(measStr(p)?(p.measUnit||'in'):''),(p.measDate||''),p.microchip,p.microchipType,p.license,p.originType,p.originFrom,originAddr(p),p.originPhone,p.originCost,p.originContact,p.originArn,p.originAnimalId,p.originIntakeDate,p.originTransferFrom,p.previousName,p.registrationNo,p.registeredName,p.vetName,p.vetDoctor,p.vetPhone,p.vetEmail,p.vet2Name,p.vet2Doctor,p.vet2Phone,p.vet2Email,p.notes].map(clean)));
   add('Activity', ['Dog','Type','When','Detail','Notes'],
-    data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
+    data.logs.filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)).map(l => [nm(l.petId), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',weight:'Weight',med:'Medication'})[l.type]||l.type, fmtDateTime(l.dateTime), (logSummary(l)||'').replace(/<[^>]+>/g,''), clean(l.notes)]));
   add('Vet Visits', ['Dog','Date','Time','Reason','Vet','Clinic','Address','Weight','Cost','Line items','Paid by','Payment','Card','Follow-up','Notes'], data.vetVisits.map(v => [nm(v.petId),v.date,(v.time?fmtClock(v.time):''),v.reason,v.vet,v.clinic,fullAddr(v),v.weight,v.cost,((v.lineItems||[]).map(lineItemStr).join('; ')),v.paidBy,v.payMethod,(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?((v.ccBrand?v.ccBrand+' ':'')+'••'+v.ccLast4):''),(v.followUpDate?fmtDate(v.followUpDate)+(v.followUpTime?' '+fmtClock(v.followUpTime):''):''),v.notes].map(clean)));
   add('Grooming', ['Dog','Date','Time','Services','Groomer','Phone','Address','Cost','Line items','Paid by','Payment','Card','Next due','Notes'], data.grooming.map(g => [nm(g.petId),g.date,(g.time?fmtClock(g.time):''),(g.services||[]).join(', '),g.groomer,(g.phone||''),fullAddr(g),g.cost,((g.lineItems||[]).map(lineItemStr).join('; ')),g.paidBy,g.payMethod,(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?((g.ccBrand?g.ccBrand+' ':'')+'••'+g.ccLast4):''),g.nextDueDate,g.notes].map(clean)));
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
@@ -1718,7 +1722,7 @@ async function exportPDF(onlyPetId){
 
     const allLogs = data.logs.filter(l=>l.petId===p.id && l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
     const acts = allLogs.filter(l=>l.type!=='weight').slice(0,40);
-    if(acts.length){ y = heading('Recent activity (latest 40)', y); y = table(['When','Type','Detail'], acts.map(l=>[fmtDateTime(l.dateTime), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk'})[l.type]||l.type, logSummary(l).replace(/<[^>]+>/g,'')]), y); }
+    if(acts.length){ y = heading('Recent activity (latest 40)', y); y = table(['When','Type','Detail'], acts.map(l=>[fmtDateTime(l.dateTime), ({feed:'Feeding',water:'Water',potty:'Potty',walk:'Walk',med:'Medication'})[l.type]||l.type, logSummary(l).replace(/<[^>]+>/g,'')]), y); }
   });
 
   if(data.contacts && data.contacts.length){
@@ -1968,7 +1972,7 @@ function deletePet(id){
 // ═══════════════════════════════════════════════
 // QUICK LOG + LOG ENTRIES
 // ═══════════════════════════════════════════════
-const LOG_ENTITY = { feed:'feeding', water:'water', potty:'potty break', walk:'walk', weight:'weight' };
+const LOG_ENTITY = { feed:'feeding', water:'water', potty:'potty break', walk:'walk', weight:'weight', med:'medication dose' };
 function addLog(entry){
   if(denyLog()) return;
   if(!data.activePetId){ promptAddDog(); return; }
@@ -1980,7 +1984,7 @@ function addLog(entry){
   if(typeof queueActivitySync==='function') queueActivitySync();
   return rec.id;
 }
-function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); if(l) trashRecord('logs', l, (logSummary(l)||'').replace(/<[^>]+>/g,'')); data.logs =data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); save(); queueActivitySync(); }
+function delLog(id){ if(denyLog()) return; const l = data.logs.find(x=>x.id===id); if(l) trashRecord('logs', l, (logSummary(l)||'').replace(/<[^>]+>/g,'')); data.logs =data.logs.filter(x=>x.id!==id); markDeleted(id); if(l) logChange('deleted', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,'')); if(l && l.type==='med') recomputeMedLastGiven(l.medId); save(); queueActivitySync(); }
 
 // Quick buttons
 function quickWater(){
@@ -2723,7 +2727,7 @@ function medModal(id){
     +'<div><label class="label">Dose <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" id="md-dose" value="'+(m?esc(m.dose||''):'')+'" placeholder="1 tablet · 0.5 mL · 68 mg"></div></div>'
     +'<div class="grid-2"><div><label class="label">Repeat every (days)'+tip('How often it recurs — the next-due date is figured from Last given + this many days.')+'</label><input class="input" type="number" id="md-interval" value="'+(m?esc(m.intervalDays||''):'30')+'" placeholder="30"></div>'
     +'<div><label class="label">Given by'+tip('Who administered it — you, or a vet/clinic. Pick a saved vet or type a name.')+'</label><input class="input" id="md-by" list="md-by-list" autocomplete="off" value="'+(m?esc(m.givenBy||''):'You')+'" placeholder="You / Dr. Lee"><datalist id="md-by-list">'+byOpts+'</datalist></div></div>'
-    +'<div class="grid-2"><div><label class="label">Last given</label><input class="input" type="date" id="md-last" value="'+(m?esc(m.lastGiven||''):todayISO())+'"></div>'
+    +'<div class="grid-2"><div><label class="label">Last given'+tip('Changing this date only moves the reminder schedule — it does not add a dose to the history. Use the Gave it button on the med\'s row to log a dose.')+'</label><input class="input" type="date" id="md-last" value="'+(m?esc(m.lastGiven||''):todayISO())+'"></div>'
     +'<div><label class="label">Time <span style="font-weight:400;color:var(--text-secondary)">(optional)</span></label><input class="input" type="time" id="md-time" value="'+(m?esc(m.time||''):'')+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Next due <span style="font-weight:400;color:var(--text-secondary)">(auto if blank)</span></label><input class="input" type="date" id="md-next" value="'+(m?esc(m.nextDue||''):'')+'"></div>'
     +'<div><label class="label">Record #'+tip('If a vet gave this dose, note their record/invoice number. For a full vet-visit medical entry, the Records tab is the better home — see the note below.')+'</label><input class="input" id="md-recordno" value="'+(m?esc(m.recordNo||''):'')+'" placeholder="optional, if vet-given"></div></div>'
@@ -2745,18 +2749,52 @@ function saveMed(id){
   const f = { name:fv('md-name'), kind:fv('md-kind'), dose:fv('md-dose'), givenBy:fv('md-by'), intervalDays:fv('md-interval'), lastGiven:fv('md-last'), time:fv('md-time'), nextDue:fv('md-next'), recordNo:fv('md-recordno'), notes:fv('md-notes') };
   if(!f.name){ showToast('⚠️ Enter a name'); return; }
   if(id) data.meds = data.meds.map(m => m.id===id ? {...m, ...f} : m);
-  else data.meds.unshift({ id:genId(), petId:data.activePetId, ...f });
+  else data.meds.unshift({ id:genId(), petId:data.activePetId, ...f, doseLogSeeded:true }); // new meds start their history at the first "Gave it"
   logChange(id?'edited':'added','medication', [f.name, f.kind].filter(Boolean).join(' · '));
   closeModal(); save(); showToast('💊 Saved');
   if(gcalAccessToken) syncToGoogleCalendar();
 }
 function giveMedNow(id){
-  if(denyManage()) return;
+  if(denyLog()) return; // logging a dose is caretaker-level, like other activity entries
   const m = data.meds.find(x=>x.id===id); if(!m) return;
-  const now = new Date();
-  m.lastGiven = todayISO(); m.nextDue = ''; m.time = pad(now.getHours())+':'+pad(now.getMinutes()); if(!m.givenBy) m.givenBy = 'You';
-  logChange('marked','medication given', m.name||'');
-  save(); showToast('✅ Marked given today');
+  const dt = nowLocalISO();
+  m.lastGiven = dt.slice(0,10); m.nextDue = ''; m.time = dt.slice(11,16); if(!m.givenBy) m.givenBy = 'You';
+  // Each dose is an activity-log entry, so it has a history. addLog saves, queues the activity sync and records the change-history entry.
+  const logged = addLog({ type:'med', petId:m.petId, medId:m.id, name:m.name, kind:m.kind||'', dose:m.dose||'', givenBy:m.givenBy||'You', dateTime:dt, notes:'' });
+  if(!logged) save();
+  showToast('✅ Marked given today');
+}
+// The med's Last given follows its newest logged dose. Meds with no dose logs (entered
+// before v0.82) keep their hand-typed date. Caller saves.
+function medDoseLogs(medId){ return (data.logs||[]).filter(l => l.type==='med' && l.medId===medId && l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime)); }
+function recomputeMedLastGiven(medId){
+  const m = medId && (data.meds||[]).find(x=>x.id===medId); if(!m) return;
+  const newest = medDoseLogs(medId)[0]; if(!newest) return;
+  m.lastGiven = newest.dateTime.slice(0,10); m.time = newest.dateTime.slice(11,16);
+}
+// Idempotent load-time migration: meds from before dose logging get one starter dose log
+// at their current Last given. The id is derived from the med id so two devices migrating
+// before they sync produce the same record (merge dedupes by id), and the doseLogSeeded
+// flag stops a deleted starter from coming back. Returns how many were added; caller persists.
+function migrateMedDoses(){
+  let changed = 0;
+  data.logs = data.logs || [];
+  (data.meds||[]).forEach(m => {
+    if(!m || !m.lastGiven || m.doseLogSeeded) return;
+    const sid = 'medstart-'+m.id;
+    if(!(data.deleted && data.deleted[sid]) && !data.logs.some(l => l.type==='med' && l.medId===m.id))
+      data.logs.push({ id:sid, petId:m.petId, createdAt:new Date().toISOString(), type:'med', medId:m.id, name:m.name||'', kind:m.kind||'', dose:m.dose||'', givenBy:m.givenBy||'', dateTime:m.lastGiven+'T'+(m.time||'12:00'), notes:'' });
+    m.doseLogSeeded = true; changed++;
+  });
+  return changed;
+}
+// Inline per-med dose history on Care → Meds; open state survives re-renders.
+const medHistOpen = new Set();
+function toggleMedHist(id){
+  if(medHistOpen.has(id)) medHistOpen.delete(id); else medHistOpen.add(id);
+  const open = medHistOpen.has(id), g = document.getElementById('medhist-'+id), b = document.getElementById('medhist-btn-'+id);
+  if(g) g.style.display = open ? '' : 'none';
+  if(b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 
 // Illness (ported from sick, dog-flavored)
@@ -3125,7 +3163,7 @@ function activityEventBody(l){
   const mins = (l.type==='walk' && num(l.durationMin)) ? Math.max(5, num(l.durationMin)) : 15;
   const end = new Date(start.getTime() + mins*60000);
   const iso = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;
-  const em = { feed:'🍖', water:'💧', potty:'🚪', walk:'🦮', weight:'⚖️' }[l.type] || '🐾';
+  const em = { feed:'🍖', water:'💧', potty:'🚪', walk:'🦮', weight:'⚖️', med:'💊' }[l.type] || '🐾';
   const p = activePet();
   const summary = em+' '+(p?p.name+': ':'')+String(logSummary(l)||l.type).replace(/<[^>]+>/g,'');
   return { summary, description:(l.notes?l.notes+'\n\n':'')+'— via PawPrints', start:{ dateTime:iso(start), timeZone:appTimezone() }, end:{ dateTime:iso(end), timeZone:appTimezone() } };
@@ -3648,8 +3686,9 @@ function renderToday(){
   html += '</div></div>';
   return html;
 }
-const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'} };
+const LOG_META = { feed:{i:'fed',c:'var(--accent)'}, water:{i:'water',c:'var(--blue)'}, potty:{i:'potty',c:'var(--accent-2)'}, walk:{i:'walk',c:'var(--success)'}, weight:{i:'weight',c:'var(--accent-purple)'}, med:{i:'meds',c:'var(--accent-purple)'} };
 function logSummary(l){
+  if(l.type==='med') return esc(l.name||'Medication') + (l.dose?' · '+esc(l.dose):'') + (l.givenBy?' · by '+esc(l.givenBy):'');
   if(l.type==='feed') return [l.amount?esc(l.amount)+' '+esc(l.unit||''):'', esc(l.foodItem||l.foodType||'Food'), l.foodPlace?'@ '+esc(l.foodPlace):''].filter(Boolean).join(' · ');
   if(l.type==='water') return 'Refilled fresh water'+(l.place?' @ '+esc(l.place):'');
   if(l.type==='potty'){ const wx = l.weather ? l.weather.emoji+' '+l.weather.tempF+'°' : ''; const rest = [l.place?esc(l.place):'', l.stool?esc(l.stool)+' stool':'', wx].filter(Boolean); return esc(l.result==='Both'?'Pee + Poop':(l.result||'Potty')) + (rest.length ? ' — ' + rest.join(' · ') : ''); }
@@ -3679,7 +3718,7 @@ function runSearch(){
   const groups = [];
   const add = (title, rows) => { if(rows.length) groups.push({ title, rows: rows.slice(0,8), more: rows.length > 8 ? rows.length - 8 : 0 }); };
   const row = (icon, label, sub, open) => ({ icon, label, sub, open });
-  add('Activity', petLogs().filter(l => l.dateTime && hit(logSummary(l).replace(/<[^>]+>/g,''), l.notes, l.place, l.foodType, l.from, l.to, l.stool))
+  add('Activity', petLogs().filter(l => l.dateTime && hit(logSummary(l).replace(/<[^>]+>/g,''), l.notes, l.place, l.foodType, l.from, l.to, l.stool, l.kind))
     .sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime))
     .map(l => row((LOG_META[l.type]&&LOG_META[l.type].i)||'log', logSummary(l).replace(/<[^>]+>/g,''), fmtDateTime(l.dateTime), "editLogModal('"+l.id+"')")));
   const care = [];
@@ -3723,7 +3762,7 @@ function dupLog(id){
   editLogModal(copy.id);
   showToast('⧉ Duplicated — adjust anything and Save');
 }
-// Edit an existing activity log entry (feed / water / potty / walk / weight), pre-filled.
+// Edit an existing activity log entry (feed / water / potty / walk / weight / med dose), pre-filled.
 function editLogModal(id){
   const l = data.logs.find(x => x.id === id); if(!l) return;
   const sel = (arr,v)=>arr.map(o=>'<option value="'+esc(o)+'"'+(v===o?' selected':'')+'>'+esc(o)+'</option>').join('');
@@ -3762,6 +3801,11 @@ function editLogModal(id){
     const unit = l.unit || (activePet() && activePet().weightUnit) || 'lb';
     title = '⚖️ Edit weight';
     body += '<label class="label">Weight ('+esc(unit)+')</label><input class="input" type="number" step="0.1" id="e-w" value="'+esc(l.value||'')+'">';
+  } else if(l.type === 'med'){
+    // Name / dose / type are a snapshot of the med at dose time — edit the med itself to change them.
+    title = '💊 Edit dose';
+    body = '<p style="font-size:13px;margin:0 0 12px"><strong>'+esc(l.name||'Medication')+'</strong>'+[l.kind,l.dose].filter(Boolean).map(x=>' · '+esc(x)).join('')+'</p>' + body
+      + '<label class="label">Given by</label><input class="input" id="e-by" value="'+esc(l.givenBy||'')+'" placeholder="You / Dr. Lee">';
   } else { return; }
   body += '<label class="label">Note</label><input class="input" id="e-note" value="'+esc(l.notes||'')+'">';
   openModal('<h3>'+title+'</h3>'+body
@@ -3779,6 +3823,7 @@ function saveEditLog(id){
   else if(l.type === 'potty'){ l.result = pottyResultFrom('e') || l.result; l.place = fv('e-place'); l.stool = fv('e-stool'); l.location = (fv('e-loc')||'home')==='other'?'other':'home'; }
   else if(l.type === 'walk'){ l.durationMin = fv('e-dur'); l.distance = fv('e-dist'); l.from = fv('e-from'); l.to = fv('e-to'); l.roundTrip = document.getElementById('e-round').checked; }
   else if(l.type === 'weight'){ l.value = fv('e-w'); }
+  else if(l.type === 'med'){ l.givenBy = fv('e-by'); recomputeMedLastGiven(l.medId); }
   logChange('edited', LOG_ENTITY[l.type]||'activity', (logSummary(l)||'').replace(/<[^>]+>/g,''));
   closeModal(); save(); showToast('✅ Updated');
   if(l.type==='walk') checkWalkBadges(true);
@@ -4206,7 +4251,12 @@ function renderMedsTab(){
       const doseChip = m.dose ? ' <span class="chip-2" style="font-size:10px">'+esc(m.dose)+'</span>' : '';
       const lastStr = m.lastGiven ? 'Last: '+fmtDate(m.lastGiven)+(m.time?' '+fmtClock(m.time):'')+(m.givenBy?' by '+esc(m.givenBy):'') : '';
       const subParts = [lastStr, m.intervalDays?'every '+esc(m.intervalDays)+'d':'', nd?'Next: '+fmtDate(nd):'', m.recordNo?'#'+esc(m.recordNo):''].filter(Boolean).join(' · ');
-      return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span>'+doseChip+'</div><div style="font-size:12px;color:var(--text-secondary)">'+subParts+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div></div><div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
+      const doses = medDoseLogs(m.id), histOpen = medHistOpen.has(m.id);
+      const hist = doses.length ? '<button type="button" class="btn btn-sm" id="medhist-btn-'+m.id+'" aria-expanded="'+histOpen+'" aria-controls="medhist-'+m.id+'" style="margin-top:6px;font-size:12px" onclick="toggleMedHist(\''+m.id+'\')">History ('+doses.length+')</button>'
+        + '<div id="medhist-'+m.id+'" style="'+(histOpen?'':'display:none;')+'margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.6">'
+        + doses.slice(0,12).map(l => '<div>'+fmtDate(l.dateTime)+' '+fmtClock(l.dateTime.slice(11,16))+(l.givenBy?' · by '+esc(l.givenBy):'')+'</div>').join('')
+        + (doses.length>12?'<div>+ '+(doses.length-12)+' earlier — see All activity</div>':'')+'</div>' : '';
+      return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span>'+doseChip+'</div><div style="font-size:12px;color:var(--text-secondary)">'+subParts+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div>'+hist+'</div><div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
     }).join('')+'</div>';
   } else if(!vetMeds.length) html += '<div class="card empty"><div class="ico">'+svgIcon('meds',46)+'</div><p style="color:var(--text-secondary)">Track heartworm, flea & tick, vaccines and get next-due reminders. Meds you buy on a vet bill (tag the line item 💊) show up here too.</p></div>';
   if(vetMeds.length){
@@ -4910,6 +4960,9 @@ function enterDemo(){
       { id:'w1', petId:pid, type:'weight', dateTime:dAgo(90)+'T12:00', value:'58', unit:'lb', source:'manual' },
       { id:'w2', petId:pid, type:'weight', dateTime:dAgo(40)+'T12:00', value:'61', unit:'lb', source:'manual' },
       { id:'w3', petId:pid, type:'weight', dateTime:dAgo(5)+'T12:00', value:'62.5', unit:'lb', source:'manual' },
+      { id:'md1', petId:pid, type:'med', medId:'m1', name:'Heartgard Plus', kind:'Heartworm', dose:'1 chew (51-100 lb)', givenBy:'You', dateTime:dAgo(22)+'T08:00', notes:'' },
+      { id:'md2', petId:pid, type:'med', medId:'m1', name:'Heartgard Plus', kind:'Heartworm', dose:'1 chew (51-100 lb)', givenBy:'You', dateTime:dAgo(52)+'T08:10', notes:'' },
+      { id:'md3', petId:pid, type:'med', medId:'m2', name:'NexGard', kind:'Flea & Tick', dose:'1 chew', givenBy:'You', dateTime:dAgo(28)+'T08:05', notes:'' },
     ],
     vetVisits: [
       { id:'v1', petId:pid, date:dAgo(55), reason:'New-adoption wellness exam', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', cost:'185.00', weight:'60', followUpDate:dAgo(-25), notes:'Healthy. Due for booster in ~4 weeks.', lineItems:[{desc:'Wellness exam',qty:'1',amount:'55',med:false},{desc:'Apoquel 16mg (30 ct)',qty:'1',amount:'78',med:true},{desc:'Ear cleaner',qty:'1',amount:'22',med:true},{desc:'Nail trim',qty:'1',amount:'30',med:false}] },
@@ -4918,8 +4971,8 @@ function enterDemo(){
     grooming: [ { id:'g1', petId:pid, date:dAgo(20), groomer:'Soapy Paws', services:['Bath','Nail trim','De-shedding'], cost:'75.00', nextDueDate:dAgo(-40), notes:'' } ],
     illnesses: [ { id:'i1', petId:pid, start:dAgo(35), recovery:dAgo(31), symptoms:['Diarrhea','Loss of Appetite'], severity:'Mild', diagnosis:'Diet adjustment', treatment:'Bland diet 3 days', notes:'Settled after switching food.' } ],
     meds: [
-      { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', dose:'1 chew (51-100 lb)', givenBy:'You', intervalDays:'30', lastGiven:dAgo(22), time:'08:00', nextDue:'', notes:'' },
-      { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', dose:'1 chew', givenBy:'You', intervalDays:'30', lastGiven:dAgo(28), time:'08:05', nextDue:'', notes:'' },
+      { id:'m1', petId:pid, name:'Heartgard Plus', kind:'Heartworm', dose:'1 chew (51-100 lb)', givenBy:'You', intervalDays:'30', lastGiven:dAgo(22), time:'08:00', nextDue:'', notes:'', doseLogSeeded:true },
+      { id:'m2', petId:pid, name:'NexGard', kind:'Flea & Tick', dose:'1 chew', givenBy:'You', intervalDays:'30', lastGiven:dAgo(28), time:'08:05', nextDue:'', notes:'', doseLogSeeded:true },
     ],
     records: [
       { id:'rc1', petId:pid, type:'Vaccination', vaccineType:'Killed / Inactivated', name:'Rabies (3-year)', recordNo:'RB-77213', date:dAgo(55), time:'10:30', vet:'Dr. Patel', clinic:'Riverside Animal Hospital', address:'482 Riverside Dr', city:'Springfield', state:'IL', zip:'62704', phone:'(555) 012-3456', cost:'32.00', nextDue:dAgo(-1040), notes:'Tag #RB-77213' },
@@ -4971,7 +5024,7 @@ applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.set
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 seedWalkBadges();
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
-else { backfillVetContacts(); if(migrateFeedItems()) saveLocal(); render(); }
+else { backfillVetContacts(); if(migrateFeedItems() + migrateMedDoses()) saveLocal(); render(); }
 initAnalytics();
 if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather();
 setInterval(() => { if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather(); }, 1800000);

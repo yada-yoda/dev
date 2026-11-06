@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.81.0**
+**Current Version: v0.82.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -34,7 +34,8 @@ covers both.
   plus a reminders strip and today's activity timeline
 - **Care** — vet visits (past + upcoming, reason, vet, cost, follow-up, and a weight recorded
   at the visit), grooming (groomer, services, cost, next-due), meds & preventatives
-  (heartworm, flea & tick, vaccines) with next-due reminders, and an illness log
+  (heartworm, flea & tick, vaccines) with next-due reminders and a per-med dose history (each
+  "Gave it" is an activity-log entry), and an illness log
 - **Profile** — current weight + a weight-trend chart, and a merged Health Timeline of vet
   visits, grooming, illnesses, and meds
 - **Contacts** — save your vet, emergency vet, groomer, sitter, boarding, trainer and more;
@@ -85,6 +86,7 @@ covers both.
 
 ## Version History
 
+- **v0.82.0** — **Med doses are real history now.** Marking a med given now writes an entry to the activity log — it shows up in Today's activity and the by-day view, can be edited, duplicated or deleted like any entry (and restored from Recently deleted), syncs to the daily-activity calendar, and each med's card grows a "History" list of past doses. The med's "Last given" follows the history: delete today's dose by mistake and it falls back to the previous one. Your existing meds get a starter history entry from their current last-given date.
 - **v0.81.0** — **Phone forms that stop fighting you.** Three iPhone fixes from the field: form fields are 16px on phones so iOS stops auto-zooming the page every time you tap one; the Save / Cancel row is now pinned to the bottom of every form modal, always visible instead of hiding below seven fields of scroll; and modals now size themselves to the space the keyboard actually leaves, instead of hiding their bottom edge behind it. Modals also anchor to the top on phones so the fields you're typing in stay put.
 - **v0.80.0** — **Walk window up top.** On desktop, the paw-safety / best-walk-window strip now lives inside the dog summary bar (that empty space next to the name), so it's visible the moment the page opens — and with it out of the left column, a typical day's Today view fits on screen without scrolling. Desktop cards also tightened up a touch. Phones keep the strip where it was.
 - **v0.79.0** — **Nothing is lost by accident anymore.** Every delete — an activity entry, a vet visit, a supply, a journal note, even a discarded draft — now goes to a **Recently deleted** bin in Settings, where it can be restored with one tap for 30 days before clearing for good. That keeps quick one-tap deleting fast without needing "are you sure?" popups everywhere. Unsaved drafts also tidy themselves up after 30 days, and the supply form's Qty field finally explains the Qty / Unit / Package-size trio (one 65-ct bag of treats = Qty 1, Unit bag, Size 65 ct — or track by piece if you prefer).
