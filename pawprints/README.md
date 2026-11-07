@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.83.0**
+**Current Version: v0.84.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -35,9 +35,11 @@ covers both.
 - **Care** — vet visits (past + upcoming, reason, vet, cost, follow-up, and a weight recorded
   at the visit), grooming (groomer, services, cost, next-due), meds & preventatives
   (heartworm, flea & tick, vaccines) with next-due reminders and a per-med dose history (each
-  "Gave it" is an activity-log entry), and an illness log
-- **Profile** — current weight + a weight-trend chart, and a merged Health Timeline of vet
-  visits, grooming, illnesses, and meds
+  "Gave it" is an activity-log entry), an illness log, and a combined Care history list at the
+  bottom of every Care subtab
+- **Profile** — current weight + a weight-trend chart, body measurements with a dated history
+  (each re-measure is an activity-log entry), and a merged Health Timeline of vet visits,
+  grooming, illnesses, med doses, and records
 - **Contacts** — save your vet, emergency vet, groomer, sitter, boarding, trainer and more;
   each downloads or shares as a phone contact card (**vCard / .vcf**). Plus a "share your dog's
   info card" vCard for handing off to a sitter
@@ -86,6 +88,7 @@ covers both.
 
 ## Version History
 
+- **v0.84.0** — **Growth history, friendlier touch targets, easier install.** Body measurements now keep a dated history like meds do — each re-measure becomes an entry (visible in the activity log, editable, restorable) with a History list on the profile, and your current numbers seed the first snapshot. On touch screens, buttons, toggle pills, row actions, the modal close and the little "i" tooltips all grow to comfortable thumb size (desktop unchanged). And installing to the home screen got real help: Android gets a one-tap Install button (plus step-by-step instructions where the browser hides it), the Settings option now appears on Android too, and phones see a small dismissible nudge on first visit. The Care tab also gains a combined Care history list of everything — visits, grooming, doses, illnesses, records — and doses you logged before v0.82 are recovered from the change history.
 - **v0.83.0** — **Entries can't vanish on bad wifi anymore.** Fixed a data-loss chain where an entry logged on a weak connection (the backyard problem) could be erased later: iOS sometimes resurrects the app with an old copy in memory, and saving anything new overwrote the newer entries sitting in local storage. Local saves now merge with what's already stored instead of overwriting it, the app re-adopts any orphaned entries the moment it wakes up, Firestore's own offline queue now delivers failed uploads when the connection returns, new activity entries also go to a separate 50-entry safety journal that's reconciled at startup, and if this device's local storage ever stops working you get told instead of silently losing the offline copy.
 
 - **v0.82.0** — **Med doses are real history now.** Marking a med given now writes an entry to the activity log — it shows up in Today's activity and the by-day view, can be edited, duplicated or deleted like any entry (and restored from Recently deleted), syncs to the daily-activity calendar, and each med's card grows a "History" list of past doses. The med's "Last given" follows the history: delete today's dose by mistake and it falls back to the previous one. Your existing meds get a starter history entry from their current last-given date.
