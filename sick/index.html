@@ -119,12 +119,32 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:12px;background:var(--bg-card);border:1px solid var(--border);color:var(--text-primary);font-size:14px;font-weight:500;z-index:100;box-shadow:0 8px 32px rgba(0,0,0,.4);animation:fadeIn .3s ease}
 @keyframes fadeIn{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .hidden{display:none !important}
+/* Install banner + modal (v0.53) */
+.install-banner{background:linear-gradient(90deg,#58a6ff 0%,#a371f7 100%);color:#fff;padding:10px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:500;flex-wrap:wrap}
+.install-banner-actions{display:flex;gap:8px}
+.install-banner-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.install-banner-btn:hover{background:rgba(255,255,255,.3)}
+.install-banner-btn.dismiss{background:transparent;font-weight:500}
+.install-modal{position:fixed;inset:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px}
+.install-dialog{background:var(--bg-secondary);border:1px solid var(--border);border-radius:12px;padding:24px;max-width:460px;width:100%;position:relative;max-height:90vh;overflow:auto}
+.install-dialog h2{font-size:20px;font-weight:700;margin-bottom:12px;color:var(--text-primary);padding-right:28px}
+.install-dialog p{font-size:14px;color:var(--text-primary);line-height:1.55;margin-bottom:8px}
+.install-close{position:absolute;top:12px;right:12px;background:transparent;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;padding:4px 10px;border-radius:6px;line-height:1}
+.install-close:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.install-steps{padding-left:22px;margin-top:10px}
+.install-steps li{font-size:14px;color:var(--text-primary);line-height:1.6;margin-bottom:6px}
+.ios-share-glyph{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:1px solid var(--border);border-radius:5px;background:var(--bg-tertiary);font-size:13px;vertical-align:-6px;margin:0 2px}
+.btn-install-primary{background:var(--accent);color:#fff;border:none;padding:10px 18px;font-weight:600;font-size:14px;border-radius:6px;cursor:pointer;font-family:inherit}
+.btn-install-primary:hover{filter:brightness(1.1)}
 /* iOS Add-to-Home-Screen safe-area insets — keeps header out from under the status bar
    and the footer/toast off the home-indicator bar when launched as a standalone app */
 @supports (padding: env(safe-area-inset-top)){
   #demo-banner{padding-top:calc(8px + env(safe-area-inset-top)) !important}
+  #install-banner{padding-top:calc(10px + env(safe-area-inset-top))}
+  #demo-banner:not(.hidden) ~ #install-banner{padding-top:10px}
   .auth-banner{padding-top:calc(12px + env(safe-area-inset-top))}
-  #demo-banner:not(.hidden) ~ .auth-banner{padding-top:12px}
+  #demo-banner:not(.hidden) ~ .auth-banner,
+  #install-banner:not(.hidden) ~ .auth-banner{padding-top:12px}
   body > footer{padding-bottom:calc(24px + env(safe-area-inset-bottom)) !important}
   .toast{bottom:calc(24px + env(safe-area-inset-bottom))}
 }
@@ -139,6 +159,14 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 <!-- firebase-firestore-compat.js is lazy-loaded by ensureFirestore() on first use -->
 
 <div id="demo-banner" class="hidden" style="background:linear-gradient(90deg,#a371f7 0%,#58a6ff 100%);color:#fff;padding:8px 16px;display:flex;justify-content:center;align-items:center;gap:14px;font-size:13px;font-weight:500;flex-wrap:wrap"><span>🎭 <strong>Demo Mode</strong> — sample data, nothing is saved</span><button onclick="exitDemo()" style="background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.4);color:#fff;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:500;cursor:pointer">Exit Demo</button></div>
+
+<div id="install-banner" class="install-banner hidden">
+  <span>🏠 <strong>Install Illness Tracker</strong> on your home screen — one-tap access, no browser bar</span>
+  <div class="install-banner-actions">
+    <button class="install-banner-btn" onclick="openInstallModal();dismissInstallBanner(false)">Install</button>
+    <button class="install-banner-btn dismiss" onclick="dismissInstallBanner(true)">Not now</button>
+  </div>
+</div>
 
 <div id="auth-banner" class="auth-banner">
   <div id="auth-signed-out"><span style="color:var(--text-secondary)">Sign in to sync data &amp; Google Calendar</span></div>
@@ -181,6 +209,8 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 </div>
 <footer style="text-align:center;padding:24px 16px;color:var(--text-secondary);font-size:12px;border-top:1px solid var(--border);margin-top:24px;line-height:2">
   <a id="footer-demo-link" href="?demo=1" style="color:var(--accent-purple);text-decoration:none;font-weight:500">🎭 Try the demo</a>
+  <span id="footer-install-sep" style="margin:0 10px;opacity:.4">·</span>
+  <a id="footer-install-link" href="#" onclick="event.preventDefault();openInstallModal()" style="color:var(--accent);text-decoration:none;font-weight:500">📱 Install app</a>
   <span style="margin:0 10px;opacity:.4">·</span>
   <a href="privacy.html" style="color:var(--text-secondary);text-decoration:none">Privacy · Terms · Disclaimer</a>
   <span style="margin:0 10px;opacity:.4">·</span>
@@ -188,13 +218,141 @@ body{font-family:'DM Sans','Segoe UI',sans-serif;background:var(--bg-primary);co
 </footer>
 <!-- Off-screen container for PNG rendering -->
 <div id="png-render-area"></div>
+
+<div id="install-modal" class="install-modal hidden" onclick="if(event.target===this)closeInstallModal()">
+  <div class="install-dialog" role="dialog" aria-labelledby="install-title" aria-modal="true">
+    <button class="install-close" onclick="closeInstallModal()" aria-label="Close">✕</button>
+    <h2 id="install-title">📱 Install Illness Tracker</h2>
+    <div id="install-case-native" class="install-case hidden">
+      <p>Add Illness Tracker to your home screen for one-tap access, a full-screen view without the browser bar, and a faster launch.</p>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap">
+        <button class="btn" onclick="closeInstallModal()">Cancel</button>
+        <button class="btn-install-primary" onclick="triggerNativeInstall()">Install now</button>
+      </div>
+    </div>
+    <div id="install-case-ios" class="install-case hidden">
+      <p>Add it to your iPhone or iPad home screen for one-tap access and a full-screen view (no Safari address bar).</p>
+      <ol class="install-steps">
+        <li>Tap the <strong>Share</strong> button <span class="ios-share-glyph">⬆</span> at the bottom of Safari (or top on iPad)</li>
+        <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+        <li>Tap <strong>Add</strong> in the top right</li>
+      </ol>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn-install-primary" onclick="closeInstallModal()">Got it</button></div>
+    </div>
+    <div id="install-case-ios-other" class="install-case hidden">
+      <p>On iPhone and iPad, only <strong>Safari</strong> can install sites to the home screen.</p>
+      <ol class="install-steps">
+        <li>Copy this page's address from the address bar</li>
+        <li>Open <strong>Safari</strong> and paste it</li>
+        <li>Tap <strong>Share</strong> <span class="ios-share-glyph">⬆</span> → <strong>Add to Home Screen</strong> → <strong>Add</strong></li>
+      </ol>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn-install-primary" onclick="closeInstallModal()">Got it</button></div>
+    </div>
+    <div id="install-case-generic" class="install-case hidden">
+      <p>Open your browser's menu and look for <strong>Install Illness Tracker</strong> or <strong>Install this site</strong>.</p>
+      <p style="font-size:13px;color:var(--text-secondary);margin-top:8px">In Chrome or Edge, a small install icon also appears at the right edge of the address bar.</p>
+      <div style="margin-top:16px;display:flex;justify-content:flex-end"><button class="btn-install-primary" onclick="closeInstallModal()">Got it</button></div>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast hidden"></div>
 
 <script>
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.52';
+const APP_VERSION = 'v0.53';
+
+// ═══════════════════════════════════════════════
+// INSTALL (A2HS) — v0.53
+// ═══════════════════════════════════════════════
+let deferredInstallPrompt = null;
+const INSTALL_DISMISSED_KEY = 'install-prompt-dismissed';
+
+function isStandalone(){
+  try{
+    if(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) return true;
+  }catch(e){}
+  return window.navigator.standalone === true;
+}
+function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream; }
+function isIOSSafari(){
+  if(!isIOS()) return false;
+  const ua = navigator.userAgent;
+  return /safari/i.test(ua) && !/crios|fxios|edgios|opios/i.test(ua);
+}
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+});
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  hideInstallUI();
+  try{ localStorage.setItem(INSTALL_DISMISSED_KEY, 'installed'); }catch(e){}
+  try{ showToast('🎉 Installed to home screen'); }catch(e){}
+});
+
+function hideInstallUI(){
+  const ids = ['install-banner','footer-install-link','footer-install-sep'];
+  ids.forEach(id => { const el = document.getElementById(id); if(el) el.classList.add('hidden'); });
+}
+
+function openInstallModal(){
+  const modal = document.getElementById('install-modal'); if(!modal) return;
+  document.querySelectorAll('.install-case').forEach(el => el.classList.add('hidden'));
+  let caseId;
+  if(deferredInstallPrompt) caseId = 'install-case-native';
+  else if(isIOSSafari()) caseId = 'install-case-ios';
+  else if(isIOS()) caseId = 'install-case-ios-other';
+  else caseId = 'install-case-generic';
+  const c = document.getElementById(caseId); if(c) c.classList.remove('hidden');
+  modal.classList.remove('hidden');
+}
+function closeInstallModal(){
+  const modal = document.getElementById('install-modal'); if(modal) modal.classList.add('hidden');
+}
+function dismissInstallBanner(persist){
+  const b = document.getElementById('install-banner'); if(b) b.classList.add('hidden');
+  if(persist){
+    try{ localStorage.setItem(INSTALL_DISMISSED_KEY, 'dismissed'); }catch(e){}
+  }
+}
+async function triggerNativeInstall(){
+  const p = deferredInstallPrompt;
+  if(!p){
+    // Browser revoked the prompt between modal open and click — fall back to generic
+    document.querySelectorAll('.install-case').forEach(el => el.classList.add('hidden'));
+    const g = document.getElementById('install-case-generic'); if(g) g.classList.remove('hidden');
+    return;
+  }
+  deferredInstallPrompt = null;
+  closeInstallModal();
+  try{
+    p.prompt();
+    const { outcome } = await p.userChoice;
+    if(outcome === 'accepted'){
+      try{ localStorage.setItem(INSTALL_DISMISSED_KEY, 'installed'); }catch(e){}
+      hideInstallUI();
+    }
+  }catch(e){ /* user dismissed the native prompt — no-op */ }
+}
+
+// Init: run now (script is at end of body, DOM is ready)
+(function initInstallUI(){
+  if(isStandalone()){ hideInstallUI(); return; }
+  let dismissed = null;
+  try{ dismissed = localStorage.getItem(INSTALL_DISMISSED_KEY); }catch(e){}
+  if(dismissed) return; // footer link stays; banner never auto-shows again
+  setTimeout(() => {
+    if(isStandalone()) return;
+    const demoEl = document.getElementById('demo-banner');
+    const demoVisible = demoEl && !demoEl.classList.contains('hidden');
+    if(demoVisible) return; // don't stack two gradient banners at the top
+    const b = document.getElementById('install-banner'); if(b) b.classList.remove('hidden');
+  }, 1500);
+})();
 
 // ═══════════════════════════════════════════════
 // STATE
