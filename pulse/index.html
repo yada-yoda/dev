@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Pulse v0.1.0 — personal uptime monitor</title>
+<title>Pulse v0.2.0: personal uptime monitor</title>
 <meta name="description" content="Pulse watches your sites and workers and alerts you when they go down. Your own personal uptime monitor." />
 
 <!-- Open Graph / Twitter -->
-<meta property="og:title" content="Pulse — personal uptime monitor" />
+<meta property="og:title" content="Pulse: personal uptime monitor" />
 <meta property="og:description" content="Watch your sites and get alerted when they go down." />
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://dev.rizzo.cc/pulse/" />
@@ -22,15 +22,17 @@
 <style>
   :root{
     --bg:#f6f7fb; --surface:#ffffff; --surface-2:#f0f2f8; --border:#e3e6ef;
-    --text:#1d2333; --muted:#6b7280; --primary:#0d9488; --primary-d:#0f766e;
-    --green:#16a34a; --green-bg:#dcfce7; --red:#dc2626; --red-bg:#fee2e2;
-    --amber:#d97706; --amber-bg:#fef3c7; --gray:#6b7280; --gray-bg:#eef1f6;
+    --text:#1d2333; --muted:#6b7280; --primary:#0f766e; --primary-d:#115e59;
+    --on-primary:#ffffff;
+    --green:#166534; --green-bg:#dcfce7; --red:#991b1b; --red-bg:#fee2e2;
+    --amber:#b45309; --amber-bg:#fef3c7; --gray:#4b5563; --gray-bg:#eef1f6;
     --shadow:0 6px 24px rgba(20,24,40,.08); --radius:14px;
   }
   @media (prefers-color-scheme: dark){
     :root{
       --bg:#0f1220; --surface:#171a2b; --surface-2:#1e2236; --border:#2a2f48;
       --text:#e7e9f3; --muted:#9aa0b4; --primary:#2dd4bf; --primary-d:#14b8a6;
+      --on-primary:#0f1220;
       --green:#34d399; --green-bg:#0f3d2e; --red:#f87171; --red-bg:#3d1717;
       --amber:#fbbf24; --amber-bg:#3d2f0f; --gray:#9aa0b4; --gray-bg:#242842;
       --shadow:0 8px 30px rgba(0,0,0,.4);
@@ -45,6 +47,20 @@
   button{font-family:inherit;cursor:pointer}
   a{color:var(--primary)}
   h1,h2,h3{margin:0}
+
+  /* Visible keyboard focus on every interactive element (R-32). Ring meets
+     3:1 against both backgrounds; never removed without replacement. */
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, [tabindex]:focus-visible{
+    outline:2px solid var(--primary); outline-offset:2px; border-radius:6px;
+  }
+  /* Touch devices get 44px minimum tap targets (R-03). */
+  @media (pointer:coarse){
+    .btn, .btn.sm{min-height:44px}
+    .field input, .field select{min-height:44px}
+    .xbtn{min-width:44px; min-height:44px}
+    .hint{min-width:24px; min-height:24px}
+  }
 
   /* ---------- header ---------- */
   header{
@@ -65,7 +81,7 @@
     display:inline-flex; align-items:center; gap:.4rem;
   }
   .btn:hover{border-color:var(--primary)}
-  .btn.primary{background:var(--primary); border-color:var(--primary); color:#fff}
+  .btn.primary{background:var(--primary); border-color:var(--primary); color:var(--on-primary)}
   .btn.primary:hover{background:var(--primary-d)}
   .btn.ghost{background:transparent}
   .btn.sm{padding:.32rem .6rem;font-size:.78rem}
@@ -217,7 +233,7 @@
     <div class="brand">
       <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10b981"/>
         <path d="M4 17h6l3-8 4 14 3-9 2 3h6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      Pulse <span class="verchip">v0.1.0</span>
+      Pulse <span class="verchip">v0.2.0</span>
     </div>
     <div class="spacer"></div>
     <button class="btn ghost sm" id="refreshBtn" title="Reload status">↻ Refresh</button>
@@ -228,7 +244,7 @@
   <main>
     <div class="summary" id="summary"></div>
     <div class="cards" id="cards"></div>
-    <div id="cardsEmpty" class="empty" style="display:none">No monitors yet. Add one to start watching.</div>
+    <div id="cardsStatus" class="empty" style="display:none" aria-live="polite"></div>
 
     <div class="section">
       <h2>Recent incidents</h2>
@@ -242,7 +258,7 @@
           <tbody id="incBody"></tbody>
         </table>
       </div>
-      <div id="incEmpty" class="empty" style="display:none">No incidents recorded. 🎉</div>
+      <div id="incEmpty" class="empty" style="display:none">No incidents yet. Everything has stayed up so far.</div>
     </div>
   </main>
 </div>
@@ -256,7 +272,7 @@
     </div>
     <div class="mbody">
       <div class="field">
-        <label>Name <span class="hint" title="A label for you — e.g. 'BookHockeys home'. Shown on the card and in alerts.">i</span></label>
+        <label>Name <span class="hint" title="A label for you, e.g. 'BookHockeys home'. Shown on the card and in alerts.">i</span></label>
         <input id="fName" placeholder="BookHockeys home" />
       </div>
       <div class="field">
@@ -264,7 +280,7 @@
         <input id="fUrl" placeholder="https://bookhockeys.com" />
       </div>
       <div class="field">
-        <label>Check type <span class="hint" title="HTTP status: passes if the response code is in the expected set. Keyword: also requires a string to be present (or absent) in the page body — catches blank/broken deploys that still return 200.">i</span></label>
+        <label>Check type <span class="hint" title="HTTP status: passes if the response code is in the expected set. Keyword: also requires a string to be present (or absent) in the page body, which catches blank or broken deploys that still return 200.">i</span></label>
         <select id="fType">
           <option value="">Choose…</option>
           <option value="http">HTTP status</option>
@@ -292,13 +308,13 @@
           <input id="fStatus" value="2xx" />
         </div>
         <div class="field sub">
-          <label>Interval (min) <span class="hint" title="How often to check, in minutes. Minimum effective is 5 — the pinger drives checks every 5 minutes.">i</span></label>
+          <label>Interval (min) <span class="hint" title="How often to check, in minutes. Minimum effective is 5, since the pinger drives checks every 5 minutes.">i</span></label>
           <input id="fInterval" type="number" value="5" min="5" max="1440" />
         </div>
       </div>
       <div class="row" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem">
         <div class="field sub">
-          <label>Fail threshold <span class="hint" title="Consecutive failed checks before declaring DOWN. 2 (default) means ~10 min of failures before you're alerted — suppresses flapping on transient blips.">i</span></label>
+          <label>Fail threshold <span class="hint" title="Consecutive failed checks before declaring DOWN. 2 (default) means about 10 min of failures before you're alerted, which suppresses flapping on transient blips.">i</span></label>
           <input id="fFail" type="number" value="2" min="1" max="10" />
         </div>
         <div class="field sub">
@@ -317,7 +333,7 @@
 
 <script>
 const CFG = {
-  VERSION: '0.1.0',
+  VERSION: '0.2.0',
   WORKER: 'https://pulse-worker.sevendwarfs.workers.dev',
   CLIENT_ID: 'REPLACE_WITH_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
 };
@@ -369,7 +385,7 @@ function signOut(){
 // ---------- api ----------
 async function api(path, opts={}){
   ensureFreshToken();
-  if(!ID_TOKEN){ toast('Session expired — sign in again','err'); throw new Error('no token'); }
+  if(!ID_TOKEN){ toast('Session expired, sign in again','err'); throw new Error('no token'); }
   const res = await fetch(CFG.WORKER + path, {
     ...opts,
     headers:{ 'Authorization':'Bearer '+ID_TOKEN, 'Content-Type':'application/json', ...(opts.headers||{}) },
@@ -381,7 +397,15 @@ async function api(path, opts={}){
 }
 
 // ---------- load + render ----------
+function setCardsStatus(html){
+  const s=document.getElementById('cardsStatus');
+  const grid=document.getElementById('cards');
+  if(html){ s.innerHTML=html; s.style.display='block'; grid.style.display='none'; }
+  else { s.style.display='none'; grid.style.display=''; }
+}
+
 async function refresh(){
+  if(!STATE.loaded) setCardsStatus('Loading your monitors…');
   try{
     const [mons, incs, sum] = await Promise.all([
       api('/api/monitors'), api('/api/incidents'), api('/api/summary'),
@@ -389,8 +413,13 @@ async function refresh(){
     STATE.monitors = mons.monitors || [];
     STATE.incidents = incs.incidents || [];
     STATE.summary = sum;
+    STATE.loaded = true;
     renderSummary(); renderCards(); renderIncidents();
-  }catch(e){ if(e.message!=='401'&&e.message!=='no token') toast(e.message,'err'); }
+  }catch(e){
+    if(e.message==='401' || e.message==='no token') return;  // auth flow handles its own UI
+    setCardsStatus(`Couldn't reach the Pulse worker. Check it's deployed, then <button class="btn sm" id="retryBtn">Retry</button>`);
+    const r=document.getElementById('retryBtn'); if(r) r.onclick=refresh;
+  }
 }
 
 function renderSummary(){
@@ -405,9 +434,10 @@ function renderSummary(){
 function stat(cls,n,l){ return `<div class="stat ${cls}"><span class="n">${n}</span><span class="l">${l}</span></div>`; }
 
 function renderCards(){
-  const wrap=document.getElementById('cards'); const empty=document.getElementById('cardsEmpty');
+  const wrap=document.getElementById('cards');
   const list=STATE.monitors;
-  empty.style.display = list.length?'none':'block';
+  if(!list.length){ setCardsStatus('No monitors yet. Add one with <b>+ Monitor</b> to start watching.'); return; }
+  setCardsStatus('');
   wrap.innerHTML = list.map(cardHtml).join('');
   list.forEach(m=>{ const svg=document.getElementById('spark-'+m.id); if(svg) drawSpark(svg, m._history||[]); });
   // fetch sparkline history lazily per card
@@ -420,7 +450,7 @@ function renderCards(){
 function cardHtml(m){
   const st=m.status||'unknown';
   const u=m.uptime||{};
-  const rt = m.last_response_ms!=null ? m.last_response_ms+' ms' : '—';
+  const rt = m.last_response_ms!=null ? m.last_response_ms+' ms' : '–';
   return `<div class="card ${st}">
     <div class="top">
       <div style="flex:1;min-width:0">
@@ -502,11 +532,11 @@ function renderIncidents(){
 }
 function incVal(r,k){ if(k==='duration') return r.duration_s==null?Infinity:r.duration_s; if(k==='name') return (r.name||'').toLowerCase(); return r[k]??0; }
 function incCell(r,k){
-  if(k==='name') return `<b>${esc(r.name||'—')}</b>`;
+  if(k==='name') return `<b>${esc(r.name||'–')}</b>`;
   if(k==='started_at') return esc(fmtTime(r.started_at));
   if(k==='duration') return r.resolved_at?esc(humanDur(r.duration_s)):'<span style="color:var(--red)">ongoing</span>';
-  if(k==='cause') return esc(r.cause||'—');
-  if(k==='last_code') return r.last_code??'—';
+  if(k==='cause') return esc(r.cause||'–');
+  if(k==='last_code') return r.last_code??'–';
   return '';
 }
 function sortInc(k){ if(incSort.key===k){ incSort.dir = incSort.dir==='asc'?'desc':(incSort.key==='started_at'?'asc':'desc'); } else { incSort={key:k,dir:k==='started_at'?'desc':'asc'}; } renderIncidents(); }
@@ -551,7 +581,11 @@ function syncType(){
   document.getElementById('kwWrap').style.display = fType.value==='keyword'?'block':'none';
   fType.classList.toggle('needs-choice', fType.value==='');
 }
-function openModal(){ document.getElementById('modal').classList.add('open'); }
+function openModal(){
+  document.getElementById('modal').classList.add('open');
+  // Move focus into the dialog for keyboard users (R-32).
+  setTimeout(()=>{ const f=document.getElementById('fName'); if(f) f.focus(); }, 40);
+}
 function closeModal(){ document.getElementById('modal').classList.remove('open'); }
 
 async function saveMonitor(){
@@ -579,14 +613,18 @@ function showConfirm(msg, onYes){
     <div class="mbody"><div>${esc(msg)}</div></div>
     <div class="mfoot"><button class="btn ghost" data-no>Cancel</button><button class="btn primary" data-yes>Delete</button></div></div>`;
   document.body.appendChild(bd);
-  bd.querySelector('[data-no]').onclick=()=>bd.remove();
-  bd.querySelector('[data-yes]').onclick=()=>{ bd.remove(); onYes(); };
+  const onKey=(e)=>{ if(e.key==='Escape') cleanup(); };
+  function cleanup(){ bd.remove(); document.removeEventListener('keydown', onKey); }
+  bd.querySelector('[data-no]').onclick=cleanup;
+  bd.querySelector('[data-yes]').onclick=()=>{ cleanup(); onYes(); };
+  document.addEventListener('keydown', onKey);
+  setTimeout(()=>bd.querySelector('[data-no]').focus(), 40);
 }
 
 // ---------- helpers ----------
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function fmtPct(v){ return v==null?'—':v+'%'; }
-function fmtTime(s){ if(!s) return '—'; const d=new Date(s*1000); return d.toLocaleString(); }
+function fmtPct(v){ return v==null?'–':v+'%'; }
+function fmtTime(s){ if(!s) return '–'; const d=new Date(s*1000); return d.toLocaleString(); }
 function humanDur(sec){ sec=Math.max(0,Math.round(sec||0)); const d=Math.floor(sec/86400),h=Math.floor(sec%86400/3600),m=Math.floor(sec%3600/60),s=sec%60;
   if(d)return d+'d '+h+'h'; if(h)return h+'h '+m+'m'; if(m)return m+'m '+s+'s'; return s+'s'; }
 function ago(s){ const diff=Math.floor(Date.now()/1000)-s; if(diff<60)return diff+'s ago'; if(diff<3600)return Math.floor(diff/60)+'m ago'; if(diff<86400)return Math.floor(diff/3600)+'h ago'; return Math.floor(diff/86400)+'d ago'; }
@@ -604,7 +642,12 @@ document.getElementById('fType').onchange=syncType;
 document.getElementById('colBtn').onclick=(e)=>{ e.stopPropagation(); toggleColMenu(); };
 document.addEventListener('click',(e)=>{ const menu=document.getElementById('colMenu');
   if(menu.style.display==='block' && !menu.contains(e.target) && e.target.id!=='colBtn') menu.style.display='none'; });
-// NOTE: data-entry modal intentionally does NOT close on backdrop click — only ✕ / Cancel / Save.
+// Data-entry modal intentionally does NOT close on backdrop click (prevents
+// losing a half-typed monitor). Escape acts as the Cancel button so keyboard
+// users can still dismiss it (R-32).
+document.addEventListener('keydown',(e)=>{
+  if(e.key==='Escape' && document.getElementById('modal').classList.contains('open')) closeModal();
+});
 window.checkNow=checkNow; window.openEdit=openEdit; window.pauseMon=pauseMon; window.resumeMon=resumeMon;
 window.delMon=delMon; window.sortInc=sortInc; window.setCol=setCol; window.resetCols=resetCols;
 
