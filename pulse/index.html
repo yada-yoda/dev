@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="color-scheme" content="light dark" />
 <meta name="robots" content="noindex, nofollow" />
-<title>Pulse v0.2.0: personal uptime monitor</title>
+<title>Pulse v0.3.0: personal uptime monitor</title>
 <meta name="description" content="Pulse watches your sites and workers and alerts you when they go down. Your own personal uptime monitor." />
 
 <!-- Open Graph / Twitter -->
@@ -17,6 +17,15 @@
 <meta name="twitter:card" content="summary_large_image" />
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2310b981'/%3E%3Cpath d='M4 17h6l3-8 4 14 3-9 2 3h6' fill='none' stroke='%23fff' stroke-width='2.4' stroke-linejoin='round' stroke-linecap='round'/%3E%3C/svg%3E" />
+
+<link rel="manifest" href="site.webmanifest" />
+<link rel="apple-touch-icon" href="apple-touch-icon.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="Pulse" />
+<meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0f1220" media="(prefers-color-scheme: dark)" />
 
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -65,7 +74,11 @@
   /* ---------- header ---------- */
   header{
     position:sticky; top:0; z-index:30; background:var(--surface);
-    border-bottom:1px solid var(--border); padding:.7rem 1rem;
+    border-bottom:1px solid var(--border);
+    padding:.7rem 1rem;
+    padding-top:calc(.7rem + env(safe-area-inset-top));
+    padding-left:calc(1rem + env(safe-area-inset-left));
+    padding-right:calc(1rem + env(safe-area-inset-right));
     display:flex; align-items:center; gap:.75rem; flex-wrap:wrap;
   }
   .brand{display:flex;align-items:center;gap:.55rem;font-weight:700;font-size:1.15rem}
@@ -87,12 +100,16 @@
   .btn.sm{padding:.32rem .6rem;font-size:.78rem}
   .btn.danger:hover{border-color:var(--red);color:var(--red)}
 
-  main{max-width:1100px;margin:0 auto;padding:1rem}
+  main{max-width:1100px;margin:0 auto;padding:1rem;
+    padding-bottom:calc(1rem + env(safe-area-inset-bottom));
+    padding-left:calc(1rem + env(safe-area-inset-left));
+    padding-right:calc(1rem + env(safe-area-inset-right))}
 
   /* ---------- sign-in gate ---------- */
   #gate{
     min-height:70vh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    text-align:center;gap:1rem;padding:2rem 1rem;
+    text-align:center;gap:1rem;
+    padding:calc(2rem + env(safe-area-inset-top)) 1rem calc(2rem + env(safe-area-inset-bottom));
   }
   #gate .logo{width:64px;height:64px}
   #gate h1{font-size:1.6rem}
@@ -101,6 +118,13 @@
     background:var(--amber-bg);border:1px solid var(--amber);color:var(--amber);
     border-radius:10px;padding:.6rem .9rem;font-size:.85rem;max-width:34rem;
   }
+
+  /* Add-to-Home-Screen card (in Settings) */
+  .a2hs .a2hs-h{font-weight:700;font-size:1rem;margin-bottom:.35rem}
+  .a2hs p{margin:.2rem 0 .7rem;color:var(--muted);font-size:.9rem}
+  .a2hs p.installed{color:var(--green);font-weight:600}
+  .a2hs ol{margin:.2rem 0 .4rem 1.2rem;padding:0;font-size:.9rem;
+    display:flex;flex-direction:column;gap:.4rem}
 
   /* ---------- summary bar ---------- */
   .summary{
@@ -193,7 +217,7 @@
   .ferr{color:var(--red);font-size:.8rem;min-height:1rem}
 
   /* ---------- toasts (top-center) ---------- */
-  #toasts{position:fixed;top:1rem;left:50%;transform:translateX(-50%);z-index:80;
+  #toasts{position:fixed;top:calc(1rem + env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:80;
     display:flex;flex-direction:column;gap:.5rem;align-items:center;pointer-events:none}
   .toast{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--primary);
     border-radius:10px;box-shadow:var(--shadow);padding:.6rem .9rem;font-size:.85rem;
@@ -224,6 +248,7 @@
   <h1>Pulse</h1>
   <p>Your personal uptime monitor. Sign in with the Google account on the allowlist to continue.</p>
   <div id="signinBtn"></div>
+  <button class="btn ghost sm" id="gateInstall" style="display:none"></button>
   <div id="cfgWarn" class="config-warn" style="display:none"></div>
 </div>
 
@@ -233,11 +258,12 @@
     <div class="brand">
       <svg class="logo" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#10b981"/>
         <path d="M4 17h6l3-8 4 14 3-9 2 3h6" fill="none" stroke="#fff" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/></svg>
-      Pulse <span class="verchip">v0.2.0</span>
+      Pulse <span class="verchip">v0.3.0</span>
     </div>
     <div class="spacer"></div>
     <button class="btn ghost sm" id="refreshBtn" title="Reload status">↻ Refresh</button>
     <button class="btn primary sm" id="addBtn">+ Monitor</button>
+    <button class="btn ghost sm" id="settingsBtn" title="Settings">Settings</button>
     <button class="btn ghost sm" id="signoutBtn" title="Sign out">Sign out</button>
   </header>
 
@@ -331,9 +357,25 @@
   </div>
 </div>
 
+<!-- Settings modal -->
+<div class="backdrop" id="settingsModal">
+  <div class="modal">
+    <div class="mhead">
+      <h3>Settings</h3>
+      <button class="xbtn" id="settingsX" aria-label="Close">&times;</button>
+    </div>
+    <div class="mbody">
+      <div class="a2hs" id="a2hsCard"></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn ghost" id="settingsClose">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const CFG = {
-  VERSION: '0.2.0',
+  VERSION: '0.3.0',
   WORKER: 'https://pulse-worker.sevendwarfs.workers.dev',
   CLIENT_ID: 'REPLACE_WITH_GOOGLE_CLIENT_ID.apps.googleusercontent.com',
 };
@@ -646,11 +688,62 @@ document.addEventListener('click',(e)=>{ const menu=document.getElementById('col
 // losing a half-typed monitor). Escape acts as the Cancel button so keyboard
 // users can still dismiss it (R-32).
 document.addEventListener('keydown',(e)=>{
-  if(e.key==='Escape' && document.getElementById('modal').classList.contains('open')) closeModal();
+  if(e.key!=='Escape') return;
+  if(document.getElementById('modal').classList.contains('open')) closeModal();
+  else if(document.getElementById('settingsModal').classList.contains('open')) closeSettings();
 });
 window.checkNow=checkNow; window.openEdit=openEdit; window.pauseMon=pauseMon; window.resumeMon=resumeMon;
 window.delMon=delMon; window.sortInc=sortInc; window.setCol=setCol; window.resetCols=resetCols;
 
+// ---------- Add to Home Screen (A2HS) ----------
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',(e)=>{ e.preventDefault(); deferredPrompt=e; updateInstallUI(); });
+window.addEventListener('appinstalled',()=>{ deferredPrompt=null; updateInstallUI(); toast('Pulse added to your home screen','ok'); });
+
+function isStandalone(){ try{ return matchMedia('(display-mode: standalone)').matches || window.navigator.standalone===true; }catch(_){ return false; } }
+function isIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent); }
+// 'installed' | 'prompt' (Android/desktop can install now) | 'ios' | 'other'
+function a2hsState(){ if(isStandalone()) return 'installed'; if(deferredPrompt) return 'prompt'; if(isIOS()) return 'ios'; return 'other'; }
+
+async function doInstall(){ if(!deferredPrompt) return; deferredPrompt.prompt(); try{ await deferredPrompt.userChoice; }catch(_){ } deferredPrompt=null; updateInstallUI(); }
+
+function renderA2HSCard(){
+  const el=document.getElementById('a2hsCard'); if(!el) return;
+  const st=a2hsState();
+  if(st==='installed'){
+    el.innerHTML='<div class="a2hs-h">Add to Home Screen</div><p class="installed">Pulse is installed on this device.</p><p>Launch it from your home screen for a full-screen app with its own icon.</p>';
+  } else if(st==='prompt'){
+    el.innerHTML='<div class="a2hs-h">Add to Home Screen</div><p>Install Pulse as an app with its own icon and no browser bar.</p><button class="btn primary" id="a2hsBtn">Add to Home Screen</button>';
+    el.querySelector('#a2hsBtn').onclick=doInstall;
+  } else if(st==='ios'){
+    el.innerHTML='<div class="a2hs-h">Add to Home Screen</div><p>In Safari, add Pulse to your home screen:</p><ol><li>Tap the <b>Share</b> button at the bottom of the screen.</li><li>Scroll down and tap <b>Add to Home Screen</b>.</li><li>Tap <b>Add</b>.</li></ol>';
+  } else {
+    el.innerHTML='<div class="a2hs-h">Add to Home Screen</div><p>Open this page in Chrome (Android) or Safari (iPhone/iPad), then use the browser menu and look for <b>Install app</b> or <b>Add to Home Screen</b>.</p>';
+  }
+}
+
+function updateInstallUI(){
+  renderA2HSCard();
+  const gi=document.getElementById('gateInstall'); if(!gi) return;
+  const st=a2hsState();
+  if(st==='prompt'){ gi.style.display='inline-flex'; gi.textContent='Add Pulse to your home screen'; }
+  else if(st==='ios'){ gi.style.display='inline-flex'; gi.textContent='How to add Pulse to your home screen'; }
+  else { gi.style.display='none'; }
+}
+
+function openSettings(){ renderA2HSCard(); document.getElementById('settingsModal').classList.add('open'); setTimeout(()=>{ const b=document.getElementById('settingsClose'); if(b) b.focus(); },40); }
+function closeSettings(){ document.getElementById('settingsModal').classList.remove('open'); }
+
+document.getElementById('settingsBtn').onclick=openSettings;
+document.getElementById('settingsX').onclick=closeSettings;
+document.getElementById('settingsClose').onclick=closeSettings;
+document.getElementById('gateInstall').onclick=()=>{ if(a2hsState()==='prompt') doInstall(); else openSettings(); };
+
+// Service worker: enables installability + an offline shell. Network-first, so
+// data is never stale; the cross-origin worker API is never cached.
+if('serviceWorker' in navigator){ window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{})); }
+
+updateInstallUI();
 initAuth();
 // keep "last check run / ago" fresh
 setInterval(()=>{ if(document.getElementById('app').style.display!=='none' && STATE.summary){ renderSummary(); } }, 30000);
