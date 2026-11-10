@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.163';
+const VERSION = '1.0.164';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -62,6 +62,65 @@ let subsSort = { key: 'monthly', dir: 'desc' };
 let subsCatFilter = 'all';
 let subsStatusFilter = 'active';   // 'active' | 'all'
 let subPriceSel = null;            // which bill's price history the chart shows
+let subsSpend = {};              // billId -> { ytd, life, n, first, last }, rebuilt each render
+// Lifetime totals need every year, and year documents load one at a time on
+// demand. Pull the missing ones once per session, then re-render. Until that
+// finishes the lifetime figure is marked partial rather than shown as if it
+// were already complete.
+let allYearsLoaded = false, allYearsLoading = false;
+function ensureAllYearsLoaded() {
+  const store = window.cloverStore;
+  if (allYearsLoaded || allYearsLoading || !store || !store.isLoaded || !store.isLoaded()) return;
+  const missing = yearsAvailable().filter(y => !store.isYearLoaded(y));
+  if (!missing.length) { allYearsLoaded = true; return; }
+  allYearsLoading = true;
+  Promise.all(missing.map(y => store.loadYear(y)))
+    .then(() => { allYearsLoaded = true; allYearsLoading = false; renderView(currentRoute); })
+    .catch(() => { allYearsLoading = false; });
+}
+// What a bill has actually cost, from the expenses linked to it. One pass
+// over every loaded year rather than one per bill, so a long history stays
+// cheap even with many bills.
+function billSpendMap(store) {
+  const map = {}, yr = String(activeYear);
+  yearsAvailable().forEach(y => {
+    if (!store.isYearLoaded(y)) return;
+    (store.yearData(y).expensePayments || []).forEach(p => {
+      const id = p.recurringId;
+      if (!id) return;
+      const e = map[id] || (map[id] = { ytd: 0, life: 0, n: 0, first: '', last: '' });
+      e.life += expenseAmount(p); e.n++;
+      if (p.date) {
+        if (!e.first || p.date < e.first) e.first = p.date;
+        if (p.date > e.last) e.last = p.date;
+      }
+      if (String(y) === yr) e.ytd += expenseAmount(p);
+    });
+  });
+  return map;
+}
+// Shared by both spend columns. Only payments carrying this bill's id count,
+// so the cell says so rather than letting an empty figure read as never paid.
+function billSpendCell(entry, which) {
+  const td = el('td', 'num');
+  const v = entry ? entry[which] : 0;
+  if (!entry || !v) {
+    td.textContent = '\u2013';
+    td.title = 'Nothing is linked to this bill yet. An expense counts here once its '
+      + '\u201cLinked bill\u201d field points at this bill, which the Budget check-in sets for you.';
+    return td;
+  }
+  const partial = which === 'life' && !allYearsLoaded;
+  td.textContent = (partial ? '≈ ' : '') + money(v);
+  const paid = entry.n + ' payment' + (entry.n === 1 ? '' : 's');
+  td.title = (which === 'ytd'
+      ? paid + ' linked to this bill, totalled for ' + activeYear + '.'
+      : paid + ' linked to this bill'
+        + (entry.first ? ', from ' + fmtDate(entry.first) + ' to ' + fmtDate(entry.last) : '') + '.')
+    + (partial ? ' Earlier years are still loading, so this total will grow.' : '')
+    + ' Only expenses linked to this bill are counted.';
+  return td;
+}
 let subsSearch = '';               // live search over the bills table
 let subsBadgeFilter = null;        // { key, value } from clicking a subs value badge
 let budgetReconMonth = null;       // Budget check-in target month (0-based, within activeYear); null = auto (prev month)
@@ -3289,9 +3348,9 @@ function subsFilterBadge(colKey, text, tone) {
   }, 'Filter by ' + text);
   return b;
 }
-const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', checkNo: 'Check #', apr: 'APR %', flags: 'Flags', notes: 'Notes' };
-const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'checkNo', 'apr', 'flags', 'notes'];
-const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'flags'];
+const SUBS_COL_LABELS = { name: 'Name', category: 'Category', subcategory: 'Subcategory', vendor: 'Vendor', amount: 'Amount', frequency: 'Frequency', monthly: 'Monthly', annual: 'Annual', pct: '% net', renews: 'Renews', account: 'Account', backupAccount: 'Backup account', person: 'Person', priority: 'Priority', status: 'Status', links: 'Links', customerNo: 'Customer #', checkNo: 'Check #', apr: 'APR %', ytdSpend: 'Spent YTD', lifeSpend: 'Spent lifetime', flags: 'Flags', notes: 'Notes' };
+const SUBS_ALL_COLS = ['name', 'category', 'subcategory', 'vendor', 'amount', 'frequency', 'monthly', 'annual', 'pct', 'renews', 'account', 'backupAccount', 'person', 'priority', 'status', 'links', 'customerNo', 'checkNo', 'apr', 'ytdSpend', 'lifeSpend', 'flags', 'notes'];
+const SUBS_DEFAULT_COLS = ['name', 'category', 'amount', 'frequency', 'monthly', 'annual', 'ytdSpend', 'lifeSpend', 'renews', 'account', 'flags'];
 function buildSubsCol(store, key, net) {
   switch (key) {
     case 'name': return { label: 'Name', key: 'name', value: r => r.name, cell: r => {
@@ -3319,6 +3378,12 @@ function buildSubsCol(store, key, net) {
     case 'links': return { label: 'Links', key: 'links', sortable: false, value: () => '', cell: r => { const td = el('td'); const mk = (url, txt) => { const a = el('a', null, txt); a.href = url; a.target = '_blank'; a.rel = 'noopener'; a.style.marginRight = '8px'; td.appendChild(a); }; if (r.url) mk(r.url, 'Site ↗'); if (r.payUrl) mk(r.payUrl, 'Pay ↗'); if (!r.url && !r.payUrl) td.textContent = '—'; return td; } };
     case 'customerNo': return { label: 'Customer #', key: 'customerNo', value: r => r.customerNo || '', cell: r => { const td = el('td'); if (!r.customerNo) { td.textContent = '—'; return td; } const full = String(r.customerNo); const masked = '•••• ' + full.slice(-4); const span = el('span', null, masked); span.title = 'Click to reveal'; span.style.cursor = 'pointer'; let shown = false; span.addEventListener('click', ev => { ev.stopPropagation(); shown = !shown; span.textContent = shown ? full : masked; span.title = shown ? 'Click to hide' : 'Click to reveal'; }); td.appendChild(span); return td; } };
     case 'checkNo': return { label: 'Check #', key: 'checkNo', value: r => r.checkNo || '', cell: r => el('td', 'muted', r.checkNo || '—') };
+    case 'ytdSpend': return { label: 'Spent YTD', key: 'ytdSpend', num: true,
+        value: r => (subsSpend[r.id] || {}).ytd || 0,
+        cell: r => billSpendCell(subsSpend[r.id], 'ytd') };
+    case 'lifeSpend': return { label: 'Spent lifetime', key: 'lifeSpend', num: true,
+        value: r => (subsSpend[r.id] || {}).life || 0,
+        cell: r => billSpendCell(subsSpend[r.id], 'life') };
     case 'apr': return { label: 'APR %', key: 'apr', num: true, value: r => r.apr != null ? Number(r.apr) : -1, cell: r => el('td', 'num', (r.apr != null && r.apr !== '') ? (Number(r.apr).toFixed(2) + '%') : '—') };
     case 'person': return { label: 'Person', key: 'person', value: r => store.personName(r.personId), cell: r => el('td', null, store.personName(r.personId)) };
     case 'flags': return { label: 'Flags', sortable: false, cell: r => {
@@ -3338,6 +3403,8 @@ function buildSubsCol(store, key, net) {
 function renderSubscriptions(view) {
   destroyCharts();
   const store = window.cloverStore, s = store.state;
+  ensureAllYearsLoaded();
+  subsSpend = billSpendMap(store);
   const all = s.recurring;
   const active = all.filter(isSubActive);
   // Filters run FIRST so the stat cards reflect what's actually displayed.
@@ -4039,7 +4106,8 @@ const HELP_SECTIONS = [
     points: [
       'Enter the charge and how often it bills; Clover computes the monthly-equivalent and annual cost, and warns before renewals.',
       'Track priority, status, auto-pay, account/customer numbers (masked), price history, and a one-time vs. recurring frequency.',
-      'Convert any bill to/from a budget placeholder, or into a one-off expense, from its row.'
+      'Convert any bill to/from a budget placeholder, or into a one-off expense, from its row.',
+      'Spent YTD and Spent lifetime show what a bill has really cost, from the expenses linked to it. An expense is linked when its “Linked bill” field points at the bill, which the Budget check-in does for you. Anything logged without that link is not counted, so a dash means nothing is linked yet rather than never paid. Lifetime reads every year, so it may show a ≈ for a moment on first load while the earlier years arrive.'
     ] },
   { id: 'budget', ico: '◐', title: 'Budget', what: 'Your “budget placeholders” — expected or future costs you want reflected before they’re real bills.',
     points: [

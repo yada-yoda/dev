@@ -45,6 +45,27 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.164 — What each bill has actually cost you
+
+Bills & Subscriptions has two new columns: **Spent YTD** and **Spent lifetime**.
+The first is what that bill cost in the year you are viewing, the second is
+everything you have ever paid it, across every year.
+
+Both read your real logged expenses, not the estimate. An expense counts when
+its “Linked bill” field points at the bill, which the Budget check-in sets for
+you automatically. Expenses logged without that link are not counted, so a dash
+means nothing is linked yet rather than never paid. Hovering a figure tells you
+how many payments it covers and the span they run across.
+
+The lifetime figure has to read every year, and years load as you need them, so
+on the first visit it may briefly show a ≈ while the earlier years arrive. It
+settles on its own.
+
+_If you have customised the columns on this page before, the two new ones will
+not appear on their own: tick them under ⚙ Columns._
+
+## Changelog
+
 ### v1.0.163 — An “Add to home screen” card in Settings
 
 Getting Clover onto a phone home screen meant knowing where your browser hides
