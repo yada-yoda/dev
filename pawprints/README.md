@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.84.0**
+**Current Version: v0.85.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -88,6 +88,7 @@ covers both.
 
 ## Version History
 
+- **v0.85.0** — **"How long ago?" at a glance.** Every date in the care lists now carries its distance — "Oct 20, 2026 · 21 days" on a grooming, "in 12 days" on a follow-up — across the Care history, the health timeline, med dose and measurement histories, and the vet, grooming, records, illness and journal lists. No more date math in your head.
 - **v0.84.0** — **Growth history, friendlier touch targets, easier install.** Body measurements now keep a dated history like meds do — each re-measure becomes an entry (visible in the activity log, editable, restorable) with a History list on the profile, and your current numbers seed the first snapshot. On touch screens, buttons, toggle pills, row actions, the modal close and the little "i" tooltips all grow to comfortable thumb size (desktop unchanged). And installing to the home screen got real help: Android gets a one-tap Install button (plus step-by-step instructions where the browser hides it), the Settings option now appears on Android too, and phones see a small dismissible nudge on first visit. The Care tab also gains a combined Care history list of everything — visits, grooming, doses, illnesses, records — and doses you logged before v0.82 are recovered from the change history.
 - **v0.83.0** — **Entries can't vanish on bad wifi anymore.** Fixed a data-loss chain where an entry logged on a weak connection (the backyard problem) could be erased later: iOS sometimes resurrects the app with an old copy in memory, and saving anything new overwrote the newer entries sitting in local storage. Local saves now merge with what's already stored instead of overwriting it, the app re-adopts any orphaned entries the moment it wakes up, Firestore's own offline queue now delivers failed uploads when the connection returns, new activity entries also go to a separate 50-entry safety journal that's reconciled at startup, and if this device's local storage ever stops working you get told instead of silently losing the offline copy.
 

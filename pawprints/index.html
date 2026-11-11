@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.84.0';
+const APP_VERSION = 'v0.85.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -622,6 +622,25 @@ function untilStr(dt){
   let s = d > 0 ? d + 'd' : h + 'h';
   return { past, text: past ? s + ' ago' : 'in ' + s, days: Math.round(diff/86400000) };
 }
+// Calendar-day distance for list dates: "21 days", "yesterday", "in 3 mo", "1.4 yr". '' when unparseable.
+// Local Y-M-D on both sides, so an 11pm dose yesterday reads "yesterday", not "0 days".
+function relDaysStr(dt){
+  if(!dt) return '';
+  let d;
+  const m = String(dt).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m){ d = new Date(+m[1], +m[2]-1, +m[3]); if(d.getMonth() !== +m[2]-1) return ''; }
+  else { const x = new Date(dt); if(isNaN(x.getTime())) return ''; d = new Date(x.getFullYear(), x.getMonth(), x.getDate()); }
+  if(isNaN(d.getTime())) return '';
+  const n = new Date(), days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - d)/86400000);
+  if(days === 0) return 'today';
+  if(days === 1) return 'yesterday';
+  if(days === -1) return 'tomorrow';
+  const a = Math.abs(days);
+  const s = a <= 90 ? a + ' days' : a <= 730 ? Math.round(a/30.44) + ' mo' : (a/365.25).toFixed(1) + ' yr';
+  return days < 0 ? 'in ' + s : s;
+}
+// ' · 21 days' suffix, or '' so callers can append unconditionally
+function relSuffix(dt){ const r = relDaysStr(dt); return r ? ' · ' + r : ''; }
 function ageStr(birthday, est){
   if(!birthday) return null;
   const b = new Date(dateSafe(birthday)), now = new Date();
@@ -1267,7 +1286,7 @@ function renderRecordsTab(){
       const meta = [recProvider(r), r.recordNo?('#'+r.recordNo):'', r.cost?money(r.cost):'', r.nextDue?'next due '+fmtDate(r.nextDue):''].filter(Boolean).join(' · ');
       const addr = fullAddr(r);
       const vax = r.vaccineType ? ' <span class="chip-2" style="font-size:10px">'+esc(r.vaccineType)+'</span>' : '';
-      const when = fmtDate(r.date) + (r.time?' '+fmtClock(r.time):'');
+      const when = fmtDate(r.date) + (r.time?' '+fmtClock(r.time):'') + relSuffix(r.date);
       return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(r.name||r.type||'Record')+' <span class="chip-p" style="font-size:10px">'+esc(r.type||'Record')+'</span>'+vax+'</div>'
         +'<div style="font-size:12px;color:var(--text-secondary)">'+esc(when)+(meta?' · '+esc(meta):'')+'</div>'
         +((r.testedFor||r.result)?'<div style="font-size:12px;color:var(--text-secondary)">'+[r.testedFor&&('Tested for '+r.testedFor), r.result&&('result: '+r.result)].filter(Boolean).map(esc).join(' · ')+'</div>':'')
@@ -4095,7 +4114,7 @@ function renderProfile(){
     const ms = measureLogs(p.id), mOpen = measHistOpen.has(p.id);
     const mHist = ms.length > 1 ? '<span style="display:block;font-weight:400"><button type="button" class="btn btn-sm" id="meashist-btn-'+p.id+'" aria-expanded="'+mOpen+'" aria-controls="meashist-'+p.id+'" style="margin-top:6px;font-size:12px" onclick="toggleMeasHist(\''+p.id+'\')">History ('+ms.length+')</button>'
       + '<span id="meashist-'+p.id+'" style="display:'+(mOpen?'block':'none')+';margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.6">'
-      + ms.slice(0,12).map(l => '<span style="display:block">'+fmtDate(l.dateTime)+' — '+esc(measLogStr(l)||'—')+'</span>').join('')
+      + ms.slice(0,12).map(l => '<span style="display:block">'+fmtDate(l.dateTime)+relSuffix(l.dateTime)+' — '+esc(measLogStr(l)||'—')+'</span>').join('')
       + (ms.length>12?'<span style="display:block">+ '+(ms.length-12)+' earlier — see All activity</span>':'')+'</span></span>' : '';
     facts.push(['Measurements', esc(measStr(p))+(p.measDate?' ('+fmtDate(p.measDate)+')':'')+mHist]);
   }
@@ -4155,7 +4174,7 @@ function renderNotes(){
     return '<div class="entry-row'+(canManage()?' clickable':'')+'"'+(canManage()?' onclick="noteModal(\''+n.id+'\')"':'')+'><div style="flex:1;min-width:0">'
       + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+(k!=='note'?'<span class="chip" style="font-size:10px">'+km.e+' '+km.label+'</span>':'')+(n.title?'<span style="font-weight:700;font-size:14px">'+esc(n.title)+'</span>':'')+'</div>'
       + (n.text?'<div style="font-size:14px;white-space:pre-wrap'+((n.title||k!=='note')?';margin-top:4px':'')+'">'+esc(n.text)+'</div>':'')
-      + '<div class="tl-time">'+fmtDateTime(n.dateTime)+'</div></div></div>';
+      + '<div class="tl-time">'+fmtDateTime(n.dateTime)+relSuffix(n.dateTime)+'</div></div></div>';
   }).join('');
   else html += '<p style="color:var(--text-secondary);font-size:14px;margin:8px 0 0">'+(all.length?'Nothing under this filter yet.':'Start the diary — the first swim, the first time he answered to his name, a funny habit, a vet\'s remark. Little moments you\'ll want to look back on.')+'</p>';
   return html + '</div>';
@@ -4220,7 +4239,7 @@ function healthTimelineItems(){
 function renderHealthTimeline(){
   const items = healthTimelineItems();
   if(!items.length) return '<p style="color:var(--text-secondary);font-size:14px">Vet visits, grooming, illnesses, meds and records will appear here as a history.</p>';
-  return items.slice(0,40).map(it => '<div class="timeline-item'+(it.canOpen?' clickable':'')+'"'+(it.canOpen?' onclick="'+it.open+'"':'')+'><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+'</div></div></div>').join('');
+  return items.slice(0,40).map(it => '<div class="timeline-item'+(it.canOpen?' clickable':'')+'"'+(it.canOpen?' onclick="'+it.open+'"':'')+'><div class="tl-icon">'+iconFor(it.icon,20)+'</div><div style="flex:1"><div style="font-weight:600;font-size:14px">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:12px;color:var(--text-secondary)">'+esc(it.sub)+'</div>':'')+(it.notes?'<div style="font-size:12px;color:var(--text-secondary);font-style:italic;margin-top:2px">'+esc(it.notes)+'</div>':'')+'<div class="tl-time">'+fmtDate(it.date)+relSuffix(it.date)+'</div></div></div>').join('');
 }
 function renderContacts(){
   const cs = data.contacts || [];
@@ -4370,7 +4389,7 @@ function renderCareHistory(){
   const row = it => '<div class="entry-row'+(it.canOpen?' clickable':'')+'"'+(it.canOpen?' role="button" tabindex="0" onclick="'+it.open+'" onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();this.click()}"':'')+' style="padding:9px 12px;margin-bottom:6px;flex-wrap:nowrap;justify-content:flex-start;gap:10px">'
     + '<span style="display:inline-flex;flex-shrink:0">'+iconFor(it.icon,18)+'</span>'
     + '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow-wrap:anywhere">'+esc(it.title)+'</div>'+(it.sub?'<div style="font-size:11px;color:var(--text-secondary);overflow-wrap:anywhere">'+esc(it.sub)+'</div>':'')+'</div>'
-    + '<div class="tl-time" style="flex-shrink:0;text-align:right">'+fmtDate(it.date)+'</div></div>';
+    + '<div class="tl-time" style="flex-shrink:0;text-align:right"><div>'+fmtDate(it.date)+'</div>'+(relDaysStr(it.date)?'<div>'+relDaysStr(it.date)+'</div>':'')+'</div></div>';
   html += items.slice(0,15).map(row).join('');
   if(items.length > 15){
     html += '<div id="carehist-more" style="'+(careHistOpen?'':'display:none')+'">'+items.slice(15).map(row).join('')+'</div>'
@@ -4464,8 +4483,8 @@ function renderVetTab(){
     + '<button class="btn" style="flex:1;min-width:180px;max-width:300px" onclick="vetPrepModal()" title="A summary of everything since the last visit — weight change, illnesses, unusual stools, meds — ready to show or read to the vet">📋 Vet visit prep</button></div>';
   const total = visits.reduce((s,v)=>s+(num(v.cost)||0),0);
   if(visits.length) html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+visits.length+'</div><div class="stat-label">Visits</div></div><div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
-  if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
-  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):'',(v.lineItems&&v.lineItems.length?' · '+v.lineItems.length+' item'+(v.lineItems.length===1?'':'s'):''),(v.payMethod?' · '+esc(v.payMethod)+(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?' '+(v.ccBrand?esc(v.ccBrand)+' ':'')+'••'+esc(v.ccLast4):''):'')].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
+  if(followups.length){ html += '<div class="card"><h3 class="section-title">'+svgIcon('followups',18)+' Upcoming follow-ups</h3>'+followups.map(v=>'<div class="reminder due"><span style="display:inline-flex">'+svgIcon('vet',18)+'</span><span>'+fmtDate(v.followUpDate)+relSuffix(v.followUpDate)+' — '+esc(v.reason||'Follow-up')+'</span></div>').join('')+'</div>'; }
+  const card = (v,future) => '<div class="entry-row clickable" onclick="vetModal(\''+v.id+'\')"><div><div style="font-weight:600">'+esc(v.reason||'Vet visit')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(v.date)+(v.time?' · '+fmtClock(v.time):'')+relSuffix(v.date)+[v.vet?' · '+esc(v.vet):'',v.weight?' · '+esc(v.weight)+(activePet().weightUnit||'lb'):'',(v.lineItems&&v.lineItems.length?' · '+v.lineItems.length+' item'+(v.lineItems.length===1?'':'s'):''),(v.payMethod?' · '+esc(v.payMethod)+(((v.payMethod==='Credit card'||v.payMethod==='Debit card')&&v.ccLast4)?' '+(v.ccBrand?esc(v.ccBrand)+' ':'')+'••'+esc(v.ccLast4):''):'')].join('')+'</div></div><div style="text-align:right">'+(v.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(v.cost)+'</div>':'')+'</div></div>';
   if(visits.length) html += dateSortBtn('toggleVetSort', vetSortAsc);
   if(upcoming.length) html += '<div class="card"><h3 class="section-title">Upcoming</h3>'+upcoming.map(v=>card(v,true)).join('')+'</div>';
   if(past.length) html += '<div class="card"><h3 class="section-title">History</h3>'+past.map(v=>card(v,false)).join('')+'</div>';
@@ -4482,11 +4501,12 @@ function renderGroomTab(){
     // "Last groomed" = newest visit that has already happened; a future appointment isn't a groom yet.
     const lastGroomed = all.filter(g => (g.date||'') <= today).reduce((m,g)=> (!m || (g.date||'') > (m.date||'')) ? g : m, null);
     const nextAppt = all.filter(g => (g.date||'') > today).reduce((m,g)=> (!m || (g.date||'') < (m.date||'')) ? g : m, null);
-    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+(lastGroomed?fmtDate(lastGroomed.date):'—')+'</div><div class="stat-label">Last groomed</div></div>'
-      + (nextAppt?'<div class="card stat-card"><div class="stat-value" style="color:var(--accent-2)">'+fmtDate(nextAppt.date)+'</div><div class="stat-label">Next appointment</div></div>':'')
+    const relLine = d => relDaysStr(d) ? '<div class="tl-time" style="margin-top:2px">'+relDaysStr(d)+'</div>' : '';
+    html += '<div class="stats-grid"><div class="card stat-card"><div class="stat-value" style="color:var(--accent)">'+(lastGroomed?fmtDate(lastGroomed.date):'—')+'</div>'+(lastGroomed?relLine(lastGroomed.date):'')+'<div class="stat-label">Last groomed</div></div>'
+      + (nextAppt?'<div class="card stat-card"><div class="stat-value" style="color:var(--accent-2)">'+fmtDate(nextAppt.date)+'</div>'+relLine(nextAppt.date)+'<div class="stat-label">Next appointment</div></div>':'')
       + '<div class="card stat-card"><div class="stat-value" style="color:var(--success)">'+money(total)+'</div><div class="stat-label">Total spent</div></div></div>';
     html += dateSortBtn('toggleGroomSort', groomSortAsc);
-    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate):'')+'</div></div>'+(g.phone?'<a class="btn btn-sm" href="tel:'+esc(g.phone)+'" onclick="event.stopPropagation()" title="Call '+esc(g.groomer||'the groomer')+'">📞 Call</a>':'')+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
+    html += '<div class="card">'+items.map(g=>'<div class="entry-row clickable" onclick="groomModal(\''+g.id+'\')"><div><div style="font-weight:600">'+(g.services&&g.services.length?esc(g.services.join(', ')):'Grooming')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(g.date)+(g.time?' · '+fmtClock(g.time):'')+relSuffix(g.date)+(g.groomer?' · '+esc(g.groomer):'')+(g.lineItems&&g.lineItems.length?' · '+g.lineItems.length+' item'+(g.lineItems.length===1?'':'s'):'')+(g.payMethod?' · '+esc(g.payMethod)+(((g.payMethod==='Credit card'||g.payMethod==='Debit card')&&g.ccLast4)?' '+(g.ccBrand?esc(g.ccBrand)+' ':'')+'••'+esc(g.ccLast4):''):'')+(g.nextDueDate?' · next '+fmtDate(g.nextDueDate)+(relDaysStr(g.nextDueDate)?' ('+relDaysStr(g.nextDueDate)+')':''):'')+'</div></div>'+(g.phone?'<a class="btn btn-sm" href="tel:'+esc(g.phone)+'" onclick="event.stopPropagation()" title="Call '+esc(g.groomer||'the groomer')+'">📞 Call</a>':'')+(g.cost?'<div style="font-family:JetBrains Mono,monospace;color:var(--success)">'+money(g.cost)+'</div>':'')+'</div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('groom',46)+'</div><p style="color:var(--text-secondary)">No grooming logged yet.</p></div>';
   return html;
 }
@@ -4506,12 +4526,12 @@ function renderMedsTab(){
       const nd = medNextDue(m), u = nd?untilStr(nd):null;
       const status = u ? (u.past?'<span style="color:var(--danger);font-weight:600">overdue '+u.text+'</span>':'<span style="color:'+(u.days<=7?'var(--warning)':'var(--success)')+'">due '+u.text+'</span>') : '<span style="color:var(--text-secondary)">no schedule</span>';
       const doseChip = m.dose ? ' <span class="chip-2" style="font-size:10px">'+esc(m.dose)+'</span>' : '';
-      const lastStr = m.lastGiven ? 'Last: '+fmtDate(m.lastGiven)+(m.time?' '+fmtClock(m.time):'')+(m.givenBy?' by '+esc(m.givenBy):'') : '';
+      const lastStr = m.lastGiven ? 'Last: '+fmtDate(m.lastGiven)+(m.time?' '+fmtClock(m.time):'')+relSuffix(m.lastGiven)+(m.givenBy?' by '+esc(m.givenBy):'') : '';
       const subParts = [lastStr, m.intervalDays?'every '+esc(m.intervalDays)+'d':'', nd?'Next: '+fmtDate(nd):'', m.recordNo?'#'+esc(m.recordNo):''].filter(Boolean).join(' · ');
       const doses = medDoseLogs(m.id), histOpen = medHistOpen.has(m.id);
       const hist = doses.length ? '<button type="button" class="btn btn-sm" id="medhist-btn-'+m.id+'" aria-expanded="'+histOpen+'" aria-controls="medhist-'+m.id+'" style="margin-top:6px;font-size:12px" onclick="toggleMedHist(\''+m.id+'\')">History ('+doses.length+')</button>'
         + '<div id="medhist-'+m.id+'" style="'+(histOpen?'':'display:none;')+'margin-top:6px;font-size:12px;color:var(--text-secondary);line-height:1.6">'
-        + doses.slice(0,12).map(l => '<div>'+fmtDate(l.dateTime)+' '+fmtClock(l.dateTime.slice(11,16))+(l.givenBy?' · by '+esc(l.givenBy):'')+'</div>').join('')
+        + doses.slice(0,12).map(l => '<div>'+fmtDate(l.dateTime)+' '+fmtClock(l.dateTime.slice(11,16))+relSuffix(l.dateTime)+(l.givenBy?' · by '+esc(l.givenBy):'')+'</div>').join('')
         + (doses.length>12?'<div>+ '+(doses.length-12)+' earlier — see All activity</div>':'')+'</div>' : '';
       return '<div class="entry-row"><div style="flex:1;min-width:0"><div style="font-weight:600">'+esc(m.name)+' <span class="chip-p" style="font-size:10px">'+esc(m.kind||'')+'</span>'+doseChip+'</div><div style="font-size:12px;color:var(--text-secondary)">'+subParts+'</div><div style="font-size:12px;margin-top:3px">'+status+'</div>'+hist+'</div><div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0"><button class="btn btn-sm btn-accent" onclick="giveMedNow(\''+m.id+'\')">Gave it</button><button class="btn btn-sm" onclick="medModal(\''+m.id+'\')">Edit</button></div></div>';
     }).join('')+'</div>';
@@ -4528,7 +4548,7 @@ function renderIllnessTab(){
   let html = canManage()?'<div class="card" style="text-align:center;padding:18px"><button class="btn-primary" style="max-width:300px" onclick="illnessModal()">+ Log illness</button></div>':'';
   if(items.length){
     html += dateSortBtn('toggleIllnessSort', illnessSortAsc);
-    html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
+    html += '<div class="card">'+items.map(e=>'<div class="entry-row clickable" onclick="illnessModal(\''+e.id+'\')"><div style="flex:1"><div style="font-weight:600">'+esc(e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness')+'</div><div style="font-size:12px;color:var(--text-secondary)">'+fmtDate(e.start)+relSuffix(e.start)+(e.recovery?' → '+fmtDate(e.recovery):' · ongoing')+' · '+esc(e.severity||'')+'</div><div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">'+(e.symptoms||[]).slice(0,5).map(s=>'<span class="chip">'+esc(s)+'</span>').join('')+'</div></div></div>').join('')+'</div>';
   } else html += '<div class="card empty"><div class="ico">'+svgIcon('illness',46)+'</div><p style="color:var(--text-secondary)">Hopefully you never need this — but it\'s here if your pup gets sick.</p></div>';
   return html;
 }
