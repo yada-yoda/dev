@@ -10,6 +10,17 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.16.2 - 2026-11-12
+
+The bio, the search and link-preview descriptions, and the
+machine-readable summaries now say Second City Conservatory graduate.
+They still described the training as in progress, which undersold it
+now that the Conservatory and the Grad Revues are finished. The
+resume's course list is unchanged, since the courses themselves are
+the record. llms.txt also caught up with the resume: it was missing
+NICE SHIRT, Grad Revue II and the Grad Revue courses, and listed vocal
+coaching under the wrong school.
+
 ### v0.16.1 - 2026-09-27
 
 Hero slides can now say which part of a wide photo to keep. The hero

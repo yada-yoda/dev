@@ -3,7 +3,7 @@
 
 seo:
   title: "Frank Rizzo — Actor | Rizzo.cc"
-  description: "Frank Rizzo — Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film & TV credits, headshot, training, contact, downloadable resume."
+  description: "Frank Rizzo, Chicago actor and Second City Conservatory graduate. Film and TV credits, headshots, training, and a downloadable resume."
   canonical_url: "https://rizzo.cc/"
   robots: "index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1"
   author: "Frank Rizzo"
@@ -12,7 +12,7 @@ og:
   site_name: "Rizzo.cc"
   type: "profile"
   title: "Frank Rizzo — Actor"
-  description: "Chicago-based actor. Trained at The Second City and Acting Studio Chicago. Film & TV credits, headshot, training, contact."
+  description: "Chicago-based actor and Second City Conservatory graduate. Film and TV credits, headshots, training, contact."
   image: "https://rizzo.cc/assets/og-image.png"
   image_alt: "Rizzo.cc — Frank Rizzo, Chicago-based actor"
   locale: "en_US"
