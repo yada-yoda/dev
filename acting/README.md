@@ -10,6 +10,27 @@ for agents). All are regenerated from `data/*.yml` by
 
 ## Changelog
 
+### v0.17.0 - 2026-11-12
+
+An accessibility and phone pass, from an audit of the three pages.
+
+Phones had no menu at all: the links were hidden on small screens and
+nothing replaced them. The header now shows About, Resume, Credits and
+Contact under the logo on phones, and it scrolls away with the page
+instead of sitting on top of the content.
+
+Small text that was hard to read now has enough contrast: the cyan
+labels and grey sub-lines on the cards, the site names on Resources,
+and on the printed resume the "ACTOR" line, the stat labels and the
+grey years, which were the faintest text an agent would see.
+
+Everything tappable is now at least 44 pixels tall on a touch screen
+(the mute button was 20), buttons and fields have a visible edge, and
+keyboard users get a visible focus ring. The credit tabs work with the
+arrow keys and no longer let the keyboard land on a hidden tab's links.
+The hero quote stays readable over the darkest video on phones and no
+longer runs off-center on wide screens.
+
 ### v0.16.2 - 2026-11-12
 
 The bio, the search and link-preview descriptions, and the

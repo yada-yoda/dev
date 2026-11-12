@@ -110,7 +110,7 @@ DATA = ROOT / "data"
 # Single source of truth for the version chip displayed in the footer.
 # Bump this when you release a new version of the site (and add the
 # matching ### v0.X.Y entry to README.md changelog).
-SITE_VERSION = "v0.16.2"
+SITE_VERSION = "v0.17.0"
 
 
 # ---------- helpers ----------
@@ -586,8 +586,16 @@ def gen_credits_tabs(credits):
     buttons = []
     for i, (slug, label) in enumerate(visible):
         active = " active" if i == 0 else ""
+        # ARIA tabs pattern: the selected tab is the only one in the Tab
+        # order (tabindex 0, the others -1); the page JS moves selection
+        # with the arrow keys. id/aria-controls pair each tab with the
+        # panel the *_screen generators emit (id = slug).
+        selected = "true" if i == 0 else "false"
+        tabindex = "0" if i == 0 else "-1"
+        s = esc(slug)
         buttons.append(
-            f'      <button class="tab{active}" data-tab="{esc(slug)}" role="tab">{esc(label)}</button>'
+            f'      <button class="tab{active}" data-tab="{s}" role="tab" id="tab-{s}" '
+            f'aria-selected="{selected}" aria-controls="{s}" tabindex="{tabindex}">{esc(label)}</button>'
         )
     # The .pill is the sliding cyan background behind the active tab.
     # JS sets its transform + width to track the active button.
@@ -596,6 +604,14 @@ def gen_credits_tabs(credits):
         "      <span class=\"pill\" aria-hidden=\"true\"></span>\n"
         + "\n".join(buttons)
         + "\n    </div>\n    "
+    )
+
+
+def _panel_open(cls, slug):
+    """Opening tag of a credits tab panel, labelled by its tab button."""
+    return (
+        f'\n    <div class="{cls}" id="{slug}" role="tabpanel" '
+        f'aria-labelledby="tab-{slug}">\n'
     )
 
 
@@ -616,12 +632,12 @@ def gen_film_screen(films, is_active=True):
             link_title = "View on IMDB"
         rows.append(
             f'          <tr><td class="title"><a href="{href}" target="_blank" rel="noopener" title="{link_title}">{title}</a> '
-            f'<span class="sub" style="color:var(--dim)">({esc(f["type"])}, {esc(f["year"])})</span></td>'
+            f'<span class="sub" style="color:var(--muted)">({esc(f["type"])}, {esc(f["year"])})</span></td>'
             f'<td class="role">{esc(f["role"])}</td>'
             f'<td class="dir">dir. {esc(f["director"])}</td></tr>'
         )
     return (
-        f'\n    <div class="{cls}" id="film">\n'
+        _panel_open(cls, "film") +
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Title</th><th>Role</th><th>Director</th></tr></thead>\n"
         "        <tbody>\n"
@@ -637,7 +653,7 @@ def gen_film_print(films):
     for f in films:
         rows.append(
             f'      <tr><td class="t">{esc(f["title"])} '
-            f'<em style="color:#888;font-style:normal">({esc(f["type"])}, {esc(f["year"])})</em></td>'
+            f'<em style="color:#666;font-style:normal">({esc(f["type"])}, {esc(f["year"])})</em></td>'
             f'<td class="r">{esc(f["role"])}</td>'
             f'<td class="d">dir. {esc(f["director"])}</td></tr>'
         )
@@ -657,12 +673,12 @@ def gen_tv_screen(tv, is_active=False):
     for t in tv:
         rows.append(
             f'          <tr><td class="title">{esc(t["title"])} '
-            f'<span class="sub" style="color:var(--dim)">({esc(t["season"])})</span></td>'
+            f'<span class="sub" style="color:var(--muted)">({esc(t["season"])})</span></td>'
             f'<td class="role">{esc(t["role"])}</td>'
             f'<td class="dir">{esc(t["network"])}</td></tr>'
         )
     return (
-        f'\n    <div class="{cls}" id="tv">\n'
+        _panel_open(cls, "tv") +
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Title</th><th>Role</th><th>Network</th></tr></thead>\n"
         "        <tbody>\n"
@@ -678,7 +694,7 @@ def gen_tv_print(tv):
     for t in tv:
         rows.append(
             f'      <tr><td class="t">{esc(t["title"])} '
-            f'<em style="color:#888;font-style:normal">({esc(t["season"])})</em></td>'
+            f'<em style="color:#666;font-style:normal">({esc(t["season"])})</em></td>'
             f'<td class="r">{esc(t["role"])}</td>'
             f'<td class="d">{esc(t["network"])}</td></tr>'
         )
@@ -763,7 +779,7 @@ def gen_theater_screen(theater, footnotes_doc, is_active=False):
             + "\n      </ul>"
         )
     return (
-        f'\n    <div class="{cls}" id="theater">\n'
+        _panel_open(cls, "theater") +
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Production</th><th>Role / Sketches</th><th>Stage</th></tr></thead>\n"
         "        <tbody>\n"
@@ -792,7 +808,7 @@ def gen_commercial_screen(commercial, is_active=False):
             )
         body = "\n".join(rows)
     return (
-        f'\n    <div class="{cls}" id="commercial">\n'
+        _panel_open(cls, "commercial") +
         "      <table class=\"credits\">\n"
         "        <thead><tr><th>Title</th><th>Role</th><th>Brand</th></tr></thead>\n"
         "        <tbody>\n"
