@@ -11,3 +11,6 @@ in v0.1.0; that path now redirects to the root.
 now including Clover, PawPrints, PlanMath, and Spyglass. It lists
 only visitable dev-hub apps; DASH itself and the public /acting
 site are intentionally excluded.
+
+`/blend/` (v0.1.0) is Blend, an options cost-basis averager that keeps a
+running average across fills and works out what it takes to average down.
