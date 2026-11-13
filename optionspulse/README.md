@@ -20,9 +20,10 @@ Single file: `index.html`, plain HTML/CSS/JS, no build step. No analytics. Marke
 
 ## How data is stored
 
-- One Firestore document per user: `optionspulse/{uid}` holding `positions[]`, each with its `snapshots[]`.
+- One Firestore document per user: `optionspulse/{uid}` holding `positions[]`, each with its `snapshots[]`, plus `settings.tables` with the saved column layout (names, order, visibility, sort) of each history view.
 - A per-account copy lives in localStorage so the page loads fast. Nothing is shown until you sign in.
 - Blank values stay blank. The app never copies an earlier price into a later snapshot.
+- Re-importing the NVDA history on an account that already has it only adds missing snapshots (matched by date and time) and fills empty fields. Values you entered or edited are left alone.
 
 ## Risk label rules
 
@@ -33,6 +34,14 @@ Points from the latest snapshot: premium lost (60%+ = 3, 40%+ = 2, 20%+ = 1), da
 Screenshot upload with automatic value extraction using Claude vision. The API key must not live in the page, so this needs a Cloudflare worker that holds the key and does the extraction, the same pattern as pawprints-worker. The upload area is shown as "coming soon" for now.
 
 ## Changelog
+
+### v0.2.0 (2026-11-13)
+
+The history table showed fixed columns, so numbers like last price, bid/ask size or P/L % had nowhere to go. Each view now has Table settings: show, hide, rename and reorder any column, and click a header to sort. The layout is saved to your account, so it follows you across devices. The table still never scrolls sideways, and the phone card layout uses the same choices.
+
+The built-in NVDA history was missing values that the Robinhood screenshots did show (last, previous close, high, low, bid and ask sizes), and one row had a price sitting in its evidence note. Those are corrected, and a new Nov 13 3:16 PM snapshot is added; its date and AM/PM are inferred, so please confirm them. If you already imported the history, an "Apply NVDA history updates" button adds what is missing without touching anything you edited.
+
+Snapshots now also record bid size and ask size, including in CSV import and export.
 
 ### v0.1.1 (2026-11-13)
 

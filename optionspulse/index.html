@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>OptionsPulse v0.1.1</title>
+<title>OptionsPulse v0.2.0</title>
 <meta name="robots" content="noindex">
 <meta name="description" content="Private options-position tracker: snapshots, P/L, Greeks and rule-based holding risk.">
 <meta name="color-scheme" content="dark light">
@@ -82,7 +82,23 @@ table.hist th,table.hist td{text-align:right;border-bottom:1px solid var(--line)
 table.hist th{color:var(--muted);font-weight:600}
 table.hist th:first-child,table.hist td:first-child{text-align:left;width:24%}
 table.hist tbody tr:nth-child(even){background:var(--row)}
-table.hist tbody tr:last-child{background:var(--hl)}
+table.hist tbody tr.latest{background:var(--hl)}
+table.hist th.sorted{color:var(--text)}
+.sortbtn{background:none;border:0;padding:0;min-height:0;color:inherit;font:inherit;font-weight:600;font-size:12px;width:100%;text-align:inherit;cursor:pointer;overflow-wrap:anywhere;border-radius:4px}
+.sortbtn .arrow{margin-left:3px;font-size:9px;color:var(--blue)}
+.tblbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.tblbar h2{margin:0}
+.iconbtn{display:inline-flex;align-items:center;gap:6px}
+.iconbtn svg{width:18px;height:18px;flex:0 0 auto}
+.sortrow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:10px;margin-top:8px}
+.tbl-list{display:grid;gap:6px;margin-top:12px}
+.tcol{display:grid;grid-template-columns:20px 22px minmax(0,1fr) 40px 40px;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:10px;background:var(--panel2)}
+.tcol.off{border-style:dashed;background:transparent}
+.tcol.dragover{border-color:var(--blue)}
+.tcol input[type=checkbox]{width:20px;height:20px;margin:0;padding:0}
+.tcol .tname small{display:block;font-size:11px;color:var(--muted);margin-top:2px;overflow-wrap:anywhere}
+.tcol button{min-height:40px;padding:4px 0;font-size:12px}
+.grip{cursor:grab;color:var(--muted);text-align:center;user-select:none;font-size:16px;line-height:1}
 .tag{display:inline-block;font-size:10px;color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:0 4px;margin-top:2px}
 .foot{font-size:12px;margin-top:18px}
 .empty{text-align:center;padding:36px 18px}
@@ -140,6 +156,7 @@ table.hist tbody tr:last-child{background:var(--hl)}
       <button type="button" data-act="add-snap" class="needs-pos primary">Add snapshot</button>
       <button type="button" data-act="import-csv" class="needs-pos" title="Append snapshots from a CSV with the same columns as the export">Import CSV</button>
       <button type="button" data-act="export-csv" class="needs-pos">Export CSV</button>
+      <button type="button" id="btn-seed-merge" data-act="seed" class="hidden" title="Adds missing NVDA $215 Call snapshots and fills blank fields from the built-in history. Values you entered or edited are never changed.">Apply NVDA history updates</button>
       <input type="file" id="csv-file" accept=".csv,text/csv" class="hidden">
     </div>
     <div id="dash"></div>
@@ -154,7 +171,7 @@ table.hist tbody tr:last-child{background:var(--hl)}
 
 <script>
 'use strict';
-const APP_VERSION = '0.1.1';
+const APP_VERSION = '0.2.0';
 const TZ_DEFAULT = 'America/Chicago';
 
 // ---------- Firebase (same project as Illness Tracker / PawPrints, so the same Google login works) ----------
@@ -218,8 +235,8 @@ function signOut(){ if(firebaseReady){ firebase.auth().signOut(); toast('Signed 
 // Local cache is per-uid and only read after sign-in.
 function cacheKey(uid){ return 'optionspulse_cache_' + uid; }
 function readCache(uid){
-  try { const s = JSON.parse(localStorage.getItem(cacheKey(uid)) || 'null'); if(s && Array.isArray(s.positions)) return s; } catch(e){}
-  return { positions: [], updatedAt: 0, dirty: false };
+  try { const s = JSON.parse(localStorage.getItem(cacheKey(uid)) || 'null'); if(s && Array.isArray(s.positions)){ if(!s.settings || typeof s.settings !== 'object') s.settings = {}; return s; } } catch(e){}
+  return { positions: [], settings: {}, updatedAt: 0, dirty: false };
 }
 function writeCache(){ if(!currentUser || !state) return; try { localStorage.setItem(cacheKey(currentUser.uid), JSON.stringify(state)); } catch(e){} }
 
@@ -231,7 +248,7 @@ async function loadFromFirestore(){
     if(!currentUser || currentUser.uid !== uid) return;
     const remote = snap.exists ? snap.data() : null;
     if(remote && Array.isArray(remote.positions) && !(state.dirty && state.updatedAt > (remote.updatedAt || 0))){
-      state = { positions: remote.positions, updatedAt: remote.updatedAt || 0, dirty: false };
+      state = { positions: remote.positions, settings: (remote.settings && typeof remote.settings === 'object') ? remote.settings : (state.settings || {}), updatedAt: remote.updatedAt || 0, dirty: false };
       writeCache(); render();
     } else if(state.dirty || (!remote && state.positions.length)){
       await saveToFirestore();
@@ -242,7 +259,7 @@ async function saveToFirestore(){
   if(!currentUser || !state) return;
   try {
     await ensureFirestore();
-    const payload = JSON.parse(JSON.stringify({ positions: state.positions, updatedAt: state.updatedAt, appVersion: APP_VERSION }));
+    const payload = JSON.parse(JSON.stringify({ positions: state.positions, settings: state.settings || {}, updatedAt: state.updatedAt, appVersion: APP_VERSION }));
     await db.collection('optionspulse').doc(currentUser.uid).set(payload);
     state.dirty = false; writeCache();
   } catch(e){ syncError(e); }
@@ -321,29 +338,76 @@ function riskAssess(p, s){
   return { score, level: lvl[1], cls: lvl[2], rules, lost, days, otm };
 }
 
-// ---------- Seed (NVDA $215 Call history, 7 snapshots; blanks stay null) ----------
+// ---------- Seed (NVDA $215 Call history, 8 snapshots; blanks stay null) ----------
 const SEED_FIELDS = ['date','time','dateConfidence','stock','mark','bid','ask','iv','volume','oi','delta','gamma','theta','vega','rho','notes','risk','evidence'];
 const SEED_ROWS = [
   ['2026-11-09','10:54','inferred',176.98,2.23,null,null,null,null,null,null,null,null,null,null,'Initial position snapshot: $2.23 mark versus $2.22 entry; stock $176.98. Greeks unavailable. Date inferred.','HIGH: $215 strike is $38.02 above stock, with ~39 days to expiration. Entire premium at risk; monitor position sizing.','Likely Nov 9; NVDA $176.98 exceeds Nov 10 high $174.69'],
   ['2026-11-10','08:36','inferred',172.38,1.65,1.62,1.68,53.29,356,22013,null,null,null,null,null,'Call mark fell to $1.65; NVDA $172.38. IV 53.29%, volume 356, OI 22,013.','HIGH: option remains far OTM. Time decay and further declines can erode premium; review exit level.','Likely Nov 10; previous close $2.28 consistent with Nov 9'],
-  ['2026-11-11','11:28','inferred',176.21,1.75,1.73,1.76,50.79,2879,24665,0.1309,0.0074,-0.084,0.1195,0.0217,'Call mark recovered to $1.75; delta 0.1309, theta -0.0840; IV 50.79%. OI 24,665.','HIGH: $215 strike is $38.79 above NVDA. A rally is needed, while theta remains negative.','Likely Nov 11; previous close $1.19 consistent with Nov 10'],
-  ['2026-11-12','08:43','confirmed',160.6,0.81,0.77,0.84,57.56,2105,25695,0.0677,0.0045,-0.0537,0.0662,0.01,'NVDA fell to $160.60; call mark $0.81, delta 0.0677, theta -0.0537. IV rose to 57.56%; OI 25,695.','VERY HIGH: $141 unrealized loss (-63.5%) on $222 cost. $81 remaining mark value at risk; do not hold solely to recover sunk cost.','0.79'],
-  ['2026-11-12','10:50','confirmed',164.24,1.22,1.16,1.27,57.7,7459,25695,0.0936,0.0056,-0.0718,0.0868,0.014,'Intraday rebound: NVDA +$3.64; call mark +$0.41 to $1.22; delta 0.0936, theta -0.0718, IV 57.70%; volume +5,354.','HIGH: $100 unrealized loss (-45.0%); $122 further mark value at risk. Stock $50.76 below strike with 36 days left. Consider defined exit criteria; avoid assuming recovery.',''],
+  ['2026-11-11','11:28','inferred',176.21,1.75,1.73,1.76,50.79,2879,24665,0.1309,0.0074,-0.084,0.1195,0.0217,'Call mark recovered to $1.75; delta 0.1309, theta -0.0840; IV 50.79%. OI 24,665.','HIGH: $215 strike is $38.79 above NVDA. A rally is needed, while theta remains negative.','Likely Nov 11; previous close $1.19 consistent with Nov 10. From Robinhood screenshot'],
+  ['2026-11-12','08:43','confirmed',160.6,0.81,0.77,0.84,57.56,2105,25695,0.0677,0.0045,-0.0537,0.0662,0.01,'NVDA fell to $160.60; call mark $0.81, delta 0.0677, theta -0.0537. IV rose to 57.56%; OI 25,695.','VERY HIGH: $141 unrealized loss (-63.5%) on $222 cost. $81 remaining mark value at risk; do not hold solely to recover sunk cost.','From Robinhood screenshot'],
+  ['2026-11-12','10:50','confirmed',164.24,1.22,1.16,1.27,57.7,7459,25695,0.0936,0.0056,-0.0718,0.0868,0.014,'Intraday rebound: NVDA +$3.64; call mark +$0.41 to $1.22; delta 0.0936, theta -0.0718, IV 57.70%; volume +5,354.','HIGH: $100 unrealized loss (-45.0%); $122 further mark value at risk. Stock $50.76 below strike with 36 days left. Consider defined exit criteria; avoid assuming recovery.','From Robinhood screenshot'],
   ['2026-11-13','08:48','confirmed',162.92,0.99,0.97,1.01,58.6,171,23969,0.0792,0.005,-0.0634,0.0747,0.0115,'Call mark down $0.23 (-18.9%) versus Nov 12 10:50; NVDA down $1.32 (-0.8%). Delta fell 0.0936 to 0.0792; IV rose 0.90 pts. OI down 1,726 (-6.7%); volume 171 in new session; change vs previous reading is -7,288 (-97.7%), not a like-for-like activity decline.','VERY HIGH: $99 remaining mark value at risk; P/L -$123 (-55.4%) on $222 entry. NVDA Latest stock price not shown, 35 days left. Consider defined exit criteria; earnings rebound is uncertain.','Nov 13 morning screenshot; 8:48 AM CT'],
-  ['2026-11-13','09:35','confirmed',159.41,0.83,0.81,0.85,59.78,1213,23969,0.0682,0.0044,-0.0565,0.0653,0.0097,'Mark down $0.16 (-16.2%) from 8:48 AM; IV up 1.18 percentage points; volume +1,042 intraday; OI unchanged. Stock price looked up from market data, not from the screenshot.','VERY HIGH: $83 current mark value remains at risk, $139 unrealized loss (-62.6%). The $215 call is far OTM; earnings volatility and time decay remain key risks.','Date and time confirmed by user: Nov 13, 2026, 9:35 AM CST. Stock price LOOKED UP (not in screenshot): Yahoo Finance 1-minute bar close, NVDA, 9:35 AM CT, 159.41']
+  ['2026-11-13','09:35','confirmed',159.41,0.83,0.81,0.85,59.78,1213,23969,0.0682,0.0044,-0.0565,0.0653,0.0097,'Mark down $0.16 (-16.2%) from 8:48 AM; IV up 1.18 percentage points; volume +1,042 intraday; OI unchanged. Stock price looked up from market data, not from the screenshot.','VERY HIGH: $83 current mark value remains at risk, $139 unrealized loss (-62.6%). The $215 call is far OTM; earnings volatility and time decay remain key risks.','Date and time confirmed by user: Nov 13, 2026, 9:35 AM CST. Stock price LOOKED UP (not in screenshot): Yahoo Finance 1-minute bar close, NVDA, 9:35 AM CT, 159.41'],
+  ['2026-11-13','15:16','inferred',162.2,0.89,0.86,0.91,58.33,2954,23969,0.0731,0.0047,-0.0593,0.0696,0.0105,'Mark up $0.06 (+7.2%) from 9:35 AM; NVDA up $2.79 (+1.8%). Volume +1,741 intraday; OI unchanged. IV down 1.45 points; delta 0.0682 to 0.0731. Bid $0.86 x 284, ask $0.91 x 451.','VERY HIGH (computed, 7 points): $89 current mark value at risk; P/L -$133 (-59.9%) on $222 cost. Stock $52.80 below strike with 35 days left.','Robinhood screenshot; date and AM/PM inferred, please confirm']
 ];
-const SNAP_NUM = ['stock','mark','bid','ask','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho'];
+// Fields the seed rows above do not carry, keyed by "date time".
+const SEED_EXTRA = {
+  '2026-11-11 11:28': { last: 1.76, prevClose: 1.19, high: 2.12, low: 1.23, bidSize: 149, askSize: 24 },
+  '2026-11-12 08:43': { last: 0.79, prevClose: 1.43, high: 1.36, low: 0.56, bidSize: 1, askSize: 79 },
+  '2026-11-12 10:50': { last: 1.26, prevClose: 1.43, high: 1.36, low: 0.56, bidSize: 18, askSize: 14 },
+  '2026-11-13 09:35': { last: 0.81, prevClose: 1.22, high: 1.55, low: 0.79 },
+  '2026-11-13 15:16': { last: 0.86, prevClose: 1.22, high: 1.55, low: 0.79, bidSize: 284, askSize: 451 }
+};
+// Values shipped by earlier seed versions. A saved field still holding one of these was never edited, so the corrected value may replace it.
+const SEED_LEGACY = {
+  '2026-11-11 11:28': { evidence: 'Likely Nov 11; previous close $1.19 consistent with Nov 10' },
+  '2026-11-12 08:43': { evidence: '0.79' }
+};
+const SEED_KEY = 'nvda-215c-2026-12-18';
+const SNAP_NUM = ['stock','mark','bid','ask','bidSize','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho'];
 function blankSnap(){ const s = { id: uid(), date: '', time: '', tz: TZ_DEFAULT, dateConfidence: '', notes: '', risk: '', evidence: '' }; SNAP_NUM.forEach(k => s[k] = null); return s; }
-function importSeed(){
-  if(state.positions.some(p => p.seedKey === 'nvda-215c-2026-12-18')){ toast('NVDA $215 Call history is already imported'); return; }
-  const p = { id: uid(), seedKey: 'nvda-215c-2026-12-18', ticker: 'NVDA', type: 'call', strike: 215, expiry: '2026-12-18', qty: 1, multiplier: 100, avgPremium: 2.22, openedDate: '2026-11-09', snapshots: [] };
-  SEED_ROWS.forEach(r => { const s = blankSnap(); SEED_FIELDS.forEach((f, i) => s[f] = r[i]); p.snapshots.push(s); });
-  Object.assign(p.snapshots[p.snapshots.length - 1], { last: 0.81, prevClose: 1.22, high: 1.55, low: 0.79 });
-  state.positions.push(p); activeId = p.id; noteIdx = null; commit(); toast('Imported 7 NVDA snapshots');
+function seedSnaps(){
+  return SEED_ROWS.map(r => { const s = blankSnap(); SEED_FIELDS.forEach((f, i) => s[f] = r[i]); return Object.assign(s, SEED_EXTRA[s.date + ' ' + s.time] || {}); });
+}
+const isBlank = v => v == null || v === '';
+// Merge plan for an already-imported seed: add missing snapshots (by date + time), fill blank fields only.
+function seedPlan(p){
+  const add = [], fills = [];
+  seedSnaps().forEach(ns => {
+    const key = ns.date + ' ' + ns.time, cur = p.snapshots.find(x => x.date === ns.date && x.time === ns.time);
+    if(!cur){ add.push(ns); return; }
+    const legacy = SEED_LEGACY[key] || {}, keys = [];
+    Object.keys(ns).forEach(k => {
+      if(k === 'id' || isBlank(ns[k])) return;
+      const cv = cur[k];
+      if((isBlank(cv) || (k in legacy && cv === legacy[k])) && cv !== ns[k]) keys.push(k);
+    });
+    if(keys.length) fills.push({ cur, ns, keys });
+  });
+  return { add, fills };
+}
+async function importSeed(){
+  const ex = state.positions.find(p => p.seedKey === SEED_KEY);
+  if(!ex){
+    const p = { id: uid(), seedKey: SEED_KEY, ticker: 'NVDA', type: 'call', strike: 215, expiry: '2026-12-18', qty: 1, multiplier: 100, avgPremium: 2.22, openedDate: '2026-11-09', snapshots: seedSnaps() };
+    state.positions.push(p); activeId = p.id; noteIdx = null; commit(); toast('Imported ' + p.snapshots.length + ' NVDA snapshots');
+    return;
+  }
+  const plan = seedPlan(ex), nFields = plan.fills.reduce((a, f) => a + f.keys.length, 0);
+  if(!plan.add.length && !plan.fills.length){ toast('NVDA history is already up to date'); return; }
+  const when = s => esc(shortDate(s.date) + ' ' + to12(s.time));
+  const ok = await confirmBox('Update NVDA history',
+    '<p>Add <b>' + plan.add.length + '</b> snapshot(s)' + (plan.add.length ? ' (' + plan.add.map(when).join(', ') + ')' : '') +
+    ' and fill <b>' + nFields + '</b> blank field(s) in <b>' + plan.fills.length + '</b> snapshot(s)' + (plan.fills.length ? ' (' + plan.fills.map(f => when(f.cur)).join(', ') + ')' : '') +
+    '?</p><p class="legend">Values you entered or edited are never changed. Only empty fields, and evidence text an earlier version shipped by mistake, are updated.</p>', 'Update');
+  if(!ok) return;
+  plan.add.forEach(s => ex.snapshots.push(s));
+  plan.fills.forEach(f => f.keys.forEach(k => f.cur[k] = f.ns[k]));
+  sortSnaps(ex); activeId = ex.id; noteIdx = null; commit(); toast('NVDA history updated');
 }
 
 // ---------- CSV ----------
-const CSV_COLS = [['date','date'],['time','time'],['timezone','tz'],['date_confidence','dateConfidence'],['stock','stock'],['mark','mark'],['bid','bid'],['ask','ask'],['last','last'],['prev_close','prevClose'],['high','high'],['low','low'],['iv','iv'],['volume','volume'],['oi','oi'],['delta','delta'],['gamma','gamma'],['theta','theta'],['vega','vega'],['rho','rho'],['analysis_notes','notes'],['holding_risk','risk'],['evidence','evidence']];
+const CSV_COLS = [['date','date'],['time','time'],['timezone','tz'],['date_confidence','dateConfidence'],['stock','stock'],['mark','mark'],['bid','bid'],['ask','ask'],['bid_size','bidSize'],['ask_size','askSize'],['last','last'],['prev_close','prevClose'],['high','high'],['low','low'],['iv','iv'],['volume','volume'],['oi','oi'],['delta','delta'],['gamma','gamma'],['theta','theta'],['vega','vega'],['rho','rho'],['analysis_notes','notes'],['holding_risk','risk'],['evidence','evidence']];
 const CSV_ALIASES = { tz: 'tz', notes: 'notes', risk: 'risk' };
 function parseCSV(text){
   const rows = []; let row = [], f = '', q = false;
@@ -363,7 +427,7 @@ function csvToSnaps(text){
   const rows = parseCSV(text); if(rows.length < 2) return [];
   const norm = h => h.toLowerCase().replace(/[^a-z]/g, '');
   const map = {}; CSV_COLS.forEach(([c, k]) => map[norm(c)] = k); Object.keys(CSV_ALIASES).forEach(a => map[a] = CSV_ALIASES[a]);
-  map.prevclose = 'prevClose'; map.dateconfidence = 'dateConfidence';
+  map.prevclose = 'prevClose'; map.dateconfidence = 'dateConfidence'; map.bidsize = 'bidSize'; map.asksize = 'askSize';
   const keys = rows[0].map(h => map[norm(h)] || null);
   return rows.slice(1).map(r => {
     const s = blankSnap();
@@ -451,6 +515,7 @@ function snapshotForm(s){
     '<div><label for="f-conf" title="Confirmed = the date/time was visible or you know it. Inferred = worked out from other clues.">Date confidence</label><select id="f-conf"' + (s.dateConfidence ? '' : ' class="attn"') + '><option value="">Choose...</option><option value="confirmed"' + (s.dateConfidence === 'confirmed' ? ' selected' : '') + '>Confirmed</option><option value="inferred"' + (s.dateConfidence === 'inferred' ? ' selected' : '') + '>Inferred</option></select></div>' +
     M('stock', 'Stock', 'Underlying price at the snapshot. Leave blank if not shown; earlier values are never carried forward.') +
     M('mark', 'Mark', 'Mid price of the option per share. Drives value and P/L.') + M('bid', 'Bid') + M('ask', 'Ask') +
+    F('bidSize', 'Bid size', 'Contracts waiting at the bid (the number after the x). Shows how deep the bid is if you sell.', 'numeric') + F('askSize', 'Ask size', 'Contracts offered at the ask (the number after the x).', 'numeric') +
     M('last', 'Last', 'Last traded price of the option.') + M('prevClose', 'Prev close', "Option's previous session close.") + M('high', 'High', 'Session high of the option.') + M('low', 'Low', 'Session low of the option.') +
     F('iv', 'IV %', 'Implied volatility in percent, e.g. 57.56.') + F('volume', 'Volume', 'Contracts traded so far this session. Resets daily.', 'numeric') + F('oi', 'Open interest', 'Open contracts, usually updated once per day before the open.', 'numeric') +
     F('delta', 'Delta', 'Approximate option price change per $1 stock move.') + F('gamma', 'Gamma', 'Change in delta per $1 stock move.') + F('theta', 'Theta', 'Approximate value lost per day from time decay (per share).') + F('vega', 'Vega', 'Price change per 1 point of IV.') + F('rho', 'Rho', 'Price change per 1 point of interest rates.') +
@@ -492,31 +557,156 @@ function chartSVG(rows){
   rows.forEach((d, i) => { if(d.date !== last){ h += '<text x="' + x(i) + '" y="' + (H - 14) + '" text-anchor="middle" class="axis">' + shortDate(d.date) + '</text>'; last = d.date; } });
   return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + esc(METRICS.find(m => m[0] === activeMetric)[1]) + ' over time">' + h + '</svg>';
 }
-const VIEWS = {
-  overview: { cols: [['date','Date / time'],['stock','Stock'],['mark','Mark'],['pl','P/L'],['iv','IV']], help: 'Price, position value and volatility at each snapshot. Blank means the value was not shown.' },
-  activity: { cols: [['date','Date / time'],['volume','Volume'],['volDelta','Δ Vol'],['oi','OI'],['oiDelta','Δ OI'],['volOi','Vol/OI']], help: 'Δ Vol compares consecutive readings that have a volume. Intraday = same date. Cross-session = different dates; volume resets daily, so a cross-session change is not a change in activity. Δ OI compares consecutive OI readings. Vol/OI is session activity, not direction.' },
-  greeks: { cols: [['date','Date / time'],['delta','Delta'],['gamma','Gamma'],['theta','Theta'],['vega','Vega'],['rho','Rho']], help: 'Greeks exactly as recorded; missing values stay blank.' }
+// Every column a history view can show: key -> [default header, what it is].
+const COLS = {
+  date: ['Date / time', 'Snapshot date and time. Always first and always shown.'],
+  stock: ['Stock', 'Underlying stock price at the snapshot.'],
+  mark: ['Mark', 'Option mid price per share.'],
+  bid: ['Bid', 'Best bid per share.'],
+  ask: ['Ask', 'Best ask per share.'],
+  bidSize: ['Bid size', 'Contracts waiting at the bid.'],
+  askSize: ['Ask size', 'Contracts offered at the ask.'],
+  last: ['Last', 'Last traded option price.'],
+  prevClose: ['Prev close', "Option's previous session close."],
+  high: ['High', 'Option session high.'],
+  low: ['Low', 'Option session low.'],
+  spread: ['Spread', 'Ask minus bid.'],
+  pl: ['P/L', 'Unrealized profit or loss in dollars.'],
+  plPct: ['P/L %', 'Unrealized profit or loss as a percent of cost basis.'],
+  iv: ['IV', 'Implied volatility.'],
+  volume: ['Volume', 'Contracts traded this session.'],
+  volDelta: ['Δ Vol', 'Change in volume since the previous reading, with intraday or cross-session tag.'],
+  oi: ['OI', 'Open interest.'],
+  oiDelta: ['Δ OI', 'Change in open interest since the previous reading.'],
+  volOi: ['Vol/OI', 'Volume as a percent of open interest.'],
+  delta: ['Delta', 'Option delta.'], gamma: ['Gamma', 'Option gamma.'], theta: ['Theta', 'Option theta.'], vega: ['Vega', 'Option vega.'], rho: ['Rho', 'Option rho.']
 };
+const COL_KEYS = Object.keys(COLS);
+const MONEY_COLS = ['stock','mark','bid','ask','last','prevClose','high','low','spread'];
+const VIEWS = {
+  overview: { name: 'Price & P/L', cols: ['date','stock','mark','pl','iv'], help: 'Price, position value and volatility at each snapshot. Blank means the value was not shown.' },
+  activity: { name: 'Volume & Open Interest', cols: ['date','volume','volDelta','oi','oiDelta','volOi'], help: 'Δ Vol compares consecutive readings that have a volume. Intraday = same date. Cross-session = different dates; volume resets daily, so a cross-session change is not a change in activity. Δ OI compares consecutive OI readings. Vol/OI is session activity, not direction.' },
+  greeks: { name: 'Greeks & IV', cols: ['date','delta','gamma','theta','vega','rho'], help: 'Greeks exactly as recorded; missing values stay blank.' }
+};
+const LABEL_MAX = 24;
+function defaultLayout(v){
+  const d = VIEWS[v].cols;
+  return { cols: d.concat(COL_KEYS.filter(k => !d.includes(k))).map(k => ({ k, label: '', show: d.includes(k) })), sort: null };
+}
+// Saved layout merged with the column pool: unknown keys dropped, new keys appended hidden, Date forced first and visible.
+function getLayout(v){
+  const saved = state && state.settings && state.settings.tables && state.settings.tables[v];
+  if(!saved || !Array.isArray(saved.cols)) return defaultLayout(v);
+  const seen = new Set(), cols = [];
+  saved.cols.forEach(c => { if(c && COLS[c.k] && !seen.has(c.k)){ seen.add(c.k); cols.push({ k: c.k, label: typeof c.label === 'string' ? c.label.slice(0, LABEL_MAX) : '', show: !!c.show }); } });
+  COL_KEYS.forEach(k => { if(!seen.has(k)) cols.push({ k, label: '', show: false }); });
+  const dc = cols.splice(cols.findIndex(c => c.k === 'date'), 1)[0]; dc.show = true; cols.unshift(dc);
+  if(cols.filter(c => c.show).length < 2) return defaultLayout(v);
+  const s = saved.sort, sort = s && COLS[s.k] && (s.dir === 'asc' || s.dir === 'desc') ? { k: s.k, dir: s.dir } : null;
+  return { cols, sort };
+}
+function setLayout(v, layout){
+  state.settings = state.settings || {}; state.settings.tables = state.settings.tables || {};
+  state.settings.tables[v] = layout; commit();
+}
+function colLabel(c){ return c.label || COLS[c.k][0]; }
+function sortRows(rows, sort){
+  const list = rows.map((d, i) => ({ d, i }));
+  if(!sort) return list;
+  const val = d => sort.k === 'date' ? d.date + ' ' + (d.time || '') : d[sort.k];
+  list.sort((a, b) => {
+    const x = val(a.d), y = val(b.d), xb = isBlank(x), yb = isBlank(y);
+    if(xb || yb) return xb && yb ? a.i - b.i : xb ? 1 : -1; // blanks last either way
+    const c = typeof x === 'string' ? x.localeCompare(y) : x - y;
+    return (sort.dir === 'desc' ? -c : c) || a.i - b.i;
+  });
+  return list;
+}
+function cycleSort(k){
+  const L = getLayout(historyView), s = L.sort;
+  L.sort = !s || s.k !== k ? { k, dir: 'asc' } : s.dir === 'asc' ? { k, dir: 'desc' } : null;
+  setLayout(historyView, L);
+}
 function cell(d, k){
   if(k === 'date') return esc(shortDate(d.date)) + ' ' + esc(to12(d.time)) + (d.dateConfidence === 'inferred' ? '<br><span class="tag" title="Date was inferred, not seen">inferred</span>' : '');
   if(k === 'pl') return d.pl == null ? '—' : '<span class="' + (d.pl >= 0 ? 'green' : 'red') + '">' + money(d.pl) + '</span>';
-  if(k === 'stock' || k === 'mark') return money(d[k]);
+  if(k === 'plPct') return d.plPct == null ? '—' : '<span class="' + (d.plPct >= 0 ? 'green' : 'red') + '">' + signed(d.plPct, 1) + '%</span>';
+  if(MONEY_COLS.includes(k)) return money(d[k]);
   if(k === 'iv') return d.iv == null ? '—' : fmt(d.iv, 2) + '%';
-  if(k === 'volume' || k === 'oi') return fmt(d[k], 0);
+  if(k === 'volume' || k === 'oi' || k === 'bidSize' || k === 'askSize') return fmt(d[k], 0);
   if(k === 'volDelta') return d.volDelta == null ? '—' : signed(d.volDelta, 0) + '<br><span class="tag">' + d.volKind + '</span>';
   if(k === 'oiDelta') return d.oiDelta == null ? '—' : signed(d.oiDelta, 0);
   if(k === 'volOi') return d.volOi == null ? '—' : fmt(d.volOi, 1) + '%';
   return fmt(d[k], 4);
 }
+
+// ---------- Table settings modal (edits a draft; applied only on Save) ----------
+const GEAR_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>';
+const LABEL_TIP = 'Header text for this column. Short labels fit better: the table never scrolls sideways, so long headers wrap and squeeze the numbers. Leave empty to use the default name.';
+let tblDraft = null, dragFrom = null;
+function tableSettings(){
+  tblDraft = JSON.parse(JSON.stringify(getLayout(historyView)));
+  openModal('<div class="modal-head"><h2>Table settings: ' + esc(VIEWS[historyView].name) + '</h2><button type="button" class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<p class="legend">Show, rename and reorder the columns of this view. Date / time stays first. At least 2 columns stay visible. Nothing changes until you save.</p>' +
+    '<div class="sortrow"><div><label for="t-sortk" title="Row order of the table. Chronological is oldest first. Clicking a column header does the same thing.">Sort by</label><select id="t-sortk"></select></div>' +
+    '<div><label for="t-sortd" title="Ascending puts the smallest value (or oldest date) first. Blank values always go last.">Direction</label><select id="t-sortd"><option value="asc">Ascending</option><option value="desc">Descending</option></select></div></div>' +
+    '<div id="tbl-list" class="tbl-list"></div>' +
+    '<div class="modal-actions"><button type="button" data-act="tbl-reset" style="margin-right:auto" title="Put this view back to its original columns, names and order. Applied when you save.">Reset view to default</button>' +
+    '<button type="button" data-act="close">Cancel</button><button type="button" class="primary" data-act="tbl-save">Save</button></div>');
+  fillSortControls(); renderTblList();
+}
+function fillSortControls(){
+  const s = tblDraft.sort;
+  $('t-sortk').innerHTML = '<option value="">Chronological (default)</option>' + COL_KEYS.map(k => '<option value="' + k + '"' + (s && s.k === k ? ' selected' : '') + '>' + esc(COLS[k][0]) + '</option>').join('');
+  $('t-sortd').value = s ? s.dir : 'asc';
+}
+function renderTblList(){
+  const n = tblDraft.cols.length;
+  $('tbl-list').innerHTML = tblDraft.cols.map((c, i) => {
+    const name = COLS[c.k][0], locked = i === 0;
+    return '<div class="tcol' + (c.show ? '' : ' off') + '" data-i="' + i + '">' +
+      '<span class="grip"' + (locked ? '' : ' draggable="true" title="Drag to reorder"') + ' aria-hidden="true">' + (locked ? '' : '&#8942;') + '</span>' +
+      '<input type="checkbox" data-tshow="' + i + '"' + (c.show ? ' checked' : '') + (locked ? ' disabled' : '') + ' aria-label="Show ' + esc(name) + '" title="' + (locked ? 'Date / time is always shown' : 'Show or hide this column') + '">' +
+      '<div class="tname"><input data-tlabel="' + i + '" maxlength="' + LABEL_MAX + '" autocomplete="off" value="' + esc(c.label) + '" placeholder="' + esc(name) + '" aria-label="Header for ' + esc(name) + '" title="' + esc(LABEL_TIP) + '"><small title="' + esc(COLS[c.k][1]) + '">' + esc(name) + (locked ? ' (locked first)' : '') + '</small></div>' +
+      '<button type="button" data-tmove="-1" data-i="' + i + '" aria-label="Move ' + esc(name) + ' up"' + (i <= 1 ? ' disabled' : '') + '>&#9650;</button>' +
+      '<button type="button" data-tmove="1" data-i="' + i + '" aria-label="Move ' + esc(name) + ' down"' + (locked || i === n - 1 ? ' disabled' : '') + '>&#9660;</button></div>';
+  }).join('');
+}
+function moveCol(from, to){
+  if(!tblDraft || from < 1 || to < 1 || to >= tblDraft.cols.length || from === to) return;
+  const [c] = tblDraft.cols.splice(from, 1); tblDraft.cols.splice(to, 0, c); renderTblList();
+}
+function saveTableSettings(){
+  if(!tblDraft) return;
+  const cols = tblDraft.cols.map(c => ({ k: c.k, label: c.label.trim().slice(0, LABEL_MAX), show: c.k === 'date' ? true : !!c.show }));
+  if(cols.filter(c => c.show).length < 2){ toast('Keep at least 2 columns visible'); return; }
+  const k = $('t-sortk').value;
+  setLayout(historyView, { cols, sort: k ? { k, dir: $('t-sortd').value === 'desc' ? 'desc' : 'asc' } : null });
+  tblDraft = null; closeModal(); toast('Table layout saved');
+}
+document.addEventListener('input', e => { const i = e.target.dataset && e.target.dataset.tlabel; if(i != null && tblDraft) tblDraft.cols[+i].label = e.target.value; });
+document.addEventListener('change', e => {
+  const i = e.target.dataset && e.target.dataset.tshow; if(i == null || !tblDraft) return;
+  if(!e.target.checked && tblDraft.cols.filter(c => c.show).length <= 2){ e.target.checked = true; toast('Keep at least 2 columns visible'); return; }
+  tblDraft.cols[+i].show = e.target.checked; e.target.closest('.tcol').classList.toggle('off', !e.target.checked);
+});
+document.addEventListener('dragstart', e => { const g = e.target.closest && e.target.closest('.grip'); if(!g || !tblDraft) return; dragFrom = +g.parentNode.dataset.i; try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(dragFrom)); } catch(err){} });
+document.addEventListener('dragover', e => { const r = dragFrom != null && e.target.closest && e.target.closest('.tcol'); if(!r) return; e.preventDefault(); document.querySelectorAll('.tcol.dragover').forEach(x => x !== r && x.classList.remove('dragover')); r.classList.add('dragover'); });
+document.addEventListener('drop', e => { const r = dragFrom != null && e.target.closest && e.target.closest('.tcol'); if(!r) return; e.preventDefault(); const from = dragFrom; dragFrom = null; moveCol(from, Math.max(1, +r.dataset.i)); });
+document.addEventListener('dragend', () => { dragFrom = null; document.querySelectorAll('.tcol.dragover').forEach(x => x.classList.remove('dragover')); });
+
 function render(){
   if(!currentUser || !state) return;
   const sel = $('pos-select');
   if(!activePos()) activeId = state.positions.length ? state.positions[0].id : null;
   sel.innerHTML = state.positions.length ? state.positions.map(p => '<option value="' + esc(p.id) + '"' + (p.id === activeId ? ' selected' : '') + '>' + esc(posLabel(p)) + '</option>').join('') : '<option value="">No positions yet</option>';
   document.querySelectorAll('.needs-pos').forEach(b => b.disabled = !activeId);
+  const sp = state.positions.find(x => x.seedKey === SEED_KEY), plan = sp ? seedPlan(sp) : null, nPlan = plan ? plan.add.length + plan.fills.length : 0;
+  $('btn-seed-merge').classList.toggle('hidden', !nPlan);
+  $('btn-seed-merge').textContent = 'Apply NVDA history updates (' + nPlan + ')';
   const p = activePos(), dash = $('dash');
   if(!p){
-    dash.innerHTML = '<section class="panel empty"><h2>No positions yet</h2><p>Create a position, or load the NVDA $215 Call history (7 snapshots, Nov 9 to Nov 13).</p><div class="toolbar" style="justify-content:center"><button type="button" class="primary" data-act="seed">Import NVDA $215 Call history</button><button type="button" data-act="new-pos">New position</button></div></section>';
+    dash.innerHTML = '<section class="panel empty"><h2>No positions yet</h2><p>Create a position, or load the NVDA $215 Call history (' + SEED_ROWS.length + ' snapshots, Nov 9 to Nov 13).</p><div class="toolbar" style="justify-content:center"><button type="button" class="primary" data-act="seed">Import NVDA $215 Call history</button><button type="button" data-act="new-pos">New position</button></div></section>';
     return;
   }
   const rows = derive(p), cost = costBasis(p), mult = p.multiplier || 100;
@@ -552,11 +742,16 @@ function render(){
   h += '<section class="panel section"><h2>Additional-loss scenarios</h2><p>Changes in remaining contract value from the latest mark value of ' + money(v) + '. Illustrations, not forecasts.</p><div class="scenarios">' +
     [[0.25, 'Premium falls 25%'], [0.5, 'Premium falls 50%'], [1, 'Expires worthless']].map(([f, lab]) => '<div class="scenario"><small>' + lab + '</small><strong class="red">' + (v == null ? '—' : money(-v * f)) + '</strong><small>' + (f === 1 ? 'Total lost ' + money(cost) : 'Remaining value ' + (v == null ? '—' : money(v * (1 - f)))) + '</small></div>').join('') + '</div></section>';
   h += '<section class="panel section"><h2>Snapshot notes</h2><label for="note-select">Snapshot</label><div class="toolbar"><select id="note-select">' + rows.map((d, i) => '<option value="' + i + '"' + (i === noteIdx ? ' selected' : '') + '>' + esc(longDate(d.date) + ' · ' + to12(d.time)) + (d.dateConfidence === 'inferred' ? ' (inferred)' : '') + '</option>').join('') + '</select><button type="button" data-act="edit-snap">Edit</button><button type="button" class="danger" data-act="del-snap">Delete</button></div>' +
-    '<div class="notes"><div><div class="eyebrow">Notes</div><p>' + (esc(N.notes) || 'Not recorded') + '</p>' + (N.evidence ? '<p class="legend">Evidence: ' + esc(N.evidence) + '</p>' : '') + '</div><div><div class="eyebrow gold">Holding risk note</div><p>' + (esc(N.risk) || 'Not recorded') + '</p><p class="legend">Computed for this snapshot: <b class="' + riskAssess(p, N).cls + '">' + riskAssess(p, N).level + '</b></p></div></div></section>';
-  const V = VIEWS[historyView];
-  h += '<section class="panel section"><h2>Snapshot history</h2><div class="history-tabs" role="group" aria-label="History view">' + [['overview', 'Price & P/L'], ['activity', 'Volume & OI'], ['greeks', 'Greeks & IV']].map(([k, lab]) => '<button type="button" data-view="' + k + '"' + (k === historyView ? ' class="active"' : '') + '>' + lab + '</button>').join('') + '</div>' +
-    '<p class="legend">' + V.help + '</p><div class="tablewrap"><table class="hist"><thead><tr>' + V.cols.map(c => '<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>' +
-    rows.map(d => '<tr>' + V.cols.map(c => '<td data-label="' + c[1] + '">' + cell(d, c[0]) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></section>';
+    '<div class="notes"><div><div class="eyebrow">Notes</div><p>' + (esc(N.notes) || 'Not recorded') + '</p>' + (N.bid != null || N.ask != null ? '<p class="legend">Bid ' + money(N.bid) + (N.bidSize != null ? ' x ' + fmt(N.bidSize, 0) : '') + ' · Ask ' + money(N.ask) + (N.askSize != null ? ' x ' + fmt(N.askSize, 0) : '') + (N.last != null ? ' · Last ' + money(N.last) : '') + '</p>' : '') + (N.evidence ? '<p class="legend">Evidence: ' + esc(N.evidence) + '</p>' : '') + '</div><div><div class="eyebrow gold">Holding risk note</div><p>' + (esc(N.risk) || 'Not recorded') + '</p><p class="legend">Computed for this snapshot: <b class="' + riskAssess(p, N).cls + '">' + riskAssess(p, N).level + '</b></p></div></div></section>';
+  const V = VIEWS[historyView], TL = getLayout(historyView), vis = TL.cols.filter(c => c.show), srt = TL.sort;
+  const th = c => {
+    const on = srt && srt.k === c.k, lab = colLabel(c);
+    return '<th scope="col"' + (on ? ' class="sorted" aria-sort="' + (srt.dir === 'asc' ? 'ascending' : 'descending') + '"' : '') + '><button type="button" class="sortbtn" data-sort="' + c.k + '" title="' + esc(COLS[c.k][1] + ' Click to sort ascending, again for descending, a third time for date order.') + '">' + esc(lab) + (on ? '<span class="arrow" aria-hidden="true">' + (srt.dir === 'asc' ? '&#9650;' : '&#9660;') + '</span>' : '') + '</button></th>';
+  };
+  h += '<section class="panel section"><div class="tblbar"><h2>Snapshot history</h2><button type="button" class="iconbtn" data-act="tbl-settings" title="Show, hide, rename, reorder and sort the columns of this view">' + GEAR_SVG + 'Table settings</button></div>' +
+    '<div class="history-tabs" role="group" aria-label="History view">' + [['overview', 'Price & P/L'], ['activity', 'Volume & OI'], ['greeks', 'Greeks & IV']].map(([k, lab]) => '<button type="button" data-view="' + k + '"' + (k === historyView ? ' class="active"' : '') + '>' + lab + '</button>').join('') + '</div>' +
+    '<p class="legend">' + V.help + (srt ? ' Sorted by ' + esc(colLabel(TL.cols.find(c => c.k === srt.k))) + ' (' + (srt.dir === 'asc' ? 'ascending' : 'descending') + '); the latest snapshot stays highlighted.' : '') + '</p><div class="tablewrap"><table class="hist"><thead><tr>' + vis.map(th).join('') + '</tr></thead><tbody>' +
+    sortRows(rows, srt).map(o => '<tr' + (o.i === rows.length - 1 ? ' class="latest"' : '') + '>' + vis.map(c => '<td data-label="' + esc(colLabel(c)) + '">' + cell(o.d, c.k) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></section>';
   dash.innerHTML = h;
 }
 
@@ -564,10 +759,15 @@ function render(){
 document.addEventListener('click', async e => {
   const m = e.target.closest('[data-metric]'); if(m){ activeMetric = m.dataset.metric; render(); return; }
   const v = e.target.closest('[data-view]'); if(v){ historyView = v.dataset.view; render(); return; }
+  const so = e.target.closest('[data-sort]'); if(so && state){ cycleSort(so.dataset.sort); return; }
+  const tm = e.target.closest('[data-tmove]'); if(tm){ const i = +tm.dataset.i; moveCol(i, i + +tm.dataset.tmove); const b = document.querySelector('[data-tmove="' + tm.dataset.tmove + '"][data-i="' + (i + +tm.dataset.tmove) + '"]'); if(b && !b.disabled) b.focus(); return; }
   const a = e.target.closest('[data-act]'); if(!a || !state) return;
   const p = activePos();
   switch(a.dataset.act){
-    case 'close': closeModal(); break;
+    case 'close': tblDraft = null; closeModal(); break;
+    case 'tbl-settings': if(p) tableSettings(); break;
+    case 'tbl-save': saveTableSettings(); break;
+    case 'tbl-reset': if(tblDraft){ tblDraft = defaultLayout(historyView); fillSortControls(); renderTblList(); toast('Defaults restored here; Save to keep them'); } break;
     case 'seed': importSeed(); break;
     case 'new-pos': positionForm(null); break;
     case 'edit-pos': if(p) positionForm(p); break;
