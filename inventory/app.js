@@ -5,7 +5,12 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.2.0';
+const APP_VERSION = '1.2.1';
+
+// What the UI prints where a value is missing (P&L rows, card SKU, days,
+// suggested price). An en dash reads as "nothing here" without looking
+// like a minus sign or a sentence break.
+const NO_VALUE = '\u2013';
 
 const STORAGE_KEY = 'theLedger.inventory.v1';
 const SETTINGS_KEY = 'theLedger.settings.v1';
@@ -50,9 +55,12 @@ const DEFAULT_FIELDS = {
   // Additional cost basis
   item_tax: '', other_expenses: '', other_expenses_notes: '',
   status: 'Draft', sold_platform: '',
-  date_listed: '', date_sold: '',
+  date_listed: '', date_sold: '', date_shipped: '',
   url_poshmark: '', url_ebay: '',
   ebay_item_number: '', poshmark_order_number: '',
+  // Private: who bought it (disputes, repeat customers). Never written into
+  // the Poshmark TXT or eBay File Exchange listing exports.
+  buyer: '',
   // Pricing research (manual entries with date stamps)
   research_ebay_avg: '', research_ebay_date: '', research_ebay_notes: '',
   research_poshmark_avg: '', research_poshmark_date: '', research_poshmark_notes: '',
@@ -79,6 +87,22 @@ const DEFAULT_FIELDS = {
   created_at: '', updated_at: ''
 };
 
+// Select options whose wording changed. Older saves are mapped on load so the
+// select still matches them and the listing description reads cleanly.
+const LEGACY_VALUES = {
+  has_packaging: {
+    'Yes \u2014 Original Box': 'Yes, original box',
+    'Yes \u2014 Original Bag': 'Yes, original bag',
+  },
+};
+function normalizeItem(item) {
+  if (!item) return item;
+  Object.entries(LEGACY_VALUES).forEach(([field, map]) => {
+    if (map[item[field]]) item[field] = map[item[field]];
+  });
+  return item;
+}
+
 // ============ STATE ============
 let state = {
   items: [],
@@ -94,7 +118,7 @@ let state = {
 function loadState() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) state.items = JSON.parse(saved);
+    if (saved) state.items = JSON.parse(saved).map(normalizeItem);
     const settings = localStorage.getItem(SETTINGS_KEY);
     if (settings) state.settings = { ...state.settings, ...JSON.parse(settings) };
   } catch (e) {
@@ -111,7 +135,7 @@ function saveState() {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(state.settings));
   } catch (e) {
     console.error('Save failed:', e);
-    toast('Save failed — storage may be full. Export a backup.', 'error');
+    toast('Save failed: browser storage may be full. Export a backup.', 'error');
   }
 }
 
@@ -189,12 +213,14 @@ function render() {
   const grid = document.getElementById('itemGrid');
   const table = document.getElementById('itemTable');
   const empty = document.getElementById('emptyState');
+  const noMatch = document.getElementById('noMatchState');
   const count = document.getElementById('resultCount');
   const view = state.settings.view;
 
   if (state.items.length === 0) {
     grid.style.display = 'none';
     table.style.display = 'none';
+    noMatch.classList.remove('visible');
     empty.classList.add('visible');
     count.textContent = '';
     return;
@@ -202,6 +228,16 @@ function render() {
 
   empty.classList.remove('visible');
   count.textContent = `${filtered.length} of ${state.items.length} items`;
+
+  if (filtered.length === 0) {
+    grid.style.display = 'none';
+    table.style.display = 'none';
+    document.getElementById('noMatchDetail').textContent = describeActiveFilters();
+    noMatch.classList.add('visible');
+    populateCategoryFilter();
+    return;
+  }
+  noMatch.classList.remove('visible');
 
   if (view === 'grid') {
     grid.style.display = '';
@@ -215,8 +251,75 @@ function render() {
 
   document.querySelectorAll('[data-edit-id]').forEach(el => {
     el.addEventListener('click', () => openEditor(el.dataset.editId));
+    // Cards and rows carry tabindex="0" so keyboard users can open them too.
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openEditor(el.dataset.editId);
+      }
+    });
   });
   populateCategoryFilter();
+}
+
+// One sentence naming every filter that is hiding items, for the
+// "No items match" panel. Sort order never hides anything, so it's skipped.
+function describeActiveFilters() {
+  const { search, category, status, scope } = state.filter;
+  const parts = [];
+  if (search) parts.push(`search "${search}"`);
+  if (category) parts.push(`category ${category}`);
+  if (status) parts.push(`status ${status}`);
+  if (scope === 'active') parts.push('the Active card');
+  if (scope === 'sold') parts.push('the Sold card');
+  const total = state.items.length;
+  const lead = parts.length ? `Filtering by ${parts.join(', ')}.` : 'The current filters hide every item.';
+  return `${lead} Clear filters to see all ${total} item${total === 1 ? '' : 's'}.`;
+}
+
+function clearFilters() {
+  state.filter = { ...state.filter, search: '', category: '', status: '', scope: '' };
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterCategory').value = '';
+  document.getElementById('filterStatus').value = '';
+  render();
+  document.getElementById('searchInput').focus();
+}
+
+// Local calendar date as YYYY-MM-DD. toISOString() is UTC, which rolls over
+// to tomorrow during a US evening.
+function localDateStr(d = new Date()) {
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// Ship-by = date sold + 3 business days (Sat/Sun skipped): the handling
+// window Poshmark shows on the order page. Only for items still in "Sold"
+// with no shipped date; returns null otherwise.
+const SHIP_BY_BUSINESS_DAYS = 3;
+function shipByInfo(item) {
+  if (item.status !== 'Sold' || item.date_shipped) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(item.date_sold || '');
+  if (!m) return null;
+  const due = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+  let added = 0;
+  while (added < SHIP_BY_BUSINESS_DAYS) {
+    due.setDate(due.getDate() + 1);
+    const wd = due.getDay();
+    if (wd !== 0 && wd !== 6) added++;
+  }
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return {
+    label: due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    late: today > due
+  };
+}
+
+function shipByHtml(item) {
+  const s = shipByInfo(item);
+  if (!s) return '';
+  return `<span class="ship-by${s.late ? ' late' : ''}">Ship by ${s.label}${s.late ? ' (late)' : ''}</span>`;
 }
 
 function renderStats() {
@@ -263,12 +366,13 @@ function renderCard(item) {
     : (item.price ? `<span class="card-price">${formatMoney(item.price)}</span>` : `<span class="card-price no-price">unpriced</span>`);
 
   return `
-    <div class="item-card" data-edit-id="${item.id}">
+    <div class="item-card" data-edit-id="${item.id}" tabindex="0" role="button" aria-label="Edit ${escapeHtml(item.name || 'Untitled')}">
       <div class="card-image">${img}</div>
       <div class="card-body">
-        <div class="card-sku">${escapeHtml(item.sku || '—')}</div>
+        <div class="card-sku">${escapeHtml(item.sku || NO_VALUE)}</div>
         <div class="card-name">${escapeHtml(item.name || 'Untitled')}</div>
         <div class="card-meta">${metaParts.map((p, i) => i === 0 ? p : `<span class="card-meta-dot">·</span>${p}`).join(' ')}</div>
+        ${shipByHtml(item)}
         <div class="card-footer">
           ${price}
           <span class="status-badge ${statusClass}">${escapeHtml(item.status || 'Draft')}</span>
@@ -282,14 +386,14 @@ function renderTable(items) {
     <th>SKU</th><th>Name</th><th>Category</th><th>Year</th>
     <th>Condition</th><th>Status</th><th>Price</th><th>Location</th>
   </tr></thead><tbody>${items.map(i => `
-    <tr data-edit-id="${i.id}">
-      <td class="col-sku">${escapeHtml(i.sku || '—')}</td>
+    <tr data-edit-id="${i.id}" tabindex="0" aria-label="Edit ${escapeHtml(i.name || 'Untitled')}">
+      <td class="col-sku">${escapeHtml(i.sku || NO_VALUE)}</td>
       <td class="col-name">${escapeHtml(i.name || 'Untitled')}</td>
       <td>${escapeHtml(i.category || '')}</td>
       <td>${escapeHtml(i.bb_year || '')}</td>
       <td>${escapeHtml(i.condition || '')}</td>
-      <td><span class="status-badge status-${slug(i.status || 'draft')}">${escapeHtml(i.status || 'Draft')}</span></td>
-      <td class="col-price">${formatMoney(i.status === 'Sold' || i.status === 'Shipped' ? i.sold_price : i.price) || '—'}</td>
+      <td><span class="status-badge status-${slug(i.status || 'draft')}">${escapeHtml(i.status || 'Draft')}</span>${shipByHtml(i)}</td>
+      <td class="col-price">${formatMoney(i.status === 'Sold' || i.status === 'Shipped' ? i.sold_price : i.price) || NO_VALUE}</td>
       <td>${escapeHtml(i.location || '')}</td>
     </tr>`).join('')}</tbody></table>`;
 }
@@ -317,7 +421,7 @@ function applyFilters(items) {
     if (status && i.status !== status) return false;
     if (search) {
       const q = search.toLowerCase();
-      const blob = [i.name, i.sku, i.upc, i.brand, i.tags, i.location, i.listing_title, i.bb_year, i.category]
+      const blob = [i.name, i.sku, i.upc, i.brand, i.tags, i.location, i.listing_title, i.bb_year, i.category, i.buyer]
         .join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
@@ -386,7 +490,7 @@ function updateResearchSummary() {
   const marginRow = document.getElementById('marginRow');
 
   if (present.length === 0) {
-    valueEl.textContent = '—';
+    valueEl.textContent = NO_VALUE;
     valueEl.classList.add('empty');
     subEl.textContent = 'Fill in any platform above';
     useBtn.disabled = true;
@@ -455,7 +559,7 @@ function openEditor(id = null) {
   if (id) {
     item = state.items.find(i => i.id === id);
     if (!item) return;
-    document.getElementById('modalEyebrow').textContent = `Entry · ${item.sku || '—'}`;
+    document.getElementById('modalEyebrow').textContent = `Entry · ${item.sku || NO_VALUE}`;
     document.getElementById('modalTitle').textContent = item.name || 'Untitled';
     document.getElementById('deleteBtn').style.display = '';
     Object.entries(item).forEach(([k, v]) => {
@@ -569,7 +673,7 @@ async function saveItem(e) {
       cloudSaveItemSafe(savedItem);
     } catch (err) {
       console.error('Photo upload failed:', err);
-      toast('Photo upload failed — item saved to cloud without new photos', 'error');
+      toast('Photo upload failed. The item saved to the cloud without its new photos; they stay on this device.', 'error');
       cloudSaveItemSafe(savedItem);
     }
   }
@@ -621,10 +725,10 @@ async function lookupUPC(upc) {
 
   if (found) {
     applyProductData(found);
-    status.innerHTML = `✓ Found via <strong>${found.source}</strong> — review the auto-filled fields`;
+    status.innerHTML = `Found via <strong>${escapeHtml(found.source)}</strong>. Review the auto-filled fields.`;
     status.className = 'lookup-status success';
   } else {
-    status.innerHTML = `No match found in public databases. This is normal for vintage/collectible items — fill in manually. UPC is saved for reference.`;
+    status.innerHTML = `No match found in public databases. This is normal for vintage and collectible items, so fill in the details manually. The UPC is saved for reference.`;
     status.className = 'lookup-status';
   }
 }
@@ -715,7 +819,7 @@ async function addPhotoFromUrl(url) {
     state.currentPhotos.push(data);
     renderPhotoPreview();
     return true;
-  } catch (e) { return false; /* CORS or network issue — caller decides */ }
+  } catch (e) { return false; /* CORS or network issue; caller decides */ }
 }
 
 // Sequential on purpose: the gallery order on eBay is the order the seller
@@ -751,7 +855,7 @@ async function importFromEbay(raw) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) {
       const msg = data.error === 'not_configured'
-        ? 'eBay import is not switched on yet — the lookup service is still waiting for its eBay API keys.'
+        ? 'eBay import is not switched on yet: the lookup service is still waiting for its eBay API keys. Add the item by hand for now.'
         : (data.message || `eBay lookup failed (${res.status})`);
       setEbayImportStatus(escapeHtml(msg), 'error');
       return;
@@ -764,16 +868,16 @@ async function importFromEbay(raw) {
     let photoNote = '';
     const wanted = (item.photos || []).slice(0, EBAY_IMPORT_MAX_PHOTOS);
     if (wanted.length && state.currentPhotos.length === 0) {
-      setEbayImportStatus(`✓ Imported ${title} — pulling ${wanted.length} photo${wanted.length === 1 ? '' : 's'}…`, 'loading');
+      setEbayImportStatus(`Imported ${title}. Pulling ${wanted.length} photo${wanted.length === 1 ? '' : 's'}…`, 'loading');
       const added = await addPhotosFromUrls(wanted);
       photoNote = added
         ? `, ${added} photo${added === 1 ? '' : 's'}`
         : ' (photos could not be downloaded)';
     }
-    setEbayImportStatus(`✓ Imported ${title} — ${filled} field${filled === 1 ? '' : 's'}${photoNote} filled. Review before saving.${endedNote}`, 'success');
+    setEbayImportStatus(`Imported ${title}: ${filled} field${filled === 1 ? '' : 's'}${photoNote} filled. Review before saving.${endedNote}`, 'success');
   } catch (err) {
     console.error('eBay import failed:', err);
-    setEbayImportStatus('Could not reach the eBay lookup service — check your connection and try again.', 'error');
+    setEbayImportStatus('Could not reach the eBay lookup service. Check your connection and try again.', 'error');
   } finally {
     btn.disabled = false;
   }
@@ -878,7 +982,7 @@ function applyEbayListing(item) {
 
   const cond = mapEbayCondition(item.condition);
   if (cond) set('condition', cond, isNew);
-  const condNote = [item.condition, item.condition_description].filter(Boolean).join(' — ');
+  const condNote = [item.condition, item.condition_description].filter(Boolean).join(': ');
   if (condNote && (!cond || item.condition_description)) set('condition_notes', 'eBay: ' + condNote);
 
   set('ebay_item_number', item.ebay_item_number, true);
@@ -1034,7 +1138,7 @@ function doBeanieLookup() {
   resEl.innerHTML = results.map((r, idx) => `
     <button type="button" class="beanie-result" data-bb-idx="${idx}">
       <strong>${escapeHtml(r.name)}</strong>
-      <small>${escapeHtml(r.year || '')}${r.style ? ' · Style #' + escapeHtml(r.style) : ''}${r.retired ? ' · Retired ' + escapeHtml(r.retired) : ''}${r.notes ? ' — ' + escapeHtml(r.notes.slice(0, 80)) + (r.notes.length > 80 ? '…' : '') : ''}</small>
+      <small>${escapeHtml(r.year || '')}${r.style ? ' · Style #' + escapeHtml(r.style) : ''}${r.retired ? ' · Retired ' + escapeHtml(r.retired) : ''}${r.notes ? ' · ' + escapeHtml(r.notes.slice(0, 80)) + (r.notes.length > 80 ? '…' : '') : ''}</small>
     </button>
   `).join('');
   resEl.classList.add('open');
@@ -1134,7 +1238,7 @@ function renderPhotoPreview() {
   el.innerHTML = state.currentPhotos.map((src, idx) => `
     <div class="photo-thumb">
       <img src="${src}" alt="photo ${idx + 1}" />
-      <button type="button" class="photo-remove" data-idx="${idx}">×</button>
+      <button type="button" class="photo-remove" data-idx="${idx}" aria-label="Remove photo ${idx + 1}">×</button>
     </div>`).join('');
   el.querySelectorAll('.photo-remove').forEach(btn => {
     btn.onclick = () => {
@@ -1209,7 +1313,7 @@ function exportPoshmark() {
     if (i.size) lines.push(`SIZE: ${i.size}`);
     if (i.color) lines.push(`COLOR: ${i.color}`);
     lines.push(`CONDITION: ${i.condition}`);
-    lines.push(`PRICE: ${formatMoney(i.price) || '—'}`);
+    lines.push(`PRICE: ${formatMoney(i.price) || NO_VALUE}`);
     if (i.min_price) lines.push(`MIN ACCEPT: ${formatMoney(i.min_price)}`);
     lines.push('');
     lines.push('DESCRIPTION:');
@@ -1302,7 +1406,7 @@ function buildDescription(i, platform) {
   if (i.has_variations && i.variation_description) {
     parts.push(`• Variation: ${i.variation_description}`);
   } else if (i.has_variations) {
-    parts.push(`• Variation: each one is unique — colors and patterns vary`);
+    parts.push(`• Variation: each one is unique, colors and patterns vary`);
   }
   parts.push(`• Condition: ${i.condition}`);
   if (i.condition_notes) parts.push(`• Flaws/Notes: ${i.condition_notes}`);
@@ -1385,7 +1489,7 @@ function applyImport(incoming, userBeanies, mode, formatLabel) {
     item.created_at = item.created_at || nowISO();
     item.updated_at = nowISO();
     item.photos = Array.isArray(item.photos) ? item.photos : [];
-    return item;
+    return normalizeItem(item);
   });
 
   if (mode === 'replace') {
@@ -1434,7 +1538,7 @@ async function doImport() {
       // dates and numbers as display strings so downstream parsing is uniform.
       const rows = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { defval: '', raw: false });
       ({ incoming, formatLabel } = rowsToIncoming(rows, 'spreadsheet'));
-      if (wb.SheetNames.length > 1) formatLabel += ` — sheet "${sheetName}"`;
+      if (wb.SheetNames.length > 1) formatLabel += `, sheet "${sheetName}"`;
     } else {
       const rows = parseCSV(await readFileAs(file, 'text'));
       ({ incoming, formatLabel } = rowsToIncoming(rows, 'CSV'));
@@ -1504,6 +1608,8 @@ function templateFieldsAndExample() {
     carrier: 'USPS Ground Advantage',
     ship_cost: '4.50',
     private_notes: 'Source: estate sale',
+    // buyer, date_sold and date_shipped stay blank on purpose: the example
+    // row is a live listing, and a buyer on an unsold item would mislead.
   };
   return { fields, example };
 }
@@ -1518,7 +1624,7 @@ function buildCsvTemplate() {
 function downloadCsvTemplate(e) {
   if (e) e.preventDefault();
   downloadBlob(buildCsvTemplate(), 'the-ledger-import-template.csv', 'text/csv');
-  toast('CSV template downloaded — fill it in and re-upload via Import', 'success');
+  toast('CSV template downloaded. Fill it in and upload it through Import.', 'success');
 }
 
 // Same columns + example row as the CSV template, but a real .xlsx so it
@@ -1540,7 +1646,7 @@ async function downloadXlsxTemplate(e) {
     XLSX.utils.book_append_sheet(wb, ws, 'Inventory');
     const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
     downloadBlob(out, 'the-ledger-import-template.xlsx', XLSX_MIME);
-    toast('Excel template downloaded — fill it in and re-upload via Import', 'success');
+    toast('Excel template downloaded. Fill it in and upload it through Import.', 'success');
   } catch (err) {
     console.error(err);
     toast('Could not build the Excel template: ' + err.message, 'error');
@@ -1573,6 +1679,9 @@ const EBAY_COLUMN_MAP = {
   'Start date':          'date_listed',
   'Sold date':           'date_sold',
   'Sale date':           'date_sold',
+  'Buyer username':      'buyer',
+  'Buyer Username':      'buyer',
+  'Buyer name':          'buyer',
 };
 
 function looksLikeEbayCsv(headers) {
@@ -1586,7 +1695,12 @@ function ebayRowToItem(row) {
   const item = {};
   Object.entries(row).forEach(([k, v]) => {
     const dst = EBAY_COLUMN_MAP[(k || '').trim()];
-    if (dst) item[dst] = String(v == null ? '' : v).trim();
+    if (!dst) return;
+    const val = String(v == null ? '' : v).trim();
+    // Sold reports can carry both "Buyer username" and "Buyer name"; keep
+    // whichever non-empty one comes first (the username, in eBay's order).
+    if (dst === 'buyer' && item.buyer) return;
+    item[dst] = val;
   });
   // Fallback: use the listing title as the item name
   if (!item.name && item.listing_title) item.name = item.listing_title;
@@ -1696,8 +1810,20 @@ function autoFillFees() {
   Object.entries(fees).forEach(([k, v]) => {
     if (v !== '' && form.elements[k]) form.elements[k].value = v;
   });
+  // Poshmark sales ship on a prepaid label: the buyer pays Poshmark for
+  // postage, so the seller neither charges nor pays any. Only blanks are
+  // filled, so a value the user typed (e.g. an upgraded label) survives.
+  const isPosh = /posh/i.test(form.elements.sold_platform.value || '');
+  if (isPosh) {
+    ['postage_paid', 'ship_cost'].forEach(name => {
+      const el = form.elements[name];
+      if (el && el.value === '') el.value = '0.00';
+    });
+  }
   updatePnl();
-  toast('Standard fees filled — adjust to match your seller statement', 'success');
+  toast(isPosh
+    ? 'Poshmark fee filled. Postage is 0.00: prepaid label, the buyer pays Poshmark directly.'
+    : 'Standard fees filled. Adjust them to match your seller statement.', 'success');
 }
 
 function getPnlInputs() {
@@ -1735,8 +1861,8 @@ function updatePnl() {
 
   // Status line
   $('pnlStatus').textContent = i.sold
-    ? 'Item is sold — values reflect actuals'
-    : 'Not sold yet — values are projections based on listing price';
+    ? 'Item is sold. Values reflect actuals.'
+    : 'Not sold yet. Values are projections based on the listing price.';
 
   // Revenue
   if (totalRevenue > 0) {
@@ -1746,7 +1872,7 @@ function updatePnl() {
     if (i.revenuePostage > 0) parts.push('+ postage ' + fmt$(i.revenuePostage));
     $('pnlRevenueDetail').textContent = parts.join('  ');
   } else {
-    $('pnlRevenue').textContent = '—';
+    $('pnlRevenue').textContent = NO_VALUE;
     $('pnlRevenueDetail').textContent = 'No price set';
   }
 
@@ -1760,7 +1886,7 @@ function updatePnl() {
     if (i.postagePaid > 0) parts.push('+ postage paid ' + fmt$(i.postagePaid));
     $('pnlCostDetail').textContent = parts.join('  ');
   } else {
-    $('pnlCost').textContent = '—';
+    $('pnlCost').textContent = NO_VALUE;
     $('pnlCostDetail').textContent = 'No costs entered';
   }
 
@@ -1775,14 +1901,14 @@ function updatePnl() {
     if (i.fees.other > 0) parts.push('Other ' + fmt$(i.fees.other));
     $('pnlFeesDetail').textContent = parts.join('  ');
   } else {
-    $('pnlFees').textContent = '—';
-    $('pnlFeesDetail').textContent = i.sold ? 'No fees entered — try Auto-fill' : 'Fees fill in once sold';
+    $('pnlFees').textContent = NO_VALUE;
+    $('pnlFeesDetail').textContent = i.sold ? 'No fees entered. Try Auto-fill standard fees.' : 'Fees fill in once sold';
   }
 
   // Net
   const netEl = $('pnlNet');
   if (totalRevenue === 0 && totalCost === 0) {
-    netEl.textContent = '—';
+    netEl.textContent = NO_VALUE;
     netEl.className = 'pnl-row-amount';
     $('pnlMarginDetail').textContent = '';
   } else {
@@ -1823,15 +1949,15 @@ function updateDaysPanel() {
   const activeDays = sold ? daysBetween(listed, sold) : daysBetween(listed, today);
   const activeLabel = document.getElementById('daysActiveLabel');
   activeLabel.textContent = sold ? 'Total days listed' : 'Days active';
-  document.getElementById('daysActiveValue').textContent = activeDays != null ? activeDays + ' days' : '—';
+  document.getElementById('daysActiveValue').textContent = activeDays != null ? activeDays + ' days' : NO_VALUE;
   document.getElementById('daysActiveSub').textContent = sold
-    ? `Listed ${listed} → sold ${sold}`
+    ? `Listed ${listed}, sold ${sold}`
     : `Listed ${listed}`;
 
   if (sold) {
     soldBlock.hidden = false;
     const dts = daysBetween(listed, sold);
-    document.getElementById('daysToSoldValue').textContent = dts != null ? dts + ' days' : '—';
+    document.getElementById('daysToSoldValue').textContent = dts != null ? dts + ' days' : NO_VALUE;
     document.getElementById('daysToSoldSub').textContent = dts != null
       ? (dts < 7 ? 'Quick flip' : dts < 30 ? 'Normal turnover' : dts < 90 ? 'Slow mover' : 'Long tail')
       : '';
@@ -1852,14 +1978,14 @@ function openSettings() {
   } else if (state.demoMode) {
     syncEl.textContent = 'Demo mode (in memory only)';
   } else {
-    syncEl.textContent = 'Guest — local only';
+    syncEl.textContent = 'Guest, local only';
   }
   // Wipe-button copy varies depending on auth state
   const wipeNote = document.getElementById('wipeNote');
   if (user) {
-    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. Your cloud data is <strong>not</strong> touched — you\'d still see your items after signing in again.';
+    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. Your cloud data is <strong>not</strong> touched, so your items come back when you sign in again.';
   } else {
-    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. <strong>Cannot be undone</strong> for guest data — export a JSON backup first if you want to keep it.';
+    wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. <strong>Cannot be undone</strong> for guest data. Export a JSON backup first if you want to keep it.';
   }
   document.getElementById('settingsModal').classList.add('open');
 }
@@ -1907,7 +2033,7 @@ function shouldAutoDemo() {
     if (localStorage.getItem(STORAGE_KEY)) return false;
     if (localStorage.getItem(DEMO_DISMISSED_KEY)) return false;
   } catch (e) {
-    return false; // localStorage disabled / private mode — bail safely
+    return false; // localStorage disabled / private mode: bail safely
   }
   return true;
 }
@@ -1931,7 +2057,7 @@ function enterDemoMode() {
   if (banner) banner.hidden = false;
   document.body.classList.add('demo-mode');
   render();
-  toast('Demo mode on — sample data, nothing is saved', 'success');
+  toast('Demo mode on: sample data, nothing is saved', 'success');
 }
 
 // userDismissed=true means the visitor clicked "Exit demo" deliberately —
@@ -2030,7 +2156,20 @@ function onCloudAuthChanged(user) {
     cloudUnsubItems = window.firestoreApi.subscribeItems(
       user.uid,
       async (items) => {
-        state.items = items.map(i => ({ ...DEFAULT_FIELDS, ...i }));
+        const prevById = new Map(state.items.map(i => [i.id, i]));
+        let keptLocalPhotos = false;
+        state.items = items.map(i => {
+          const merged = normalizeItem({ ...DEFAULT_FIELDS, ...i });
+          const prev = prevById.get(merged.id);
+          // A failed Storage upload makes saveItem strip data: photos before the Firestore write; keep the local copies instead of letting this echo wipe them.
+          if ((!Array.isArray(merged.photos) || merged.photos.length === 0) && prev && Array.isArray(prev.photos)
+              && prev.photos.some(p => typeof p === 'string' && p.startsWith('data:'))) {
+            merged.photos = prev.photos;
+            keptLocalPhotos = true;
+          }
+          return merged;
+        });
+        if (keptLocalPhotos) saveState();
         render();
         if (!cloudMigrationOffered) {
           cloudMigrationOffered = true;
@@ -2040,7 +2179,7 @@ function onCloudAuthChanged(user) {
       (err) => {
         const code = err && err.code;
         if (code === 'permission-denied') {
-          toast('Cloud access denied — check Firestore rules', 'error');
+          toast('Cloud access denied. Check the Firestore rules for this project.', 'error');
         } else {
           toast('Cloud sync error: ' + (code || err.message || 'unknown'), 'error');
         }
@@ -2119,7 +2258,7 @@ async function maybeOfferMigration() {
   }
 
   if (itemsFail > 0) {
-    toast(`Uploaded ${itemsOk} of ${localOnlyItems.length} items (${itemsFail} failed — see console)`, 'error');
+    toast(`Uploaded ${itemsOk} of ${localOnlyItems.length} items (${itemsFail} failed, see the browser console)`, 'error');
   } else {
     const summaryDone = [];
     if (itemsOk > 0) summaryDone.push(`${itemsOk} item${itemsOk === 1 ? '' : 's'}`);
@@ -2132,7 +2271,7 @@ function cloudSaveItemSafe(item) {
   if (!isSignedIn() || !window.firestoreApi) return;
   window.firestoreApi.saveItem(cloudUid, item).catch(err => {
     console.error('Cloud save failed:', err);
-    toast('Cloud save failed — change is saved locally', 'error');
+    toast('Cloud save failed. The change is saved on this device.', 'error');
   });
 }
 
@@ -2140,7 +2279,7 @@ function cloudDeleteItemSafe(itemId) {
   if (!isSignedIn() || !window.firestoreApi) return;
   window.firestoreApi.deleteItem(cloudUid, itemId).catch(err => {
     console.error('Cloud delete failed:', err);
-    toast('Cloud delete failed — try again when online', 'error');
+    toast('Cloud delete failed. Try again when you are online.', 'error');
   });
 }
 
@@ -2211,7 +2350,7 @@ function init() {
   // covers the case where someone forgets to bump the static title on
   // release. The static title still matters for SEO + social cards, so
   // we leave a sensible hardcoded fallback in index.html.
-  document.title = 'The Ledger v' + APP_VERSION + ' — Collectibles Inventory';
+  document.title = 'The Ledger v' + APP_VERSION + ' \u00b7 Collectibles Inventory';
 
   wireAuthUI();
 
@@ -2261,7 +2400,8 @@ function init() {
   document.getElementById('addBtn').onclick = () => openEditor();
   document.getElementById('modalClose').onclick = closeEditor;
   document.getElementById('cancelBtn').onclick = closeEditor;
-  document.querySelector('#itemModal .modal-backdrop').onclick = closeEditor;
+  // No backdrop close on purpose: a stray tap outside the form must not throw
+  // away a half-filled entry. X, Cancel, Save, or Escape close it.
   document.getElementById('deleteBtn').onclick = deleteCurrentItem;
   document.getElementById('itemForm').onsubmit = saveItem;
 
@@ -2286,6 +2426,32 @@ function init() {
     document.querySelector('[name="sku"]').value = nextSku(cat);
   };
   document.querySelector('[name="listing_title"]').addEventListener('input', updateTitleCount);
+
+  // Moving an item to Shipped stamps today's date, unless the user already
+  // typed one (they may be catching up on yesterday's drop-off).
+  const statusSelect = document.querySelector('#itemForm [name="status"]');
+  statusSelect.addEventListener('change', () => {
+    const shipped = document.querySelector('#itemForm [name="date_shipped"]');
+    if (statusSelect.value === 'Shipped' && shipped && !shipped.value) {
+      shipped.value = localDateStr();
+    }
+  });
+
+  // Tooltip badges: reachable by keyboard, and read aloud by screen readers.
+  document.querySelectorAll('.info-tip').forEach(el => {
+    el.tabIndex = 0;
+    el.setAttribute('role', 'note');
+    el.setAttribute('aria-label', el.dataset.tip || '');
+  });
+
+  // Reference DB size, counted from the data instead of hardcoded copy.
+  const beanieCountEl = document.getElementById('beanieDbCount');
+  if (beanieCountEl && typeof BEANIE_DB !== 'undefined') {
+    beanieCountEl.textContent = String(BEANIE_DB.length);
+  }
+
+  const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+  if (clearFiltersBtn) clearFiltersBtn.onclick = clearFilters;
 
   const hasVarToggle = document.getElementById('hasVariationsToggle');
   if (hasVarToggle) hasVarToggle.addEventListener('change', syncVariationFieldVisibility);
@@ -2438,15 +2604,17 @@ function init() {
   if (dlTpl) dlTpl.onclick = downloadCsvTemplate;
   const dlXlsxTpl = document.getElementById('downloadXlsxTemplateLink');
   if (dlXlsxTpl) dlXlsxTpl.onclick = downloadXlsxTemplate;
-  document.querySelector('#importModal .modal-backdrop').onclick = () => document.getElementById('importModal').classList.remove('open');
+  // Import modal: like the editor, closes only via Cancel, Import, or Escape.
 
   // Restore view
   document.querySelectorAll('.view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === state.settings.view));
 
   // Keyboard
   document.addEventListener('keydown', e => {
+    // Escape is the keyboard X: it closes every modal, the form ones included.
     if (e.key === 'Escape') {
       closeScanner();
+      if (document.getElementById('itemModal').classList.contains('open')) closeEditor();
       document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !document.querySelector('.modal.open')) {

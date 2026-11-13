@@ -38,7 +38,7 @@ const BEANIE_DB = [
     style: "4062",
     poem: "Peanut the elephant walks on tip-toes\nQuiet and gentle wherever she goes\nShe'll bring you luck and happiness\nYou'll love her cuteness, we must confess!",
     retired: "1998-05-01",
-    notes: "Royal (dark) Blue version is the rare one — manufactured by mistake in 1995, only about 2000 made. Light blue version is common."
+    notes: "Royal (dark) Blue version is the rare one, manufactured by mistake in 1995, only about 2000 made. Light blue version is common."
   },
   {
     name: "Peanut the Light Blue Elephant",
@@ -47,7 +47,7 @@ const BEANIE_DB = [
     style: "4062",
     poem: "Peanut the elephant walks on tip-toes\nQuiet and gentle wherever she goes\nShe'll bring you luck and happiness\nYou'll love her cuteness, we must confess!",
     retired: "1998-05-01",
-    notes: "Light blue version — much more common than Royal Blue."
+    notes: "Light blue version, much more common than Royal Blue."
   },
   {
     name: "Patti the Platypus",
@@ -110,7 +110,7 @@ const BEANIE_DB = [
     style: "4000",
     poem: "See Spot sprint, see Spot run\nYou and Spot will have lots of fun\nSpot likes to play a lot with a ball\nBut it is you he likes best of all!",
     retired: "1998-10-01",
-    notes: "Original 9 Beanie Baby. WITHOUT SPOT (no spot on back) is the extremely rare early version — could be worth thousands."
+    notes: "Original 9 Beanie Baby. WITHOUT SPOT (no spot on back) is the extremely rare early version. Could be worth thousands."
   },
   {
     name: "Flash the Dolphin",
@@ -128,7 +128,7 @@ const BEANIE_DB = [
     style: "4010",
     poem: "Cubbie used to eat crackers and honey\nAnd what happened to him was funny\nHe was stung by fourteen bees\nNow Cubbie eats broccoli and cheese!",
     retired: "1997-12-31",
-    notes: "Originally named 'Brownie' — very rare. Renamed 'Cubbie' in late 1993. First bear ever."
+    notes: "Originally named 'Brownie', very rare. Renamed 'Cubbie' in late 1993. First bear ever."
   },
   {
     name: "Valentino the Bear",
@@ -146,7 +146,7 @@ const BEANIE_DB = [
     style: "4053",
     poem: "All races, all colors, under the sun\nJoin hands together and have some fun\nDance to the music, rock and roll is the sound\nPeace and love make the world go 'round!",
     retired: "1999-07-14",
-    notes: "Tie-dye bear — each one is unique. Darker/brighter colored versions are more sought after."
+    notes: "Tie-dye bear: each one is unique. Darker/brighter colored versions are more sought after."
   },
   {
     name: "Erin the Bear",
@@ -164,7 +164,7 @@ const BEANIE_DB = [
     style: "4188",
     poem: "Wearing the flag for all to see\nSymbol of freedom for you and me\nRed white and blue - the colors come\nLets all hear it for the Fourth of July!",
     retired: "1998-12-31",
-    notes: "1998 MLB All-Star Game commemorative — those versions are rarer."
+    notes: "1998 MLB All-Star Game commemorative; those versions are rarer."
   },
   {
     name: "Millennium (originally Millenium) the Bear",
@@ -173,7 +173,7 @@ const BEANIE_DB = [
     style: "4226",
     poem: "A brand new century has come to call\nHealth and happiness to one and all\nBring on the fireworks and all the fun\nCelebrate the Millennium it has only begun!",
     retired: "2000-03-17",
-    notes: "Original tag misspells 'Millennium' as 'Millenium' — common. Corrected versions exist too. Check both tags."
+    notes: "Original tag misspells 'Millennium' as 'Millenium' (common). Corrected versions exist too. Check both tags."
   },
   {
     name: "Curly the Bear",
@@ -191,7 +191,7 @@ const BEANIE_DB = [
     style: "4051",
     poem: "The old Beanies all parade single file\nHe tye-dyed them when he came in style\nLooking good has always been his aim\nAnd you'll love it, we know, just the same!",
     retired: "1997-05-11",
-    notes: "Jerry Garcia tribute (Grateful Dead). Pulled from shelves due to licensing — makes it desirable."
+    notes: "Jerry Garcia tribute (Grateful Dead). Pulled from shelves due to licensing, which makes it desirable."
   },
   {
     name: "Humphrey the Camel",
@@ -313,7 +313,7 @@ const BEANIE_DB = [
     style: "4067",
     poem: "Bongo the monkey lives in a tree\nThe happiest monkey you'll ever see\nIn his spare time he plays the guitar\nOne of these days he will be a big star!",
     retired: "1998-12-31",
-    notes: "Originally named 'Nana' — extremely rare version exists with that name on tag."
+    notes: "Originally named 'Nana': an extremely rare version exists with that name on tag."
   },
   {
     name: "Mel the Koala",
@@ -339,7 +339,7 @@ const BEANIE_DB = [
     style: "4002",
     poem: "Bold and brave, on the run\nTabasco really is the one\nFrom the fields to the ring of fame\nA star of rodeo he became!",
     retired: "1996-12-31",
-    notes: "Retired due to trademark issues with Tabasco sauce — renamed Snort. Makes Tabasco rarer."
+    notes: "Retired due to trademark issues with Tabasco sauce and renamed Snort. Makes Tabasco rarer."
   },
   {
     name: "Snort the Bull",
@@ -450,7 +450,7 @@ const BEANIE_DB = [
     style: "4031",
     poem: "",
     retired: "1995-06-15",
-    notes: "Retired early — highly collectible. Original 9 Beanie Baby."
+    notes: "Retired early, highly collectible. Original 9 Beanie Baby."
   },
   {
     name: "Web the Spider",
@@ -468,7 +468,7 @@ const BEANIE_DB = [
     style: "4090",
     poem: "Ghosts can be a scary sight\nBut don't let Spooky bring you fright\nBecause when you're alone, you will see\nThe best friend that Spooky can be!",
     retired: "1997-12-31",
-    notes: "Originally named 'Spook' — very rare early tag version."
+    notes: "Originally named 'Spook': very rare early tag version."
   },
   {
     name: "Pumkin' the Pumpkin",
@@ -477,7 +477,7 @@ const BEANIE_DB = [
     style: "4205",
     poem: "Ghosts and goblins are out tonight\nTrick or treaters, I'll give a fright\nHere's a Beanie Baby to make you smile\nHappy Halloween - just for a while!",
     retired: "1998-12-31",
-    notes: "Short production — only a few months."
+    notes: "Short production, only a few months."
   },
   {
     name: "Gobbles the Turkey",
@@ -512,7 +512,7 @@ const BEANIE_DB = [
     style: "4601",
     poem: "Britannia the bear will sail the seas\nSo she can be with you and me\nShe's always sure to catch the tide\nAnd wear the Union Jack with pride!",
     retired: "1999-07-23",
-    notes: "UK exclusive — brown bear with Union Jack on chest. Harder to find in US market."
+    notes: "UK exclusive: brown bear with Union Jack on chest. Harder to find in US market."
   },
   {
     name: "Maple the Bear",
@@ -593,7 +593,7 @@ const BEANIE_DB = [
     name: "Libearty the Bear",
     year: 1996, birthday: "1996-07-04", style: "4057", poem: "",
     retired: "1997-01-01",
-    notes: "USA-flag bear. Tag intentionally misspells 'Liberty' as 'Libearty'. Short shelf life — retired ~6 months after release."
+    notes: "USA-flag bear. Tag intentionally misspells 'Liberty' as 'Libearty'. Short shelf life, retired ~6 months after release."
   },
   {
     name: "Osito the Bear",
@@ -651,7 +651,7 @@ const BEANIE_DB = [
     name: "Nip the Cat",
     year: 1995, birthday: "1994-03-06", style: "4003", poem: "",
     retired: "1997-12-31",
-    notes: "Gold cat. Three main versions: all-gold (rarest), white-face/belly, and white-paws — all share the style number, value differs significantly."
+    notes: "Gold cat. Three main versions: all-gold (rarest), white-face/belly, and white-paws. All share the style number; value differs significantly."
   },
   {
     name: "Snip the Cat",
@@ -719,7 +719,7 @@ const BEANIE_DB = [
     name: "Iggy the Iguana",
     year: 1997, birthday: "1997-08-12", style: "4038", poem: "",
     retired: "1999-03-31",
-    notes: "Multiple production variations (tongue/no-tongue, solid blue / tie-dye) due to a 1997 mix-up with Rainbow's material — consult a collector reference for the version-by-version value spread."
+    notes: "Multiple production variations (tongue/no-tongue, solid blue / tie-dye) due to a 1997 mix-up with Rainbow's material. Consult a collector reference for the version-by-version value spread."
   },
   {
     name: "Rainbow the Chameleon",
@@ -743,7 +743,7 @@ const BEANIE_DB = [
     name: "Rex the Tyrannosaurus",
     year: 1995, birthday: "", style: "4086", poem: "",
     retired: "1996-06-15",
-    notes: "Tie-dye orange/yellow/red. Part of the 1995 dinosaur trio (Rex / Steg / Bronty) — all retired together in 1996, all highly valuable. Style # was later reused for Righty (1996)."
+    notes: "Tie-dye orange/yellow/red. Part of the 1995 dinosaur trio (Rex / Steg / Bronty), all retired together in 1996, all highly valuable. Style # was later reused for Righty (1996)."
   },
   {
     name: "Steg the Stegosaurus",
@@ -755,7 +755,7 @@ const BEANIE_DB = [
     name: "Bronty the Brontosaurus",
     year: 1995, birthday: "", style: "4085", poem: "",
     retired: "1996-06-15",
-    notes: "Tie-dye blue/teal. Part of the discontinued 1995 dinosaur trio — usually the rarest of the three. Style # was later reused for Lefty (1996)."
+    notes: "Tie-dye blue/teal. Part of the discontinued 1995 dinosaur trio, usually the rarest of the three. Style # was later reused for Lefty (1996)."
   },
 
   // Ocean & water
@@ -768,7 +768,7 @@ const BEANIE_DB = [
     name: "Echo the Dolphin",
     year: 1996, birthday: "1996-12-21", style: "4180", poem: "",
     retired: "1998-05-01",
-    notes: "Brief tag-swap with Waves at production — versions exist where Echo's body has Waves' tag and vice versa."
+    notes: "Brief tag-swap with Waves at production: versions exist where Echo's body has Waves' tag and vice versa."
   },
   {
     name: "Bubbles the Fish",
@@ -853,7 +853,7 @@ const BEANIE_DB = [
     name: "Tank the Armadillo",
     year: 1995, birthday: "1995-02-22", style: "4031", poem: "",
     retired: "1997-10-01",
-    notes: "Three main shell variations: 7-line (oldest, no shell — rarest), 9-line, and 9-line with sewn shell flap. Value differs significantly between them."
+    notes: "Three main shell variations: 7-line (oldest, no shell, rarest), 9-line, and 9-line with sewn shell flap. Value differs significantly between them."
   },
   {
     name: "Slowpoke the Sloth",
@@ -883,7 +883,7 @@ const BEANIE_DB = [
     name: "Spinner the Spider",
     year: 1996, birthday: "1996-10-28", style: "4036", poem: "",
     retired: "1998-09-19",
-    notes: "Halloween-season spider. Some early tags read 'Creepy' instead of 'Spinner' — extremely rare error."
+    notes: "Halloween-season spider. Some early tags read 'Creepy' instead of 'Spinner', an extremely rare error."
   },
   {
     name: "Stinger the Scorpion",
@@ -896,7 +896,7 @@ const BEANIE_DB = [
     name: "Lefty the Donkey",
     year: 1996, birthday: "1996-07-04", style: "4085", poem: "",
     retired: "1997-01-01",
-    notes: "Democrat political bear with USA flag on chest. Style # was reused (originally Bronty's). Companion to Righty. Both retired right after the 1996 election — short window, sought after."
+    notes: "Democrat political bear with USA flag on chest. Style # was reused (originally Bronty's). Companion to Righty. Both retired right after the 1996 election. Short window, sought after."
   },
   {
     name: "Righty the Elephant",
@@ -915,7 +915,7 @@ const BEANIE_DB = [
     name: "Chops the Lamb",
     year: 1996, birthday: "1996-05-03", style: "4019", poem: "",
     retired: "1997-01-01",
-    notes: "Black-faced lamb. Replaced by Fleece — short shelf life makes Chops valuable."
+    notes: "Black-faced lamb. Replaced by Fleece; a short shelf life makes Chops valuable."
   },
   {
     name: "Fleece the Lamb",

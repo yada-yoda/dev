@@ -2,29 +2,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Ledger v1.2.0 — Collectibles Inventory</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>The Ledger v1.2.1 · Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
+<!-- iOS home-screen app: name under the icon, full-screen launch, and a
+     translucent status bar. viewport-fit=cover plus the env(safe-area-*)
+     padding in styles.css keeps bars clear of the notch and home indicator. -->
+<meta name="apple-mobile-web-app-title" content="The Ledger" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
 <!-- Open Graph -->
 <meta property="og:type" content="website" />
 <meta property="og:url" content="https://dev.rizzo.cc/inventory/" />
-<meta property="og:title" content="The Ledger — Collectibles Inventory" />
+<meta property="og:title" content="The Ledger · Collectibles Inventory" />
 <meta property="og:description" content="Self-hosted inventory for Beanie Babies and resale collectibles. Listing-ready for Poshmark and eBay, multi-device sync, photo backup." />
 <meta property="og:image" content="https://dev.rizzo.cc/inventory/og-image.png" />
 <meta property="og:image:width" content="1200" />
 <meta property="og:image:height" content="630" />
-<meta property="og:image:alt" content="The Ledger — collectibles inventory tool, dark mode with teal plush-bear logo" />
+<meta property="og:image:alt" content="The Ledger, a collectibles inventory tool in dark mode with a teal plush-bear logo" />
 <meta property="og:site_name" content="The Ledger" />
 
 <!-- Twitter / X -->
 <meta name="twitter:card" content="summary_large_image" />
-<meta name="twitter:title" content="The Ledger — Collectibles Inventory" />
+<meta name="twitter:title" content="The Ledger · Collectibles Inventory" />
 <meta name="twitter:description" content="Self-hosted inventory for Beanie Babies and resale collectibles. Listing-ready for Poshmark and eBay, multi-device sync, photo backup." />
 <meta name="twitter:image" content="https://dev.rizzo.cc/inventory/og-image.png" />
-<meta name="twitter:image:alt" content="The Ledger — collectibles inventory tool, dark mode with teal plush-bear logo" />
+<meta name="twitter:image:alt" content="The Ledger, a collectibles inventory tool in dark mode with a teal plush-bear logo" />
 
 <!-- Icons -->
 <link rel="icon" type="image/svg+xml" href="favicon.svg" />
@@ -39,14 +46,14 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=1.2.0" />
+<link rel="stylesheet" href="styles.css?v=1.2.1" />
 </head>
 <body>
 
 <!-- ============ DEMO BANNER ============ -->
 <div class="demo-banner" id="demoBanner" hidden>
   <div class="demo-banner-inner">
-    <span class="demo-banner-icon" aria-hidden="true">&#x1F3AC;</span>
+    <svg class="demo-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
     <span class="demo-banner-text"><strong>Demo mode</strong> &middot; sample data only, nothing is being saved</span>
     <button type="button" class="btn-link" id="exitDemoBtn">Exit demo</button>
   </div>
@@ -117,9 +124,9 @@
         <option value="">All Statuses</option>
         <option value="Draft">Draft</option>
         <option value="Ready to List">Ready to List</option>
-        <option value="Listed - Poshmark">Listed — Poshmark</option>
-        <option value="Listed - eBay">Listed — eBay</option>
-        <option value="Listed - Both">Listed — Both</option>
+        <option value="Listed - Poshmark">Listed on Poshmark</option>
+        <option value="Listed - eBay">Listed on eBay</option>
+        <option value="Listed - Both">Listed on both</option>
         <option value="Sold">Sold</option>
         <option value="Shipped">Shipped</option>
         <option value="Archived">Archived</option>
@@ -127,11 +134,11 @@
       <select id="sortBy">
         <option value="created_desc">Newest first</option>
         <option value="created_asc">Oldest first</option>
-        <option value="name_asc">Name A→Z</option>
-        <option value="name_desc">Name Z→A</option>
-        <option value="price_desc">Price High→Low</option>
-        <option value="price_asc">Price Low→High</option>
-        <option value="sku_asc">SKU ↑</option>
+        <option value="name_asc">Name A to Z</option>
+        <option value="name_desc">Name Z to A</option>
+        <option value="price_desc">Price High to Low</option>
+        <option value="price_asc">Price Low to High</option>
+        <option value="sku_asc">SKU ascending</option>
       </select>
     </div>
     <div class="actions">
@@ -148,11 +155,11 @@
           Export
         </button>
         <div class="dropdown-menu" id="exportMenu">
-          <button data-format="json"><strong>Full Backup</strong><small>JSON — re-importable</small></button>
-          <button data-format="csv"><strong>Spreadsheet</strong><small>CSV — Excel / Sheets</small></button>
-          <button data-format="xlsx"><strong>Excel Workbook</strong><small>XLSX — opens directly</small></button>
-          <button data-format="poshmark"><strong>Poshmark Listings</strong><small>TXT — ready to copy</small></button>
-          <button data-format="ebay"><strong>eBay File Exchange</strong><small>CSV — direct upload</small></button>
+          <button data-format="json"><strong>Full Backup</strong><small>JSON · re-importable</small></button>
+          <button data-format="csv"><strong>Spreadsheet</strong><small>CSV · Excel / Sheets</small></button>
+          <button data-format="xlsx"><strong>Excel Workbook</strong><small>XLSX · opens directly</small></button>
+          <button data-format="poshmark"><strong>Poshmark Listings</strong><small>TXT · ready to copy</small></button>
+          <button data-format="ebay"><strong>eBay File Exchange</strong><small>CSV · direct upload</small></button>
         </div>
       </div>
       <button class="btn btn-primary" id="addBtn">
@@ -188,11 +195,21 @@
       <path d="M 28 41 Q 32 43.5 36 41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/>
     </svg>
     <h2>No items yet</h2>
-    <p>Start cataloguing your collection — or import a backup to restore existing data.</p>
+    <p>Start cataloguing your collection, or import a backup to restore existing data.</p>
     <div class="empty-actions">
       <button class="btn btn-primary" onclick="document.getElementById('addBtn').click()">Add First Item</button>
       <button class="btn btn-ghost" onclick="document.getElementById('importBtn').click()">Import Backup</button>
       <button class="btn btn-ghost" id="tryDemoBtn">See it with sample data</button>
+    </div>
+  </div>
+
+  <!-- Shown when items exist but the search / filters hide all of them. -->
+  <div id="noMatchState" class="empty-state" role="status">
+    <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M8 11h6"/></svg>
+    <h2>No items match these filters</h2>
+    <p id="noMatchDetail">The current filters hide every item.</p>
+    <div class="empty-actions">
+      <button type="button" class="btn btn-primary" id="clearFiltersBtn">Clear filters</button>
     </div>
   </div>
 </main>
@@ -339,11 +356,11 @@
           <div class="field field-span-2">
             <label class="checkbox-label">
               <input type="checkbox" name="has_variations" id="hasVariationsToggle" />
-              <span>Each one is unique &mdash; colors / patterns vary (tye-dye, hand-painted, etc.)</span>
+              <span>Each one is unique: colors / patterns vary (tye-dye, hand-painted, etc.)</span>
             </label>
           </div>
           <div class="field field-span-2" id="variationDescField" style="display:none;">
-            <label>Variation Notes <small>&mdash; what differs between examples</small></label>
+            <label>Variation Notes <small>what differs between examples</small></label>
             <input type="text" name="variation_description" placeholder='e.g. "purple/blue tye-dye, swirl pattern unique to each"' />
           </div>
         </div>
@@ -361,7 +378,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
             <div>
               <h4>Fill from Reference Database</h4>
-              <p>Search our database of 60+ popular Beanies, or add your own entries for reuse.</p>
+              <p>Search the built-in database of <span id="beanieDbCount">124</span> Beanies, or add your own entries for reuse.</p>
             </div>
           </div>
           <div class="lookup-row">
@@ -485,14 +502,14 @@
           </div>
           <div class="field field-span-2">
             <label>Condition Notes / Flaws</label>
-            <textarea name="condition_notes" rows="4" placeholder="List every flaw honestly — pilling, stains, missing tags, discoloration, loose thread at left paw…"></textarea>
+            <textarea name="condition_notes" rows="4" placeholder="List every flaw honestly: pilling, stains, missing tags, discoloration, loose thread at left paw…"></textarea>
           </div>
           <div class="field">
             <label>Has Original Packaging?</label>
             <select name="has_packaging">
               <option>No</option>
-              <option>Yes — Original Box</option>
-              <option>Yes — Original Bag</option>
+              <option>Yes, original box</option>
+              <option>Yes, original bag</option>
               <option>Partial</option>
             </select>
           </div>
@@ -517,24 +534,24 @@
       <section class="tab-panel" data-panel="listing">
         <div class="field-grid">
           <div class="field field-span-2">
-            <label>Listing Title <small>— what buyers see (Poshmark 50 char / eBay 80 char)</small></label>
+            <label>Listing Title <small>what buyers see (Poshmark 50 char / eBay 80 char)</small></label>
             <input type="text" name="listing_title" maxlength="80" placeholder='e.g. "VTG 1997 Ty Princess Diana Beanie Baby PVC Pellets Mint"' />
             <small class="char-count" id="titleCount">0 / 80</small>
           </div>
           <div class="field field-span-2">
-            <label>Shared Listing Description <small>&mdash; default used when a platform-specific description is empty</small></label>
+            <label>Shared Listing Description <small>default used when a platform-specific description is empty</small></label>
             <textarea name="listing_desc" rows="5" placeholder="Default description used for both platforms. Include all details, condition, measurements, shipping info."></textarea>
           </div>
           <div class="field field-span-2">
-            <label>eBay Description <small>&mdash; overrides shared when present</small></label>
-            <textarea name="listing_desc_ebay" rows="4" placeholder='Optional. eBay-specific copy &mdash; e.g. more detail-heavy, condition-focused.'></textarea>
+            <label>eBay Description <small>overrides shared when present</small></label>
+            <textarea name="listing_desc_ebay" rows="4" placeholder='Optional. eBay-specific copy, e.g. more detail-heavy, condition-focused.'></textarea>
           </div>
           <div class="field field-span-2">
-            <label>Poshmark Description <small>&mdash; overrides shared when present</small></label>
-            <textarea name="listing_desc_poshmark" rows="4" placeholder='Optional. Poshmark-specific copy &mdash; e.g. more conversational, hashtag-friendly.'></textarea>
+            <label>Poshmark Description <small>overrides shared when present</small></label>
+            <textarea name="listing_desc_poshmark" rows="4" placeholder='Optional. Poshmark-specific copy, e.g. more conversational, hashtag-friendly.'></textarea>
           </div>
           <div class="field field-span-2">
-            <label>Tags / Keywords <small>— comma separated</small></label>
+            <label>Tags / Keywords <small>comma separated</small></label>
             <input type="text" name="tags" placeholder="vintage, 90s, beanie, ty, princess, rare, collectible" />
           </div>
           <div class="field">
@@ -546,7 +563,7 @@
             <input type="number" step="0.01" name="item_tax" placeholder="0.00" />
           </div>
           <div class="field field-span-2">
-            <label>Other Expenses <small>&mdash; supplies, gas, etc.</small> <span class="info-tip" data-tip="Variable costs tied to this listing: bubble wrap, tape, labels, gas to ship, authentication fees. Adds to cost basis.">?</span></label>
+            <label>Other Expenses <small>supplies, gas, etc.</small> <span class="info-tip" data-tip="Variable costs tied to this listing: bubble wrap, tape, labels, gas to ship, authentication fees. Adds to cost basis.">?</span></label>
             <div class="input-with-btn">
               <input type="number" step="0.01" name="other_expenses" placeholder="0.00" style="flex:0 0 120px" />
               <input type="text" name="other_expenses_notes" placeholder="Notes (e.g. bubble wrap + label)" />
@@ -561,8 +578,8 @@
             <input type="number" step="0.01" name="min_price" placeholder="0.00" />
           </div>
           <div class="field">
-            <label>Sold Price <span class="info-tip" data-tip="What the buyer actually paid, before fees and shipping.">?</span></label>
-            <input type="number" step="0.01" name="sold_price" placeholder="0.00" />
+            <label>Date Listed</label>
+            <input type="date" name="date_listed" />
           </div>
           <div class="field">
             <label>Status</label>
@@ -578,9 +595,13 @@
             </select>
           </div>
           <div class="field">
+            <label>Sold Price <span class="info-tip" data-tip="What the buyer actually paid, before fees and shipping.">?</span></label>
+            <input type="number" step="0.01" name="sold_price" placeholder="0.00" />
+          </div>
+          <div class="field">
             <label>Platform Sold On</label>
             <select name="sold_platform">
-              <option value="">—</option>
+              <option value="">–</option>
               <option>Poshmark</option>
               <option>eBay</option>
               <option>Mercari</option>
@@ -590,28 +611,32 @@
             </select>
           </div>
           <div class="field">
-            <label>Date Listed</label>
-            <input type="date" name="date_listed" />
-          </div>
-          <div class="field">
             <label>Date Sold</label>
             <input type="date" name="date_sold" />
           </div>
           <div class="field">
-            <label>Poshmark Listing URL</label>
-            <input type="url" name="url_poshmark" placeholder="https://poshmark.com/listing/…" />
+            <label>Date Shipped <span class="info-tip" data-tip="The day the package went out. Until this is set, a Sold item shows a Ship by date (sold date plus 3 business days) on its card. Choosing status Shipped fills in today.">?</span></label>
+            <input type="date" name="date_shipped" />
           </div>
           <div class="field">
-            <label>eBay Listing URL</label>
-            <input type="url" name="url_ebay" placeholder="https://ebay.com/itm/…" />
+            <label>Buyer <span class="info-tip" data-tip="Who bought it, for disputes and for spotting repeat customers. Private: never included in the Poshmark or eBay listing exports.">?</span></label>
+            <input type="text" name="buyer" placeholder="@username or buyer name" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label>Poshmark Order Number</label>
+            <input type="text" name="poshmark_order_number" placeholder="e.g. 65a1f23..." />
           </div>
           <div class="field">
             <label>eBay Item Number</label>
             <input type="text" name="ebay_item_number" placeholder="e.g. 285123456789" />
           </div>
           <div class="field">
-            <label>Poshmark Order Number</label>
-            <input type="text" name="poshmark_order_number" placeholder="e.g. 65a1f23..." />
+            <label>eBay Listing URL</label>
+            <input type="url" name="url_ebay" placeholder="https://ebay.com/itm/…" />
+          </div>
+          <div class="field field-span-2">
+            <label>Poshmark Listing URL</label>
+            <input type="url" name="url_poshmark" placeholder="https://poshmark.com/listing/…" />
           </div>
         </div>
       </section>
@@ -692,7 +717,7 @@
           <div class="suggest-row">
             <div class="suggest-block">
               <div class="suggest-label">Suggested listing price</div>
-              <div class="suggest-value" id="suggestedPrice">—</div>
+              <div class="suggest-value empty" id="suggestedPrice">–</div>
               <div class="suggest-sub" id="suggestedSub">Fill in any platform above</div>
             </div>
             <button type="button" class="btn btn-ghost" id="useSuggestedPrice" disabled>Use as listing price</button>
@@ -700,16 +725,16 @@
           <div class="margin-row" id="marginRow" hidden>
             <div class="margin-block">
               <div class="margin-label">Poshmark net (~80%)</div>
-              <div class="margin-value" id="marginPoshmark">—</div>
+              <div class="margin-value" id="marginPoshmark">–</div>
               <div class="margin-sub" id="marginPoshmarkSub">&nbsp;</div>
             </div>
             <div class="margin-block">
               <div class="margin-label">eBay net (~87%)</div>
-              <div class="margin-value" id="marginEbay">—</div>
+              <div class="margin-value" id="marginEbay">–</div>
               <div class="margin-sub" id="marginEbaySub">&nbsp;</div>
             </div>
           </div>
-          <p class="suggest-disclaimer">Net estimates are rough &mdash; Poshmark takes 20% on sales &ge; $15 ($2.95 flat below), eBay takes ~13% plus a small payment-processing fee. Actuals vary by category.</p>
+          <p class="suggest-disclaimer">Net estimates are rough. Poshmark takes 20% on sales &ge; $15 ($2.95 flat below), eBay takes ~13% plus a small payment-processing fee. Actuals vary by category.</p>
         </div>
       </section>
 
@@ -782,6 +807,7 @@
           <div class="field">
             <label>Actual Postage Paid <span class="info-tip" data-tip="What the shipping label actually cost you. Counts against profit. Often different from what the buyer paid.">?</span></label>
             <input type="number" step="0.01" name="postage_paid" placeholder="0.00" />
+            <small>Poshmark sales: 0.00 (prepaid label, buyer pays Poshmark directly)</small>
           </div>
           <div class="field field-span-2">
             <label>Shipping Notes</label>
@@ -794,7 +820,7 @@
       <section class="tab-panel" data-panel="fees">
         <div class="panel-intro">
           <h3>Fees &amp; Profit</h3>
-          <p>Once an item sells, fill in what each platform actually charged you. The summary at the bottom shows revenue minus costs minus fees, so you know what actually landed in your bank account. The <strong>Auto-fill standard fees</strong> button pre-fills the typical rates based on the sold platform and price &mdash; you can then tweak each value to match your real seller statement.</p>
+          <p>Once an item sells, fill in what each platform actually charged you. The summary at the bottom shows revenue minus costs minus fees, so you know what actually landed in your bank account. The <strong>Auto-fill standard fees</strong> button pre-fills the typical rates based on the sold platform and price. You can then tweak each value to match your real seller statement.</p>
         </div>
 
         <div class="fees-toolbar">
@@ -848,7 +874,7 @@
             </header>
             <div class="fees-card-fields">
               <div class="field">
-                <label>PayPal / processing <span class="info-tip" data-tip="2.9% + $0.30 per transaction for PayPal Goods &amp; Services. Most marketplace platforms now bundle this into their final value fee &mdash; only fill this if you accepted payment outside the marketplace's flow.">?</span></label>
+                <label>PayPal / processing <span class="info-tip" data-tip="2.9% + $0.30 per transaction for PayPal Goods &amp; Services. Most marketplace platforms now bundle this into their final value fee, so only fill this if you accepted payment outside the marketplace's flow.">?</span></label>
                 <input type="number" step="0.01" name="fee_paypal" placeholder="0.00" />
               </div>
               <div class="field">
@@ -866,28 +892,28 @@
         <div class="pnl-panel" id="pnlPanel">
           <header class="pnl-header">
             <h4>Profit &amp; Loss</h4>
-            <div class="pnl-status" id="pnlStatus">Not sold yet &mdash; values are projections based on listing price</div>
+            <div class="pnl-status" id="pnlStatus">Not sold yet. Values are projections based on the listing price.</div>
           </header>
           <div class="pnl-rows">
             <div class="pnl-row">
               <div class="pnl-row-label">Revenue</div>
-              <div class="pnl-row-detail" id="pnlRevenueDetail">&mdash;</div>
-              <div class="pnl-row-amount pos" id="pnlRevenue">&mdash;</div>
+              <div class="pnl-row-detail" id="pnlRevenueDetail">–</div>
+              <div class="pnl-row-amount pos" id="pnlRevenue">–</div>
             </div>
             <div class="pnl-row">
               <div class="pnl-row-label">Cost basis</div>
-              <div class="pnl-row-detail" id="pnlCostDetail">&mdash;</div>
-              <div class="pnl-row-amount neg" id="pnlCost">&mdash;</div>
+              <div class="pnl-row-detail" id="pnlCostDetail">–</div>
+              <div class="pnl-row-amount neg" id="pnlCost">–</div>
             </div>
             <div class="pnl-row">
               <div class="pnl-row-label">Platform fees</div>
-              <div class="pnl-row-detail" id="pnlFeesDetail">&mdash;</div>
-              <div class="pnl-row-amount neg" id="pnlFees">&mdash;</div>
+              <div class="pnl-row-detail" id="pnlFeesDetail">–</div>
+              <div class="pnl-row-amount neg" id="pnlFees">–</div>
             </div>
             <div class="pnl-row pnl-row-total">
               <div class="pnl-row-label">Net profit</div>
-              <div class="pnl-row-detail" id="pnlMarginDetail">&mdash;</div>
-              <div class="pnl-row-amount" id="pnlNet">&mdash;</div>
+              <div class="pnl-row-detail" id="pnlMarginDetail">–</div>
+              <div class="pnl-row-amount" id="pnlNet">–</div>
             </div>
           </div>
         </div>
@@ -895,12 +921,12 @@
         <div class="days-panel" id="daysPanel" hidden>
           <div class="days-block">
             <div class="days-label" id="daysActiveLabel">Days active</div>
-            <div class="days-value" id="daysActiveValue">&mdash;</div>
+            <div class="days-value" id="daysActiveValue">–</div>
             <div class="days-sub" id="daysActiveSub">&nbsp;</div>
           </div>
           <div class="days-block" id="daysSoldBlock" hidden>
             <div class="days-label">Days from listed to sold</div>
-            <div class="days-value" id="daysToSoldValue">&mdash;</div>
+            <div class="days-value" id="daysToSoldValue">–</div>
             <div class="days-sub" id="daysToSoldSub">&nbsp;</div>
           </div>
         </div>
@@ -922,7 +948,7 @@
           <div class="photo-preview" id="photoPreview"></div>
         </div>
         <div class="field">
-          <label>Private Notes <small>— for your eyes only, not exported to listings</small></label>
+          <label>Private Notes <small>for your eyes only, not exported to listings</small></label>
           <textarea name="private_notes" rows="4" placeholder="Source, purchase date, research links, pricing history…"></textarea>
         </div>
       </section>
@@ -955,7 +981,7 @@
   <div class="modal-backdrop"></div>
   <div class="modal-card mini-card">
     <h3>Import Inventory</h3>
-    <p>Upload a JSON backup, an <strong>Excel workbook</strong> (.xlsx / .xls), a CSV, or an <strong>eBay Seller Hub</strong> export. Format is auto-detected from the headers &mdash; Google Sheets works too, just download it as .xlsx or .csv first.</p>
+    <p>Upload a JSON backup, an <strong>Excel workbook</strong> (.xlsx / .xls), a CSV, or an <strong>eBay Seller Hub</strong> export. Format is auto-detected from the headers. Google Sheets works too: download it as .xlsx or .csv first.</p>
     <input type="file" id="importFile" accept=".json,.csv,.xlsx,.xls,.xlsm" />
     <div class="import-options">
       <label><input type="radio" name="importMode" value="merge" checked /> Merge with existing</label>
@@ -989,9 +1015,9 @@
     <section class="settings-section">
       <h4>About</h4>
       <dl class="settings-dl">
-        <div><dt>Version</dt><dd id="settingsVersion">v0.10.0</dd></div>
+        <div><dt>Version</dt><dd id="settingsVersion">v1.2.1</dd></div>
         <div><dt>Items</dt><dd id="settingsItemCount">0</dd></div>
-        <div><dt>Sync</dt><dd id="settingsSyncStatus">Guest &mdash; local only</dd></div>
+        <div><dt>Sync</dt><dd id="settingsSyncStatus">Guest, local only</dd></div>
       </dl>
     </section>
 
@@ -1006,7 +1032,7 @@
 
     <section class="settings-section settings-danger">
       <h4>Danger zone</h4>
-      <p class="settings-muted" id="wipeNote">Clears items, settings, and demo flag from this device's localStorage. Your cloud data (if signed in) is <strong>not</strong> touched &mdash; you'd still see your items after signing in again.</p>
+      <p class="settings-muted" id="wipeNote">Clears items, settings, and demo flag from this device's localStorage. Your cloud data (if signed in) is <strong>not</strong> touched, so your items come back when you sign in again.</p>
       <button type="button" class="btn btn-danger" id="wipeLocalBtn">Wipe local data</button>
     </section>
   </div>
@@ -1032,16 +1058,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.2.0</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.2.1</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=1.2.0"></script>
-<script defer src="beanie-db.js?v=1.2.0"></script>
-<script defer src="demo-data.js?v=1.2.0"></script>
-<script defer src="app.js?v=1.2.0"></script>
+<script type="module" src="firebase-config.js?v=1.2.1"></script>
+<script defer src="beanie-db.js?v=1.2.1"></script>
+<script defer src="demo-data.js?v=1.2.1"></script>
+<script defer src="app.js?v=1.2.1"></script>
 </body>
 </html>
