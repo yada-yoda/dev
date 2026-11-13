@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>OptionsPulse v0.1.0</title>
+<title>OptionsPulse v0.1.1</title>
 <meta name="robots" content="noindex">
 <meta name="description" content="Private options-position tracker: snapshots, P/L, Greeks and rule-based holding risk.">
 <meta name="color-scheme" content="dark light">
@@ -154,7 +154,7 @@ table.hist tbody tr:last-child{background:var(--hl)}
 
 <script>
 'use strict';
-const APP_VERSION = '0.1.0';
+const APP_VERSION = '0.1.1';
 const TZ_DEFAULT = 'America/Chicago';
 
 // ---------- Firebase (same project as Illness Tracker / PawPrints, so the same Google login works) ----------
@@ -330,7 +330,7 @@ const SEED_ROWS = [
   ['2026-11-12','08:43','confirmed',160.6,0.81,0.77,0.84,57.56,2105,25695,0.0677,0.0045,-0.0537,0.0662,0.01,'NVDA fell to $160.60; call mark $0.81, delta 0.0677, theta -0.0537. IV rose to 57.56%; OI 25,695.','VERY HIGH: $141 unrealized loss (-63.5%) on $222 cost. $81 remaining mark value at risk; do not hold solely to recover sunk cost.','0.79'],
   ['2026-11-12','10:50','confirmed',164.24,1.22,1.16,1.27,57.7,7459,25695,0.0936,0.0056,-0.0718,0.0868,0.014,'Intraday rebound: NVDA +$3.64; call mark +$0.41 to $1.22; delta 0.0936, theta -0.0718, IV 57.70%; volume +5,354.','HIGH: $100 unrealized loss (-45.0%); $122 further mark value at risk. Stock $50.76 below strike with 36 days left. Consider defined exit criteria; avoid assuming recovery.',''],
   ['2026-11-13','08:48','confirmed',162.92,0.99,0.97,1.01,58.6,171,23969,0.0792,0.005,-0.0634,0.0747,0.0115,'Call mark down $0.23 (-18.9%) versus Nov 12 10:50; NVDA down $1.32 (-0.8%). Delta fell 0.0936 to 0.0792; IV rose 0.90 pts. OI down 1,726 (-6.7%); volume 171 in new session; change vs previous reading is -7,288 (-97.7%), not a like-for-like activity decline.','VERY HIGH: $99 remaining mark value at risk; P/L -$123 (-55.4%) on $222 entry. NVDA Latest stock price not shown, 35 days left. Consider defined exit criteria; earnings rebound is uncertain.','Nov 13 morning screenshot; 8:48 AM CT'],
-  ['2026-11-13','09:35','confirmed',null,0.83,0.81,0.85,59.78,1213,23969,0.0682,0.0044,-0.0565,0.0653,0.0097,'Mark down $0.16 (-16.2%) from 8:48 AM; IV up 1.18 percentage points; volume +1,042 intraday; OI unchanged. Stock price not shown.','VERY HIGH: $83 current mark value remains at risk, $139 unrealized loss (-62.6%). The $215 call is far OTM; earnings volatility and time decay remain key risks.','Date and time confirmed by user: Nov 13, 2026, 9:35 AM CST']
+  ['2026-11-13','09:35','confirmed',159.41,0.83,0.81,0.85,59.78,1213,23969,0.0682,0.0044,-0.0565,0.0653,0.0097,'Mark down $0.16 (-16.2%) from 8:48 AM; IV up 1.18 percentage points; volume +1,042 intraday; OI unchanged. Stock price looked up from market data, not from the screenshot.','VERY HIGH: $83 current mark value remains at risk, $139 unrealized loss (-62.6%). The $215 call is far OTM; earnings volatility and time decay remain key risks.','Date and time confirmed by user: Nov 13, 2026, 9:35 AM CST. Stock price LOOKED UP (not in screenshot): Yahoo Finance 1-minute bar close, NVDA, 9:35 AM CT, 159.41']
 ];
 const SNAP_NUM = ['stock','mark','bid','ask','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho'];
 function blankSnap(){ const s = { id: uid(), date: '', time: '', tz: TZ_DEFAULT, dateConfidence: '', notes: '', risk: '', evidence: '' }; SNAP_NUM.forEach(k => s[k] = null); return s; }

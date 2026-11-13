@@ -34,6 +34,10 @@ Screenshot upload with automatic value extraction using Claude vision. The API k
 
 ## Changelog
 
+### v0.1.1 (2026-11-13)
+
+The 9:35 AM Nov 13 snapshot had no stock price in its screenshot, so it was filled from a market-data lookup (Yahoo 1-minute close, $159.41) and labelled as looked up, which lets the out-of-the-money distance compute for that row.
+
 ### v0.1.0 (2026-11-13)
 
 First version. Tracking was being done by hand in one-off dashboards built from screenshots; this puts the same views in one private, signed-in page that keeps history across devices. Includes positions, manual snapshot entry with a date/time confirmation step, edit and delete, CSV import and export, a one-click import of the NVDA $215 Call history, a trend chart, a three-view history table, loss scenarios and a transparent risk label.
