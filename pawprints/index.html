@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.85.0';
+const APP_VERSION = 'v0.86.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3193,6 +3193,186 @@ async function shareDogCard(){
   dl(new Blob([lines.join('\r\n')],{type:'text/vcard'}), fname); showToast('⬇️ '+p.name+'’s card saved');
 }
 
+// ── Emergency card ──
+// A read-only snapshot for a stranger in an emergency (sitter, neighbor, ER vet). The app
+// computes it from the dog's own data, pawprints-worker stores it under a random token and
+// serves it at /e/<token> with no sign-in. Snapshot, not live: "Update card" re-uploads.
+// Per-dog link state lives in data.settings['emergencyCard_'+petId] = {token,url,updated}.
+const EMERGENCY_PHOTO_MAX = 300000; // chars of data URI; bigger photos are left off the card
+const EMERGENCY_DAYS = 14;          // feeding look-back window
+function emergencyKey(pid){ return 'emergencyCard_'+pid; }
+function emergencyState(pid){ const s = data.settings && data.settings[emergencyKey(pid)]; return (s && s.token && s.url) ? s : null; }
+// Owner-side only: a full-access collaborator passes canManage(), but a card they made would sit
+// under THEIR uid, out of the owner's reach to turn off. So a shared view never gets the feature.
+function denyEmergencyShared(){ if(!sharedOwnerUid) return false; showToast('🔒 Only the dog’s owner can manage the emergency card'); return true; }
+function invFullName(i){ return ((i.brand?i.brand+' ':'')+(i.name||'')).trim(); }
+// Feeding lines worked out from the logs + routine, so the owner never has to type them.
+function emergencyFeeding(){
+  const feeds = petLogs('feed').filter(l=>l.dateTime).sort((a,b)=>new Date(b.dateTime)-new Date(a.dateTime));
+  const inv = petArr('inventory');
+  // Food: whatever he ate last, upgraded to the inventory's brand + name when it matches.
+  let food = 'See owner';
+  const lastName = feeds.length ? String(feeds[0].foodItem||feeds[0].foodType||'').trim() : '';
+  if(lastName){
+    const hit = inv.find(i => i.name && (i.name.trim()===lastName || invFullName(i)===lastName));
+    food = hit ? invFullName(hit) : lastName;
+  }
+  const since = Date.now() - EMERGENCY_DAYS*86400000;
+  const recent = feeds.filter(l => new Date(l.dateTime).getTime() >= since);
+  // Per meal: the most common amount + unit over the window (ties go to the most recent).
+  let perMeal = '';
+  const counts = {};
+  recent.forEach(l => {
+    if(l.amount==='' || l.amount==null) return;
+    const amt = String(l.amount).trim(), unit = String(l.unit||'').trim();
+    const one = num(amt) === 1 && /s$/.test(unit) ? unit.slice(0,-1) : unit; // "1 cups" -> "1 cup"
+    const k = (amt+' '+one).trim();
+    counts[k] = (counts[k]||0) + 1;
+  });
+  Object.keys(counts).forEach(k => { if(!perMeal || counts[k] > counts[perMeal]) perMeal = k; });
+  // How often: the routine's feed times when the routine is on, else the logged average.
+  const s = data.settings || {};
+  const times = (s.routineFeedTimes||[]).slice().sort();
+  let mealsPerDay = '';
+  if(s.routineOn && times.length){
+    mealsPerDay = times.length+' meal'+(times.length===1?'':'s')+'/day at '+times.map(fmtClock).join(', ');
+  } else if(recent.length){
+    // Average over the days that have any feeds logged, so a day the owner forgot to log
+    // doesn't drag the number down. Same-minute duplicates count once.
+    const distinct = new Set(recent.map(l => String(l.dateTime).slice(0,16)));
+    const days = new Set(recent.map(l => String(l.dateTime).slice(0,10)));
+    mealsPerDay = (Math.round(distinct.size/days.size*10)/10)+'x per day';
+  }
+  // Treats: the most recently opened Treats item still in use.
+  const treat = inv.filter(i => i.category==='Treats' && invStatus(i)==='In use')
+    .sort((a,b)=>String(b.startDate||b.purchaseDate||'').localeCompare(String(a.startDate||a.purchaseDate||'')))[0];
+  const treats = treat ? 'Treats: '+invFullName(treat) : '';
+  const lines = ['Food: '+food];
+  if(perMeal) lines.push('Amount per meal: '+perMeal);
+  if(mealsPerDay) lines.push('How often: '+mealsPerDay);
+  if(treats) lines.push(treats);
+  return { food, perMeal, mealsPerDay, treats, lines };
+}
+function buildEmergencyCard(){
+  const p = activePet(); if(!p) return null;
+  const w = latestWeight();
+  const card = {
+    name: p.name || 'Dog',
+    tz: appTimezone(),
+    who: {
+      breed: p.breed||'', sex: p.sex||'', age: ageStr(p.birthday, p.birthdayEstimated)||'',
+      weight: w ? (w.value+' '+(w.unit||p.weightUnit||'lb')) : '',
+      color: p.color||'',
+      microchip: p.microchip ? String(p.microchip)+(p.microchipType?' ('+p.microchipType+')':'') : '',
+      license: p.license||''
+    },
+    feeding: emergencyFeeding(),
+    meds: petArr('meds').filter(m=>m.name).map(m => {
+      const parts = [m.dose||'', num(m.intervalDays)?'every '+parseInt(m.intervalDays,10)+'d':'', m.lastGiven?'last given '+fmtDate(m.lastGiven):''].filter(Boolean);
+      return m.name+(m.kind?' ('+m.kind+')':'')+(parts.length?' — '+parts.join(', '):'');
+    }),
+    medical: { notes: p.notes||'', ongoing: '' },
+    contacts: { owner: String((data.settings||{}).emergencyOwnerLine||'').trim(), vet: null, emergencyVet: null }
+  };
+  const ill = petArr('illnesses').filter(e => !e.recovery).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')))[0];
+  if(ill) card.medical.ongoing = 'Ongoing: '+(ill.diagnosis || (ill.symptoms||[]).join(', ') || 'illness')+(ill.start?' (since '+fmtDate(ill.start)+')':'');
+  if(p.vetName || p.vetDoctor || p.vetPhone) card.contacts.vet = { name:p.vetName||'', doctor:p.vetDoctor||'', phone:p.vetPhone||'' };
+  // Emergency vet: a Contacts entry with that role first, then the profile's second vet.
+  const er = (data.contacts||[]).find(c => /^emergency vet$/i.test(String(c.role||'').trim()));
+  if(er) card.contacts.emergencyVet = { name:er.org||'', doctor:er.name||'', phone:er.phone||'' };
+  else if(p.vet2Name || p.vet2Doctor || p.vet2Phone) card.contacts.emergencyVet = { name:p.vet2Name||'', doctor:p.vet2Doctor||'', phone:p.vet2Phone||'' };
+  if(typeof p.photo === 'string' && p.photo.startsWith('data:image/') && p.photo.length < EMERGENCY_PHOTO_MAX) card.photo = p.photo;
+  return card;
+}
+function emergencyModal(){
+  if(denyEmergencyShared()) return;
+  if(denyManage()) return;
+  const p = activePet(); if(!p) return;
+  const st = emergencyState(p.id);
+  const ownerLine = (data.settings||{}).emergencyOwnerLine || '';
+  const ownerField = '<label class="label" for="er-owner">Your contact line'+tip('Shown at the top of Contacts so whoever has '+(p.name||'your dog')+' can reach you. Leave it blank to show only the vets.')+'</label>'
+    + '<input class="input" id="er-owner" maxlength="160" value="'+esc(ownerLine)+'" placeholder="e.g. Sam · 555-123-4567">';
+  let html = '<h3>🆘 Emergency card</h3>';
+  if(!st){
+    html += '<p style="font-size:14px;color:var(--text-secondary);margin:0 0 14px">Makes a link and QR code to a page with '+esc(p.name)+'’s photo, food, meds, medical notes and vet numbers. Anyone with the link can see it, no sign-in needed. You can turn it off anytime.</p>'
+      + ownerField
+      + '<button class="btn-primary" id="er-go" onclick="saveEmergencyCard()">Create card</button>';
+  } else {
+    html += '<div style="text-align:center;margin-bottom:12px"><div id="er-qr" style="display:inline-block;background:#fff;padding:12px;border-radius:10px;line-height:0;min-width:204px;min-height:204px" aria-label="QR code for the emergency card link"></div></div>'
+      + '<label class="label" for="er-url">Card link</label>'
+      + '<input class="input" id="er-url" readonly value="'+esc(st.url)+'" onfocus="this.select()" style="font-family:JetBrains Mono,monospace;font-size:13px">'
+      + '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px"><button class="btn btn-sm" type="button" onclick="copyEmergencyLink()">📋 Copy</button>'
+      + (navigator.share ? '<button class="btn btn-sm" type="button" onclick="shareEmergencyLink()">'+svgIcon('share',15)+' Share</button>' : '')
+      + '<a class="btn btn-sm" href="'+esc(st.url)+'" target="_blank" rel="noopener noreferrer">Preview</a></div>'
+      + '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px">Updated '+esc(relDaysStr(st.updated)||fmtDate(st.updated))+'. The page is a snapshot — tap Update after changing food, meds or vets.</p>'
+      + ownerField
+      + '<div><button class="btn-primary" id="er-go" onclick="saveEmergencyCard()">Update card</button><button class="btn btn-danger" id="er-off" onclick="turnOffEmergencyCard()">Turn off link</button></div>';
+  }
+  openModal(html);
+  if(st) renderEmergencyQR(st.url);
+}
+function renderEmergencyQR(url){
+  loadQR().then(()=>{
+    const el = document.getElementById('er-qr'); if(!el) return;
+    el.innerHTML = '';
+    // Dark modules on a fixed white box (not theme colors) so phones scan it in dark mode too.
+    new QRCode(el, { text:url, width:180, height:180, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
+  }).catch(()=>{ const el = document.getElementById('er-qr'); if(el) el.innerHTML = '<span style="font-size:13px;color:#333;line-height:1.4">QR code couldn’t load — the link below still works.</span>'; });
+}
+async function saveEmergencyCard(){
+  if(denyEmergencyShared()) return;
+  if(denyManage()) return;
+  if(demoMode){ showToast('🐾 Emergency cards aren’t available in the demo'); return; }
+  const p = activePet(); if(!p) return;
+  const ownerEl = document.getElementById('er-owner');
+  if(ownerEl){ data.settings.emergencyOwnerLine = ownerEl.value.trim(); save(false); }
+  if(!currentUser){ signIn(false, saveEmergencyCard); return; }
+  const btn = document.getElementById('er-go'), label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
+  try {
+    const r = await workerFetch('/emergency', { method:'POST', body: JSON.stringify({ petId:p.id, card:buildEmergencyCard() }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.ok || !j.url) throw new Error(r.status===413 ? 'too-large' : (j.error||'failed'));
+    const wasNew = !emergencyState(p.id);
+    data.settings[emergencyKey(p.id)] = { token:j.token, url:j.url, updated:new Date().toISOString() };
+    logChange(wasNew?'added':'edited','emergency card', p.name);
+    save(false);
+    showToast(wasNew ? '🆘 Emergency card created' : '🆘 Emergency card updated');
+    emergencyModal();
+  } catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = label; }
+    showToast(e && e.message==='too-large' ? '⚠️ Card too large — try a smaller profile photo' : '⚠️ Couldn’t save the card — check your connection and try again');
+  }
+}
+async function turnOffEmergencyCard(){
+  if(denyEmergencyShared()) return;
+  if(denyManage()) return;
+  const p = activePet(); if(!p) return;
+  if(!currentUser){ signIn(false, turnOffEmergencyCard); return; }
+  const btn = document.getElementById('er-off');
+  if(btn){ btn.disabled = true; btn.textContent = 'Turning off…'; }
+  try {
+    const r = await workerFetch('/emergency?petId='+encodeURIComponent(p.id), { method:'DELETE' });
+    if(!r.ok) throw new Error('failed');
+    data.settings[emergencyKey(p.id)] = null; // null, not delete: the settings merge would resurrect a missing key from the cloud copy
+    logChange('deleted','emergency card', p.name);
+    save(false); closeModal(); render();
+    showToast('🔒 Emergency link turned off');
+  } catch(e){
+    if(btn){ btn.disabled = false; btn.textContent = 'Turn off link'; }
+    showToast('⚠️ Couldn’t turn it off — check your connection and try again');
+  }
+}
+function copyEmergencyLink(){
+  const st = activePet() && emergencyState(activePet().id); if(!st) return;
+  if(navigator.clipboard){ navigator.clipboard.writeText(st.url).then(()=>showToast('📋 Link copied')).catch(()=>showToast('⚠️ Couldn\'t copy — select the link and copy it')); }
+  else { const el = document.getElementById('er-url'); if(el){ el.focus(); el.select(); } showToast('Select the link and copy it'); }
+}
+async function shareEmergencyLink(){
+  const p = activePet(), st = p && emergencyState(p.id); if(!st || !navigator.share) return;
+  try { await navigator.share({ title:p.name+' · Emergency card', text:'Emergency info for '+p.name, url:st.url }); } catch(e){ /* user cancelled */ }
+}
+
 // ═══════════════════════════════════════════════
 // CALENDAR — dated events + Google Calendar sync
 // ═══════════════════════════════════════════════
@@ -4133,7 +4313,7 @@ function renderProfile(){
   if(p.vet2Name || p.vet2Doctor) facts.push(['Secondary vet', [p.vet2Doctor?esc(p.vet2Doctor):'', p.vet2Name?esc(p.vet2Name):'', p.vet2Phone?esc(p.vet2Phone):'', p.vet2Email?esc(p.vet2Email):''].filter(Boolean).join(' · ')]);
   if(facts.length) html += '<div class="grid-auto" style="margin-top:6px">'+facts.map(([k,v])=>'<div class="kv"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px">'+esc(k)+'</div><strong>'+v+'</strong></div>').join('')+'</div>';
   if(p.notes) html += '<div style="margin-top:14px;font-size:13px;color:var(--text-secondary);font-style:italic;border-top:1px solid var(--border);padding-top:12px">"'+esc(p.notes)+'"</div>';
-  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">'+svgIcon('weight',15)+' Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">'+svgIcon('share',15)+' Share '+esc(p.name)+'’s info card</button><button class="btn btn-sm" onclick="exportPDF(\''+p.id+'\')">'+svgIcon('download',15)+' Export PDF</button></div>';
+  html += '<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">'+(canLog()?'<button class="btn btn-sm" onclick="quickWeight()">'+svgIcon('weight',15)+' Log weight</button>':'')+'<button class="btn btn-sm" onclick="shareDogCard()">'+svgIcon('share',15)+' Share '+esc(p.name)+'’s info card</button><button class="btn btn-sm" onclick="exportPDF(\''+p.id+'\')">'+svgIcon('download',15)+' Export PDF</button>'+((canManage() && !sharedOwnerUid)?'<button class="btn btn-sm" onclick="emergencyModal()" title="A link + QR code with '+esc(p.name)+'’s food, meds and vet numbers, for whoever has your dog in an emergency — no sign-in to view">🆘 Emergency card'+(emergencyState(p.id)?' <span class="chip-2" style="font-size:10px">on</span>':'')+'</button>':'')+'</div>';
   html += '</div>';
   // weight chart
   const weights = petLogs('weight').filter(l=>num(l.value)!=null);
@@ -5048,6 +5228,14 @@ function loadChart(){
   if(_chartLoading) return _chartLoading;
   _chartLoading = new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js'; s.onload=resolve; s.onerror=()=>{_chartLoading=null;reject();}; document.head.appendChild(s); });
   return _chartLoading;
+}
+// qrcodejs for the emergency-card QR — same lazy pattern, only fetched when that modal opens.
+let _qrLoading = null;
+function loadQR(){
+  if(typeof QRCode === 'function') return Promise.resolve();
+  if(_qrLoading) return _qrLoading;
+  _qrLoading = new Promise((resolve,reject)=>{ const s=document.createElement('script'); s.src='https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'; s.onload=resolve; s.onerror=()=>{_qrLoading=null;reject();}; document.head.appendChild(s); });
+  return _qrLoading;
 }
 function maybeDrawWeightChart(){
   // Profile and Insights both have a weight-chart canvas — target the one in the CURRENT view.
