@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>OptionsPulse v0.2.0</title>
+<title>OptionsPulse v0.3.0</title>
 <meta name="robots" content="noindex">
 <meta name="description" content="Private options-position tracker: snapshots, P/L, Greeks and rule-based holding risk.">
 <meta name="color-scheme" content="dark light">
@@ -115,11 +115,28 @@ table.hist th.sorted{color:var(--text)}
 .money::before{content:"$";position:absolute;left:10px;bottom:10px;color:var(--muted);font-size:14px;pointer-events:none}
 .money input{padding-left:22px}
 .modal-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap;margin-top:16px}
-.drop{border:2px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--muted);font-size:13px;margin-bottom:12px;opacity:.7}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:14px;text-align:center;color:var(--muted);font-size:13px;margin-bottom:12px}
+.drop p{margin:0 0 8px}
+.drop .legend{margin:8px 0 0}
+.drop.on{border-color:var(--blue);color:var(--text);background:var(--hl)}
+.ocrbox{display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr);gap:12px;align-items:start;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
+.ocrbox.big{grid-template-columns:minmax(0,1fr)}
+.ocrbox p{margin:0 0 6px;font-size:13px;overflow-wrap:anywhere}
+.ocrbox p.legend{font-size:12px}
+.thumbbtn{display:block;padding:0;min-height:0;border-radius:8px;overflow:hidden;background:none;border:1px solid var(--line);width:100%;cursor:zoom-in}
+.ocrbox.big .thumbbtn{cursor:zoom-out}
+.thumbbtn img{display:block;width:100%;height:auto}
+.ocr-list{list-style:none;margin:8px 0 0;padding:0;font-size:12px;color:var(--muted)}
+.ocr-list li{overflow-wrap:anywhere;padding:2px 0}
+.ocr-list li.cur{color:var(--text);font-weight:600}
+.warn{color:var(--gold)}
+input.ocr{border-color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}
+.fields .warn{margin:0;font-size:13px}
 .legend{font-size:12px;color:var(--muted)}
 @media(max-width:900px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.twocol,.notes{grid-template-columns:minmax(0,1fr)}}
 @media(max-width:640px){
   .scenarios{grid-template-columns:minmax(0,1fr)}
+  .ocrbox{grid-template-columns:minmax(0,84px) minmax(0,1fr)}
   table.hist thead{display:none}
   table.hist,table.hist tbody,table.hist tr,table.hist td{display:block;width:100%!important}
   table.hist tr{border:1px solid var(--line);border-radius:10px;margin-bottom:10px;padding:4px 10px}
@@ -158,6 +175,7 @@ table.hist th.sorted{color:var(--text)}
       <button type="button" data-act="export-csv" class="needs-pos">Export CSV</button>
       <button type="button" id="btn-seed-merge" data-act="seed" class="hidden" title="Adds missing NVDA $215 Call snapshots and fills blank fields from the built-in history. Values you entered or edited are never changed.">Apply NVDA history updates</button>
       <input type="file" id="csv-file" accept=".csv,text/csv" class="hidden">
+      <input type="file" id="shot-file" accept="image/*" multiple class="hidden">
     </div>
     <div id="dash"></div>
   </div>
@@ -171,7 +189,7 @@ table.hist th.sorted{color:var(--text)}
 
 <script>
 'use strict';
-const APP_VERSION = '0.2.0';
+const APP_VERSION = '0.3.0';
 const TZ_DEFAULT = 'America/Chicago';
 
 // ---------- Firebase (same project as Illness Tracker / PawPrints, so the same Google login works) ----------
@@ -212,7 +230,7 @@ function initFirebase(){
         ensureFirestore().then(loadFromFirestore).catch(e => { console.warn('firestore load failed:', e); toast('Cloud sync unavailable; working from this device'); });
       } else {
         state = null; activeId = null; noteIdx = null;
-        closeModal(); updateAuthUI(); document.getElementById('dash').innerHTML = '';
+        ocrStop(); closeModal(); updateAuthUI(); document.getElementById('dash').innerHTML = '';
       }
     });
   } catch(e){ console.warn('Firebase init failed:', e); toast('Sign-in could not start'); }
@@ -502,12 +520,15 @@ function savePosition(isNew){
   noteIdx = null; closeModal(); commit(); toast('Position saved');
 }
 
-function snapshotForm(s){
-  const isNew = !s; s = s || Object.assign(blankSnap(), { date: todayCT() });
+// ocr (optional) = { item, filled: [field keys read from the screenshot], warn: [text] } from the screenshot queue.
+function snapshotForm(s, ocr){
+  const isNew = !s || !!ocr; s = s || Object.assign(blankSnap(), { date: todayCT() });
   const F = (k, l, tip, mode) => numField('f-' + k, l, s[k], tip, mode);
   const M = (k, l, tip) => moneyField('f-' + k, l, s[k], tip);
-  openModal('<div class="modal-head"><h2>' + (isNew ? 'Add snapshot' : 'Edit snapshot') + '</h2><button type="button" class="x" data-act="close" aria-label="Close">&times;</button></div>' +
-    '<div class="drop" aria-disabled="true">Upload screenshot (coming soon). For now, type the values you see; leave anything not shown blank.</div>' +
+  const top = ocr ? ocrPanel(ocr) : isNew ? '<div class="drop" id="drop-zone"><p><b>Fill from screenshots.</b> Drop Robinhood option screenshots here, or</p>' +
+    '<button type="button" data-act="pick-shots" title="Pick one or more screenshots (up to 15 MB each). On a phone this opens your photo library.">Choose screenshots</button>' +
+    '<p class="legend">Text is read in this browser with free OCR. The image never leaves your device and is not saved. You check every value before anything is stored. Or type the values below; leave anything not shown blank.</p></div>' : '';
+  openModal('<div class="modal-head"><h2>' + (ocr ? 'Add snapshot from screenshot' : isNew ? 'Add snapshot' : 'Edit snapshot') + '</h2><button type="button" class="x" data-act="close" aria-label="Close">&times;</button></div>' + top +
     '<div class="fields">' +
     '<div><label for="f-date">Date</label><input id="f-date" type="date" value="' + esc(s.date) + '"></div>' +
     '<div><label for="f-time">Time</label><input id="f-time" type="time" value="' + esc(s.time) + '"></div>' +
@@ -522,22 +543,399 @@ function snapshotForm(s){
     '<div class="wide"><label for="f-notes">Notes</label><textarea id="f-notes">' + esc(s.notes) + '</textarea></div>' +
     '<div class="wide"><label for="f-risk" title="Your own holding-risk note. The computed risk label is separate and rule-based.">Risk note</label><textarea id="f-risk">' + esc(s.risk) + '</textarea></div>' +
     '<div class="wide"><label for="f-evidence" title="What supports the date/time, e.g. a visible clock or a matching previous close.">Evidence</label><input id="f-evidence" value="' + esc(s.evidence) + '"></div>' +
-    '</div><div class="modal-actions"><button type="button" data-act="close">Cancel</button><button type="button" class="primary" data-act="save-snap" data-id="' + (isNew ? '' : esc(s.id)) + '">Review and save</button></div>');
+    '<p id="dt-warn" class="wide warn" role="status"></p>' +
+    '</div><div class="modal-actions"><button type="button" data-act="close"' + (ocr ? ' title="Stop importing screenshots. Nothing from this screenshot is saved."' : '') + '>' + (ocr ? 'Cancel import' : 'Cancel') + '</button>' +
+    (ocr ? '<button type="button" data-act="ocr-skip" title="Leave this screenshot out and go to the next one">Skip screenshot</button>' : '') +
+    '<button type="button" class="primary" data-act="save-snap" data-id="' + (isNew ? '' : esc(s.id)) + '" data-hash="' + (ocr && ocr.item.hash ? esc(ocr.item.hash) : '') + '">Review and save</button></div>');
+  if(ocr) ocr.filled.forEach(k => { const el = $('f-' + k); if(el){ el.classList.add('ocr'); el.title = OCR_TIP; } });
+  dtWarn();
 }
-async function saveSnapshot(id){
+const OCR_TIP = 'Read from screenshot, please verify';
+// Live warning when another snapshot of this position already has the chosen date and time.
+function dtWarn(){
+  const w = $('dt-warn'), p = activePos(); if(!w || !p) return;
+  const b = document.querySelector('[data-act="save-snap"]'), id = b ? b.dataset.id : '', d = $('f-date').value, t = $('f-time').value;
+  const dup = d && t && p.snapshots.find(x => x.id !== id && x.date === d && x.time === t);
+  w.textContent = dup ? 'A snapshot with this date and time already exists for this position.' : '';
+}
+document.addEventListener('input', e => {
+  if(e.target.id === 'f-date' || e.target.id === 'f-time') dtWarn();
+  if(e.target.classList && e.target.classList.contains('ocr')){ e.target.classList.remove('ocr'); e.target.removeAttribute('title'); }
+});
+document.addEventListener('change', e => { if(e.target.id === 'f-date' || e.target.id === 'f-time') dtWarn(); });
+async function saveSnapshot(id, hash){
   const p = activePos(); if(!p) return;
   const s = { id: id || uid(), date: $('f-date').value, time: $('f-time').value, tz: $('f-tz').value.trim() || TZ_DEFAULT, dateConfidence: $('f-conf').value, notes: $('f-notes').value.trim(), risk: $('f-risk').value.trim(), evidence: $('f-evidence').value.trim() };
   SNAP_NUM.forEach(k => s[k] = num($('f-' + k).value));
   if(!s.date || !s.time){ toast('Date and time are required'); return; }
   if(!s.dateConfidence){ $('f-conf').classList.add('attn'); toast('Choose a date confidence'); return; }
   if(s.mark == null){ toast('Mark is required'); return; }
+  const prev = id ? p.snapshots.find(x => x.id === id) : null;
+  const imageHash = prev ? (prev.imageHash || null) : (hash || null);
+  if(imageHash) s.imageHash = imageHash;
+  const hashDup = !prev && imageHash ? findHash(imageHash) : null;
   const dup = p.snapshots.find(x => x.id !== s.id && x.date === s.date && x.time === s.time);
-  const ok = await confirmBox('Confirm timestamp', '<p>Save this snapshot as <b>' + esc(longDate(s.date)) + ' at ' + esc(to12(s.time)) + '</b> (' + esc(s.tz) + '), date <b>' + esc(s.dateConfidence) + '</b>?</p>' + (dup ? '<p class="gold">Another snapshot already has this exact date and time.</p>' : ''), 'Save snapshot');
+  const ok = await confirmBox('Confirm timestamp', '<p>Save this snapshot as <b>' + esc(longDate(s.date)) + ' at ' + esc(to12(s.time)) + '</b> (' + esc(s.tz) + '), date <b>' + esc(s.dateConfidence) + '</b>?</p>' +
+    (dup ? '<p class="gold">Another snapshot already has this exact date and time.</p>' : '') +
+    (hashDup ? '<p class="gold">Already imported: this exact screenshot was saved as the ' + esc(longDate(hashDup.s.date) + ' ' + to12(hashDup.s.time)) + ' snapshot of ' + esc(posLabel(hashDup.p)) + '.</p>' : ''), 'Save snapshot');
   if(!ok) return;
   const i = p.snapshots.findIndex(x => x.id === s.id);
   if(i >= 0) p.snapshots[i] = s; else p.snapshots.push(s);
   sortSnaps(p); noteIdx = p.snapshots.findIndex(x => x.id === s.id); closeModal(); commit(); toast('Snapshot saved');
+  if(!id && ocrCur) ocrAdvance('saved');
 }
+function findHash(h){
+  if(!h || !state) return null;
+  for(const p of state.positions) for(const s of p.snapshots) if(s.imageHash === h) return { p, s };
+  return null;
+}
+
+// ---------- Screenshot OCR parser (pure function; no DOM, no globals; unit-tested in Node) ----------
+// Robinhood lays stats out as a row of labels followed by a row of values. A label row is matched when any one
+// of its labels appears (OCR often garbles one, e.g. "IV" -> "\Y"), and values are read by position from the
+// next line (within 2) that has enough numbers. Anything not read stays null; nothing is guessed.
+function parseRobinhoodText(text){
+  const ROWS = [
+    { labels: ['bid', 'ask'], keys: ['bid', 'ask'], sizes: true },
+    { labels: ['mark', 'last trade', 'iv'], keys: ['mark', 'last', 'iv'] },
+    { labels: ['prev close', 'high', 'low'], keys: ['prevClose', 'high', 'low'] },
+    { labels: ['volume', 'open interest'], keys: ['volume', 'oi'] },
+    { labels: ['delta', 'gamma', 'theta'], keys: ['delta', 'gamma', 'theta'] },
+    { labels: ['vega', 'rho'], keys: ['vega', 'rho'] },
+    { labels: ['contracts', 'current price'], keys: ['contracts', 'currentPrice'] },
+    { labels: ['average cost', 'market value'], keys: ['avgCost', 'marketValue'] },
+    { labels: ['date bought', 'expiration date'], keys: ['dateBought', 'expiration'], dates: true },
+    { labels: ['breakeven', 'current [a-z]{1,5} price', 'current'], keys: ['breakeven', 'currentUnderlying'] }
+  ];
+  const FIELDS = ['stock','mark','bid','bidSize','ask','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho','clock',
+    'contracts','avgCost','marketValue','currentPrice','dateBought','expiration','breakeven','currentUnderlying','ticker','titleTicker','titleStrike','titleType'];
+  const out = {}; FIELDS.forEach(k => out[k] = null);
+  if(typeof text !== 'string' || !text) return out;
+  // Dash variants (figure/en/em dash, minus, and their UTF-8-read-as-Latin-1 forms) become "-".
+  const norm = s => s.replace(/â€[“”]|[‒-―−]/g, '-');
+  const NUM = /[+-]?\$?[+-]?\d[\d,]*(?:\.\d+)?%?/g;
+  const toNum = t => { const v = parseFloat(String(t).replace(/[^\d.]/g, '')); return isFinite(v) ? (/-/.test(t) ? -v : v) : null; };
+  const all = norm(text);
+  const lines = all.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const clock = lines[0] && lines[0].match(/^(\d{1,2}:\d{2})/);
+  if(clock) out.clock = clock[1];
+  const used = new Set();
+  for(let i = 0; i < lines.length; i++){
+    const low = lines[i].toLowerCase();
+    if(/\d\.\d/.test(low)) continue; // a label row has no decimals
+    for(const row of ROWS){
+      if(used.has(row) || !row.labels.some(l => new RegExp('\\b' + l + '\\b').test(low))) continue;
+      for(let j = i + 1; j <= i + 2 && j < lines.length; j++){
+        const toks = lines[j].match(row.dates ? /\d{1,2}\/\d{1,2}(?:\/\d{2,4})?/g : NUM) || [];
+        if(toks.length >= row.keys.length){
+          row.keys.forEach((k, n) => out[k] = row.dates ? toks[n] : toNum(toks[n]));
+          used.add(row);
+          if(row.sizes && lines[j + 1]){
+            const sz = Array.from(lines[j + 1].matchAll(/[xX×]\s*(\d+)/g), m => +m[1]);
+            if(sz[0] != null) out.bidSize = sz[0];
+            if(sz[1] != null) out.askSize = sz[1];
+          }
+          break;
+        }
+      }
+      break;
+    }
+  }
+  // "Bid Ask" label row lost: the bid/ask values are the only line of two prices directly above two "x size" values.
+  if(out.bid == null){
+    for(let j = 0; j + 1 < lines.length; j++){
+      const sz = Array.from(lines[j + 1].matchAll(/[xX×]\s*(\d+)/g), m => +m[1]), px = lines[j].match(/\$\d[\d,]*\.\d+/g) || [];
+      if(sz.length === 2 && px.length === 2){ out.bid = toNum(px[0]); out.ask = toNum(px[1]); out.bidSize = sz[0]; out.askSize = sz[1]; break; }
+    }
+  }
+  // Title such as "NVDA $215 Call".
+  const title = all.match(/\b([A-Z]{1,5})\s+\$(\d[\d,]*(?:\.\d+)?)\s+(Call|Put)\b/i);
+  if(title){ out.titleTicker = title[1].toUpperCase(); out.titleStrike = toNum(title[2]); out.titleType = title[3].toLowerCase(); }
+  // Bottom bar "NVDA - $164.24": ticker, a dash-like glyph, then the stock price. The last match wins, so the strike in the title is never used.
+  const bars = Array.from(all.matchAll(/\b([A-Z]{1,5})\s+[-~=.]+\s*\$(\d[\d,]*\.\d{2})/g));
+  if(bars.length){ const b = bars[bars.length - 1]; out.ticker = b[1]; out.stock = toNum(b[2]); }
+  return out;
+}
+// ---------- end OCR parser ----------
+
+// ---------- Screenshot import: OCR runs in this browser; images never leave the device and are not stored ----------
+const SHOT_MAX = 15 * 1024 * 1024;
+const TESS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/7.0.0/tesseract.min.js';
+const OCR_NUM_KEYS = ['stock','mark','bid','bidSize','ask','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho','contracts','avgCost','marketValue','currentPrice','breakeven','currentUnderlying'];
+let ocrQueue = [], ocrCur = null, ocrBusy = false, ocrGen = 0, ocrWaiting = false, ocrLog = null;
+let tessLoading = null, tessWorker = null;
+function loadTesseract(){
+  if(window.Tesseract) return Promise.resolve();
+  if(tessLoading) return tessLoading;
+  tessLoading = new Promise((res, rej) => {
+    const s = document.createElement('script'); s.src = TESS_SRC; s.crossOrigin = 'anonymous';
+    s.onload = res; s.onerror = () => { tessLoading = null; rej(new Error('the OCR engine could not be downloaded')); };
+    document.head.appendChild(s);
+  });
+  return tessLoading;
+}
+// Worker, core and English data load from the library's default jsdelivr paths and are cached by the browser.
+async function getWorker(){
+  if(tessWorker) return tessWorker;
+  await loadTesseract();
+  const w = await Tesseract.createWorker('eng', 1, { logger: m => { if(ocrLog) ocrLog(m); } });
+  await w.setParameters({ tessedit_pageseg_mode: '3' }); // automatic page segmentation; sparse mode (11) scored worse
+  tessWorker = w; return w;
+}
+function dropWorker(){ if(tessWorker){ try { tessWorker.terminate(); } catch(e){} tessWorker = null; } }
+async function sha256Hex(buf){
+  if(!(window.crypto && crypto.subtle)) return null;
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(h), b => b.toString(16).padStart(2, '0')).join('');
+}
+// EXIF DateTimeOriginal (JPEG APP1 or PNG eXIf), else an XMP creation date. Only ever shown as a labelled suggestion.
+function exifDateSuggestion(buf){
+  try {
+    const dv = new DataView(buf); let tiff = -1;
+    if(dv.getUint16(0) === 0xFFD8){
+      let o = 2;
+      while(o + 10 < dv.byteLength){
+        const mk = dv.getUint16(o), len = dv.getUint16(o + 2);
+        if(mk === 0xFFE1 && dv.getUint32(o + 4) === 0x45786966){ tiff = o + 10; break; }
+        if(mk === 0xFFDA || (mk & 0xFF00) !== 0xFF00) break;
+        o += 2 + len;
+      }
+    } else if(dv.getUint32(0) === 0x89504E47){
+      let o = 8;
+      while(o + 12 < dv.byteLength){
+        const len = dv.getUint32(o), type = dv.getUint32(o + 4);
+        if(type === 0x65584966){ tiff = o + 8; break; }
+        if(type === 0x49444154) break;
+        o += 12 + len;
+      }
+    }
+    let m = null;
+    if(tiff >= 0){
+      const le = dv.getUint16(tiff) === 0x4949, u16 = o => dv.getUint16(tiff + o, le), u32 = o => dv.getUint32(tiff + o, le);
+      const tag = (ifd, t) => { const n = u16(ifd); for(let i = 0; i < n; i++){ const e = ifd + 2 + i * 12; if(u16(e) === t) return e; } return -1; };
+      const ex = tag(u32(4), 0x8769);
+      const e = ex >= 0 ? tag(u32(ex + 8), 0x9003) : -1;
+      if(e >= 0){ const off = u32(e + 8); let s = ''; for(let i = 0; i < 19; i++) s += String.fromCharCode(dv.getUint8(tiff + off + i)); m = /^(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2})/.exec(s); }
+    }
+    if(!m){
+      const head = new TextDecoder('latin1').decode(new Uint8Array(buf, 0, Math.min(buf.byteLength, 262144)));
+      m = /(?:DateTimeOriginal|photoshop:DateCreated|xmp:CreateDate)(?:>|=")(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(head);
+    }
+    if(!m || +m[1] < 2000 || +m[1] > 2100) return null;
+    return { date: m[1] + '-' + m[2] + '-' + m[3], time: m[4] + ':' + m[5] };
+  } catch(e){ return null; }
+}
+async function decodeImage(file){
+  if(window.createImageBitmap){ try { return await createImageBitmap(file); } catch(e){} }
+  return new Promise((res, rej) => {
+    const im = new Image(), u = URL.createObjectURL(file);
+    im.onload = () => { URL.revokeObjectURL(u); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('this image format cannot be opened in this browser')); };
+    im.src = u;
+  });
+}
+function imgSize(img){ return { w: img.naturalWidth || img.width, h: img.naturalHeight || img.height }; }
+// 2x upscale (OCR reads small phone text much better), capped under the ~16.7M pixel canvas limit of iOS Safari.
+function shotCanvas(img, invert){
+  const { w, h } = imgSize(img), k = Math.min(2, Math.sqrt(16e6 / (w * h)));
+  const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, c.width, c.height);
+  if(invert){
+    const d = g.getImageData(0, 0, c.width, c.height), a = d.data;
+    for(let i = 0; i < a.length; i += 4){ const y = 255 - Math.round(0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2]); a[i] = a[i + 1] = a[i + 2] = y; }
+    g.putImageData(d, 0, 0);
+  }
+  return c;
+}
+function meanLuma(img){
+  const { w, h } = imgSize(img), c = document.createElement('canvas'); c.width = 48; c.height = Math.max(1, Math.round(48 * h / w));
+  const g = c.getContext('2d'); g.drawImage(img, 0, 0, c.width, c.height);
+  const a = g.getImageData(0, 0, c.width, c.height).data; let sum = 0;
+  for(let i = 0; i < a.length; i += 4) sum += 0.299 * a[i] + 0.587 * a[i + 1] + 0.114 * a[i + 2];
+  return sum / (a.length / 4);
+}
+function ocrCount(r){ return OCR_NUM_KEYS.filter(k => r[k] != null).length; }
+// Status-bar clock has no AM/PM. Guess from US market hours: 1-7 = PM, 8-11 = AM, 12 = noon. 24-hour clocks pass through.
+function clockTo24(c){
+  const m = /^(\d{1,2}):(\d{2})$/.exec(c || ''); if(!m) return '';
+  let h = +m[1]; const mi = +m[2]; if(h > 23 || mi > 59) return '';
+  if(h >= 1 && h <= 7) h += 12;
+  return String(h).padStart(2, '0') + ':' + m[2];
+}
+
+function shotFilesChosen(fileList){
+  if(!activePos()) return;
+  const files = Array.from(fileList || []); if(!files.length) return;
+  if(!ocrQueue.length) ocrGen++;
+  let rejected = 0;
+  files.forEach(f => {
+    const it = { n: ocrQueue.length + 1, file: f, name: f.name || 'screenshot', status: 'queued', msg: '', hash: null, parsed: null, exif: null, url: null };
+    const isImg = /^image\//.test(f.type) || (!f.type && /\.(png|jpe?g|webp|gif|bmp|heic|heif)$/i.test(f.name || ''));
+    if(!isImg){ it.status = 'rejected'; it.msg = 'not an image'; rejected++; }
+    else if(f.size > SHOT_MAX){ it.status = 'rejected'; it.msg = 'larger than 15 MB'; rejected++; }
+    else it.url = URL.createObjectURL(f);
+    ocrQueue.push(it);
+  });
+  if(rejected) toast(rejected + ' file(s) left out: not an image or larger than 15 MB');
+  if(!ocrQueue.some(q => q.status === 'queued' || q.status === 'ready' || q.status === 'error' || q.status === 'reading' || q.status === 'reviewing')){ ocrStop(); return; }
+  if(!ocrCur) ocrShowNext();
+  ocrRefresh(); ocrPump();
+}
+async function ocrPump(){
+  if(ocrBusy) return;
+  const it = ocrQueue.find(q => q.status === 'queued'); if(!it) return;
+  ocrBusy = true; const gen = ocrGen; let pass = 1;
+  it.status = 'reading'; it.msg = 'starting'; ocrRefresh();
+  ocrLog = m => {
+    if(gen !== ocrGen) return;
+    if(m.status === 'recognizing text') it.msg = 'reading text ' + Math.round((m.progress || 0) * 100) + '%' + (pass === 2 ? ' (second pass, inverted)' : pass === 3 ? ' (stock price bar)' : '');
+    else if(/load|initializ/i.test(m.status)) it.msg = 'loading the OCR engine (first use downloads about 7 MB)';
+    ocrRefresh();
+  };
+  try {
+    const buf = await it.file.arrayBuffer();
+    it.hash = await sha256Hex(buf);
+    it.exif = exifDateSuggestion(buf);
+    const twin = it.hash && ocrQueue.find(q => q !== it && q.n < it.n && q.hash === it.hash);
+    if(twin){ it.status = 'skipped'; it.msg = 'same image as #' + twin.n; }
+    else {
+      const img = await decodeImage(it.file);
+      const worker = await getWorker(), canvas = shotCanvas(img, false);
+      let best = parseRobinhoodText((await worker.recognize(canvas)).data.text);
+      if(ocrCount(best) < 6 && meanLuma(img) < 128){
+        pass = 2;
+        const r2 = parseRobinhoodText((await worker.recognize(shotCanvas(img, true))).data.text);
+        if(ocrCount(r2) > ocrCount(best)) best = r2;
+      }
+      // Full-page segmentation in the browser often drops the "NVDA - $price" bar; reading the bottom quarter alone finds it.
+      if(best.stock == null){
+        pass = 3;
+        const top = Math.round(canvas.height * 0.75);
+        const rb = parseRobinhoodText((await worker.recognize(canvas, { rectangle: { left: 0, top, width: canvas.width, height: canvas.height - top } })).data.text);
+        if(rb.stock != null){ best.stock = rb.stock; best.ticker = rb.ticker; }
+      }
+      if(img.close) img.close();
+      it.parsed = best; it.status = 'ready'; it.msg = ocrCount(best) + ' values read';
+    }
+  } catch(e){
+    console.warn('screenshot OCR failed:', e);
+    it.status = 'error'; it.msg = (e && e.message) || 'could not be read';
+  }
+  ocrBusy = false; ocrLog = null;
+  if(gen === ocrGen){ ocrRefresh(); ocrShowNext(); }
+  else if(!ocrQueue.length) dropWorker(); // import was cancelled while this image was being read
+  ocrPump();
+}
+function ocrStatusText(q){
+  switch(q.status){
+    case 'queued': return 'waiting';
+    case 'reading': return q.msg;
+    case 'ready': return 'read (' + q.msg + '), waiting for you';
+    case 'reviewing': return 'open now';
+    case 'saved': return 'saved';
+    case 'skipped': return 'skipped' + (q.msg && !/values read/.test(q.msg) ? ' (' + q.msg + ')' : '');
+    case 'rejected': return 'not used: ' + q.msg;
+    case 'error': return 'could not read: ' + q.msg;
+  }
+  return q.status;
+}
+function ocrListHtml(){ return '<ul class="ocr-list">' + ocrQueue.map(q => '<li' + (q === ocrCur ? ' class="cur"' : '') + '>' + q.n + '. ' + esc(q.name) + ': ' + esc(ocrStatusText(q)) + '</li>').join('') + '</ul>'; }
+function ocrRefresh(){
+  const l = $('ocr-list'); if(l) l.innerHTML = ocrListHtml();
+  const pr = $('ocr-progress'), r = ocrQueue.find(q => q.status === 'reading');
+  if(pr) pr.textContent = r ? 'Screenshot ' + r.n + ' of ' + ocrQueue.length + ': ' + r.msg : 'Working...';
+  const th = $('ocr-thumb'); if(th && r && r.url && th.getAttribute('src') !== r.url) th.src = r.url;
+}
+function ocrShowNext(){
+  if(!ocrQueue.length || ocrCur) return;
+  const next = ocrQueue.find(q => q.status === 'ready' || q.status === 'error');
+  if(next){ ocrWaiting = false; ocrCur = next; ocrOpenForm(next); return; }
+  if(ocrQueue.some(q => q.status === 'queued' || q.status === 'reading')){ if(!ocrWaiting) ocrOpenWaiting(); return; }
+  ocrFinish();
+}
+function ocrOpenWaiting(){
+  ocrWaiting = true;
+  const it = ocrQueue.find(q => q.status === 'reading') || ocrQueue.find(q => q.status === 'queued');
+  openModal('<div class="modal-head"><h2>Reading screenshots</h2><button type="button" class="x" data-act="close" aria-label="Close">&times;</button></div>' +
+    '<div class="ocrbox"><div><img id="ocr-thumb" class="thumbimg" src="' + esc(it && it.url || '') + '" alt="Screenshot being read" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid var(--line)"></div><div>' +
+    '<p id="ocr-progress" role="status">Working...</p><p class="legend">Text is read in this browser. The image is not uploaded and not saved. You will check the values before anything is stored.</p>' +
+    '<div id="ocr-list">' + ocrListHtml() + '</div></div></div>' +
+    '<div class="modal-actions"><button type="button" data-act="close" title="Stop importing. Nothing has been saved from these screenshots.">Cancel import</button></div>');
+  ocrRefresh();
+}
+function ocrOpenForm(it){
+  const p = activePos(); if(!p){ ocrStop(); closeModal(); return; }
+  it.status = 'reviewing';
+  const r = it.parsed || parseRobinhoodText(''), s = blankSnap(), filled = [];
+  s.dateConfidence = 'inferred';
+  const put = (k, v) => { if(v != null){ s[k] = v; filled.push(k); } };
+  ['bid','ask','bidSize','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho'].forEach(k => put(k, r[k]));
+  put('mark', r.mark != null ? r.mark : r.currentPrice);
+  put('stock', r.stock != null ? r.stock : r.currentUnderlying);
+  const t = clockTo24(r.clock);
+  if(t){ s.time = t; filled.push('time'); }
+  s.evidence = 'Robinhood screenshot, read by OCR' + (r.clock ? '; status-bar clock ' + r.clock + (+r.clock.split(':')[0] <= 12 ? ' (AM/PM guessed)' : '') : '');
+  snapshotForm(s, { item: it, filled, warn: ocrWarnings(p, r, it) });
+}
+function ocrWarnings(p, r, it){
+  const w = [], type = p.type === 'put' ? 'put' : 'call';
+  if(r.titleTicker && r.titleTicker !== p.ticker) w.push('The screenshot is for ' + r.titleTicker + ', but the selected position is ' + p.ticker + '.');
+  else if(!r.titleTicker && r.ticker && r.ticker !== p.ticker) w.push('The screenshot shows ' + r.ticker + ' stock, but the selected position is ' + p.ticker + '.');
+  if(r.titleStrike != null && Math.abs(r.titleStrike - p.strike) > 1e-9) w.push('The screenshot strike is $' + fmt(r.titleStrike, 2) + '; the selected position strike is $' + fmt(p.strike, 2) + '.');
+  if(r.titleType && r.titleType !== type) w.push('The screenshot shows a ' + r.titleType + '; the selected position is a ' + type + '.');
+  if(r.contracts != null && r.contracts !== p.qty) w.push('The screenshot shows ' + r.contracts + ' contract(s); the position has ' + p.qty + '.');
+  if(r.avgCost != null && p.avgPremium != null && Math.abs(r.avgCost - p.avgPremium) > 0.005) w.push('The screenshot average cost is $' + fmt(r.avgCost, 2) + '; the position avg premium is $' + fmt(p.avgPremium, 2) + '.');
+  if(r.expiration && p.expiry){ const a = r.expiration.split('/').map(Number), b = p.expiry.split('-').map(Number); if(a[0] !== b[1] || a[1] !== b[2]) w.push('The screenshot expiration is ' + r.expiration + '; the position expires ' + shortDate(p.expiry) + '.'); }
+  const dupe = findHash(it.hash);
+  if(dupe) w.push('Already imported: this exact screenshot was saved as the ' + longDate(dupe.s.date) + ' ' + to12(dupe.s.time) + ' snapshot of ' + posLabel(dupe.p) + '.');
+  if(!it.hash) w.push('Duplicate check unavailable in this browser (needs https).');
+  return w;
+}
+function ocrPanel(o){
+  const it = o.item, r = it.parsed, p = activePos();
+  let h = '<div class="ocrbox"><button type="button" class="thumbbtn" data-act="ocr-zoom" title="Show the screenshot larger or smaller" aria-label="Enlarge or shrink the screenshot"><img src="' + esc(it.url) + '" alt="Screenshot ' + it.n + '"></button><div>';
+  h += '<p><b>Screenshot ' + it.n + ' of ' + ocrQueue.length + '</b>: ' + esc(it.name) + '</p>';
+  h += r ? '<p>' + o.filled.length + ' field(s) were read and are highlighted. Check each one against the screenshot. Blank fields could not be read; type them if you can see them. Set the date yourself.</p>'
+    : '<p class="warn">The text could not be read (' + esc(it.msg) + '). Type the values from the screenshot, or skip it.</p>';
+  h += '<p class="legend">Saving to <b>' + esc(posLabel(p)) + '</b>. Read in this browser; the image is not uploaded or saved. Nothing is stored until you press Save.</p>';
+  o.warn.forEach(x => h += '<p class="warn">' + esc(x) + '</p>');
+  if(r){
+    const ex = [['contracts', 'Contracts', v => String(v)], ['avgCost', 'Avg cost', money], ['marketValue', 'Market value', money], ['dateBought', 'Bought', v => v], ['expiration', 'Expires', v => v], ['breakeven', 'Breakeven', money]].filter(x => r[x[0]] != null);
+    if(ex.length) h += '<p class="legend">Position screen: ' + ex.map(x => x[1] + ' ' + esc(x[2](r[x[0]]))).join(' · ') + '. Shown for checking; not saved with the snapshot.</p>';
+  }
+  if(it.exif) h += '<p class="legend">Image metadata suggests <b>' + esc(longDate(it.exif.date) + ' ' + to12(it.exif.time)) + '</b>. Only a suggestion: it can be when the file was saved or edited, not when the screenshot was taken. <button type="button" data-act="ocr-exif" title="Copy the suggested date into the Date field (and the time, if Time is empty)">Use this date</button></p>';
+  if(ocrQueue.length > 1) h += '<div id="ocr-list">' + ocrListHtml() + '</div>';
+  return h + '</div></div>';
+}
+function ocrAdvance(status){
+  if(!ocrCur) return;
+  ocrCur.status = status; ocrCur = null;
+  ocrShowNext();
+}
+function ocrFinish(){
+  const saved = ocrQueue.filter(q => q.status === 'saved').length, skipped = ocrQueue.length - saved;
+  ocrStop(); closeModal();
+  toast('Screenshot import done: ' + saved + ' saved' + (skipped ? ', ' + skipped + ' not saved' : ''));
+}
+function ocrStop(){
+  ocrGen++;
+  ocrQueue.forEach(q => { if(q.url) URL.revokeObjectURL(q.url); });
+  ocrQueue = []; ocrCur = null; ocrWaiting = false; ocrLog = null;
+  if(!ocrBusy) dropWorker();
+}
+const hasFiles = e => !!(e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files'));
+document.addEventListener('dragover', e => {
+  if(!hasFiles(e) || $('modal').classList.contains('hidden')) return;
+  e.preventDefault(); // keep a dropped image from replacing the page
+  const z = e.target.closest && e.target.closest('#drop-zone'); if(z) z.classList.add('on');
+});
+document.addEventListener('dragleave', e => { const z = e.target.closest && e.target.closest('#drop-zone'); if(z && !z.contains(e.relatedTarget)) z.classList.remove('on'); });
+document.addEventListener('drop', e => {
+  if(!hasFiles(e) || $('modal').classList.contains('hidden')) return;
+  e.preventDefault();
+  const z = e.target.closest && e.target.closest('#drop-zone');
+  if(z){ z.classList.remove('on'); shotFilesChosen(e.dataTransfer.files); }
+});
 
 // ---------- Rendering ----------
 const METRICS = [['mark','Mark','$'],['stock','Stock','$'],['pl','P/L','$'],['iv','IV','%'],['volume','Volume',''],['volDelta','Δ Volume',''],['oi','Open interest',''],['oiDelta','Δ OI',''],['volOi','Vol / OI','%'],['delta','Delta','g'],['theta','Theta','g'],['gamma','Gamma','g'],['vega','Vega','g']];
@@ -764,7 +1162,14 @@ document.addEventListener('click', async e => {
   const a = e.target.closest('[data-act]'); if(!a || !state) return;
   const p = activePos();
   switch(a.dataset.act){
-    case 'close': tblDraft = null; closeModal(); break;
+    case 'close': tblDraft = null; if(ocrQueue.length) ocrStop(); closeModal(); break;
+    case 'pick-shots': $('shot-file').value = ''; $('shot-file').click(); break;
+    case 'ocr-skip': ocrAdvance('skipped'); break;
+    case 'ocr-zoom': { const b = a.closest('.ocrbox'); if(b) b.classList.toggle('big'); break; }
+    case 'ocr-exif': {
+      const x = ocrCur && ocrCur.exif; if(!x) break;
+      $('f-date').value = x.date; if(!$('f-time').value) $('f-time').value = x.time;
+      dtWarn(); toast('Suggested date copied; check it against the screenshot'); break; }
     case 'tbl-settings': if(p) tableSettings(); break;
     case 'tbl-save': saveTableSettings(); break;
     case 'tbl-reset': if(tblDraft){ tblDraft = defaultLayout(historyView); fillSortControls(); renderTblList(); toast('Defaults restored here; Save to keep them'); } break;
@@ -777,7 +1182,7 @@ document.addEventListener('click', async e => {
         state.positions = state.positions.filter(x => x.id !== p.id); activeId = null; noteIdx = null; closeModal(); commit(); toast('Position deleted');
       } break;
     case 'add-snap': if(p) snapshotForm(null); break;
-    case 'save-snap': saveSnapshot(a.dataset.id); break;
+    case 'save-snap': saveSnapshot(a.dataset.id, a.dataset.hash); break;
     case 'edit-snap': if(p && p.snapshots[noteIdx]) snapshotForm(p.snapshots[noteIdx]); break;
     case 'del-snap': {
       const s = p && p.snapshots[noteIdx]; if(!s) break;
@@ -791,6 +1196,7 @@ document.addEventListener('click', async e => {
 $('pos-select').addEventListener('change', e => { activeId = e.target.value || null; noteIdx = null; render(); });
 document.addEventListener('change', e => { if(e.target.id === 'note-select'){ noteIdx = +e.target.value; render(); } });
 $('csv-file').addEventListener('change', e => importCSVFile(e.target.files[0]));
+$('shot-file').addEventListener('change', e => shotFilesChosen(e.target.files));
 $('btn-signin').addEventListener('click', signIn);
 $('btn-signout').addEventListener('click', signOut);
 
