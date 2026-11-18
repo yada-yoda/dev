@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.86.0**
+**Current Version: v0.87.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -93,6 +93,7 @@ covers both.
 
 ## Version History
 
+- **v0.87.0** — **Clothing, with the size that fits.** Supplies has a new **Clothing** category for jackets, sweaters, boots and the like. Pick it and a **Clothing size** field appears, so you can save the tag size or the measurements that fit ("M", "20 in chest"). Next time you shop, the right size is one glance away instead of another round with the tape measure. The size shows quietly next to the item name in the list, is searchable, and rides along in the PDF and spreadsheet exports. New clothing items are marked as one-time keeps automatically, since a jacket isn't something you use up.
 - **v0.86.0** — **Emergency card.** A new option on the Profile creates a QR code + link you can hand to anyone — a sitter, a neighbor, an emergency vet — opening a clean page with your dog's photo, breed, weight, microchip, what food he eats and how much and how often (worked out from your actual logs and routine), his meds and doses, medical notes, and your vet's number. No sign-in needed to view, nothing else in your account reachable, and one tap turns the link off. Update it anytime to re-snapshot the latest info.
 - **v0.85.0** — **"How long ago?" at a glance.** Every date in the care lists now carries its distance — "Oct 20, 2026 · 21 days" on a grooming, "in 12 days" on a follow-up — across the Care history, the health timeline, med dose and measurement histories, and the vet, grooming, records, illness and journal lists. No more date math in your head.
 - **v0.84.0** — **Growth history, friendlier touch targets, easier install.** Body measurements now keep a dated history like meds do — each re-measure becomes an entry (visible in the activity log, editable, restorable) with a History list on the profile, and your current numbers seed the first snapshot. On touch screens, buttons, toggle pills, row actions, the modal close and the little "i" tooltips all grow to comfortable thumb size (desktop unchanged). And installing to the home screen got real help: Android gets a one-tap Install button (plus step-by-step instructions where the browser hides it), the Settings option now appears on Android too, and phones see a small dismissible nudge on first visit. The Care tab also gains a combined Care history list of everything — visits, grooming, doses, illnesses, records — and doses you logged before v0.82 are recovered from the change history.

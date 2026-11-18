@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.86.0';
+const APP_VERSION = 'v0.87.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -540,7 +540,7 @@ const TREND_METRICS = [
   { k:'walkdist',label:'Walk miles',icon:'walk', auto:'area', hint:'Total miles walked per day.' },
   { k:'weight',  label:'Weight',  icon:'weight', auto:'line', hint:'Weigh-ins over time. Gaps are normal — the line connects your recorded points.' }
 ];
-const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds','Other'];
+const INV_CATEGORIES = ['Food','Treats','Grooming','Supplies','Meds','Clothing','Other'];
 // Category dropdown = built-ins + any custom categories from Settings, with "Other" kept last.
 function catOptions(){ const c = (data.settings && data.settings.customCategories) || []; return [...new Set([...notHidden('category', INV_CATEGORIES.filter(x=>x!=='Other')), ...c, 'Other'])]; }
 const PAY_METHODS = ['Cash','Credit card','Debit card','Check','Pet insurance','Other'];
@@ -1768,7 +1768,7 @@ async function exportXLSX(){
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
-  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,i.size,i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,[i.size,i.clothingSize].filter(Boolean).join(' · '),i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Journal', ['Dog','When','Type','Title','Entry'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),JOURNAL_KINDS[journalKind(n)].label,(n.title||''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
@@ -1851,7 +1851,7 @@ async function exportPDF(onlyPetId){
     if(ill.length){ y = heading('Illness history', y); y = table(['Started','Recovered','Symptoms','Severity','Diagnosis','Notes'], ill.map(e=>[fmtDate(e.start), e.recovery?fmtDate(e.recovery):'ongoing', (e.symptoms||[]).join(', ')||dash, e.severity||dash, e.diagnosis||dash, e.notes||'']), y); }
 
     const inv = recordsFor('inventory', p.id).slice().sort((a,b)=>(b.purchaseDate||'').localeCompare(a.purchaseDate||''));
-    if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Paid','Status'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), [(i.qty||''),(i.unit||''),(i.size?'· '+i.size:'')].filter(Boolean).join(' '), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, payStr(i)||dash, invStatus(i)+(i.runningLow?'  ·  low':'')]), y); }
+    if(inv.length){ y = heading('Supplies & purchases', y); y = table(['Category','Item','Qty','Cost','Purchased','Paid','Status'], inv.map(i=>[i.category||dash, (i.brand?i.brand+' ':'')+(i.name||''), [(i.qty||''),(i.unit||''),(i.size?'· '+i.size:''),(i.clothingSize?'· '+i.clothingSize:'')].filter(Boolean).join(' '), i.cost?money(i.cost):dash, i.purchaseDate?fmtDate(i.purchaseDate):dash, payStr(i)||dash, invStatus(i)+(i.runningLow?'  ·  low':'')]), y); }
 
     const jn = (data.journal||[]).filter(n=>n.petId===p.id).sort((a,b)=>new Date(b.dateTime||0)-new Date(a.dateTime||0));
     if(jn.length){ y = heading('Journal & milestones', y); y = table(['When','Type','Title','Entry'], jn.map(n=>[n.dateTime?fmtDateTime(n.dateTime):dash, JOURNAL_KINDS[journalKind(n)].label, n.title||dash, n.text||dash]), y); }
@@ -3052,12 +3052,13 @@ function invModal(id, pre){
   const unitList = [...new Set([...(it && it.unit ? [it.unit] : []), ...unitOptions()])];
   const catList = [...new Set([...catOptions(), ...(it && it.category ? [it.category] : [])])];
   openModal('<h3>🛒 '+(editing?'Edit item':(pre?'Duplicate supply':'Add supply'))+'</h3>'
-    +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat">'+sel(catList, it?it.category:'Food')+'</select></div>'
+    +'<div class="grid-2"><div><label class="label">Category</label><select class="select" id="iv-cat" onchange="ivCatToggle(1)">'+sel(catList, it?it.category:'Food')+'</select></div>'
     +'<div><label class="label">Brand</label><input class="input" id="iv-brand" value="'+(it?esc(it.brand||''):'')+'" placeholder="Blue Buffalo"></div></div>'
     +'<label class="label">Item name</label><input class="input" id="iv-name" value="'+(it?esc(it.name||''):'')+'" placeholder="Chicken & rice 30lb bag">'
     +'<div class="grid-2"><div><label class="label">Qty'+tip('How many you bought — usually 1 (one bag, one box), with the amount inside in Package size below. Tracking by piece works too (65 treats = Qty 65, Unit count, no package size); cost breakdown then shows per piece.')+'</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
     +'<div><label class="label">Unit'+tip('The container or measure. Add your own units in Settings → Lists &amp; preferences.')+'</label><select class="select" id="iv-unit"><option value="">—</option>'+sel(unitList, it?(it.unit||''):'')+'</select></div></div>'
     +'<label class="label">Package size (optional)'+tip('The amount inside the package — e.g. "5 lb", "30 ct", "12 oz". It\'s separate from Unit (the container), so a 5-lb bag of food is Qty 1, Unit bag, Size 5 lb.')+'</label><input class="input" id="iv-size" value="'+(it?esc(it.size||''):'')+'" placeholder="e.g. 5 lb, 30 ct">'
+    +'<div id="iv-clothing-wrap"><label class="label">Clothing size'+tip('The size on the tag or the measurements that fit — M, XL, 20 in chest, 15 in neck. Saved with the item so you can re-buy the right size without measuring again.')+'</label><input class="input" id="iv-clothsize" value="'+(it?esc(it.clothingSize||''):'')+'" placeholder="e.g. M, 20 in chest"></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the item price before sales tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="iv-cost" value="'+(it?esc(it.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased'+(storeOptions().length?tip('Type a store or pick a past one — every store you\'ve used on a purchase shows up here automatically. Manage the list in Settings → Lists &amp; preferences → Stores.'):'')+'</label><input class="input" id="iv-store" list="iv-store-list" autocomplete="off" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"><datalist id="iv-store-list">'+storeOptions().map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+savedPick('iv-store', storeOptions(), 'Pick a past store')+'</div>'
@@ -3068,7 +3069,7 @@ function invModal(id, pre){
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="iv-cclast4" inputmode="numeric" maxlength="4" value="'+(it?esc(it.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
-    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="iv-nolife" '+(it&&it.noLifecycle?'checked':'')+' onchange="ivLifecycleToggle()" style="flex:none"> <span style="flex:1;min-width:0">One-time item — no start / finish tracking'+tip('For things you buy once and keep — tags, collar, license, toys. Hides the opened/finished dates and the Start/Finish buttons, and keeps the item out of the on-hand "Inventory" nudges. Leave off for consumables like food or treats.')+'</span></label>'
+    +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:10px;cursor:pointer"><input type="checkbox" id="iv-nolife" '+(it&&it.noLifecycle?'checked':'')+' onchange="ivNolifeTouched=true;ivLifecycleToggle()" style="flex:none"> <span style="flex:1;min-width:0">One-time item — no start / finish tracking'+tip('For things you buy once and keep — tags, collar, license, toys. Hides the opened/finished dates and the Start/Finish buttons, and keeps the item out of the on-hand "Inventory" nudges. Leave off for consumables like food or treats.')+'</span></label>'
     +'<div id="iv-lifecycle-wrap"><div class="grid-2"><div><label class="label">Started'+tip('When you opened / started using it. Leave blank for items still in inventory (unopened) — those are tracked as on-hand stock.')+'</label><input class="input" type="date" id="iv-start" value="'+(it?esc(it.startDate||''):'')+'">'+((it&&it.startDate)?clearDateBtn('iv-start','↺ Clear — back to inventory'):'')+'</div>'
     +'<div><label class="label">Finished'+tip('When it was used up or thrown out. Clear this to mark the item still in use.')+'</label><input class="input" type="date" id="iv-end" value="'+(it?esc(it.endDate||''):'')+'">'+((it&&it.endDate)?clearDateBtn('iv-end','↺ Clear — still in use'):'')+'</div></div></div>'
     +'<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:12px;cursor:pointer"><input type="checkbox" id="iv-low" '+(it&&it.runningLow?'checked':'')+' style="flex:none"> <span style="flex:1;min-width:0">Running low / needs reorder'+tip('Flags this item for restocking: it appears in the Restock list at the top of Supplies, nudges you on the Today page, shows the Reorder / Amazon buttons on its row, and is what the reorder reminder email (Settings) sends. Tap "Got it" after re-buying (or Finish the item) to clear it.')+'</span></label>'
@@ -3077,10 +3078,22 @@ function invModal(id, pre){
     +'<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-primary" onclick="saveInv('+(editing?"'"+id+"'":'null')+')">Save</button>'
     +(editing?'<button class="btn" onclick="dupInv(\''+id+'\')" title="Add another of this same item">Duplicate</button><button class="btn btn-danger" onclick="deleteInv(\''+id+'\')">Delete</button>':'')
     +'<button class="btn" onclick="closeModal()">Cancel</button></div>');
-  payToggle('iv'); ivLifecycleToggle();
+  ivFresh = !editing && !pre; ivNolifeTouched = false; ivHasClothSize = !!(it && it.clothingSize);
+  payToggle('iv'); ivLifecycleToggle(); ivCatToggle();
 }
 // Hide the Started/Finished dates for one-time items that don't have a use-up lifecycle.
 function ivLifecycleToggle(){ const w=document.getElementById('iv-lifecycle-wrap'), cb=document.getElementById('iv-nolife'); if(w&&cb) w.style.display = cb.checked ? 'none' : ''; }
+// Clothing size shows for the Clothing category, or whenever the item already has one saved.
+// On a brand-new item, picking Clothing also ticks "One-time item" unless the user already set that box.
+let ivFresh = false, ivNolifeTouched = false, ivHasClothSize = false;
+function ivCatToggle(fromUser){
+  const cat = fv('iv-cat'), w = document.getElementById('iv-clothing-wrap');
+  if(w) w.style.display = (cat==='Clothing' || ivHasClothSize) ? '' : 'none';
+  if(fromUser && cat==='Clothing' && ivFresh && !ivNolifeTouched){
+    const cb = document.getElementById('iv-nolife');
+    if(cb && !cb.checked){ cb.checked = true; ivLifecycleToggle(); }
+  }
+}
 // Open a fresh Add form pre-filled from an existing item — quick "buy another of the same".
 function dupInv(id){
   if(denyManage()) return;
@@ -3096,7 +3109,7 @@ function saveInv(id){
   if(!activePet()){ promptAddDog(); return; }
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const noLifecycle = document.getElementById('iv-nolife').checked;
-  const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'),
+  const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'), clothingSize:fv('iv-clothsize'),
     cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), reorderUrl:fv('iv-url'), asin:normalizeAsin(fv('iv-asin')), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
@@ -4133,7 +4146,7 @@ function runSearch(){
   petArr('records').forEach(r => { if(hit(r.name, r.type, r.vaccineType, r.result, r.vet, r.clinic, r.notes)) care.push(row('records', (r.name||r.type||'Record'), fmtDate(r.date), "recordModal('"+r.id+"')")); });
   petArr('illnesses').forEach(e => { if(hit(e.diagnosis, (e.symptoms||[]).join(' '), e.treatment, e.notes)) care.push(row('illness', e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness', fmtDate(e.start), "illnessModal('"+e.id+"')")); });
   add('Care', care);
-  add('Supplies', petArr('inventory').filter(i => hit(i.name, i.brand, i.category, i.store, i.upc, i.asin, i.notes))
+  add('Supplies', petArr('inventory').filter(i => hit(i.name, i.brand, i.category, i.clothingSize, i.store, i.upc, i.asin, i.notes))
     .map(i => row('supplies', ((i.brand?i.brand+' ':'')+(i.name||'')).trim(), [i.category, i.purchaseDate?fmtDate(i.purchaseDate):''].filter(Boolean).join(' · '), "invModal('"+i.id+"')")));
   add('Journal', petArr('journal').filter(n => hit(n.title, n.text))
     .map(n => row('log', (JOURNAL_KINDS[journalKind(n)].e+' '+(n.title||String(n.text||'').split('\n')[0].slice(0,50))), n.dateTime?fmtDate(n.dateTime):'', "noteModal('"+n.id+"')")));
@@ -4859,7 +4872,7 @@ function renderSupplies(){
       +(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'');
     const sub = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
     return '<tr onclick="invModal(\''+i.id+'\')">'
-      + '<td class="sup-item" data-label="Item">'+esc(i.name)+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>'
+      + '<td class="sup-item" data-label="Item">'+esc(i.name)+(i.clothingSize?' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+esc(i.clothingSize)+'</span>':'')+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>'
       + '<td data-label="Brand">'+brandCell+'</td>'
       + '<td data-label="Where">'+whereCell+'</td>'
       + '<td data-label="Category">'+catCell+'</td>'
@@ -5453,6 +5466,7 @@ function enterDemo(){
       { id:'inv2', petId:pid, category:'Treats', brand:'Milk-Bone', name:'Mini biscuits', qty:'2', unit:'box', cost:'9.50', purchaseDate:dAgo(12), store:'Amazon', reorderUrl:'amazon.com', runningLow:true, notes:'' },
       { id:'inv3', petId:pid, category:'Supplies', brand:'', name:'Poop bags (270 ct)', qty:'1', unit:'pack', cost:'12.00', purchaseDate:dAgo(40), runningLow:false, notes:'' },
       { id:'inv4', petId:pid, category:'Other', brand:'', name:'Engraved ID tag', qty:'1', unit:'', cost:'14.99', purchaseDate:dAgo(58), noLifecycle:true, notes:'On the collar' },
+      { id:'inv5', petId:pid, category:'Clothing', brand:'Ruffwear', name:'Rain jacket', clothingSize:'M', qty:'1', unit:'', cost:'49.95', purchaseDate:dAgo(30), store:'Chewy', noLifecycle:true, notes:'' },
     ],
     contacts: [
       { id:'c1', role:'Vet', name:'Dr. Patel', org:'Riverside Animal Hospital', phone:'(555) 012-3456', email:'care@riversideah.example', address:'420 River Rd, Springfield, IL 62704', website:'https://riversideah.example', notes:'Ask for the established-patient line' },
