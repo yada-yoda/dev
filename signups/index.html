@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="0.1.0">
-<title>Sign-ups v0.1.0</title>
+<meta name="version" content="0.2.0">
+<title>Sign-ups v0.2.0</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Ccircle cx='16' cy='11' r='5' fill='%23f4a261'/%3E%3Cpath d='M6 27c0-6 4.5-9 10-9s10 3 10 9z' fill='%232dd4bf'/%3E%3C/svg%3E">
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -74,6 +74,30 @@ td.num{font-variant-numeric:tabular-nums}
 .chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);margin-left:4px}
 .when{font-size:13px;color:var(--text-secondary)}
 .note{font-size:13px;margin:10px 0 0}
+/* Users count as an expand control: looks like the cell text, not a big button. */
+.ubtn{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:4px 8px;margin:-4px -8px;border:0;border-radius:6px;
+background:none;color:var(--text-primary);font-weight:600;font-variant-numeric:tabular-nums}
+.ubtn:hover{background:var(--bg-tertiary)}
+.ubtn .chev{display:inline-block;width:.8em;color:var(--accent-2);transition:transform .15s}
+.ubtn[aria-expanded="true"] .chev{transform:rotate(90deg)}
+@media (prefers-reduced-motion:reduce){.ubtn .chev{transition:none}}
+@media (pointer:coarse){.ubtn{min-height:44px;min-width:44px;margin:0 -8px}}
+tr.xrow[hidden]{display:none}
+tr.xrow td{border-top:0;padding-top:0}
+.roster-box{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px}
+.roster{list-style:none;margin:0;padding:0}
+.roster li{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) minmax(0,1fr);gap:4px 16px;padding:8px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+.roster li:first-child{border-top:0}
+.roster .chip{margin-left:6px}
+.rname{font-weight:600}
+.remail{display:block;color:var(--text-secondary)}
+.rlbl{display:block;font-size:12px;color:var(--text-secondary)}
+.rlbl[title]{cursor:help;text-decoration:underline dotted;text-underline-offset:2px}
+.rnote{margin:8px 0;font-size:13px}
+@media (max-width:760px){
+  .roster li{grid-template-columns:minmax(0,1fr);gap:2px}
+  .rwhen{display:grid;grid-template-columns:minmax(0,6.5em) minmax(0,1fr);gap:8px;align-items:baseline}
+}
 @media (max-width:640px){
   .mobile-only{display:flex}
   table,tbody,tr,td{display:block;width:100%}
@@ -82,6 +106,10 @@ td.num{font-variant-numeric:tabular-nums}
   tbody tr:first-child{border-top:0;padding-top:0}
   td{border-top:0;padding:3px 0;display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr);gap:8px}
   td::before{content:attr(data-label);color:var(--text-secondary);font-size:13px}
+  tr.xrow{border-top:0;padding:0 0 10px}
+  tr.xrow td{display:block;padding:0}
+  tr.xrow td::before{content:none}
+  .roster-box{padding:2px 10px}
 }
 </style>
 </head>
@@ -91,7 +119,7 @@ td.num{font-variant-numeric:tabular-nums}
 </div>
 <script>
 'use strict';
-var VERSION = '0.1.0';
+var VERSION = '0.2.0';
 var WORKER = 'https://pawprints-worker.sevendwarfs.workers.dev';
 // Client-side check is only for a friendly message. The worker enforces the owner
 // email (verified token claim) on GET /signupwatch and returns 403 to anyone else.
@@ -106,6 +134,10 @@ var DEFAULT_SORT = { key: 'users', dir: 'desc', isDefault: true };
 var sort = { key: 'users', dir: 'desc', isDefault: true };
 var dash = null;
 var currentUser = null;
+// projectId -> 1 for rosters the owner has expanded; survives re-sorts and refreshes.
+var openRows = Object.create(null);
+var NO_ROSTER_TIP = 'User list arrives with the next daily check (08:10).';
+var LAST_SIGNIN_TIP = 'Most recent sign-in Firebase recorded. Firebase doesn\'t expose a login count.';
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -219,15 +251,51 @@ function th(k, label, tip){
   return '<th scope="col" aria-sort="' + aria + '"><button type="button" data-sort="' + k + '" title="' + esc(tip) + '">'
     + esc(label) + '<span class="arrow" aria-hidden="true">' + arrow + '</span></button></th>';
 }
+// Date + time + relative age, or an em dash when Firebase recorded nothing (null / 0).
+function userWhen(ms){
+  if(typeof ms !== 'number' || !isFinite(ms) || ms <= 0) return '<span class="muted" title="Not recorded">&mdash;</span>';
+  return esc(fmtFull(ms)) + ' <span class="muted">(' + esc(relTime(ms)) + ')</span>';
+}
+// Every string here comes from someone's sign-up, so all of it goes through esc().
+function rosterHtml(p){
+  var users = p.users;
+  if(!users.length) return '<p class="muted rnote">No users yet.</p>';
+  var items = users.map(function(u){
+    u = (u && typeof u === 'object') ? u : {};
+    var chips = (u.anonymous === true ? '<span class="chip" title="Signed in without an email (Firebase anonymous auth)">anonymous</span>' : '')
+      + (u.owner === true ? '<span class="chip" title="Your own account (on the watcher\'s allowlist)">you</span>' : '');
+    return '<li><div class="rwho"><span class="rname">' + esc(u.name || '(no name)') + '</span>' + chips
+      + (u.email ? '<span class="remail">' + esc(u.email) + '</span>' : '') + '</div>'
+      + '<div class="rwhen"><span class="rlbl">Signed up</span><span>' + userWhen(u.createdAt) + '</span></div>'
+      + '<div class="rwhen"><span class="rlbl" title="' + esc(LAST_SIGNIN_TIP) + '">Last sign-in</span><span>' + userWhen(u.lastLoginAt) + '</span></div></li>';
+  }).join('');
+  var foot = p.usersTruncated === true
+    ? '<p class="muted rnote">Showing newest ' + esc(users.length) + (typeof p.totalUsers === 'number' ? ' of ' + esc(p.totalUsers) : '') + '.</p>'
+    : '';
+  return '<ul class="roster">' + items + '</ul>' + foot;
+}
+function usersCell(p, idx){
+  if(typeof p.totalUsers !== 'number') return '<span class="muted" title="Not counted: this project failed to export on the last run">-</span>';
+  // Payload from watcher 0.2.x (no roster yet): plain count, as before.
+  if(!Array.isArray(p.users)) return '<span title="' + esc(NO_ROSTER_TIP) + '">' + esc(p.totalUsers) + '</span>';
+  var open = !!openRows[p.projectId];
+  return '<button type="button" class="ubtn" data-ux="' + idx + '" aria-expanded="' + open + '" aria-controls="ux-' + idx + '"'
+    + ' aria-label="' + esc(p.totalUsers + ' users in ' + sitesStr(p) + ', show list') + '" title="Show who signed up, newest first">'
+    + '<span class="chev" aria-hidden="true">&#9656;</span>' + esc(p.totalUsers) + '</button>';
+}
 function renderTable(){
   var projects = Array.isArray(dash.projects) ? dash.projects : [];
   var rows = sortedProjects(projects).map(function(p){
+    var idx = projects.indexOf(p);
+    var hasRoster = typeof p.totalUsers === 'number' && Array.isArray(p.users);
     return '<tr>'
       + '<td data-label="Site(s)">' + esc(sitesStr(p)) + '<span class="pidsub">' + esc(p.projectId) + '</span></td>'
-      + '<td data-label="Users" class="num">' + (typeof p.totalUsers === 'number' ? p.totalUsers : '<span class="muted" title="Not counted: this project failed to export on the last run">-</span>') + '</td>'
+      + '<td data-label="Users" class="num">' + usersCell(p, idx) + '</td>'
       + '<td data-label="Status">' + (p.ok ? '<span class="status ok">OK</span>' : '<span class="status fail" title="' + esc(p.error || '') + '">FAILED</span>') + '</td>'
       + '<td data-label="Last checked"><span title="' + esc(fmtFull(p.lastOkAt) || 'No successful export recorded yet') + '">' + esc(relTime(p.lastOkAt)) + '</span></td>'
-      + '</tr>';
+      + '</tr>'
+      + (hasRoster ? '<tr class="xrow" id="ux-' + idx + '"' + (openRows[p.projectId] ? '' : ' hidden') + '><td colspan="4">'
+        + '<div class="roster-box">' + rosterHtml(p) + '</div></td></tr>' : '');
   }).join('');
   var opts = [['users-desc','Users, most first'],['users-asc','Users, fewest first'],['sites-asc','Site A-Z'],['sites-desc','Site Z-A'],['status-asc','Failing first'],['last-desc','Checked most recently'],['last-asc','Checked longest ago']];
   var cur = sort.key + '-' + sort.dir;
@@ -244,6 +312,17 @@ function renderTable(){
     + '</tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="muted">No projects in the last push.</td></tr>') + '</tbody></table>';
   Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function(b){
     b.addEventListener('click', function(){ setSort(b.getAttribute('data-sort')); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ux]'), function(b){
+    b.addEventListener('click', function(){
+      var i = +b.getAttribute('data-ux');
+      var row = $('ux-' + i), p = projects[i];
+      if(!row || !p) return;
+      var opening = row.hidden;
+      row.hidden = !opening;
+      b.setAttribute('aria-expanded', String(opening));
+      if(opening) openRows[p.projectId] = 1; else delete openRows[p.projectId];
+    });
   });
   var rb = $('btn-sort-reset');
   if(rb) rb.addEventListener('click', function(){ sort = { key: DEFAULT_SORT.key, dir: DEFAULT_SORT.dir, isDefault: true }; renderTable(); });
