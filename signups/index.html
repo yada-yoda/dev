@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="version" content="0.1.0">
+<title>Sign-ups v0.1.0</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Ccircle cx='16' cy='11' r='5' fill='%23f4a261'/%3E%3Cpath d='M6 27c0-6 4.5-9 10-9s10 3 10 9z' fill='%232dd4bf'/%3E%3C/svg%3E">
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<style>
+/* Token palette copied from dev/pawprints (dark theme). Dark-only for v0.1. */
+:root{--bg-primary:#0d1117;--bg-card:#161b22;--bg-tertiary:#21262d;--text-primary:#e6edf3;--text-secondary:#8b949e;
+--accent:#f4a261;--accent-2:#2dd4bf;--border:#30363d;--danger:#f85149;--success:#3fb950;--on-accent:#08231f;
+--danger-tint:rgba(248,81,73,.12);--danger-border:rgba(248,81,73,.45)}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg-primary);color:var(--text-primary);
+font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
+body{overflow-x:hidden}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px}
+h1{font-size:24px;line-height:1.2;margin:0}
+h2{font-size:15px;margin:0 0 10px;letter-spacing:.01em}
+.muted{color:var(--text-secondary)}
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:16px;margin:0 0 16px;min-width:0}
+.center{min-height:70vh;display:flex;align-items:center;justify-content:center}
+.center .card{max-width:420px;width:100%;text-align:center;padding:28px 22px}
+.center h2{font-size:20px;margin-bottom:8px}
+.center p{margin:0 0 18px}
+button{font:inherit;cursor:pointer;border-radius:8px;min-height:40px;padding:8px 16px;border:1px solid var(--border);
+background:var(--bg-tertiary);color:var(--text-primary)}
+button:hover{border-color:var(--text-secondary)}
+button:focus-visible,select:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+button.primary{background:var(--accent-2);border-color:var(--accent-2);color:var(--on-accent);font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+.hdr{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:0 0 18px}
+.hdr .who{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.updated{font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0 0 16px}
+@media (min-width:760px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{background:var(--bg-card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0}
+.tile .lbl{font-size:13px;color:var(--text-secondary);cursor:help}
+.tile .num{font-size:28px;font-weight:700;line-height:1.2;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile.bad{background:var(--danger-tint);border-color:var(--danger-border)}
+.tile.bad .num{color:var(--danger)}
+.failing{border-color:var(--danger-border);background:var(--danger-tint)}
+.failing ul{margin:0;padding:0;list-style:none}
+.failing li{padding:8px 0;border-top:1px solid var(--danger-border);overflow-wrap:anywhere}
+.failing li:first-child{border-top:0;padding-top:0}
+.failing .pid{font-weight:600}
+.err{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;color:var(--text-primary)}
+.tbl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 10px}
+.tbl-head h2{margin:0}
+.sort-ctl{display:flex;align-items:center;gap:8px;font-size:13px}
+.mobile-only{display:none}
+select{font:inherit;min-height:40px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary)}
+table{width:100%;border-collapse:collapse;table-layout:fixed}
+th,td{text-align:left;padding:9px 10px;border-top:1px solid var(--border);vertical-align:top;overflow-wrap:anywhere}
+thead th{border-top:0;font-size:13px;font-weight:600;color:var(--text-secondary);padding:0}
+thead th button{width:100%;text-align:left;background:none;border:0;border-radius:6px;color:inherit;padding:8px 10px;min-height:36px;font-weight:600}
+thead th button:hover{color:var(--text-primary)}
+thead th[aria-sort="ascending"] button,thead th[aria-sort="descending"] button{color:var(--accent)}
+.arrow{display:inline-block;width:1em;margin-left:4px}
+col.c-sites{width:40%}col.c-users{width:14%}col.c-status{width:16%}col.c-last{width:30%}
+td.num{font-variant-numeric:tabular-nums}
+.status{display:inline-block;font-size:12px;font-weight:700;letter-spacing:.04em;padding:2px 8px;border-radius:999px}
+.status.ok{color:var(--success);background:rgba(63,185,80,.12)}
+.status.fail{color:var(--danger);background:var(--danger-tint)}
+.pidsub{display:block;font-size:12px;color:var(--text-secondary)}
+.events{list-style:none;margin:0;padding:0}
+.events li{padding:10px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
+.events li:first-child{border-top:0;padding-top:0}
+.events .site{font-weight:600;color:var(--accent)}
+.chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);margin-left:4px}
+.when{font-size:13px;color:var(--text-secondary)}
+.note{font-size:13px;margin:10px 0 0}
+@media (max-width:640px){
+  .mobile-only{display:flex}
+  table,tbody,tr,td{display:block;width:100%}
+  thead,colgroup{display:none}
+  tr{border-top:1px solid var(--border);padding:10px 0}
+  tbody tr:first-child{border-top:0;padding-top:0}
+  td{border-top:0;padding:3px 0;display:grid;grid-template-columns:minmax(0,7.5em) minmax(0,1fr);gap:8px}
+  td::before{content:attr(data-label);color:var(--text-secondary);font-size:13px}
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="center"><div class="card"><p class="muted">Loading...</p></div></div>
+</div>
+<script>
+'use strict';
+var VERSION = '0.1.0';
+var WORKER = 'https://pawprints-worker.sevendwarfs.workers.dev';
+// Client-side check is only for a friendly message. The worker enforces the owner
+// email (verified token claim) on GET /signupwatch and returns 403 to anyone else.
+var OWNER_EMAIL = 'frank.l.rizzo@gmail.com';
+var FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCR7AHHq8nIu_k7usHiItQCJIu_6Lo-p6A",authDomain:"illnesstracker-8d888.firebaseapp.com",
+  projectId:"illnesstracker-8d888",storageBucket:"illnesstracker-8d888.firebasestorage.app",
+  messagingSenderId:"660525580864",appId:"1:660525580864:web:ba78d04b13147a2b34d5a5"
+};
+var DAY = 86400000;
+var DEFAULT_SORT = { key: 'users', dir: 'desc', isDefault: true };
+var sort = { key: 'users', dir: 'desc', isDefault: true };
+var dash = null;
+var currentUser = null;
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function fmtFull(ms){
+  if(typeof ms !== 'number' || !isFinite(ms)) return '';
+  return new Date(ms).toLocaleString('en-US', { month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit' });
+}
+function fmtDate(ms){
+  if(typeof ms !== 'number' || !isFinite(ms)) return 'unknown date';
+  return new Date(ms).toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+// Relative time from a ms timestamp: "just now", "12 min ago", "5 h ago", "yesterday",
+// "9 days ago", "3 mo ago", "1.4 yr ago". Past the first hour it counts local calendar
+// days, so something from 11pm last night reads "yesterday" the next morning.
+function relTime(ms){
+  if(typeof ms !== 'number' || !isFinite(ms)) return 'never';
+  var now = Date.now(), diff = now - ms;
+  if(diff < 0) diff = 0;
+  if(diff < 60000) return 'just now';
+  if(diff < 3600000) return Math.floor(diff/60000) + ' min ago';
+  var n = new Date(now), d = new Date(ms);
+  var days = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - new Date(d.getFullYear(), d.getMonth(), d.getDate()))/DAY);
+  if(days === 0) return Math.floor(diff/3600000) + ' h ago';
+  if(days === 1) return 'yesterday';
+  if(days <= 90) return days + ' days ago';
+  if(days <= 730) return Math.round(days/30.44) + ' mo ago';
+  return (days/365.25).toFixed(1) + ' yr ago';
+}
+function sitesStr(p){ return (Array.isArray(p.sites) && p.sites.length ? p.sites : [p.projectId || '?']).join(' / '); }
+
+// ---------- screens ----------
+function screen(inner){ $('app').innerHTML = '<div class="center"><div class="card">' + inner + '</div></div>'; }
+function showSignIn(msg){
+  screen('<h2>Admin sign-in</h2><p class="muted">Sign in with Google to see sign-ups across every watched site.</p>'
+    + '<button class="primary" id="btn-signin" type="button">Sign in with Google</button>'
+    + (msg ? '<p class="note" style="color:var(--danger)">' + esc(msg) + '</p>' : ''));
+  $('btn-signin').addEventListener('click', signIn);
+}
+function showNotOwner(email){
+  screen('<h2>Owner only</h2><p class="muted">This console is owner-only.' + (email ? ' You are signed in as ' + esc(email) + '.' : '') + '</p>'
+    + '<button type="button" id="btn-out">Sign out</button>');
+  $('btn-out').addEventListener('click', signOut);
+}
+function showError(title, detail){
+  screen('<h2>' + esc(title) + '</h2><p class="muted">' + esc(detail) + '</p>'
+    + '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center"><button class="primary" type="button" id="btn-retry">Try again</button>'
+    + '<button type="button" id="btn-out">Sign out</button></div>');
+  $('btn-retry').addEventListener('click', load);
+  $('btn-out').addEventListener('click', signOut);
+}
+function showEmpty(){
+  screen('<h2>No data yet</h2><p class="muted">No data pushed yet - the watcher runs daily at 8:10.</p>'
+    + '<button type="button" id="btn-out">Sign out</button>');
+  $('btn-out').addEventListener('click', signOut);
+}
+
+// ---------- auth ----------
+function signIn(){
+  var p = new firebase.auth.GoogleAuthProvider();
+  firebase.auth().signInWithPopup(p).catch(function(e){ showSignIn('Sign-in failed: ' + (e && e.message ? e.message : e)); });
+}
+function signOut(){ if(typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) firebase.auth().signOut(); else location.reload(); }
+
+// ---------- data ----------
+function load(){
+  if(!currentUser) return;
+  screen('<p class="muted">Loading sign-ups...</p>');
+  currentUser.getIdToken().then(function(tok){
+    return fetch(WORKER + '/signupwatch', { headers: { Authorization: 'Bearer ' + tok } });
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(body){ return { status: r.status, body: body }; });
+  }).then(function(res){
+    if(res.status === 403) return showNotOwner(currentUser && currentUser.email);
+    if(res.status === 401) return showError('Session not accepted', 'The server did not accept your sign-in. Sign out and back in, then try again.');
+    if(res.status !== 200) return showError('Could not load sign-ups', 'The server answered ' + res.status + (res.body && res.body.error ? ': ' + res.body.error : '.'));
+    if(!res.body || res.body.empty) return showEmpty();
+    dash = res.body;
+    render();
+  }).catch(function(e){
+    showError('Could not reach the server', 'The sign-ups service did not respond (' + (e && e.message ? e.message : e) + '). Check your connection and try again.');
+  });
+}
+
+// ---------- render ----------
+function sortedProjects(list){
+  var k = sort.key, mul = sort.dir === 'asc' ? 1 : -1;
+  var val = function(p){
+    if(k === 'sites') return sitesStr(p).toLowerCase();
+    if(k === 'users') return typeof p.totalUsers === 'number' ? p.totalUsers : -1;
+    if(k === 'status') return p.ok ? 1 : 0;
+    if(k === 'last') return typeof p.lastOkAt === 'number' ? p.lastOkAt : 0;
+    return 0;
+  };
+  return list.map(function(p, i){ return { p: p, i: i }; }).sort(function(a, b){
+    var x = val(a.p), y = val(b.p);
+    if(x < y) return -1 * mul;
+    if(x > y) return 1 * mul;
+    return a.i - b.i;
+  }).map(function(o){ return o.p; });
+}
+function setSort(k){
+  if(sort.key !== k || sort.isDefault) sort = { key: k, dir: 'asc', isDefault: false };
+  else if(sort.dir === 'asc') sort = { key: k, dir: 'desc', isDefault: false };
+  else sort = { key: DEFAULT_SORT.key, dir: DEFAULT_SORT.dir, isDefault: true };
+  renderTable();
+}
+function th(k, label, tip){
+  var on = sort.key === k;
+  var aria = on ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none';
+  var arrow = on ? (sort.dir === 'asc' ? '&#9650;' : '&#9660;') : '';
+  return '<th scope="col" aria-sort="' + aria + '"><button type="button" data-sort="' + k + '" title="' + esc(tip) + '">'
+    + esc(label) + '<span class="arrow" aria-hidden="true">' + arrow + '</span></button></th>';
+}
+function renderTable(){
+  var projects = Array.isArray(dash.projects) ? dash.projects : [];
+  var rows = sortedProjects(projects).map(function(p){
+    return '<tr>'
+      + '<td data-label="Site(s)">' + esc(sitesStr(p)) + '<span class="pidsub">' + esc(p.projectId) + '</span></td>'
+      + '<td data-label="Users" class="num">' + (typeof p.totalUsers === 'number' ? p.totalUsers : '<span class="muted" title="Not counted: this project failed to export on the last run">-</span>') + '</td>'
+      + '<td data-label="Status">' + (p.ok ? '<span class="status ok">OK</span>' : '<span class="status fail" title="' + esc(p.error || '') + '">FAILED</span>') + '</td>'
+      + '<td data-label="Last checked"><span title="' + esc(fmtFull(p.lastOkAt) || 'No successful export recorded yet') + '">' + esc(relTime(p.lastOkAt)) + '</span></td>'
+      + '</tr>';
+  }).join('');
+  var opts = [['users-desc','Users, most first'],['users-asc','Users, fewest first'],['sites-asc','Site A-Z'],['sites-desc','Site Z-A'],['status-asc','Failing first'],['last-desc','Checked most recently'],['last-asc','Checked longest ago']];
+  var cur = sort.key + '-' + sort.dir;
+  $('proj-card').innerHTML = '<div class="tbl-head"><h2>Projects</h2>'
+    + (sort.isDefault ? '' : '<button type="button" id="btn-sort-reset" title="Back to the default order: most users first">Reset sort</button>')
+    + '<label class="sort-ctl mobile-only"><span class="muted">Sort</span><select id="sort-sel">'
+    + opts.map(function(o){ return '<option value="' + o[0] + '"' + (o[0] === cur ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('')
+    + '</select></label></div>'
+    + '<table><colgroup><col class="c-sites"><col class="c-users"><col class="c-status"><col class="c-last"></colgroup><thead><tr>'
+    + th('sites', 'Site(s)', 'Sites sharing this Firebase project; the project id is underneath')
+    + th('users', 'Users', 'Firebase Auth accounts in this project, owner accounts included')
+    + th('status', 'Status', 'Whether the last run could export this project\'s users')
+    + th('last', 'Last checked', 'When this project last exported successfully')
+    + '</tr></thead><tbody>' + (rows || '<tr><td colspan="4" class="muted">No projects in the last push.</td></tr>') + '</tbody></table>';
+  Array.prototype.forEach.call(document.querySelectorAll('[data-sort]'), function(b){
+    b.addEventListener('click', function(){ setSort(b.getAttribute('data-sort')); });
+  });
+  var rb = $('btn-sort-reset');
+  if(rb) rb.addEventListener('click', function(){ sort = { key: DEFAULT_SORT.key, dir: DEFAULT_SORT.dir, isDefault: true }; renderTable(); });
+  $('sort-sel').addEventListener('change', function(e){
+    var parts = e.target.value.split('-');
+    var isDef = parts[0] === DEFAULT_SORT.key && parts[1] === DEFAULT_SORT.dir;
+    sort = { key: parts[0], dir: parts[1], isDefault: isDef };
+    renderTable();
+  });
+}
+function render(){
+  var projects = Array.isArray(dash.projects) ? dash.projects : [];
+  var events = Array.isArray(dash.events) ? dash.events : [];
+  var totals = dash.totals || {};
+  var now = Date.now();
+  var weekNew = events.filter(function(e){ return typeof e.firstSeenAt === 'number' && now - e.firstSeenAt <= 7 * DAY; }).length;
+  var siteSet = {};
+  projects.forEach(function(p){ (Array.isArray(p.sites) ? p.sites : [p.projectId]).forEach(function(s){ siteSet[s] = 1; }); });
+  var failing = projects.filter(function(p){ return !p.ok; });
+
+  var tile = function(label, tip, value, bad){
+    return '<div class="tile' + (bad ? ' bad' : '') + '"><div class="lbl" title="' + esc(tip) + '">' + esc(label) + '</div><div class="num">' + esc(value) + '</div></div>';
+  };
+  var eventsHtml = events.length ? '<ul class="events">' + events.map(function(e){
+    var who = esc(e.name || '(no name)') + (e.anonymous ? ' <span class="chip" title="Signed in without an email (Firebase anonymous auth)">anonymous</span>' : ' &lt;' + esc(e.email) + '&gt;');
+    return '<li><span class="site">' + esc((Array.isArray(e.sites) ? e.sites : [e.projectId]).join(' / ')) + '</span> &mdash; ' + who
+      + '<div class="when"><span title="' + esc(fmtFull(e.createdAt) || 'Firebase did not record a creation time') + '">signed up ' + esc(fmtDate(e.createdAt)) + '</span>'
+      + ' &middot; <span title="' + esc('First seen by the watcher ' + fmtFull(e.firstSeenAt)) + '">spotted ' + esc(relTime(e.firstSeenAt)) + '</span></div></li>';
+  }).join('') + '</ul>' : '<p class="muted" style="margin:0">No sign-ups recorded yet - that\'s a quiet, healthy fleet.</p>';
+
+  $('app').innerHTML = '<header class="hdr"><div><h1>Sign-ups</h1>'
+    + '<div class="updated muted"><span title="' + esc('Watcher run finished ' + fmtFull(dash.generatedAt)) + '">Updated ' + esc(relTime(dash.generatedAt)) + '</span></div></div>'
+    + '<div class="who"><span class="muted" style="font-size:13px">' + esc(currentUser && currentUser.email) + '</span>'
+    + '<button type="button" id="btn-refresh" title="Fetch the latest pushed snapshot">Refresh</button>'
+    + '<button type="button" id="btn-out">Sign out</button></div></header>'
+    + '<section class="tiles" aria-label="Summary">'
+    + tile('Total accounts', 'Firebase Auth accounts across projects that exported OK on the last run, owner accounts included', typeof totals.totalUsers === 'number' ? totals.totalUsers : '-')
+    + tile('New this week', 'Sign-ups the watcher first spotted in the last 7 days (owner accounts never count)', weekNew)
+    + tile('Sites watched', 'Distinct sites across every watched Firebase project (several sites can share one project)', Object.keys(siteSet).length)
+    + tile('Projects failing', 'Projects whose user export failed on the last run, so new sign-ups there could be missed', failing.length, failing.length > 0)
+    + '</section>'
+    + (failing.length ? '<section class="card failing"><h2>Failing projects</h2><ul>' + failing.map(function(p){
+        return '<li><span class="pid">' + esc(p.projectId) + '</span> <span class="muted">(' + esc(sitesStr(p)) + ')</span><div class="err">' + esc(p.error || 'unknown error') + '</div>'
+          + '<div class="when">last OK ' + esc(relTime(p.lastOkAt)) + '</div></li>';
+      }).join('') + '</ul></section>' : '')
+    + '<section class="card" id="proj-card"></section>'
+    + '<section class="card"><h2 title="Newest first; owner accounts are never listed">Recent sign-ups</h2>' + eventsHtml + '</section>'
+    + '<p class="note muted">Sign-ups v' + VERSION + (dash.version ? ' &middot; watcher v' + esc(dash.version) : '') + '</p>';
+  renderTable();
+  $('btn-out').addEventListener('click', signOut);
+  $('btn-refresh').addEventListener('click', load);
+}
+
+// ---------- boot ----------
+document.addEventListener('DOMContentLoaded', function(){
+  if(typeof firebase === 'undefined'){ showError('Could not load sign-in', 'The Google sign-in library did not load. Check your connection and reload the page.'); return; }
+  try { firebase.initializeApp(FIREBASE_CONFIG); }
+  catch(e){ showError('Could not start sign-in', String(e && e.message ? e.message : e)); return; }
+  firebase.auth().onAuthStateChanged(function(user){
+    currentUser = user; dash = null;
+    if(!user) return showSignIn();
+    if((user.email || '').toLowerCase() !== OWNER_EMAIL) return showNotOwner(user.email);
+    load();
+  });
+});
+</script>
+</body>
+</html>
