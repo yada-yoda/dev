@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.87.0';
+const APP_VERSION = 'v0.88.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -641,6 +641,34 @@ function relDaysStr(dt){
 }
 // ' · 21 days' suffix, or '' so callers can append unconditionally
 function relSuffix(dt){ const r = relDaysStr(dt); return r ? ' · ' + r : ''; }
+// Activity logs record things that already happened, so a time well ahead of now is almost always a
+// typo (wrong AM/PM, wrong day). The first Save shows an inline warning above the button row and
+// stops; a second Save with the same value keeps it. 10-minute grace so "just now" never nags.
+// futureWarnVal = the value already warned about; openModal() clears it so it never carries over.
+let futureWarnVal = null;
+function futureLogOk(dtVal){
+  const v = String(dtVal || '');
+  const t = v ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(v) ? v + 'T00:00' : v).getTime() : NaN;
+  const old = document.getElementById('future-warn');
+  if(isNaN(t) || t <= Date.now() + 600000 || futureWarnVal === v){
+    futureWarnVal = null; if(old) old.remove(); return true;
+  }
+  const mb = document.querySelector('#modal-root .modal-body');
+  const row = mb && (mb.querySelector('.modal-actions') || mb.lastElementChild);
+  if(!old && !row) return true; // no form on screen to warn in; never block the save
+  futureWarnVal = v;
+  const d = new Date(t), rel = relDaysStr(v);
+  const when = rel === 'today' ? 'later today at ' + fmtTime(d) : fmtDateTime(d) + (rel ? ' (' + rel + ')' : '');
+  let w = old;
+  if(!w){
+    w = document.createElement('div'); w.id = 'future-warn'; w.setAttribute('role', 'alert');
+    w.style.cssText = 'background:rgba(210,153,34,.10);border:1px solid var(--warning);border-radius:10px;padding:9px 12px;margin:4px 0 10px;font-size:13px;line-height:1.4;color:var(--text-primary);overflow-wrap:anywhere';
+    row.parentNode.insertBefore(w, row);
+  }
+  w.innerHTML = '⏳ <b style="color:var(--warning)">That\'s in the future</b> — ' + esc(when) + ', which hasn\'t happened yet. If it\'s right, tap Save again to keep it.';
+  try { w.scrollIntoView({ block:'nearest' }); } catch(e){}
+  return false;
+}
 function ageStr(birthday, est){
   if(!birthday) return null;
   const b = new Date(dateSafe(birthday)), now = new Date();
@@ -681,6 +709,7 @@ let modalVV = null; // the one visualViewport listener while a modal is open
 function openModal(html, opts){
   // Pull a leading <h3>…</h3> title out so the title + ✕ live in a sticky header
   // while the rest scrolls in the body.
+  futureWarnVal = null; // a future-date confirmation never carries into another form
   let title = '', body = html;
   const m = html.match(/^\s*<h3[^>]*>([\s\S]*?)<\/h3>/);
   if(m){ title = m[1]; body = html.slice(m.index + m[0].length); }
@@ -2186,6 +2215,7 @@ function quickWater(){
     +'<button class="btn-primary" onclick="saveWater()">Save</button>');
 }
 function saveWater(){
+  if(!futureLogOk(fv('q-dt'))) return;
   addLog({ type:'water', dateTime:fv('q-dt'), refilled:true, place:fv('q-place'), notes:fv('q-note') });
   closeModal(); showToast('💧 Fresh water given');
 }
@@ -2268,7 +2298,7 @@ function quickFeed(){
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, initFed?(initFed.unit||'cups'):'cups')+'</select></div></div>'
     +'<div id="q-place-wrap"'+(/treat|chew/i.test(initType)?' style="display:none"':'')+'><label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
   populateFoodItems('q', initItem);
 }
 function quickPotty(){
@@ -2312,6 +2342,7 @@ function updateStoolVisibility(prefix){
   if(!poopOn){ const s = document.getElementById(prefix+'-stool'); if(s) s.value = ''; }
 }
 function savePotty(){
+  if(!futureLogOk(fv('q-dt'))) return;
   const result = pottyResultFrom('q');
   if(!result){ showToast('⚠️ Pick pee, poop, or nothing'); return; }
   const atHome = (fv('q-loc') || 'home') !== 'other';
@@ -2343,6 +2374,7 @@ function addWalkFavorite(from, to){
   if(!data.settings.walkFavorites.some(f => f.from===from && f.to===to)){ data.settings.walkFavorites.push({ from, to }); }
 }
 function saveWalk(){
+  if(!futureLogOk(fv('q-dt'))) return;
   const entry = { type:'walk', dateTime:fv('q-dt'), durationMin:fv('q-dur'), distance:fv('q-dist'), from:fv('q-from'), to:fv('q-to'), roundTrip:document.getElementById('q-round').checked, notes:fv('q-note') };
   const saveFav = document.getElementById('q-fav') && document.getElementById('q-fav').checked && (entry.from || entry.to);
   if(saveFav) addWalkFavorite(entry.from, entry.to);
@@ -2663,7 +2695,7 @@ function quickWeight(){
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">Weight ('+unit+')</label><input class="input" type="number" step="0.1" id="q-w" placeholder="42.5">'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="addLog({type:\'weight\',dateTime:fv(\'q-dt\'),value:fv(\'q-w\'),unit:\''+unit+'\',source:\'manual\',notes:fv(\'q-note\')});closeModal();showToast(\'⚖️ Weight logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;addLog({type:\'weight\',dateTime:fv(\'q-dt\'),value:fv(\'q-w\'),unit:\''+unit+'\',source:\'manual\',notes:fv(\'q-note\')});closeModal();showToast(\'⚖️ Weight logged\')">Save</button>');
 }
 
 // ═══════════════════════════════════════════════
@@ -4241,6 +4273,7 @@ function editLogModal(id){
 }
 function saveEditLog(id){
   if(denyLog()) return;
+  if(!futureLogOk(fv('e-dt'))) return;
   const l = data.logs.find(x => x.id === id); if(!l) return;
   l.dateTime = fv('e-dt'); l.notes = fv('e-note');
   if(l.type === 'feed'){ l.foodType = fv('e-food'); l.foodItem = fv('e-fooditem')||''; l.amount = fv('e-amt'); l.unit = fv('e-unit'); l.foodPlace = fv('e-place'); }
@@ -4390,6 +4423,7 @@ function noteModal(id){
 }
 function saveNote(id){
   if(denyManage()) return;
+  if(fv('nt-dt') && !futureLogOk(fv('nt-dt'))) return; // before draftCommit so a paused save keeps the draft
   draftCommit();
   if(!activePet()){ promptAddDog(); return; }
   const text = fv('nt-text'), title = (fv('nt-title')||'').trim();
