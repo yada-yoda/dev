@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.88.0';
+const APP_VERSION = 'v0.89.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -371,6 +371,7 @@ let firebaseReady = false;
 let currentUser = null;
 let db = null;
 let demoMode = false;
+let diagMode = false; // set at boot from ?diag; shows the read-only sync diagnostics card on Today
 let demoBackup = null;
 let gcalAccessToken = null;
 let sharedOwnerUid = null;   // when set, the app is viewing/editing another owner's dogs (shared access)
@@ -4060,12 +4061,127 @@ function renderRoutineCard(){
       + '</div>').join('')
     + '</div>';
 }
+// Hidden sync diagnostics (?diag=1). Builds one plain-text report; the card shows it verbatim
+// and Copy sends the same string, so what the owner sees is exactly what gets pasted.
+// Read-only and never throws: each section is wrapped so one failure prints a line instead.
+function diagReport(){
+  const out = [];
+  const D = (typeof data === 'object' && data) ? data : {};
+  const yn = v => v ? 'yes' : 'no';
+  const arr = v => Array.isArray(v) ? v : [];
+  const lsGet = k => { try { return { v: localStorage.getItem(k) }; } catch(e){ return { err: (e && e.message) || 'blocked' }; } };
+  const when = t => { try { if(t == null || t === '') return '-'; const d = new Date(typeof t === 'string' && /^\d+$/.test(t) ? +t : t); return isNaN(d.getTime()) ? String(t) : fmtDateTime(d); } catch(e){ return String(t); } };
+  const sid = id => String(id == null ? '-' : id).slice(0, 8);
+  const section = (title, fn) => { out.push('', '== ' + title + ' =='); try { fn(); } catch(e){ out.push('section failed: ' + ((e && e.message) || e)); } };
+  let journal = null, journalErr = '';
+  try {
+    const r = lsGet(JOURNAL_KEY);
+    if(r.err) journalErr = 'could not read storage: ' + r.err;
+    else { const j = JSON.parse(r.v || '[]'); if(Array.isArray(j)) journal = j; else journalErr = 'stored value is not a list'; }
+  } catch(e){ journalErr = 'could not parse: ' + ((e && e.message) || e); }
+  section('PawPrints diagnostics', () => {
+    out.push('Version: ' + APP_VERSION);
+    out.push('Generated: ' + when(Date.now()));
+    out.push('Device: ' + ((typeof navigator !== 'undefined' && navigator.userAgent) || '-'));
+    let sa = false; try { sa = !!(window.matchMedia && matchMedia('(display-mode: standalone)').matches) || (typeof navigator !== 'undefined' && navigator.standalone === true); } catch(e){}
+    out.push('Home-screen app: ' + yn(sa));
+    out.push('Online: ' + yn(typeof navigator !== 'undefined' && navigator.onLine));
+  });
+  section('Account', () => {
+    out.push('Signed in: ' + yn(currentUser) + (currentUser && currentUser.uid ? ' (uid ' + String(currentUser.uid).slice(0, 8) + '...)' : ''));
+    out.push('Demo mode: ' + yn(demoMode));
+    out.push('Shared profile: ' + yn(sharedOwnerUid));
+  });
+  section('Sync flags', () => {
+    const r = lsGet('pawprints_dirty');
+    out.push('cloudDirty: ' + cloudDirty);
+    out.push('pawprints_dirty (stored): ' + (r.err ? 'read failed: ' + r.err : r.v === null ? '(not set)' : JSON.stringify(r.v)));
+    out.push('localSaveFailed: ' + localSaveFailed);
+    out.push('localSaveWarned: ' + localSaveWarned);
+  });
+  section('Storage', () => {
+    const d = lsGet('pawprints_data'), j = lsGet(JOURNAL_KEY);
+    out.push('pawprints_data: ' + (d.err ? 'read failed: ' + d.err : d.v == null ? '(not set)' : (d.v.length / 1024).toFixed(1) + ' KB'));
+    out.push('Journal key: ' + (j.err ? 'read failed: ' + j.err : j.v == null ? '(not set)' : j.v.length + ' chars'));
+    let n = '-'; try { n = String(localStorage.length); } catch(e){ n = 'read failed: ' + ((e && e.message) || e); }
+    out.push('localStorage keys: ' + n);
+  });
+  section('Today (' + todayISO() + ', all dogs)', () => {
+    const today = todayISO(), tl = arr(D.logs).filter(l => l && typeof l.dateTime === 'string' && l.dateTime.slice(0, 10) === today);
+    ['feed','potty','walk','water','weight','med','measure'].forEach(t => {
+      const ls = tl.filter(l => l.type === t).sort((a, b) => String(b.dateTime).localeCompare(String(a.dateTime)));
+      out.push(t + ': ' + ls.length + (ls.length ? ' (newest ' + fmtClock(ls[0].dateTime.slice(11, 16)) + ')' : ''));
+    });
+    out.push('Collections:');
+    SYNC_COLLECTIONS.forEach(c => { const v = D[c]; out.push('  ' + c + ': ' + (Array.isArray(v) ? v.length : v == null ? 'missing' : typeof v)); });
+    out.push('Tombstones (deleted ids): ' + Object.keys(D.deleted && typeof D.deleted === 'object' ? D.deleted : {}).length);
+    out.push('Trash: ' + arr(D.trash).length);
+  });
+  section('Safety journal (this device)', () => {
+    if(!journal){ out.push('Journal unreadable - ' + journalErr); return; }
+    out.push(journal.length + ' entr' + (journal.length === 1 ? 'y' : 'ies') + ', newest first (id | type | logged for | saved at)');
+    journal.slice(0, 50).forEach(x => { if(!x || typeof x !== 'object'){ out.push('(bad entry)'); return; } out.push(sid(x.id) + ' | ' + (x.type || '-') + ' | ' + (x.dateTime || '-') + ' | ' + when(x.createdAt)); });
+  });
+  section('Change history (last 20, newest first)', () => {
+    const a = arr(D.auditLog).slice(0, 20);
+    if(!a.length){ out.push('(empty)'); return; }
+    a.forEach(r => { if(!r || typeof r !== 'object') return; const det = String(r.detail == null ? '' : r.detail).replace(/\s+/g, ' ').trim(); out.push(when(r.ts) + ' | ' + (r.action || '-') + ' | ' + (r.entity || '-') + (det ? ' | ' + (det.length > 60 ? det.slice(0, 60) + '...' : det) : '')); });
+  });
+  section('Journal vs logs (last 7 days)', () => {
+    if(demoMode || sharedOwnerUid){ out.push('skipped - the screen is showing ' + (demoMode ? 'demo' : 'shared') + ' data, not this device\'s own logs'); return; }
+    if(!journal){ out.push('skipped - journal unreadable'); return; }
+    const ids = new Set(arr(D.logs).map(l => l && l.id)), tomb = (D.deleted && typeof D.deleted === 'object') ? D.deleted : {};
+    const cutoff = Date.now() - 7 * 86400000;
+    const stamp = x => { const t = Date.parse(x.createdAt || ''); return isNaN(t) ? Date.parse(x.dateTime || '') : t; };
+    const missing = journal.filter(x => x && typeof x === 'object' && x.id && stamp(x) >= cutoff && !ids.has(x.id) && !tomb[x.id]);
+    out.push('JOURNAL ENTRIES MISSING FROM LOGS (possible lost data):');
+    if(!missing.length) out.push('none - journal and logs agree');
+    missing.forEach(x => { const p = arr(D.pets).find(q => q && q.id === x.petId); out.push('  ' + sid(x.id) + ' | ' + (x.type || '-') + ' | ' + (x.dateTime || '-') + ' | saved ' + when(x.createdAt) + (p && p.name ? ' | ' + p.name : '')); });
+    const jids = new Set(journal.map(x => x && x.id)), today = todayISO();
+    const notInJ = arr(D.logs).filter(l => l && typeof l.dateTime === 'string' && l.dateTime.slice(0, 10) === today && !jids.has(l.id)).length;
+    out.push('Today\'s logs not in this device\'s journal: ' + notInJ + ' (normal for entries made on another device)');
+  });
+  return out.join('\n').replace(/^\n/, '');
+}
+function diagCardHtml(){
+  let rep = ''; try { rep = diagReport(); } catch(e){ rep = 'report failed: ' + ((e && e.message) || e); }
+  return '<div class="card" id="diag-card">'
+    + '<h2 style="font-size:17px;font-weight:700;margin-bottom:4px">Sync diagnostics</h2>'
+    + '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">Read-only snapshot for troubleshooting. Nothing here changes your data.</p>'
+    + '<button class="btn-primary" style="margin-bottom:14px" onclick="copyDiagReport()">📋 Copy report</button>'
+    + '<pre id="diag-report" style="white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font-family:\'JetBrains Mono\',ui-monospace,monospace;font-size:12px;line-height:1.5;color:var(--text-secondary)">' + esc(rep) + '</pre></div>';
+}
+function copyDiagReport(){
+  let rep = ''; try { rep = diagReport(); } catch(e){ rep = ''; }
+  const pre = document.getElementById('diag-report');
+  if(pre && rep) pre.textContent = rep; // keep the on-screen text identical to what is copied
+  else if(pre) rep = pre.textContent || '';
+  const legacy = () => {
+    let ta = null;
+    try {
+      ta = document.createElement('textarea'); ta.value = rep; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;font-size:16px';
+      document.body.appendChild(ta); ta.focus(); ta.select(); try { ta.setSelectionRange(0, rep.length); } catch(e){}
+      return document.execCommand('copy');
+    } catch(e){ return false; } finally { if(ta) ta.remove(); }
+  };
+  const manual = () => {
+    try { if(pre){ const r = document.createRange(); r.selectNodeContents(pre); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); pre.scrollIntoView({ block:'nearest' }); } } catch(e){}
+    showToast('Couldn’t copy automatically. The report is selected; tap Copy.');
+  };
+  const fallback = () => { if(legacy()) showToast('📋 Report copied'); else manual(); };
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(rep).then(() => showToast('📋 Report copied'), fallback);
+    else fallback();
+  } catch(e){ fallback(); }
+}
 function renderToday(){
-  if(!activePet()) return emptyState();
+  const diag = diagMode ? diagCardHtml() : '';
+  if(!activePet()) return diag + emptyState();
   const p = activePet();
   const fed = lastLog('feed'), water = lastLog('water'), walk = lastLog('walk');
   const w = latestWeight();
-  let html = '';
+  let html = diag;
   // shared-access notice
   if(sharedOwnerUid){
     const msg = canManage() ? 'full access' : canLog() ? 'you can log daily activity, but can’t change the profile or care records' : 'view-only — you can see everything but can’t make changes';
@@ -5538,6 +5654,7 @@ loadLocal();
 applyTheme(localStorage.getItem('pawprints_theme') || (data.settings && data.settings.theme) || currentTheme());
 if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 seedWalkBadges();
+try { diagMode = new URLSearchParams(location.search).has('diag'); } catch(e){ diagMode = false; }
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
 else { backfillVetContacts(); if(migrateFeedItems() + migrateMedDoses() + migrateMedDosesFromAudit() + migrateMeasurements()) saveLocal(); render(); }
 initAnalytics();

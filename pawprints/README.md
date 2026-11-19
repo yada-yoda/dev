@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.88.0**
+**Current Version: v0.89.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -93,6 +93,7 @@ covers both.
 
 ## Version History
 
+- **v0.89.0** — **A troubleshooting report for the vanished-logs mystery.** Some potty and water entries logged on an iPhone disappeared from both devices without a trace, and we couldn't see what that phone was seeing. Now, opening the app with `?diag=1` added to the address shows a read-only sync health report at the top of Today, with one big Copy report button so it can be pasted straight into a chat. It covers the app version, whether it's running as the home-screen app, sign-in and sync status, storage use, today's counts, the on-device safety journal, and recent change history. Most importantly, it cross-checks the last 7 days of the safety journal against the actual logs and flags anything that's missing. Nothing in the report changes your data, and it never appears unless you ask for it.
 - **v0.88.0** — **A heads-up before logging something that hasn't happened yet.** A 7 PM walk logged at 7 AM is almost always a wrong AM/PM tap, and it quietly throws off the "last walk" timers until someone notices. Now, if you save a feeding, walk, potty trip, water refill, weight, journal entry, or an edited log with a time more than 10 minutes from now, a short amber note appears above the Save button saying when that is and that it hasn't happened yet. Fix the time and save, or tap Save again to keep it as is. Vet visits, grooming, and medication schedules are left alone, since future dates there are the whole point.
 - **v0.87.0** — **Clothing, with the size that fits.** Supplies has a new **Clothing** category for jackets, sweaters, boots and the like. Pick it and a **Clothing size** field appears, so you can save the tag size or the measurements that fit ("M", "20 in chest"). Next time you shop, the right size is one glance away instead of another round with the tape measure. The size shows quietly next to the item name in the list, is searchable, and rides along in the PDF and spreadsheet exports. New clothing items are marked as one-time keeps automatically, since a jacket isn't something you use up.
 - **v0.86.0** — **Emergency card.** A new option on the Profile creates a QR code + link you can hand to anyone — a sitter, a neighbor, an emergency vet — opening a clean page with your dog's photo, breed, weight, microchip, what food he eats and how much and how often (worked out from your actual logs and routine), his meds and doses, medical notes, and your vet's number. No sign-in needed to view, nothing else in your account reachable, and one tap turns the link off. Update it anytime to re-snapshot the latest info.
