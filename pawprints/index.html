@@ -299,7 +299,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.89.0';
+const APP_VERSION = 'v0.90.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -857,7 +857,7 @@ function initFirebase(){
       currentUser = user; updateAuthUI();
       if(user){
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
-        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
+        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); if(typeof syncRecapPrefs==='function') syncRecapPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
       else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; }
     });
@@ -1208,7 +1208,7 @@ function loadLocal(){
   if(reconcileJournal()) setCloudDirty(true);
 }
 function persist(){ if(!demoMode) setCloudDirty(true); saveLocal(); saveToFirestore(); }
-function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(rerender !== false) render(); }
+function save(rerender){ persist(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(); if(typeof syncRecapPrefs==='function') syncRecapPrefs(); if(rerender !== false) render(); }
 
 function exportJSON(){ dl(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}), 'pawprints-backup-' + todayISO() + '.json'); showToast('💾 Backup saved'); }
 function dl(blob,name){ const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; a.click(); URL.revokeObjectURL(u); }
@@ -1526,6 +1526,15 @@ function settingsListsHTML(){
       + '<div style="display:flex;gap:8px"><input class="input" type="email" id="reorder-email" placeholder="you@example.com" value="'+reEmail+'" style="margin-bottom:0"><button class="btn" onclick="saveReorderEmail()">Save</button></div>'
       + '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px">Sent from PawPrints (notify.rizzo.cc). At most one email a day, one line per item.</div></div>';
   }
+  const rcOn = !!s.recapEmailOn, rcEmail = esc(s.recapEmail || s.reorderEmail || (currentUser && currentUser.email) || '');
+  h += '<div style="margin-bottom:14px"><label class="label" style="margin-bottom:4px">Monthly recap email'+tip('Once a month, after the month ends, PawPrints emails you a recap: walks, feedings, potty counts, weight change, meds given, vet visits, what you spent, and your current supplies with an estimate of when each will run out. One email per month, nothing else.')+'</label>';
+  if(!currentUser){
+    h += '<p style="font-size:12px;color:var(--text-secondary);margin:0">Sign in (top of the page) to get a monthly recap by email.</p></div>';
+  } else {
+    h += '<label style="display:flex;align-items:center;gap:8px;font-size:14px;margin-bottom:8px;cursor:pointer"><input type="checkbox" id="recap-email-on" '+(rcOn?'checked':'')+'> Email me a recap after each month</label>'
+      + '<div style="display:flex;gap:8px"><input class="input" type="email" id="recap-email" placeholder="you@example.com" value="'+rcEmail+'" style="margin-bottom:0"><button class="btn" onclick="saveRecapEmail()">Save</button></div>'
+      + '<div style="font-size:11px;color:var(--text-secondary);margin-top:6px">Sent from PawPrints (notify.rizzo.cc) in the first days of each month, covering the month before.</div></div>';
+  }
   h += '<div style="margin-bottom:'+((s.homeZip||'').trim()?'8px':'14px')+'"><label class="label" style="margin-bottom:4px">Home ZIP code (for walk weather)'+tip('US ZIP. When set, each walk you log records the current weather for this location (via Open-Meteo).')+'</label><div style="display:flex;gap:8px"><input class="input" id="home-zip" inputmode="numeric" maxlength="10" placeholder="5-digit ZIP" value="'+esc(s.homeZip||'')+'" style="margin-bottom:0"><button class="btn" onclick="saveHomeZip()">Save</button></div></div>';
   if((s.homeZip||'').trim()){
     const pastHomeEntries = (data.logs||[]).filter(l => (l.type==='walk'||l.type==='potty') && !l.weather && l.dateTime && isHomeEntry(l)).length;
@@ -1708,6 +1717,18 @@ function saveReorderEmail(){
   save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
   syncReorderPrefs(true);
   showToast(data.settings.reorderEmailOn ? '📧 Reorder reminders on' : 'Reorder reminders off');
+}
+function saveRecapEmail(){
+  if(denyManage()) return;
+  data.settings = data.settings || {};
+  const on = !!(document.getElementById('recap-email-on')||{}).checked;
+  const email = (fv('recap-email')||'').trim();
+  if(on && email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ showToast('⚠️ Enter a valid email address'); return; }
+  data.settings.recapEmail = email;
+  data.settings.recapEmailOn = on && !!email;
+  save(false); refreshSettingsSection('settings-lists', settingsListsHTML);
+  syncRecapPrefs(true);
+  showToast(data.settings.recapEmailOn ? '📧 Monthly recap on' : 'Monthly recap off');
 }
 function saveHomeZip(){
   if(denyManage()) return;
@@ -4932,6 +4953,122 @@ async function syncReorderPrefs(force){
     _lastReorderSig = sig;
     await workerFetch('/reorder/sync', { method:'POST', body: JSON.stringify({ enabled, email, items }) });
   } catch(e){ _lastReorderSig = null; /* leave dirty so the next change retries */ }
+}
+
+// ── Monthly recap email ──
+// The app summarizes the PREVIOUS full calendar month from its complete local data
+// and pushes it to the worker on every sync; the worker's daily run mails it once
+// per month (it remembers the last monthKey it sent). Opening the app late in the
+// new month just delays the email, it never makes it incomplete.
+let _lastRecapSig = null;
+const invNormName = i => ((i.brand?i.brand+' ':'')+(i.name||'')).trim().toLowerCase();
+// Expected run-out for an in-use supply: average how long the last (up to) 5 finished
+// items with the same brand+name lasted, counted from this one's start date.
+// Returns { date:'YYYY-MM-DD', days, overdue } or null when there's no history.
+function invDepletionEstimate(item){
+  if(!item || invStatus(item)!=='In use' || !item.startDate) return null;
+  const key = invNormName(item); if(!key) return null;
+  const spans = (data.inventory||[])
+    .filter(o => o && o !== item && invStatus(o)==='Finished' && o.startDate && o.endDate && invNormName(o)===key)
+    .map(o => ({ end:o.endDate, d:daysBetween(o.startDate, o.endDate) }))
+    .filter(x => x.d != null && x.d > 0)
+    .sort((a,b) => String(b.end).localeCompare(String(a.end)))
+    .slice(0, 5);
+  if(!spans.length) return null;
+  const days = Math.round(spans.reduce((s,x)=>s+x.d, 0) / spans.length);
+  const d = new Date(item.startDate+'T00:00'); if(isNaN(d)) return null;
+  d.setDate(d.getDate() + days);
+  const date = d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  return { date, days, overdue: date < todayISO() };
+}
+function recapDataForEmail(){
+  const now = new Date();
+  const pm = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const monthKey = pm.getFullYear()+'-'+pad(pm.getMonth()+1);
+  const monthLabel = pm.toLocaleDateString('en-US', { month:'long', year:'numeric' });
+  const inMonth = v => typeof v === 'string' && v.slice(0,7) === monthKey;
+  const round1 = n => Math.round(n*10)/10;
+  const byPet = {};
+  (data.pets||[]).forEach(p => { if(p && p.id) byPet[p.id] = { walks:0, miles:0, minutes:0, feeds:0, pee:0, poop:0, water:0, meds:0, measures:0, weights:[], vet:0, groom:0, ill:0, spend:0, cats:{} }; });
+  // One pass over all logs (can be thousands), bucketed by pet.
+  (data.logs||[]).forEach(l => {
+    if(!l || !inMonth(l.dateTime)) return;
+    const b = byPet[l.petId]; if(!b) return;
+    switch(l.type){
+      case 'walk': b.walks++; b.miles += num(l.distance)||0; b.minutes += num(l.durationMin)||0; break;
+      case 'feed': b.feeds++; break;
+      case 'potty': {
+        const r = l.result || '';
+        if(r==='Pee' || r==='Both') b.pee++;
+        if(r==='Poop' || r==='Both' || !!(l.stool && String(l.stool).trim())) b.poop++;
+        break;
+      }
+      case 'water': b.water++; break;
+      case 'med': b.meds++; break;
+      case 'measure': b.measures++; break;
+      case 'weight': { const v = num(l.value); if(v != null) b.weights.push({ dt:l.dateTime, v, unit:l.unit||'' }); break; }
+    }
+  });
+  (data.vetVisits||[]).forEach(v => { if(v && inMonth(v.date) && byPet[v.petId]) byPet[v.petId].vet++; });
+  (data.grooming||[]).forEach(g => { if(g && inMonth(g.date) && byPet[g.petId]) byPet[g.petId].groom++; });
+  (data.illnesses||[]).forEach(e => { if(e && inMonth(e.start) && byPet[e.petId]) byPet[e.petId].ill++; });
+  (data.inventory||[]).forEach(i => {
+    if(!i || !inMonth(i.purchaseDate) || !byPet[i.petId]) return;
+    const c = num(i.cost); if(!c) return;
+    const b = byPet[i.petId], cat = (i.category||'Other').trim() || 'Other';
+    b.spend += c; b.cats[cat] = (b.cats[cat]||0) + c;
+  });
+  const pets = (data.pets||[]).filter(p => p && byPet[p.id]).map(p => {
+    const b = byPet[p.id];
+    let weight = null;
+    if(b.weights.length){
+      b.weights.sort((x,y) => String(x.dt).localeCompare(String(y.dt)));
+      const f = b.weights[0], la = b.weights[b.weights.length-1];
+      weight = { first:f.v, firstDate:fmtDate(f.dt.slice(0,10)), last:la.v, lastDate:fmtDate(la.dt.slice(0,10)), delta:round1(la.v - f.v), unit:la.unit || p.weightUnit || 'lb', count:b.weights.length };
+    }
+    const top = Object.entries(b.cats).sort((x,y) => y[1]-x[1]).slice(0,3).map(([category, amt]) => ({ category, amount:money(amt) }));
+    return {
+      petId:p.id, name:p.name||'Your dog',
+      walks:{ count:b.walks, miles:round1(b.miles), minutes:Math.round(b.minutes) },
+      feeds:b.feeds, pee:b.pee, poop:b.poop, water:b.water, meds:b.meds, measures:b.measures,
+      weight, vetVisits:b.vet, grooming:b.groom, illnesses:b.ill,
+      spend: b.spend > 0 ? { total:money(b.spend), top } : null,
+    };
+  });
+  // Supplies: a CURRENT snapshot (not month-bound) of everything not finished or one-time.
+  const supplies = (data.inventory||[])
+    .filter(i => i && invStatus(i) !== 'Finished' && invStatus(i) !== 'One-time' && ((i.brand?i.brand+' ':'')+(i.name||'')).trim())
+    .sort((a,b) => {
+      const ua = invStatus(a)==='In use' ? 1 : 0, ub = invStatus(b)==='In use' ? 1 : 0; if(ua !== ub) return ub - ua;
+      const la = a.runningLow ? 1 : 0, lb = b.runningLow ? 1 : 0; if(la !== lb) return lb - la;
+      return String(b.purchaseDate||'').localeCompare(String(a.purchaseDate||''));
+    })
+    .slice(0, 20)
+    .map(i => {
+      const status = invStatus(i);
+      let depletion = '';
+      if(status === 'In use'){
+        const est = invDepletionEstimate(i);
+        depletion = !est ? 'no estimate yet' : (est.overdue ? 'any day now' : 'around '+fmtDate(est.date));
+      }
+      return { name:((i.brand?i.brand+' ':'')+(i.name||'')).trim(), status, low:!!i.runningLow, started:i.startDate ? fmtDate(i.startDate) : '', depletion };
+    });
+  return { monthKey, monthLabel, generatedAt:Date.now(), pets, supplies };
+}
+async function syncRecapPrefs(force){
+  try {
+    if(!currentUser || demoMode || sharedOwnerUid) return; // only the signed-in owner syncs their own prefs
+    const s = data.settings || {};
+    const enabled = !!s.recapEmailOn;
+    const email = (s.recapEmail||'').trim();
+    const previous = (enabled && email) ? recapDataForEmail() : null;
+    // generatedAt changes every call; leave it out of the sig so idle opens don't re-POST.
+    const sigPrev = previous ? Object.assign({}, previous, { generatedAt:0 }) : null;
+    const sig = JSON.stringify({ enabled, email, previous:sigPrev });
+    if(!force && sig === _lastRecapSig) return;
+    _lastRecapSig = sig;
+    await workerFetch('/recap/sync', { method:'POST', body: JSON.stringify({ enabled, email, previous }) });
+  } catch(e){ _lastRecapSig = null; /* leave dirty so the next change retries */ }
 }
 // Accepts a bare ASIN or a pasted Amazon product URL; returns the uppercased 10-char ASIN ('' if absent).
 function normalizeAsin(v){ v=(v||'').trim(); if(!v) return ''; const m = v.match(/(?:\/dp\/|\/gp\/product\/|\/gp\/aw\/d\/)([A-Za-z0-9]{10})/) || v.match(/^([A-Za-z0-9]{10})$/); return m ? m[1].toUpperCase() : v; }

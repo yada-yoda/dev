@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.89.0**
+**Current Version: v0.90.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -53,6 +53,10 @@ covers both.
   updates the same events, no duplicates), plus a no-account `.ics` download
 - **Supplies** — inventory of food/treats/supplies/meds with purchase history, a running-low
   restock list, and year-to-date spend
+- **Monthly recap email** (opt-in, Settings) — after each month ends, one email with that month's
+  walks, feedings, potty counts, weight change, meds, vet visits and spend per dog, plus every
+  supply on hand with a guess at when it runs out. The app builds the summary and
+  `pawprints-worker` (`POST /recap/sync`) mails it once per month
 - **Insights** — meals today, walks & walk-time, weight trend, and a vet/grooming/supplies
   spend breakdown
 - **Photos stored inline** — uploads are canvas-downscaled to a small thumbnail, so they sync
@@ -93,6 +97,7 @@ covers both.
 
 ## Version History
 
+- **v0.90.0** — **A monthly recap by email.** Turn on Settings → Monthly recap email and, once each month is over, PawPrints sends you one short email about it: walks and miles, feedings, potty counts, weight change, meds given, vet visits, and what you spent and on what. It's a once-a-month pulse on how your dog is doing without having to open the app and dig. The email also lists the supplies you have on hand, and for anything in use it estimates when it'll run out, based on how long the same item lasted the last few times, so you know what to buy before you're scrambling. If you don't open the app for a while, the recap still arrives, just a little later, and you never get the same month twice.
 - **v0.89.0** — **A troubleshooting report for the vanished-logs mystery.** Some potty and water entries logged on an iPhone disappeared from both devices without a trace, and we couldn't see what that phone was seeing. Now, opening the app with `?diag=1` added to the address shows a read-only sync health report at the top of Today, with one big Copy report button so it can be pasted straight into a chat. It covers the app version, whether it's running as the home-screen app, sign-in and sync status, storage use, today's counts, the on-device safety journal, and recent change history. Most importantly, it cross-checks the last 7 days of the safety journal against the actual logs and flags anything that's missing. Nothing in the report changes your data, and it never appears unless you ask for it.
 - **v0.88.0** — **A heads-up before logging something that hasn't happened yet.** A 7 PM walk logged at 7 AM is almost always a wrong AM/PM tap, and it quietly throws off the "last walk" timers until someone notices. Now, if you save a feeding, walk, potty trip, water refill, weight, journal entry, or an edited log with a time more than 10 minutes from now, a short amber note appears above the Save button saying when that is and that it hasn't happened yet. Fix the time and save, or tap Save again to keep it as is. Vet visits, grooming, and medication schedules are left alone, since future dates there are the whole point.
 - **v0.87.0** — **Clothing, with the size that fits.** Supplies has a new **Clothing** category for jackets, sweaters, boots and the like. Pick it and a **Clothing size** field appears, so you can save the tag size or the measurements that fit ("M", "20 in chest"). Next time you shop, the right size is one glance away instead of another round with the tape measure. The size shows quietly next to the item name in the list, is searchable, and rides along in the PDF and spreadsheet exports. New clothing items are marked as one-time keeps automatically, since a jacket isn't something you use up.
