@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="robots" content="noindex,nofollow">
-<meta name="version" content="0.2.0">
-<title>Sign-ups v0.2.0</title>
+<meta name="version" content="0.3.0">
+<title>Sign-ups v0.3.0</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23161b22'/%3E%3Ccircle cx='16' cy='11' r='5' fill='%23f4a261'/%3E%3Cpath d='M6 27c0-6 4.5-9 10-9s10 3 10 9z' fill='%232dd4bf'/%3E%3C/svg%3E">
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
@@ -18,7 +18,10 @@
 html,body{margin:0;background:var(--bg-primary);color:var(--text-primary);
 font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-text-size-adjust:100%}
 body{overflow-x:hidden}
-.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 48px}
+/* Wide cap so big monitors get two columns instead of a centred strip; insets keep the
+   home-screen app clear of notches and the home indicator (needs viewport-fit=cover). */
+.wrap{max-width:1760px;margin:0 auto;
+padding:max(20px,env(safe-area-inset-top)) max(clamp(16px,3vw,40px),env(safe-area-inset-right)) max(48px,env(safe-area-inset-bottom)) max(clamp(16px,3vw,40px),env(safe-area-inset-left))}
 h1{font-size:24px;line-height:1.2;margin:0}
 h2{font-size:15px;margin:0 0 10px;letter-spacing:.01em}
 .muted{color:var(--text-secondary)}
@@ -49,6 +52,59 @@ button.primary:hover{filter:brightness(1.08)}
 .failing li:first-child{border-top:0;padding-top:0}
 .failing .pid{font-weight:600}
 .err{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:13px;color:var(--text-primary)}
+/* One block per (error, account); lines capped so the full-width card stays readable on wide screens. */
+.failing li.fgroup{padding:12px 0}
+.failing li.fgroup:first-child{padding-top:0}
+.fgroup p{margin:0 0 8px;max-width:75ch}
+.fgroup .fprojects{margin:0 0 10px}
+.fgroup .fprojects li{border-top:0;padding:2px 0}
+.fgroup .fprojects .when{display:inline}
+.fgroup .reported{font-size:13px;margin:8px 0 0}
+.cmd{display:flex;flex-wrap:wrap;align-items:center;gap:8px;max-width:75ch;margin:0 0 4px}
+.cmd code{flex:1 1 16em;min-width:0;font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:14px;
+background:var(--bg-primary);color:var(--text-primary);border:1px solid var(--border);border-radius:8px;padding:9px 12px;
+overflow-wrap:anywhere;user-select:all;-webkit-user-select:all}
+/* Projects + aside: one column (Projects, Recent sign-ups, Email alerts) until there is room for two. */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;margin:0 0 16px}
+.layout>*,.aside>*{min-width:0}
+.layout .card{margin:0}
+.aside{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start}
+@media (min-width:1180px){.layout{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}}
+/* Email alerts */
+.alerts-intro{margin:0 0 6px;font-size:14px}
+.arow{border-top:1px solid var(--border)}
+.arow:first-of-type{border-top:0}
+.aswitch{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;padding:10px 0;cursor:pointer}
+.aswitch.is-off{cursor:not-allowed}
+.atext{min-width:0}
+.aname{display:block;font-weight:600}
+.adesc{display:block;font-size:13px;color:var(--text-secondary)}
+.actl{display:flex;align-items:center;gap:8px;flex:none}
+.astate{font-size:13px;font-weight:600;min-width:2em;text-align:right;color:var(--text-secondary)}
+.astate.on{color:var(--text-primary)}
+/* Off: grey ring + grey knob (3:1+ on the card). On: teal track, dark knob. */
+.sw{-webkit-appearance:none;appearance:none;margin:0;flex:none;position:relative;width:44px;height:26px;border-radius:999px;
+border:2px solid var(--text-secondary);background:var(--bg-card);cursor:pointer}
+.sw::before{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--text-secondary);transition:transform .12s}
+.sw:checked{background:var(--accent-2);border-color:var(--accent-2)}
+.sw:checked::before{transform:translateX(18px);background:var(--on-accent)}
+.sw:focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
+/* .65 keeps the dimmed off ring at 3.15:1; the row text, not the dimming, says why it is disabled. */
+.sw:disabled{cursor:not-allowed;opacity:.65}
+.sw[aria-busy="true"]{cursor:progress}
+@media (prefers-reduced-motion:reduce){.sw::before{transition:none}}
+.aerr{margin:0 0 10px;font-size:13px;color:var(--danger)}
+.aerr:empty{display:none}
+.alerts-msg{margin:0}
+.alerts-msg + button{margin-top:10px}
+/* Toast: passive confirmations only, top-centre under the safe area. */
+.toast-wrap{position:fixed;left:0;right:0;top:max(12px,calc(env(safe-area-inset-top) + 8px));z-index:50;
+display:flex;justify-content:center;padding:0 16px;pointer-events:none}
+.toast{max-width:560px;background:var(--bg-tertiary);color:var(--text-primary);border:1px solid var(--border);border-radius:10px;
+padding:10px 16px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.45);opacity:0;transition:opacity .15s}
+.toast.show{opacity:1}
+.toast:empty{display:none}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
 .tbl-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;margin:0 0 10px}
 .tbl-head h2{margin:0}
 .sort-ctl{display:flex;align-items:center;gap:8px;font-size:13px}
@@ -71,6 +127,7 @@ td.num{font-variant-numeric:tabular-nums}
 .events li{padding:10px 0;border-top:1px solid var(--border);overflow-wrap:anywhere}
 .events li:first-child{border-top:0;padding-top:0}
 .events .site{font-weight:600;color:var(--accent)}
+.events .sep{color:var(--text-secondary);padding:0 6px}
 .chip{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;background:var(--bg-tertiary);color:var(--text-secondary);border:1px solid var(--border);margin-left:4px}
 .when{font-size:13px;color:var(--text-secondary)}
 .note{font-size:13px;margin:10px 0 0}
@@ -82,6 +139,8 @@ background:none;color:var(--text-primary);font-weight:600;font-variant-numeric:t
 .ubtn[aria-expanded="true"] .chev{transform:rotate(90deg)}
 @media (prefers-reduced-motion:reduce){.ubtn .chev{transition:none}}
 @media (pointer:coarse){.ubtn{min-height:44px;min-width:44px;margin:0 -8px}}
+/* Touch: every button, select and switch row reaches 44px (header buttons are 40px for mouse). */
+@media (pointer:coarse){button,select,thead th button{min-height:44px}.aswitch{min-height:48px}}
 tr.xrow[hidden]{display:none}
 tr.xrow td{border-top:0;padding-top:0}
 .roster-box{background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:4px 12px;font-size:14px}
@@ -117,9 +176,10 @@ tr.xrow td{border-top:0;padding-top:0}
 <div class="wrap" id="app">
   <div class="center"><div class="card"><p class="muted">Loading...</p></div></div>
 </div>
+<div class="toast-wrap" role="status" aria-live="polite"><div class="toast" id="toast"></div></div>
 <script>
 'use strict';
-var VERSION = '0.2.0';
+var VERSION = '0.3.0';
 var WORKER = 'https://pawprints-worker.sevendwarfs.workers.dev';
 // Client-side check is only for a friendly message. The worker enforces the owner
 // email (verified token claim) on GET /signupwatch and returns 403 to anyone else.
@@ -138,6 +198,15 @@ var currentUser = null;
 var openRows = Object.create(null);
 var NO_ROSTER_TIP = 'User list arrives with the next daily check (08:10).';
 var LAST_SIGNIN_TIP = 'Most recent sign-in Firebase recorded. Firebase doesn\'t expose a login count.';
+// Email alert settings live in the worker, fetched separately from the dashboard so a
+// settings failure never blanks the page. state: 'loading' | 'error' | 'ready'.
+var alerts = { state: 'loading', reason: '', settings: null, pending: {}, rowErr: {}, seq: 0 };
+var ALERT_ROWS = [
+  { key: 'emailNewSignups', name: 'New sign-ups', desc: 'Email me when someone new creates an account on any watched site.' },
+  { key: 'emailAnonymous', name: 'Guest sessions too', desc: 'Include visitors who sign in without an email address. Off by default: a guest session has no name or email to act on.' },
+  { key: 'emailFailures', name: 'Failed checks', desc: 'Email me when a project cannot be checked, at most once a week.' }
+];
+var REAUTH_RE = /credentials are no longer valid|login --reauth/i;
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
@@ -167,6 +236,48 @@ function relTime(ms){
   return (days/365.25).toFixed(1) + ' yr ago';
 }
 function sitesStr(p){ return (Array.isArray(p.sites) && p.sites.length ? p.sites : [p.projectId || '?']).join(' / '); }
+// The watcher captures firebase-tools output verbatim, terminal colour codes included.
+// Strip real ANSI sequences, then any "[1m"-style leftovers whose ESC byte was lost.
+function cleanErr(s){
+  return String(s == null ? '' : s).replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/\[\d{1,3}(;\d{1,3})*m/g, '').trim();
+}
+
+// ---------- toast (passive confirmations only) ----------
+var toastTimer = null, toastClear = null;
+function toast(msg){
+  var el = $('toast');
+  if(!el) return;
+  clearTimeout(toastTimer); clearTimeout(toastClear);
+  // Empty first so a repeated identical message is announced again.
+  el.textContent = '';
+  el.classList.remove('show');
+  setTimeout(function(){
+    el.textContent = msg;
+    el.classList.add('show');
+    toastTimer = setTimeout(function(){
+      el.classList.remove('show');
+      toastClear = setTimeout(function(){ el.textContent = ''; }, 200);
+    }, 3500);
+  }, 30);
+}
+function copyText(text){
+  var fallback = function(){
+    var ta = document.createElement('textarea'), ok = false;
+    ta.value = text; ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed'; ta.style.top = '0'; ta.style.left = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { ok = document.execCommand('copy'); } catch(e){ ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  };
+  var done = function(ok){ toast(ok ? 'Command copied' : 'Could not copy. Select the command and copy it by hand.'); };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ done(fallback()); });
+  } else {
+    done(fallback());
+  }
+}
 
 // ---------- screens ----------
 function screen(inner){ $('app').innerHTML = '<div class="center"><div class="card">' + inner + '</div></div>'; }
@@ -185,7 +296,7 @@ function showError(title, detail){
   screen('<h2>' + esc(title) + '</h2><p class="muted">' + esc(detail) + '</p>'
     + '<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center"><button class="primary" type="button" id="btn-retry">Try again</button>'
     + '<button type="button" id="btn-out">Sign out</button></div>');
-  $('btn-retry').addEventListener('click', load);
+  $('btn-retry').addEventListener('click', refreshAll);
   $('btn-out').addEventListener('click', signOut);
 }
 function showEmpty(){
@@ -220,6 +331,149 @@ function load(){
     showError('Could not reach the server', 'The sign-ups service did not respond (' + (e && e.message ? e.message : e) + '). Check your connection and try again.');
   });
 }
+function refreshAll(){ load(); loadSettings(); }
+
+// ---------- email alert settings ----------
+function readRes(r){
+  return r.json().catch(function(){ return {}; }).then(function(body){ return { status: r.status, body: body || {} }; });
+}
+function resReason(res){
+  if(res.status === 403) return '403, this account is not the owner';
+  if(res.status === 401) return '401, sign-in not accepted';
+  return 'HTTP ' + res.status + (res.body && typeof res.body.error === 'string' && res.body.error ? ': ' + res.body.error : '');
+}
+function errReason(e){ return e && e.reason ? e.reason : (e && e.message ? e.message : String(e)); }
+function normSettings(s){
+  s = (s && typeof s === 'object') ? s : {};
+  return { emailNewSignups: s.emailNewSignups === true, emailAnonymous: s.emailAnonymous === true, emailFailures: s.emailFailures === true };
+}
+function settingsReq(method, body){
+  return currentUser.getIdToken().then(function(tok){
+    var opts = { method: method, headers: { Authorization: 'Bearer ' + tok } };
+    if(body){ opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+    return fetch(WORKER + '/signupwatch/settings', opts);
+  }).then(readRes).then(function(res){
+    if(res.status !== 200 || !res.body.settings || typeof res.body.settings !== 'object') throw { reason: res.status === 200 ? 'unexpected response' : resReason(res) };
+    return normSettings(res.body.settings);
+  });
+}
+// Fetches only the settings; the dashboard is untouched. A newer call wins over an older one.
+function loadSettings(){
+  if(!currentUser) return;
+  var my = ++alerts.seq;
+  alerts.state = 'loading'; alerts.reason = ''; alerts.pending = {}; alerts.rowErr = {};
+  renderAlerts();
+  settingsReq('GET').then(function(s){
+    if(my !== alerts.seq) return;
+    alerts.settings = s; alerts.state = 'ready';
+    renderAlerts();
+  }).catch(function(e){
+    if(my !== alerts.seq) return;
+    alerts.state = 'error'; alerts.reason = errReason(e);
+    renderAlerts();
+  });
+}
+function alertVal(k){ return Object.prototype.hasOwnProperty.call(alerts.pending, k) ? alerts.pending[k] : !!(alerts.settings && alerts.settings[k]); }
+function saveSetting(key, val, input){
+  var hadFocus = document.activeElement === input;
+  var body = {}; body[key] = val;
+  alerts.pending[key] = val;
+  syncAlertRows();
+  settingsReq('POST', body).then(function(s){
+    delete alerts.pending[key];
+    delete alerts.rowErr[key];
+    alerts.settings = s;
+    syncAlertRows();
+    toast('Saved. Applies from the next daily check (08:10).');
+  }).catch(function(e){
+    delete alerts.pending[key];
+    alerts.rowErr[key] = 'Could not save (' + errReason(e) + '). Nothing changed.';
+    syncAlertRows();
+  }).then(function(){
+    // Disabling a focused control drops focus in some browsers; hand it back.
+    var a = document.activeElement;
+    if(hadFocus && (!a || a === document.body) && document.body.contains(input)) input.focus();
+  });
+}
+
+// ---------- render: email alerts ----------
+// Full rebuild only on state changes (loading / error / ready). Saves go through
+// syncAlertRows(), which updates the existing inputs so keyboard focus stays put.
+function renderAlerts(){
+  var el = $('alerts-card');
+  if(!el) return;
+  var head = '<h2>Email alerts</h2>';
+  if(alerts.state === 'loading'){ el.innerHTML = head + '<p class="muted alerts-msg">Loading email settings...</p>'; return; }
+  if(alerts.state === 'error'){
+    el.innerHTML = head + '<p class="alerts-msg">Could not load email settings (' + esc(alerts.reason) + ').</p>'
+      + '<button type="button" id="btn-alerts-retry">Try again</button>';
+    $('btn-alerts-retry').addEventListener('click', loadSettings);
+    return;
+  }
+  var to = dash && typeof dash.emailTo === 'string' && dash.emailTo ? dash.emailTo : '';
+  var intro = (to ? 'Sent to ' + esc(to) + ' after each daily check (08:10).' : 'Sent after each daily check (08:10).')
+    + ' Sign-ups always appear on this page, with or without the email.';
+  el.innerHTML = head + '<p class="muted alerts-intro">' + intro + '</p><div class="arows">'
+    + ALERT_ROWS.map(function(r){
+      var k = r.key;
+      return '<div class="arow"><label class="aswitch" id="alab-' + k + '"><span class="atext"><span class="aname" id="aname-' + k + '">' + esc(r.name) + '</span>'
+        + '<span class="adesc" id="adesc-' + k + '"></span></span>'
+        + '<span class="actl"><span class="astate" id="astate-' + k + '" aria-hidden="true"></span>'
+        + '<input type="checkbox" role="switch" class="sw" id="asw-' + k + '" aria-labelledby="aname-' + k + '" aria-describedby="adesc-' + k + ' aerr-' + k + '"></span></label>'
+        + '<p class="aerr" id="aerr-' + k + '" role="alert"></p></div>';
+    }).join('') + '</div>';
+  ALERT_ROWS.forEach(function(r){
+    var input = $('asw-' + r.key);
+    input.addEventListener('change', function(){ saveSetting(r.key, input.checked, input); });
+  });
+  syncAlertRows();
+}
+function syncAlertRows(){
+  if(alerts.state !== 'ready') return;
+  var busy = function(k){ return Object.prototype.hasOwnProperty.call(alerts.pending, k); };
+  var signupsOn = alertVal('emailNewSignups');
+  ALERT_ROWS.forEach(function(r){
+    var k = r.key, input = $('asw-' + k);
+    if(!input) return;
+    var on = alertVal(k);
+    var blocked = k === 'emailAnonymous' && (!signupsOn || busy('emailNewSignups'));
+    input.checked = on;
+    input.disabled = busy(k) || blocked;
+    if(busy(k)) input.setAttribute('aria-busy', 'true'); else input.removeAttribute('aria-busy');
+    $('alab-' + k).className = 'aswitch' + (blocked ? ' is-off' : '');
+    var st = $('astate-' + k);
+    st.textContent = on ? 'On' : 'Off';
+    st.className = 'astate' + (on ? ' on' : '');
+    $('adesc-' + k).textContent = k === 'emailAnonymous' && !signupsOn ? 'Turn on New sign-ups first.' : r.desc;
+    $('aerr-' + k).textContent = alerts.rowErr[k] || '';
+  });
+}
+
+// ---------- render: failing projects ----------
+// Projects that share one cleaned error and one account collapse into one block.
+function failingHtml(failing){
+  var groups = [], byKey = Object.create(null);
+  failing.forEach(function(p){
+    var err = cleanErr(p.error) || 'unknown error';
+    var acct = typeof p.account === 'string' ? p.account : '';
+    var key = err + '\n' + acct;
+    if(!byKey[key]){ byKey[key] = { err: err, acct: acct, list: [] }; groups.push(byKey[key]); }
+    byKey[key].list.push(p);
+  });
+  return '<section class="card failing"><h2>Failing projects</h2><ul>' + groups.map(function(g){
+    var projects = '<ul class="fprojects">' + g.list.map(function(p){
+      return '<li><span class="pid">' + esc(p.projectId) + '</span> <span class="muted">' + esc(sitesStr(p)) + '</span>'
+        + ' <span class="when">&middot; last OK ' + esc(relTime(p.lastOkAt)) + '</span></li>';
+    }).join('') + '</ul>';
+    if(!REAUTH_RE.test(g.err)) return '<li class="fgroup"><p class="err">' + esc(g.err) + '</p>' + projects + '</li>';
+    var cmd = 'firebase login --reauth' + (g.acct ? ' --account ' + g.acct : '');
+    return '<li class="fgroup"><p>The Firebase command-line login' + (g.acct ? ' for <strong>' + esc(g.acct) + '</strong>' : '')
+      + ' expired, so these projects could not be checked.</p>' + projects
+      + '<p class="muted">Run this in PowerShell on the PC that runs the watcher. The next daily check (08:10) picks it up.</p>'
+      + '<div class="cmd"><code>' + esc(cmd) + '</code><button type="button" data-copy="' + esc(cmd) + '" aria-label="Copy command">Copy</button></div>'
+      + '<p class="muted reported">Reported error: ' + esc(g.err) + '</p></li>';
+  }).join('') + '</ul></section>';
+}
 
 // ---------- render ----------
 function sortedProjects(list){
@@ -251,9 +505,9 @@ function th(k, label, tip){
   return '<th scope="col" aria-sort="' + aria + '"><button type="button" data-sort="' + k + '" title="' + esc(tip) + '">'
     + esc(label) + '<span class="arrow" aria-hidden="true">' + arrow + '</span></button></th>';
 }
-// Date + time + relative age, or an em dash when Firebase recorded nothing (null / 0).
+// Date + time + relative age, or "not recorded" when Firebase recorded nothing (null / 0).
 function userWhen(ms){
-  if(typeof ms !== 'number' || !isFinite(ms) || ms <= 0) return '<span class="muted" title="Not recorded">&mdash;</span>';
+  if(typeof ms !== 'number' || !isFinite(ms) || ms <= 0) return '<span class="muted">not recorded</span>';
   return esc(fmtFull(ms)) + ' <span class="muted">(' + esc(relTime(ms)) + ')</span>';
 }
 // Every string here comes from someone's sign-up, so all of it goes through esc().
@@ -291,7 +545,7 @@ function renderTable(){
     return '<tr>'
       + '<td data-label="Site(s)">' + esc(sitesStr(p)) + '<span class="pidsub">' + esc(p.projectId) + '</span></td>'
       + '<td data-label="Users" class="num">' + usersCell(p, idx) + '</td>'
-      + '<td data-label="Status">' + (p.ok ? '<span class="status ok">OK</span>' : '<span class="status fail" title="' + esc(p.error || '') + '">FAILED</span>') + '</td>'
+      + '<td data-label="Status">' + (p.ok ? '<span class="status ok">OK</span>' : '<span class="status fail" title="' + esc(cleanErr(p.error)) + '">FAILED</span>') + '</td>'
       + '<td data-label="Last checked"><span title="' + esc(fmtFull(p.lastOkAt) || 'No successful export recorded yet') + '">' + esc(relTime(p.lastOkAt)) + '</span></td>'
       + '</tr>'
       + (hasRoster ? '<tr class="xrow" id="ux-' + idx + '"' + (openRows[p.projectId] ? '' : ' hidden') + '><td colspan="4">'
@@ -348,7 +602,7 @@ function render(){
   };
   var eventsHtml = events.length ? '<ul class="events">' + events.map(function(e){
     var who = esc(e.name || '(no name)') + (e.anonymous ? ' <span class="chip" title="Signed in without an email (Firebase anonymous auth)">anonymous</span>' : ' &lt;' + esc(e.email) + '&gt;');
-    return '<li><span class="site">' + esc((Array.isArray(e.sites) ? e.sites : [e.projectId]).join(' / ')) + '</span> &mdash; ' + who
+    return '<li><span class="site">' + esc((Array.isArray(e.sites) ? e.sites : [e.projectId]).join(' / ')) + '</span><span class="sep" aria-hidden="true">&middot;</span>' + who
       + '<div class="when"><span title="' + esc(fmtFull(e.createdAt) || 'Firebase did not record a creation time') + '">signed up ' + esc(fmtDate(e.createdAt)) + '</span>'
       + ' &middot; <span title="' + esc('First seen by the watcher ' + fmtFull(e.firstSeenAt)) + '">spotted ' + esc(relTime(e.firstSeenAt)) + '</span></div></li>';
   }).join('') + '</ul>' : '<p class="muted" style="margin:0">No sign-ups recorded yet - that\'s a quiet, healthy fleet.</p>';
@@ -364,16 +618,18 @@ function render(){
     + tile('Sites watched', 'Distinct sites across every watched Firebase project (several sites can share one project)', Object.keys(siteSet).length)
     + tile('Projects failing', 'Projects whose user export failed on the last run, so new sign-ups there could be missed', failing.length, failing.length > 0)
     + '</section>'
-    + (failing.length ? '<section class="card failing"><h2>Failing projects</h2><ul>' + failing.map(function(p){
-        return '<li><span class="pid">' + esc(p.projectId) + '</span> <span class="muted">(' + esc(sitesStr(p)) + ')</span><div class="err">' + esc(p.error || 'unknown error') + '</div>'
-          + '<div class="when">last OK ' + esc(relTime(p.lastOkAt)) + '</div></li>';
-      }).join('') + '</ul></section>' : '')
-    + '<section class="card" id="proj-card"></section>'
+    + (failing.length ? failingHtml(failing) : '')
+    + '<div class="layout"><section class="card" id="proj-card"></section><div class="aside">'
     + '<section class="card"><h2 title="Newest first; owner accounts are never listed">Recent sign-ups</h2>' + eventsHtml + '</section>'
+    + '<section class="card" id="alerts-card"></section></div></div>'
     + '<p class="note muted">Sign-ups v' + VERSION + (dash.version ? ' &middot; watcher v' + esc(dash.version) : '') + '</p>';
   renderTable();
+  renderAlerts();
+  Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function(b){
+    b.addEventListener('click', function(){ copyText(b.getAttribute('data-copy')); });
+  });
   $('btn-out').addEventListener('click', signOut);
-  $('btn-refresh').addEventListener('click', load);
+  $('btn-refresh').addEventListener('click', refreshAll);
 }
 
 // ---------- boot ----------
@@ -383,9 +639,10 @@ document.addEventListener('DOMContentLoaded', function(){
   catch(e){ showError('Could not start sign-in', String(e && e.message ? e.message : e)); return; }
   firebase.auth().onAuthStateChanged(function(user){
     currentUser = user; dash = null;
+    alerts = { state: 'loading', reason: '', settings: null, pending: {}, rowErr: {}, seq: alerts.seq + 1 };
     if(!user) return showSignIn();
     if((user.email || '').toLowerCase() !== OWNER_EMAIL) return showNotOwner(user.email);
-    load();
+    refreshAll();
   });
 });
 </script>
