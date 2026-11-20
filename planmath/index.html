@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="0.7.0">
+<meta name="app-version" content="0.8.0">
 <meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
-<title>PlanMath v0.7.0 — health plan cost estimator</title>
+<title>PlanMath v0.8.0 — health plan cost estimator</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%230f766e%22/%3E%3Crect%20x=%2214%22%20y=%2234%22%20width=%228%22%20height=%2216%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.55%22/%3E%3Crect%20x=%2228%22%20y=%2224%22%20width=%228%22%20height=%2226%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.78%22/%3E%3Crect%20x=%2242%22%20y=%2214%22%20width=%228%22%20height=%2236%22%20rx=%222%22%20fill=%22%23fff%22/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PlanMath">
@@ -50,9 +50,10 @@ button.link{border:none;background:none;padding:2px 6px;color:var(--accent);text
 .plan-card h3{margin:0;font-size:16px}
 .plan-card .big{font-size:22px;font-weight:600}
 .plan-card .big small{font-size:12px;font-weight:400;color:var(--muted)}
-.kv{display:flex;justify-content:space-between;font-size:13px;color:var(--muted)}
-.kv b{color:var(--ink);font-weight:500}
-.card-actions{margin-top:8px;display:flex;gap:8px}
+.kv{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--muted)}
+.kv b{color:var(--ink);font-weight:500;text-align:right;white-space:nowrap}
+.kv b.multi{white-space:normal}
+.card-actions{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px}
 .card-actions button{padding:4px 10px;font-size:13px}
 .empty{color:var(--muted);font-size:14px;border:1px dashed var(--line);border-radius:10px;padding:18px;text-align:center}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -197,7 +198,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 
 <script>
 "use strict";
-const APP_VERSION = "0.7.0";
+const APP_VERSION = "0.8.0";
 const LS_KEY = "planmath_v1";
 const TIERS = [
   ["t1","Tier 1 — Generic"],
@@ -431,7 +432,8 @@ function simulate(plan, extraAnnual){
   }
   return { prem, dentMo, hsaMo, rxMo: rxPaid/12, visMo: visPaid/12, extraMo: extraPaid/12,
            totalMo: running/12, totalYr: running, cum,
-           worstYr: prem*12 + dentMo*12 + num(plan.oopMax) - num(plan.hsa) };
+           /* no OOP max entered = no cap to compute a worst case from (null, not a $0 cap) */
+           worstYr: num(plan.oopMax) > 0 ? prem*12 + dentMo*12 + num(plan.oopMax) - num(plan.hsa) : null };
 }
 
 /* ---------- sortable tables ---------- */
@@ -537,6 +539,7 @@ function planModal(existing){
   function saveIt(){
     const name = inName.value.trim();
     if (!name){ toast("Give the plan a name"); return; }
+    if (num(inOop.value) > 0 && num(inDed.value) > num(inOop.value)){ toast("Out-of-pocket max can't be lower than the deductible"); return; }
     const mode = {};
     for (const k of SHARE_KEYS) mode[k] = modeIn[k].value;
     const data = {
@@ -617,10 +620,23 @@ function rxModal(existing){
 function fmtShare(plan, key, amt){
   const mode = (plan.mode && plan.mode[key]) || "copay";
   const n = num(amt);
-  if (mode === "copay") return "$" + n;
-  if (mode === "copay_ded") return "$" + n + "*";
+  if (mode === "copay") return fmt(n);
+  if (mode === "copay_ded") return fmt(n) + "*";
   if (mode === "coins") return n + "%";
   return n + "%*";
+}
+function duplicatePlan(orig){
+  const copy = JSON.parse(JSON.stringify(orig));
+  copy.id = uid();
+  copy.name = orig.name + " (copy)";
+  const i = state.plans.findIndex(x=>x.id===orig.id);
+  state.plans.splice(i + 1, 0, copy);
+  for (const rx of state.rxs){
+    if (rx.perPlan && rx.perPlan[orig.id]) rx.perPlan[copy.id] = JSON.parse(JSON.stringify(rx.perPlan[orig.id]));
+  }
+  save(); renderAll();
+  toast("Plan duplicated");
+  planModal(copy);
 }
 function renderPlans(){
   const wrap = document.getElementById("planCards");
@@ -634,13 +650,15 @@ function renderPlans(){
       h("h3", null, p.name),
       h("div", {class:"big"}, fmt(monthlyPremium(p)), h("small", null, " /mo premium")),
       h("div", {class:"kv"}, h("span", null, "Deductible"), h("b", null, fmt(num(p.deductible)))),
-      h("div", {class:"kv"}, h("span", null, "OOP max"), h("b", null, fmt(num(p.oopMax)))),
-      h("div", {class:"kv"}, h("span", null, "PCP / Specialist / UC"), h("b", null, fmtShare(p,"pcp",p.pcp)+" / "+fmtShare(p,"spec",p.spec)+" / "+fmtShare(p,"uc",p.uc))),
+      h("div", {class:"kv"}, h("span", null, "OOP max"), h("b", null, num(p.oopMax) > 0 ? fmt(num(p.oopMax)) : "not set")),
+      h("div", {class:"kv"}, h("span", null, "PCP / Specialist / UC"), h("b", {class:"multi"}, fmtShare(p,"pcp",p.pcp)+" / "+fmtShare(p,"spec",p.spec)+" / "+fmtShare(p,"uc",p.uc))),
+      h("div", {class:"kv"}, h("span", null, "Rx tier 1 / 2 / 3 / 4"), h("b", {class:"multi"}, ["t1","t2","t3","t4"].map(k=>fmtShare(p, k, p.rx && p.rx[k])).join(" / "))),
       num(p.hsa) ? h("div", {class:"kv"}, h("span", null, "Employer HSA/HRA"), h("b", null, fmt(num(p.hsa))+"/yr")) : null,
       dentalMo(p) > 0.005 ? h("div", {class:"kv"}, h("span", null, "Dental & vision" + (p.dentalName ? " (" + p.dentalName + ")" : "")), h("b", null, fmt(dentalMo(p))+"/mo")) : null,
       Object.values(p.mode||{}).some(m=>m.indexOf("_ded")!==-1) ? h("div", {class:"kv"}, h("span", null, "* = after deductible")) : null,
       h("div", {class:"card-actions"},
         h("button", {onclick:()=>planModal(p)}, "Edit"),
+        h("button", {title:"Copies this plan and its prescription tiers, so you can enter several similar plans from the same insurer without retyping everything.", onclick:()=>duplicatePlan(p)}, "Duplicate"),
         h("button", {class:"danger", onclick:()=>confirmModal("Delete plan", "Delete \""+p.name+"\"? Prescription tier settings for this plan are removed too.", ()=>{
           state.plans = state.plans.filter(x=>x.id!==p.id);
           for (const rx of state.rxs) if (rx.perPlan) delete rx.perPlan[p.id];
@@ -740,6 +758,13 @@ function renderResults(){
     if (whatIf > 0) cmp("Extra care", winner.t.extraMo, runner.t.extraMo, "/mo");
     const hd = winner.t.hsaMo - runner.t.hsaMo;
     if (Math.abs(hd) >= 0.005) parts.push("Employer HSA/HRA: " + winner.p.name + " gets " + fmt(Math.abs(hd)) + "/mo " + (hd > 0 ? "more" : "less") + " free money");
+    /* worst case ignores the what-if slider: it is premiums + OOP max - HSA, a fixed ceiling */
+    const capped = rows.filter(r=>r.t.worstYr != null);
+    if (winner.t.worstYr != null && capped.length >= 2){
+      const safest = capped.reduce((a,b)=>b.t.worstYr < a.t.worstYr ? b : a);
+      if (safest.p.id === winner.p.id) parts.push("Worst-case year: " + winner.p.name + " is also the lowest, capped at " + fmt(winner.t.worstYr) + "/yr.");
+      else parts.push("Worst-case year: " + safest.p.name + " caps out lower, at " + fmt(safest.t.worstYr) + "/yr versus " + fmt(winner.t.worstYr) + "/yr for " + winner.p.name + ".");
+    }
     wrap.appendChild(h("div", {class:"banner"},
       h("div", {html: "<b>" + esc(winner.p.name) + "</b> comes out ahead — about <b>" + fmt(diff) + "/yr</b> (" + fmt(diff/12) + "/mo) cheaper than " + esc(runner.p.name) + " at your usage" + (whatIf > 0 ? " plus " + fmt(whatIf) + " of extra billed care" : "") + "."}),
       parts.length ? h("ul", null, ...parts.map(s=>h("li", null, s))) : null
@@ -758,7 +783,12 @@ function renderResults(){
       const tds = [h("td", null, p.name), cell(t.prem), cell(t.rxMo), cell(t.visMo)];
       if (anyDental) tds.push(cell(t.dentMo));
       if (whatIf > 0) tds.push(cell(t.extraMo));
-      tds.push(cell(-t.hsaMo), cell(t.totalMo, win), cell(t.totalYr, win), cell(t.worstYr));
+      let worstTd;
+      if (t.worstYr == null){
+        worstTd = h("td", {title:"No out-of-pocket max was entered for this plan, so a worst case can't be calculated."}, "—");
+        worstTd.dataset.sort = Infinity;
+      } else worstTd = cell(t.worstYr);
+      tds.push(cell(-t.hsaMo), cell(t.totalMo, win), cell(t.totalYr, win), worstTd);
       return h("tr", {class: win ? "winner" : ""}, ...tds);
     }))
   );
@@ -896,7 +926,9 @@ function renderChart(wrap, rows){
   const box = h("div", {class:"chartbox", style:"position:relative"}, legend, svg, tip);
   wrap.appendChild(box);
 
-  svg.addEventListener("mousemove", (ev)=>{
+  /* pointer events so a finger shows the readout too; pan-y keeps vertical page scrolling working over the chart */
+  svg.style.touchAction = "pan-y";
+  function showAt(ev){
     const rect = svg.getBoundingClientRect();
     const sx = (ev.clientX - rect.left) * (W/rect.width);
     let i = Math.round(((sx - padL)/iw)*11);
@@ -911,10 +943,15 @@ function renderChart(wrap, rows){
     const bx = box.getBoundingClientRect();
     let left = ev.clientX - bx.left + 14;
     if (left + tip.offsetWidth > bx.width) left = ev.clientX - bx.left - tip.offsetWidth - 14;
+    left = Math.max(0, Math.min(left, bx.width - tip.offsetWidth)); /* keep the readout inside the chart box on narrow screens */
     tip.style.left = left + "px";
     tip.style.top = (ev.clientY - bx.top - 10) + "px";
-  });
-  svg.addEventListener("mouseleave", ()=>{ tip.style.display = "none"; cross.setAttribute("visibility","hidden"); });
+  }
+  function hideTip(){ tip.style.display = "none"; cross.setAttribute("visibility","hidden"); }
+  svg.addEventListener("pointermove", showAt);
+  svg.addEventListener("pointerdown", showAt);
+  svg.addEventListener("pointerleave", hideTip);
+  svg.addEventListener("pointercancel", hideTip);
 }
 
 function renderAll(){ renderPlans(); renderRx(); renderVisits(); renderResults(); renderHistory(); }

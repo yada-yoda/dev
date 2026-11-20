@@ -11,7 +11,7 @@ prescription still cheaper after its $20-higher premium?
 
 Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
 
-## Features (v0.6)
+## Features (v0.8)
 
 - Compare any number of plans: premium (monthly or per-paycheck), deductible,
   out-of-pocket max, employer HSA/HRA contribution, PCP/specialist/urgent-care
@@ -25,7 +25,12 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   price until the deductible is met, then the copay/coinsurance applies, and
   everything stops at the out-of-pocket max
 - **Cumulative-cost chart** — one line per plan across the plan year, with a
-  hover readout, so you can see exactly where one plan overtakes another
+  hover readout (tap or drag a finger on a phone), so you can see exactly
+  where one plan overtakes another
+- Plan cards show every number you typed, including the four prescription
+  tiers, so you can check them against the plan's benefits sheet. A
+  **Duplicate** button copies a plan (and its prescription tiers) for
+  entering several similar plans from the same insurer
 - **What-if slider**: add unexpected billed care (an ER visit, a procedure) and
   watch whether the winner flips; the tipping-point line tells you the exact
   dollar amount where it does
@@ -33,9 +38,12 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   different tier under different insurers), an optional retail price per fill
   (used by deductible/coinsurance rules), or an exact custom cost; fill
   frequency entered per month or per year, whichever is natural
-- Winner banner explaining the annual savings and where they come from
+- Winner banner explaining the annual savings and where they come from,
+  plus which plan has the lowest worst-case year
 - Sortable comparison table, plus a per-prescription cost table by plan
-- Worst-case-year column: premiums + out-of-pocket max − employer HSA money
+- Worst-case-year column: premiums + out-of-pocket max − employer HSA money.
+  A plan with no out-of-pocket max entered shows a dash here instead of a
+  misleading low number
 - **History tab** — two ledgers: *saved comparisons* (timestamped snapshots of
   a whole comparison, with an optional "compared with agent" note, loadable
   back into the Compare tab) and *plan years* (what a year you actually lived
@@ -64,6 +72,20 @@ No accounts, no server, no analytics. Health and cost data never leaves your
 browser unless you export it yourself.
 
 ## Changelog
+
+### v0.8.0 - 2026-11-20
+
+Fixes and shortcuts for actually picking a plan. A plan with no
+out-of-pocket max no longer looks like the safest choice: before, its worst
+case was counted as premiums only. Now it shows a dash and sorts last, and
+the plan card says "not set". The plan form also refuses a deductible higher
+than the out-of-pocket max, which is almost always a typo. A new Duplicate
+button copies a plan and its prescription tiers, so several similar plans
+from one insurer take seconds to enter. Plan cards now list the four
+prescription tier amounts, so you can check your typing against the
+benefits sheet, and dollar amounts there show cents. The results banner
+now says which plan has the lowest worst-case year, which can differ from
+the cheapest expected year. The chart readout now works by touch on phones.
 
 ### v0.7.0 - 2026-07-07
 
