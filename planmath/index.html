@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="0.8.1">
+<meta name="app-version" content="0.9.0">
 <meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
-<title>PlanMath v0.8.1 — health plan cost estimator</title>
+<title>PlanMath v0.9.0 — health plan cost estimator</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%230f766e%22/%3E%3Crect%20x=%2214%22%20y=%2234%22%20width=%228%22%20height=%2216%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.55%22/%3E%3Crect%20x=%2228%22%20y=%2224%22%20width=%228%22%20height=%2226%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.78%22/%3E%3Crect%20x=%2242%22%20y=%2214%22%20width=%228%22%20height=%2236%22%20rx=%222%22%20fill=%22%23fff%22/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PlanMath">
@@ -20,6 +20,8 @@
 <meta name="twitter:title" content="PlanMath — which health plan actually costs less?">
 <meta name="twitter:description" content="Compare the real monthly and annual cost of health insurance plans, side by side.">
 <meta name="twitter:image" content="https://dev.rizzo.cc/planmath/og.png">
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script defer src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <style>
 :root{
   --bg:#f4f6f8; --card:#ffffff; --ink:#1a2430; --muted:#5c6b7a; --line:#dfe5eb;
@@ -34,7 +36,11 @@ header{display:flex;flex-wrap:wrap;align-items:baseline;gap:10px;margin:6px 0 4p
 header h1{font-size:26px;margin:0;letter-spacing:-.3px}
 .ver{font-size:12px;color:var(--muted);background:var(--card);border:1px solid var(--line);border-radius:20px;padding:1px 9px}
 .tagline{color:var(--muted);margin:0 0 18px}
-.toolbar{margin-left:auto;display:flex;gap:8px}
+.toolbar{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.acct{display:inline-flex;align-items:center;gap:6px;max-width:180px;min-width:0;font-size:13px;color:var(--muted)}
+.acct[hidden]{display:none}
+.acct img{width:22px;height:22px;border-radius:50%;flex:none}
+.acct span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 section{background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:18px 20px;margin-bottom:18px}
 section>h2{margin:0 0 4px;font-size:17px}
 .sub{color:var(--muted);font-size:13px;margin:0 0 14px}
@@ -45,6 +51,7 @@ button.primary:hover{filter:brightness(1.08);color:#fff}
 button.danger{color:var(--danger)}
 button.danger:hover{border-color:var(--danger)}
 button.link{border:none;background:none;padding:2px 6px;color:var(--accent);text-decoration:underline}
+button:disabled,button:disabled:hover{opacity:.55;cursor:default;border-color:var(--line);color:var(--ink)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
 .plan-card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
 .plan-card h3{margin:0;font-size:16px}
@@ -138,6 +145,9 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
       <button id="exportBtn" title="Download your data as a JSON file for backup or moving to another device">Export</button>
       <button id="importBtn" title="Load a previously exported JSON file">Import</button>
       <input type="file" id="importFile" accept="application/json" hidden>
+      <button id="signInBtn" class="no-print" disabled title="Keeps your plans in your Google account, so they follow you to any browser and are hidden when you sign out.">Sign in</button>
+      <span class="acct no-print" id="acctChip" hidden><img id="acctAvatar" alt="" referrerpolicy="no-referrer" width="22" height="22" hidden><span id="acctName"></span></span>
+      <button id="signOutBtn" class="no-print" hidden title="Signs out and clears your plans from this screen. They stay in your Google account.">Sign out</button>
     </div>
   </header>
   <div class="print-header" id="printHeader"></div>
@@ -189,7 +199,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
   </div>
 
   <footer>
-    Your data never leaves this browser — stored locally, export it any time. ·
+    <span id="syncStatus">Saved in this browser only. Sign in to keep it in your Google account.</span> ·
     <span id="verFoot"></span> ·
     <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms &amp; Disclaimer</a>
   </footer>
@@ -198,7 +208,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 
 <script>
 "use strict";
-const APP_VERSION = "0.8.1";
+const APP_VERSION = "0.9.0";
 const LS_KEY = "planmath_v1";
 const TIERS = [
   ["t1","Tier 1 — Generic"],
@@ -268,6 +278,15 @@ function load(){
 }
 function save(){
   if (DEMO) return;
+  if (syncMode === "account"){
+    /* signed in: device cache now, cloud shortly after (debounced) */
+    sync.updatedAt = Date.now(); sync.dirty = true;
+    writeCache();
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(cloudSave, 800);
+    renderSyncStatus();
+    return;
+  }
   try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch(e){ toast("Could not save — storage unavailable"); }
 }
@@ -338,8 +357,8 @@ function toast(msg){
   document.getElementById("toasts").appendChild(t);
   setTimeout(()=>{ t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(()=>t.remove(), 320); }, 2600);
 }
-function openModal(title, body, actions){
-  const x = h("button", {class:"x", title:"Close", onclick: close}, "✕");
+function openModal(title, body, actions, onDismiss){
+  const x = h("button", {class:"x", title:"Close", onclick: ()=>{ close(); if (onDismiss) onDismiss(); }}, "✕");
   const overlay = h("div", {class:"overlay"},
     h("div", {class:"modal"},
       h("div", {class:"modal-head"}, h("h3", null, title), x),
@@ -1227,6 +1246,344 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
   reader.readAsText(file);
 });
 
+/* ---------- Google sign-in + cloud saving ---------- */
+/* Same Firebase project and origin as the other dev.rizzo.cc tools, so an existing Google sign-in carries over. */
+const FIREBASE_CONFIG = {
+  apiKey:"AIzaSyCR7AHHq8nIu_k7usHiItQCJIu_6Lo-p6A",authDomain:"illnesstracker-8d888.firebaseapp.com",
+  projectId:"illnesstracker-8d888",storageBucket:"illnesstracker-8d888.firebasestorage.app",
+  messagingSenderId:"660525580864",appId:"1:660525580864:web:ba78d04b13147a2b34d5a5"
+};
+const LEGACY_KEY = "copay_v1";            /* pre-rename key, read as a fallback for LS_KEY */
+const BACKUP_PREFIX = "planmath_v1_backup_";
+const CACHE_PREFIX = "planmath_cache_";   /* + uid; read only after that uid signs in */
+const KEPT_PREFIX = "planmath_kept_local_";
+const CLOUD_MAX_CHARS = 900000;           /* Firestore documents top out near 1 MB */
+let syncMode = DEMO ? "demo" : "local";   /* "demo" | "local" | "account" */
+let fbReady = false, db = null, currentUser = null;
+let sync = { updatedAt: 0, dirty: false }; /* account mode only; kept outside state so exports and snapshots are unchanged */
+let resolved = false;         /* the sign-in decision has run against the cloud copy */
+let decisionPending = false;  /* no cloud saves while a sign-in decision is open */
+let saveTimer = null, saving = false, lastFetch = 0;
+let cloudFailed = false, cloudWarned = false, tooLargeWarned = false;
+
+function freshState(){
+  return { plans: [], rxs: [], visits: { pcp: 3, spec: 0, uc: 1 }, assume: Object.assign({}, ASSUME_DEFAULTS), history: [], snapshots: [] };
+}
+function arr(v){ return Array.isArray(v) ? v : []; }
+function toState(d){
+  return migrate({ plans: arr(d.plans), rxs: arr(d.rxs),
+    visits: (d.visits && typeof d.visits === "object") ? d.visits : { pcp: 0, spec: 0, uc: 0 },
+    assume: d.assume, history: arr(d.history), snapshots: arr(d.snapshots) });
+}
+
+/* Pure: what to do with the account's data right after sign-in. No side effects. */
+function decideOnSignIn({remote, cache, legacy, keptFlag}){
+  const hasData = d => !!d && ["plans","rxs","history","snapshots"].some(k => Array.isArray(d[k]) && d[k].length > 0);
+  if (cache && cache.dirty){
+    const cacheWins = remote ? (cache.updatedAt || 0) > (remote.updatedAt || 0) : hasData(cache.state);
+    if (cacheWins) return "push-cache"; /* unsynced device changes win */
+  }
+  if (remote && hasData(legacy) && !keptFlag) return "ask";
+  if (remote) return "use-remote";
+  if (hasData(legacy)) return "adopt-legacy";
+  return "empty";
+}
+
+function readCache(uid){
+  try{
+    const c = JSON.parse(localStorage.getItem(CACHE_PREFIX + uid) || "null");
+    if (c && c.state && typeof c.state === "object") return { state: c.state, updatedAt: num(c.updatedAt), dirty: !!c.dirty };
+  }catch(e){}
+  return null;
+}
+function writeCache(){
+  if (syncMode !== "account" || !currentUser) return;
+  try{ localStorage.setItem(CACHE_PREFIX + currentUser.uid, JSON.stringify({ state, updatedAt: sync.updatedAt, dirty: sync.dirty })); }
+  catch(e){ toast("Could not save on this device. Storage is unavailable."); }
+}
+function readLegacy(){
+  try{
+    const raw = localStorage.getItem(LS_KEY) || localStorage.getItem(LEGACY_KEY);
+    const d = raw ? JSON.parse(raw) : null;
+    return (d && typeof d === "object") ? d : null;
+  }catch(e){ return null; }
+}
+function readKeptFlag(uid){ try{ return localStorage.getItem(KEPT_PREFIX + uid) === "1"; }catch(e){ return false; } }
+/* browser-only copies; called only after the account copy is confirmed written */
+function removeBrowserCopies(){
+  try{
+    const keys = [LS_KEY, LEGACY_KEY];
+    for (let i = 0; i < localStorage.length; i++){
+      const k = localStorage.key(i);
+      if (k && k.indexOf(BACKUP_PREFIX) === 0) keys.push(k);
+    }
+    keys.forEach(k => localStorage.removeItem(k));
+  }catch(e){ console.warn("could not remove browser copies", e); }
+}
+function sameUser(uid){ return syncMode === "account" && !!currentUser && currentUser.uid === uid; }
+function closeAllModals(){ document.querySelectorAll(".overlay").forEach(o => o.remove()); }
+
+let _firestoreLoading = null;
+function ensureFirestore(){
+  if (db) return Promise.resolve(db);
+  if (_firestoreLoading) return _firestoreLoading;
+  _firestoreLoading = new Promise((resolve, reject)=>{
+    if (typeof firebase === "undefined"){ _firestoreLoading = null; return reject(new Error("firebase not loaded")); }
+    const init = ()=>{ try{ db = firebase.firestore(); resolve(db); }catch(e){ _firestoreLoading = null; reject(e); } };
+    if (firebase.firestore) return init();
+    const s = document.createElement("script");
+    s.src = "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js";
+    s.onload = init; s.onerror = ()=>{ _firestoreLoading = null; reject(new Error("firestore load failed")); };
+    document.head.appendChild(s);
+  });
+  return _firestoreLoading;
+}
+
+function cloudError(e){
+  console.warn("cloud sync failed:", e);
+  cloudFailed = true;
+  if (!cloudWarned){
+    cloudWarned = true;
+    toast(e && e.code === "permission-denied"
+      ? "Cloud saving is not set up yet. Changes are kept on this device."
+      : "Cloud saving is unavailable. Changes are kept on this device.");
+  }
+  renderSyncStatus();
+}
+
+/* Whole-document write of the current state. Resolves true only once the write is confirmed. */
+async function cloudSave(){
+  clearTimeout(saveTimer); saveTimer = null;
+  if (syncMode !== "account" || !currentUser || !resolved || decisionPending){ renderSyncStatus(); return false; }
+  const uid = currentUser.uid, stamp = sync.updatedAt;
+  const json = JSON.stringify({ plans: state.plans, rxs: state.rxs, visits: state.visits, assume: state.assume,
+    history: state.history, snapshots: state.snapshots, updatedAt: stamp, appVersion: APP_VERSION });
+  if (json.length > CLOUD_MAX_CHARS){
+    cloudFailed = true;
+    if (!tooLargeWarned){ tooLargeWarned = true; toast("Your saved comparisons are too large for cloud saving. Changes are kept on this device."); }
+    renderSyncStatus();
+    return false;
+  }
+  saving = true; renderSyncStatus();
+  try{
+    await ensureFirestore();
+    await db.collection("planmath").doc(uid).set(JSON.parse(json)); /* round trip drops undefined, which Firestore rejects */
+    if (!sameUser(uid)) return false;
+    if (sync.updatedAt === stamp){ sync.dirty = false; writeCache(); }
+    cloudFailed = false; cloudWarned = false; tooLargeWarned = false;
+    return true;
+  }catch(e){
+    if (sameUser(uid)) cloudError(e);
+    return false;
+  }finally{
+    saving = false; renderSyncStatus();
+  }
+}
+
+/* Runs once per sign-in (and again on return to the page if the cloud could not be reached). */
+async function resolveSignIn(uid){
+  decisionPending = true; renderSyncStatus();
+  let remote;
+  try{
+    await ensureFirestore();
+    if (!sameUser(uid)) return;
+    const snap = await db.collection("planmath").doc(uid).get();
+    if (!sameUser(uid)) return;
+    remote = snap.exists ? snap.data() : null;
+  }catch(e){
+    if (!sameUser(uid)) return;
+    decisionPending = false; /* stay on the device cache; resolved stays false, so nothing is sent or removed */
+    cloudError(e);
+    return;
+  }
+  lastFetch = Date.now(); resolved = true; cloudFailed = false; cloudWarned = false;
+  const cache = readCache(uid), legacy = readLegacy();
+  const action = decideOnSignIn({ remote, cache, legacy, keptFlag: readKeptFlag(uid) });
+  if (action === "use-remote") useRemote(remote);
+  else if (action === "push-cache"){ decisionPending = false; cloudSave(); } /* state already mirrors the cache */
+  else if (action === "adopt-legacy") adoptLegacy(legacy, uid);
+  else if (action === "ask") askWhichData(remote, legacy, uid);
+  else { closeAllModals(); state = freshState(); sync = { updatedAt: 0, dirty: false }; decisionPending = false; writeCache(); renderAll(); renderSyncStatus(); }
+}
+function useRemote(remote){
+  closeAllModals();
+  state = toState(remote);
+  sync = { updatedAt: num(remote.updatedAt), dirty: false };
+  decisionPending = false;
+  writeCache(); renderAll(); renderSyncStatus();
+}
+async function adoptLegacy(legacy, uid){
+  closeAllModals();
+  state = toState(JSON.parse(JSON.stringify(legacy)));
+  sync = { updatedAt: Date.now(), dirty: true };
+  decisionPending = false;
+  writeCache(); renderAll();
+  const ok = await cloudSave();
+  if (!ok || !sameUser(uid)) return; /* write failed: the browser copy stays */
+  removeBrowserCopies();
+  toast("Your PlanMath data is now saved to your Google account.");
+}
+function describeData(d){
+  const parts = [];
+  const add = (n, one, many)=>{ if (n) parts.push(n + " " + (n === 1 ? one : many)); };
+  add(arr(d.plans).length, "plan", "plans");
+  add(arr(d.rxs).length, "prescription", "prescriptions");
+  add(arr(d.history).length, "plan year", "plan years");
+  add(arr(d.snapshots).length, "saved comparison", "saved comparisons");
+  return parts.length ? parts.join(", ") : "nothing saved";
+}
+function askWhichData(remote, legacy, uid){
+  closeAllModals();
+  const when = num(remote.updatedAt) ? ", last saved " + new Date(num(remote.updatedAt)).toLocaleDateString() : "";
+  const keep = (remember)=>{
+    close();
+    if (!sameUser(uid)) return;
+    if (remember){ try{ localStorage.setItem(KEPT_PREFIX + uid, "1"); }catch(e){} }
+    useRemote(remote);
+  };
+  const body = h("div", null,
+    h("p", {style:"margin-top:0"}, "Your Google account has PlanMath data, and this browser has separate data from when you were signed out. Pick the one to use."),
+    h("ul", {style:"margin:0 0 12px;padding-left:20px"},
+      h("li", null, "In your account: " + describeData(remote) + when),
+      h("li", null, "In this browser: " + describeData(legacy))),
+    h("p", {class:"sub", style:"margin:0"}, "Keep account data leaves this browser's copy as it is. You will see it again when you sign out. Use this browser's data replaces your account copy, then removes the copy kept only in this browser.")
+  );
+  const close = openModal("This browser has data that is not in your account", body, [
+    h("button", {onclick:()=>{ close(); if (sameUser(uid)) adoptLegacy(legacy, uid); }}, "Use this browser's data"),
+    h("button", {class:"primary", onclick:()=>keep(true)}, "Keep account data")
+  ], ()=>{ if (sameUser(uid)) useRemote(remote); }); /* X: keep account data, but ask again next time */
+}
+
+/* Back on the page: re-read the cloud copy so a stale tab does not overwrite newer data. */
+async function refreshFromCloud(){
+  const uid = currentUser.uid;
+  lastFetch = Date.now();
+  try{
+    await ensureFirestore();
+    const snap = await db.collection("planmath").doc(uid).get();
+    if (!sameUser(uid) || sync.dirty || saving || decisionPending || document.querySelector(".overlay")) return;
+    const remote = snap.exists ? snap.data() : null;
+    if (remote && num(remote.updatedAt) > sync.updatedAt){
+      useRemote(remote);
+      toast("Loaded newer changes from your account");
+    }
+  }catch(e){ console.warn("cloud refresh failed:", e); }
+}
+function onPageVisible(){
+  if (document.visibilityState !== "visible" || syncMode !== "account" || !currentUser || decisionPending) return;
+  if (!resolved){ resolveSignIn(currentUser.uid); return; }
+  if (sync.dirty){ if (!saving && !saveTimer) cloudSave(); return; }
+  if (Date.now() - lastFetch >= 30000) refreshFromCloud();
+}
+document.addEventListener("visibilitychange", onPageVisible);
+window.addEventListener("online", onPageVisible);
+
+function enterAccount(user){
+  closeAllModals();
+  clearTimeout(saveTimer); saveTimer = null;
+  currentUser = user; syncMode = "account";
+  resolved = false; decisionPending = false; cloudFailed = false; cloudWarned = false; tooLargeWarned = false;
+  const cache = readCache(user.uid);
+  state = cache ? toState(cache.state) : freshState();
+  sync = cache ? { updatedAt: cache.updatedAt, dirty: cache.dirty } : { updatedAt: 0, dirty: false };
+  whatIf = 0;
+  renderAll(); renderAuthUI();
+  resolveSignIn(user.uid);
+}
+/* Drop to local mode. Returns true when unsynced changes were kept in the device cache. */
+function leaveAccount(){
+  closeAllModals();
+  clearTimeout(saveTimer); saveTimer = null;
+  const uid = currentUser && currentUser.uid;
+  const keep = sync.dirty;
+  if (uid){
+    if (keep) writeCache();
+    else { try{ localStorage.removeItem(CACHE_PREFIX + uid); }catch(e){} }
+  }
+  syncMode = "local"; currentUser = null;
+  resolved = false; decisionPending = false; cloudFailed = false; cloudWarned = false; tooLargeWarned = false;
+  sync = { updatedAt: 0, dirty: false };
+  whatIf = 0;
+  state = freshState(); load(); /* this browser's own data (usually empty), never the account's */
+  renderAll(); renderAuthUI();
+  return keep;
+}
+function signIn(){
+  if (!fbReady){ toast("Sign-in is still loading"); return; }
+  firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider())
+    .then(()=>toast("Signed in"))
+    .catch(e=>{
+      const code = e && e.code;
+      if (code === "auth/popup-closed-by-user" || code === "auth/cancelled-popup-request") toast("Sign-in was cancelled");
+      else if (code === "auth/popup-blocked") toast("The sign-in window was blocked. Allow pop-ups for this site and try again.");
+      else toast("Sign-in failed: " + ((e && e.message) || e));
+    });
+}
+async function signOut(){
+  if (!fbReady || !currentUser) return;
+  closeAllModals();
+  const uid = currentUser.uid;
+  if (sync.dirty && resolved && !decisionPending) await cloudSave(); /* one last try */
+  if (!sameUser(uid)) return; /* already signed out elsewhere */
+  const kept = leaveAccount();
+  try{ await firebase.auth().signOut(); }catch(e){ console.warn("sign-out failed:", e); }
+  toast(kept ? "Signed out. Unsynced changes stay on this device until you sign in again." : "Signed out");
+}
+function onAuth(user){
+  if (user){
+    if (sameUser(user.uid)){ currentUser = user; renderAuthUI(); return; }
+    if (syncMode === "account") leaveAccount(); /* a different account took over */
+    enterAccount(user);
+  } else if (syncMode === "account"){
+    /* signed out in another tab, or the session ended */
+    if (leaveAccount()) toast("Signed out. Unsynced changes stay on this device until you sign in again.");
+  }
+}
+function renderSyncStatus(){
+  const el = document.getElementById("syncStatus");
+  let msg;
+  if (syncMode === "demo") msg = "Demo data. Changes are not saved.";
+  else if (syncMode === "local") msg = "Saved in this browser only. Sign in to keep it in your Google account.";
+  else if (saving || (sync.dirty && saveTimer && !cloudFailed)) msg = "Saving...";
+  else if (sync.dirty || cloudFailed) msg = "Not synced yet. Changes are kept on this device.";
+  else msg = "Saved to your Google account";
+  el.textContent = msg;
+}
+function renderAuthUI(){
+  const inBtn = document.getElementById("signInBtn");
+  const chip = document.getElementById("acctChip");
+  const outBtn = document.getElementById("signOutBtn");
+  const signedIn = syncMode === "account" && !!currentUser;
+  inBtn.hidden = DEMO || signedIn;
+  inBtn.disabled = !fbReady;
+  chip.hidden = !signedIn;
+  outBtn.hidden = !signedIn;
+  if (signedIn){
+    const img = document.getElementById("acctAvatar");
+    if (currentUser.photoURL){ img.src = currentUser.photoURL; img.hidden = false; }
+    else { img.removeAttribute("src"); img.hidden = true; }
+    const name = currentUser.displayName || currentUser.email || "Signed in";
+    document.getElementById("acctName").textContent = name;
+    chip.title = "Signed in as " + (currentUser.email || name);
+  }
+  renderSyncStatus();
+}
+function bootFirebase(tries){
+  if (typeof firebase === "undefined" || !firebase.auth){
+    if (tries < 75){ setTimeout(()=>bootFirebase(tries + 1), 200); return; }
+    document.getElementById("signInBtn").title = "Sign-in could not load. Check your connection or content blocker, then reload the page.";
+    return;
+  }
+  try{
+    if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+    fbReady = true;
+    renderAuthUI();
+    firebase.auth().onAuthStateChanged(onAuth);
+  }catch(e){ console.warn("Firebase init failed:", e); toast("Sign-in could not start"); }
+}
+document.getElementById("signInBtn").addEventListener("click", signIn);
+document.getElementById("signOutBtn").addEventListener("click", signOut);
+
 /* ---------- boot ---------- */
 document.getElementById("addPlanBtn").addEventListener("click", ()=>planModal());
 document.getElementById("addRxBtn").addEventListener("click", ()=>rxModal());
@@ -1240,6 +1597,11 @@ document.getElementById("verFoot").textContent = "PlanMath v" + APP_VERSION;
 if (DEMO) document.getElementById("demoBanner").hidden = false;
 load();
 renderAll();
+renderAuthUI();
+if (!DEMO){
+  if (document.readyState === "complete") bootFirebase(0);
+  else window.addEventListener("load", ()=>bootFirebase(0));
+}
 </script>
 </body>
 </html>

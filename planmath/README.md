@@ -11,7 +11,7 @@ prescription still cheaper after its $20-higher premium?
 
 Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
 
-## Features (v0.8)
+## Features (v0.9)
 
 - Compare any number of plans: premium (monthly or per-paycheck), deductible,
   out-of-pocket max, employer HSA/HRA contribution, PCP/specialist/urgent-care
@@ -50,7 +50,11 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   back into the Compare tab) and *plan years* (what a year you actually lived
   through really cost: premiums paid, medical, prescriptions, deductible used —
   side by side with what the estimate predicted, with the delta called out)
-- All data stays in your browser (localStorage). Export/Import JSON for backup;
+- Signed out, all data stays in your browser (localStorage). Optional **Google
+  sign-in** saves it to your Google account instead (Firestore), so it follows
+  you to any browser and is hidden from the screen when you sign out. The
+  first sign-in moves this browser's data into the account, and asks first if
+  the account already has data. Export/Import JSON for backup;
   a history-only JSON file merges into existing data instead of replacing it,
   and a plans file with no history in it keeps your saved history
 - **Print / PDF** button — a clean, print-formatted report of the whole
@@ -70,10 +74,37 @@ between plans, not a billing-accurate forecast.
 
 ## Privacy
 
-No accounts, no server, no analytics. Health and cost data never leaves your
-browser unless you export it yourself.
+No analytics, no ads. Signed out, health and cost data never leaves your
+browser unless you export it yourself. Signed in, it is stored in Firestore
+under your Google account's ID, readable only by that account. Details on the
+privacy page.
+
+## Cloud saving setup
+
+Sign-in uses the same Firebase project and the same dev.rizzo.cc origin as the
+other tools there, so the existing Google sign-in works with no new setup.
+Data lives in one Firestore document per user, `planmath/{uid}`. The project's
+Firestore rules need this block, or cloud saving reports that it is not set up
+yet and keeps changes on the device:
+
+```
+match /planmath/{uid} { allow read, write: if request.auth != null && request.auth.uid == uid; }
+```
 
 ## Changelog
+
+### v0.9.0 - 2026-11-20
+
+Optional sign-in with Google. Until now your plans lived in one browser
+only, so a different computer or phone started empty, and anyone using
+that browser could see them. Sign in and your plans, prescriptions and
+history are saved to your Google account: they follow you to any browser,
+and they leave the screen when you sign out. The first time you sign in,
+anything already in this browser moves into your account. If your account
+already has data, PlanMath asks which one to keep instead of guessing. A
+line at the bottom of the page says where your data is saved right now. If
+you never sign in, nothing changes: your data stays in this browser, as
+before.
 
 ### v0.8.1 - 2026-11-20
 
