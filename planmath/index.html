@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="app-version" content="0.8.0">
+<meta name="app-version" content="0.8.1">
 <meta name="description" content="Compare the real monthly and annual cost of health insurance plans: premiums, prescriptions, and office visits side by side.">
-<title>PlanMath v0.8.0 — health plan cost estimator</title>
+<title>PlanMath v0.8.1 — health plan cost estimator</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns=%22http://www.w3.org/2000/svg%22%20viewBox=%220%200%2064%2064%22%3E%3Crect%20width=%2264%22%20height=%2264%22%20rx=%2214%22%20fill=%22%230f766e%22/%3E%3Crect%20x=%2214%22%20y=%2234%22%20width=%228%22%20height=%2216%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.55%22/%3E%3Crect%20x=%2228%22%20y=%2224%22%20width=%228%22%20height=%2226%22%20rx=%222%22%20fill=%22%23fff%22%20opacity=%220.78%22/%3E%3Crect%20x=%2242%22%20y=%2214%22%20width=%228%22%20height=%2236%22%20rx=%222%22%20fill=%22%23fff%22/%3E%3C/svg%3E">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="PlanMath">
@@ -198,7 +198,7 @@ textarea:focus{outline:2px solid var(--accent-soft);border-color:var(--accent)}
 
 <script>
 "use strict";
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.8.1";
 const LS_KEY = "planmath_v1";
 const TIERS = [
   ["t1","Tier 1 — Generic"],
@@ -367,13 +367,13 @@ function monthlyPremium(p){
    pct = coinsurance %. Deductible dollars and cost shares both accrue to the OOP cap. */
 function payEvent(st, mode, copayTotal, C, pct){
   let pay;
-  if (mode === "copay") pay = copayTotal;
+  if (mode === "copay") pay = C > 0 ? Math.min(copayTotal, C) : copayTotal;
   else if (mode === "coins") pay = pct/100 * C;
   else {
     const rem = Math.max(0, st.ded - st.dedPaid);
     const dedPart = Math.min(C, rem);
     st.dedPaid += dedPart;
-    if (mode === "copay_ded") pay = dedPart + copayTotal * (C > 0 ? (C - dedPart)/C : 0);
+    if (mode === "copay_ded") pay = dedPart + Math.min(copayTotal, C) * (C > 0 ? (C - dedPart)/C : 0);
     else pay = dedPart + pct/100 * Math.max(0, C - dedPart);
   }
   const capped = Math.min(pay, Math.max(0, st.oopMax - st.oopPaid));
@@ -592,7 +592,7 @@ function rxModal(existing){
         field("Fills", inFills, "How many fills in the chosen period. A monthly refill = 1 per month; an as-needed inhaler = maybe 2 or 3 per year; a 90-day supply = 4 per year."),
         field("Every", inPer, "Pick per year for occasional prescriptions so you don't have to do fraction math. Costs are spread evenly across the year either way.")
       ),
-      field("Retail price per fill ($)", inRetail, "The full cash/negotiated price of one fill — what you'd pay before the deductible is met. Needed for \"after deductible\" and coinsurance rules; GoodRx or your pharmacy receipt is a good source. Leave blank on pure-copay plans."),
+      field("Retail price per fill ($)", inRetail, "The full cash or negotiated price of one fill: what you pay before the deductible is met. Needed for \"after deductible\" and coinsurance rules. Worth filling in on copay plans too: if the drug costs less than the copay, you pay the lower price. GoodRx or a pharmacy receipt has it."),
       null
     ),
     ...(planBlocks.length ? planBlocks : [h("p", {class:"sub"}, "Add a plan first to set per-plan tiers — this prescription will default to Tier 1 on plans added later.")])
@@ -708,7 +708,7 @@ function renderVisits(){
     wrap.appendChild(field(label, inp, hint));
   }
   const costDefs = [
-    ["pcpCost","Full price: PCP visit ($)","What a primary care visit costs before insurance shares it — used when a plan's rule is \"after deductible\" or coinsurance. ~$150–250 is typical."],
+    ["pcpCost","Full price: PCP visit ($)","What a primary care visit costs before insurance shares it. Used when a plan's rule is \"after deductible\" or coinsurance, and a copay is never charged above it. ~$150–250 is typical."],
     ["specCost","Full price: specialist ($)","Full billed price of a specialist visit. ~$250–400 is typical."],
     ["ucCost","Full price: urgent care ($)","Full billed price of an urgent care visit. ~$150–300 is typical."]
   ];
@@ -834,7 +834,8 @@ function renderResults(){
             const amt = num(p.rx && p.rx[cfg.tier]);
             const mode = p.mode[cfg.tier] || "copay";
             rule = fmtShare(p, cfg.tier, amt) + " per fill";
-            mo = (mode === "coins" || mode === "coins_ded") ? count * amt/100 * num(rx.retail) : count * amt;
+            mo = (mode === "coins" || mode === "coins_ded") ? count * amt/100 * num(rx.retail)
+               : num(rx.retail) > 0 ? count * Math.min(amt, num(rx.retail)) : count * amt;
           }
           const td = cell(mo);
           td.title = rule;
@@ -1211,9 +1212,14 @@ document.getElementById("importFile").addEventListener("change", (e)=>{
         toast("History merged in");
       } else {
         if (!Array.isArray(data.plans)) throw new Error("bad shape");
+        /* a file without history/snapshots arrays (e.g. hand-made plans) keeps the saved ones */
+        const keptHist = !Array.isArray(data.history), keptSnaps = !Array.isArray(data.snapshots);
         state = migrate({ plans: data.plans, rxs: data.rxs || [], visits: data.visits || {pcp:0,spec:0,uc:0},
-                          assume: data.assume, history: data.history, snapshots: data.snapshots });
-        save(); renderAll(); toast("Data imported");
+                          assume: data.assume,
+                          history: keptHist ? state.history : data.history,
+                          snapshots: keptSnaps ? state.snapshots : data.snapshots });
+        save(); renderAll();
+        toast(keptHist || keptSnaps ? "Data imported. Your saved history was kept." : "Data imported");
       }
     }catch(err){ toast("That file doesn't look like a PlanMath export"); }
     e.target.value = "";

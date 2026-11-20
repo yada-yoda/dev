@@ -36,7 +36,8 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   dollar amount where it does
 - Prescriptions with per-plan tier assignment (the same drug is often a
   different tier under different insurers), an optional retail price per fill
-  (used by deductible/coinsurance rules), or an exact custom cost; fill
+  (used by deductible/coinsurance rules, and caps a copay when the drug costs
+  less than the copay), or an exact custom cost; fill
   frequency entered per month or per year, whichever is natural
 - Winner banner explaining the annual savings and where they come from,
   plus which plan has the lowest worst-case year
@@ -50,7 +51,8 @@ Live: https://dev.rizzo.cc/planmath/ · Demo with sample data: add `?demo=1`
   through really cost: premiums paid, medical, prescriptions, deductible used —
   side by side with what the estimate predicted, with the delta called out)
 - All data stays in your browser (localStorage). Export/Import JSON for backup;
-  a history-only JSON file merges into existing data instead of replacing it
+  a history-only JSON file merges into existing data instead of replacing it,
+  and a plans file with no history in it keeps your saved history
 - **Print / PDF** button — a clean, print-formatted report of the whole
   comparison (plans, usage, winner, tables, chart) via the browser's print
   dialog; choose "Save as PDF" there to get a shareable file
@@ -72,6 +74,18 @@ No accounts, no server, no analytics. Health and cost data never leaves your
 browser unless you export it yourself.
 
 ## Changelog
+
+### v0.8.1 - 2026-11-20
+
+Two fixes that affect real numbers. Copays now work the way insurers bill
+them: you pay the copay or the actual price, whichever is lower. Before,
+PlanMath always charged the full copay, so a $13 generic on a $25 copay tier
+counted as $25 and made some plans look more expensive than they are. Enter
+a retail price on a prescription to get the lower figure; the per-month
+prescription table now matches. Importing a plans file that has no history
+in it no longer erases your saved plan years and comparisons. They are kept,
+and the import message says so. A full PlanMath export still replaces
+everything, as before.
 
 ### v0.8.0 - 2026-11-20
 
