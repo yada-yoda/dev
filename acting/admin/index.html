@@ -10,6 +10,9 @@
 <!-- Decap CMS bootstraps itself. Configuration lives in config.yml in
      this same folder. After login, content edits commit to GitHub and
      a GitHub Action regenerates index.html from data/. -->
-<script src="https://unpkg.com/decap-cms@^3.6.0/dist/decap-cms.js"></script>
+<!-- Pinned to an exact version with an integrity hash (2026-11-20) so a new
+     upstream release cannot run here unreviewed. To upgrade: change the
+     version, then replace the hash with the sha384 of the new file. -->
+<script src="https://unpkg.com/decap-cms@3.17.3/dist/decap-cms.js" integrity="sha384-RWRzuHfiZSWCt3nEvG7B0v3cMgM1C2UuJmgBSL92GQh4uXmNSkbcthql/mNBqvjr" crossorigin="anonymous"></script>
 </body>
 </html>
