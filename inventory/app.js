@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.3.1';
+const APP_VERSION = '1.3.2';
 
 // What the UI prints where a value is missing (P&L rows, card SKU, days,
 // suggested price). An en dash reads as "nothing here" without looking
@@ -2201,7 +2201,17 @@ function submitSold(e) {
 // that still have zero photos.
 const backfill = { running: false, cancelled: false, done: false, resolveReview: null, stats: null };
 
-const BACKFILL_STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'for', 'with', 'size', 'mens', 'womens', 'large', 'medium', 'small', 'l', 'm', 's', 'xl']);
+// Words that appear in dozens of titles and say nothing about WHICH item it
+// is: condition tags, product types, the subscription box name, sizes.
+const BACKFILL_STOP_WORDS = new Set([
+  'the', 'a', 'an', 'and', 'of', 'for', 'with', 'size', 'mens', 'men', 'womens', 'women',
+  'large', 'medium', 'small', 'l', 'm', 's', 'xl', 'xs', 'xxl',
+  'new', 'exclusive', 'nwt', 'nib', 'nip', 'sealed', 'socks', 'sock', 'shirt', 'tee',
+  'pin', 'figure', 'mini', 'vinyl', 'funko', 'loot', 'crate', 'lootcrate', 'lootwear',
+  'geek', 'fuel'
+]);
+const BACKFILL_MONTHS = new Set(['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec',
+  'january', 'february', 'march', 'april', 'june', 'july', 'august', 'september', 'october', 'november', 'december']);
 // Below this a closet title is too far off to be worth asking about.
 const BACKFILL_REVIEW_MIN_SCORE = 0.4;
 
@@ -2224,23 +2234,27 @@ function scanMissingPhotos() {
   };
 }
 
+// Distinctive tokens only: parenthetical tails ("(Loot Crate - 8/18)"), m/yy
+// dates, month names, years, and the generic words above are dropped first.
 function titleTokens(title) {
   const t = String(title || '').toLowerCase()
-    .replace(/\([^)]*\d{1,2}\/\d{2}[^)]*\)/g, ' ')   // "(Loot Crate 3/19)" tails
-    .replace(/['’]/g, '')                        // men's -> mens
+    .replace(/\([^)]*\)?/g, ' ')                       // anything in parentheses
+    .replace(/\b\d{1,2}\/\d{2,4}\b/g, ' ')              // 8/18 style dates
+    .replace(/['’]/g, '')                          // men's -> mens
     .replace(/[^a-z0-9]+/g, ' ')
     .split(' ')
-    .filter(w => w && !BACKFILL_STOP_WORDS.has(w));
+    .filter(w => w && !BACKFILL_STOP_WORDS.has(w) && !BACKFILL_MONTHS.has(w) && !/^(19|20)\d{2}$/.test(w));
   return new Set(t);
 }
 
-// shared tokens / tokens in the shorter title
+// shared distinctive tokens / distinctive tokens in the shorter title.
+// No shared distinctive token means 0, whatever else the titles have in common.
 function titleMatch(a, b) {
   const small = Math.min(a.size, b.size);
-  if (!small) return { score: 0, shared: 0 };
-  let shared = 0;
-  a.forEach(w => { if (b.has(w)) shared++; });
-  return { score: shared / small, shared };
+  const sharedTokens = [];
+  a.forEach(w => { if (b.has(w)) sharedTokens.push(w); });
+  if (!small || !sharedTokens.length) return { score: 0, shared: 0, sharedTokens: [] };
+  return { score: sharedTokens.length / small, shared: sharedTokens.length, sharedTokens };
 }
 
 function setBackfillStep(step) {
@@ -2403,51 +2417,82 @@ async function backfillLinked(items) {
   return fell;
 }
 
-// Shows one review row and resolves 'accept', 'skip', or 'skipall'.
-function backfillAsk(item, best) {
+// Shows one review row with up to two candidates and resolves
+// { action: 'accept', cand } | { action: 'skip' } | { action: 'skipall' }.
+// The row is cleared the instant a button is pressed, so it can not be
+// double-clicked while the chosen item downloads.
+function backfillAsk(item, cands) {
   return new Promise(resolve => {
     const box = document.getElementById('backfillReview');
     box.textContent = '';
-    const row = document.createElement('div');
-    row.className = 'review-row';
-    if (best.c.cover) {
-      const img = document.createElement('img');
-      img.className = 'review-thumb';
-      img.alt = '';
-      img.src = best.c.cover;
-      row.appendChild(img);
-    } else {
-      const ph = document.createElement('span');
-      ph.className = 'review-thumb';
-      row.appendChild(ph);
-    }
-    const text = document.createElement('div');
-    text.className = 'review-text';
-    const mine = document.createElement('strong');
-    mine.textContent = item.name || 'Untitled';
-    const theirs = document.createElement('span');
-    theirs.textContent = `Closet title: ${best.c.title || 'Untitled'}`;
-    const score = document.createElement('span');
-    score.className = 'review-score';
-    score.textContent = `Match ${Math.round(best.score * 100)}%`;
-    text.append(mine, theirs, score);
-    row.appendChild(text);
-    const actions = document.createElement('div');
-    actions.className = 'review-actions';
-    const mk = (label, cls, value) => {
+    let settled = false;
+    const finish = result => {
+      if (settled) return;
+      settled = true;
+      backfill.resolveReview = null;
+      box.hidden = true;
+      box.textContent = '';
+      resolve(result);
+    };
+    const mk = (label, cls, onClick, aria) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn ' + cls;
       b.textContent = label;
-      b.onclick = () => { backfill.resolveReview = null; box.hidden = true; resolve(value); };
+      if (aria) b.setAttribute('aria-label', aria);
+      b.onclick = onClick;
       return b;
     };
-    const accept = mk('Accept', 'btn-primary', 'accept');
-    actions.append(accept, mk('Skip', 'btn-ghost', 'skip'), mk('Skip all remaining', 'btn-ghost', 'skipall'));
-    box.append(row, actions);
+    const head = document.createElement('p');
+    head.className = 'review-item';
+    head.textContent = item.name || 'Untitled';
+    box.appendChild(head);
+
+    let firstAccept = null;
+    cands.forEach((cand, idx) => {
+      const row = document.createElement('div');
+      row.className = 'review-row';
+      if (cand.c.cover) {
+        const img = document.createElement('img');
+        img.className = 'review-thumb';
+        img.alt = '';
+        img.src = cand.c.cover;
+        row.appendChild(img);
+      } else {
+        const ph = document.createElement('span');
+        ph.className = 'review-thumb';
+        row.appendChild(ph);
+      }
+      const text = document.createElement('div');
+      text.className = 'review-text';
+      const title = document.createElement('strong');
+      title.textContent = cand.c.title || 'Untitled';
+      const score = document.createElement('span');
+      score.className = 'review-score';
+      score.textContent = `Match ${Math.round(cand.score * 100)}%${idx === 0 ? ' (best)' : ''}`;
+      text.append(title, score);
+      if (cand.owner) {
+        const dup = document.createElement('span');
+        dup.className = 'review-dup';
+        dup.textContent = `Already linked to ${cand.owner}`;
+        text.appendChild(dup);
+      }
+      const accept = mk('Accept', idx === 0 ? 'btn-primary' : 'btn-accent', () => finish({ action: 'accept', cand }), `Accept ${cand.c.title || 'this listing'}`);
+      if (!firstAccept) firstAccept = accept;
+      text.appendChild(accept);
+      row.appendChild(text);
+      box.appendChild(row);
+    });
+    const actions = document.createElement('div');
+    actions.className = 'review-actions';
+    actions.append(
+      mk('Skip', 'btn-ghost', () => finish({ action: 'skip' })),
+      mk('Skip all remaining', 'btn-ghost', () => finish({ action: 'skipall' }))
+    );
+    box.appendChild(actions);
     box.hidden = false;
-    backfill.resolveReview = resolve;
-    accept.focus();
+    backfill.resolveReview = () => finish({ action: 'skipall' });
+    firstAccept.focus();
   });
 }
 
@@ -2473,11 +2518,20 @@ async function backfillUnlinked(items) {
   const note = closet.truncated ? ' The list was cut short, so a few items may not match.' : '';
   backfillLogSet(li, `closet loaded, ${closet.count != null ? closet.count : (closet.listings || []).length} listings.${note}`, 'note');
 
-  // A closet listing already linked to another item is not a candidate.
-  const linkedText = state.items.map(i => i.url_poshmark || '').join(' ');
-  let cands = (closet.listings || [])
-    .filter(c => c && c.title && !(c.id && linkedText.includes(c.id)))
+  const cands = (closet.listings || [])
+    .filter(c => c && c.title)
     .map(c => ({ c, tokens: titleTokens(c.title) }));
+  // How many closet titles carry each distinctive word: a long word found in
+  // exactly one title (Battletoads) is evidence enough on its own.
+  const docFreq = new Map();
+  cands.forEach(x => x.tokens.forEach(w => docFreq.set(w, (docFreq.get(w) || 0) + 1)));
+  // Another item already pointing at this listing (two units of one listing is
+  // allowed, but the reviewer should see it).
+  const ownerOf = (c, itemId) => {
+    const o = state.items.find(i => i.id !== itemId && i.url_poshmark &&
+      ((c.id && i.url_poshmark.includes(c.id)) || i.url_poshmark === c.url));
+    return o ? (o.name || 'Untitled') : '';
+  };
 
   let skipAll = false;
   let skippedQuiet = 0;
@@ -2486,9 +2540,11 @@ async function backfillUnlinked(items) {
     if (skipAll) { backfill.stats.skipped++; skippedQuiet++; continue; }
     const name = it.name || 'Untitled';
     const mine = titleTokens(it.name || it.listing_title);
+    // Ties break toward more shared words, then the shorter title.
     const ranked = cands
-      .map(x => ({ c: x.c, ...titleMatch(mine, x.tokens) }))
-      .sort((a, b) => b.score - a.score);
+      .map(x => ({ c: x.c, size: x.tokens.size, ...titleMatch(mine, x.tokens) }))
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score || b.shared - a.shared || a.size - b.size || (a.c.title || '').length - (b.c.title || '').length);
     const best = ranked[0];
     const second = ranked[1];
     if (!best || best.score < BACKFILL_REVIEW_MIN_SCORE) {
@@ -2496,16 +2552,24 @@ async function backfillUnlinked(items) {
       backfill.stats.skipped++;
       continue;
     }
-    let accepted = best.score >= BACKFILL_AUTO_SCORE && best.shared >= 2 && (!second || best.score > second.score);
+    ranked.forEach(x => { x.owner = ownerOf(x.c, it.id); });
+    const lone = best.shared === 1 ? best.sharedTokens[0] : '';
+    const strongSingle = lone.length >= 7 && docFreq.get(lone) === 1;
+    // Never silently link a listing that another item already uses.
+    let accepted = !best.owner && best.score >= BACKFILL_AUTO_SCORE &&
+      (best.shared >= 2 || strongSingle) && (!second || best.score > second.score);
+    let chosen = best;
     if (!accepted) {
-      const choice = await backfillAsk(it, best);
-      if (choice === 'skipall') {
+      const shown = ranked.slice(0, 2).filter(x => x.score >= BACKFILL_REVIEW_MIN_SCORE);
+      const choice = await backfillAsk(it, shown);
+      if (choice.action === 'skipall') {
         skipAll = true;
         backfill.stats.skipped++;
         skippedQuiet++;
         continue;
       }
-      accepted = choice === 'accept';
+      accepted = choice.action === 'accept';
+      if (accepted) chosen = choice.cand;
     }
     if (!accepted) {
       backfillLog(`${name}: skipped, no match chosen`, 'skip');
@@ -2513,21 +2577,20 @@ async function backfillUnlinked(items) {
       continue;
     }
 
-    cands = cands.filter(x => x.c !== best.c);
-    const row = backfillLog(`${name}: linked to "${best.c.title}", fetching photos`, 'busy');
+    const row = backfillLog(`${name}: linked to "${chosen.c.title}", fetching photos`, 'busy');
     const live = state.items.find(i => i.id === it.id);
     if (!live) continue;
-    live.url_poshmark = best.c.url;
+    live.url_poshmark = chosen.c.url;
     live.updated_at = nowISO();
     saveState();
     backfill.stats.linked++;
     await sleep(BACKFILL_DELAY_MS);
     let urls = [];
     try {
-      const r = await fetchListing(best.c.url);
+      const r = await fetchListing(chosen.c.url);
       if (r.ok) urls = (r.item.photos || []).slice(0, BACKFILL_MAX_PHOTOS);
     } catch (err) { /* fall back to the closet cover below */ }
-    if (!urls.length && best.c.cover) urls = [best.c.cover];
+    if (!urls.length && chosen.c.cover) urls = [chosen.c.cover];
     const added = urls.length ? await backfillAttachPhotos(it.id, urls) : 0;
     if (added) {
       backfillLogSet(row, `${name}: linked, ${added} photo${added === 1 ? '' : 's'}`, 'ok');
