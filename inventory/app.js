@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.3.0';
+const APP_VERSION = '1.3.1';
 
 // What the UI prints where a value is missing (P&L rows, card SKU, days,
 // suggested price). An en dash reads as "nothing here" without looking
@@ -2276,6 +2276,7 @@ function backfillLogSet(li, text, cls) {
 }
 
 function openPhotoBackfill() {
+  if (state.demoMode) { toast('Exit demo and sign in to use this.', 'error'); return; }
   if (backfill.running) { toast('Still stopping the last run. Try again in a moment.', 'error'); return; }
   closeSettings();
   backfill.cancelled = false;
@@ -2298,11 +2299,11 @@ function openPhotoBackfill() {
   if (!missing.length) {
     scan.textContent = 'Every item already has at least one photo. Nothing to do.';
   } else {
-    let text = `${missing.length} item${missing.length === 1 ? ' has' : 's have'} no photos: ${linked.length} with a listing link, ${unlinked.length} without.`;
+    let text = `${missing.length} item${missing.length === 1 ? ' has' : 's have'} no photos: ${linked.length} linked, ${unlinked.length} without a link. Linked items whose listing has no photos also try the closet.`;
     if (unlinked.length && !handle) {
-      text += ` The ${unlinked.length} without a link can only be matched by title against your Poshmark closet. Add your closet username in Settings, under Photos, and run this again; until then they are skipped.`;
+      text += ` Without a link they can only be matched by title against your Poshmark closet. Add your Poshmark closet username in Settings, Photos, and run this again; until then they are skipped.`;
     } else if (unlinked.length) {
-      text += ` The ${unlinked.length} without a link will be matched by title against the closet "${handle}". Close calls ask you first.`;
+      text += ` Items without a link will be matched by title against the closet "${handle}". Close calls ask you first.`;
     }
     scan.textContent = text;
   }
@@ -2346,9 +2347,19 @@ function backfillFailureText(r) {
   return r.message || `lookup failed (${r.httpStatus})`;
 }
 
+// Errors that mean "nothing to take from this link". An item that also lacks a
+// Poshmark link then falls through to closet matching (step 3).
+const BACKFILL_NO_PHOTO_ERRORS = ['not_found', 'upstream_error', 'unsupported_host', 'unsupported', 'not_configured'];
+
+// Resolves the items that fell through to the closet step.
 async function backfillLinked(items) {
+  const fell = [];
+  const fallThrough = (it, li, name) => {
+    backfillLogSet(li, `${name}: no photos from the link, trying the closet`, 'note');
+    fell.push(it);
+  };
   for (const it of items) {
-    if (backfill.cancelled) return;
+    if (backfill.cancelled) return fell;
     const name = it.name || 'Untitled';
     const li = backfillLog(`${name}: looking up the listing`, 'busy');
     let r = null;
@@ -2357,7 +2368,10 @@ async function backfillLinked(items) {
       backfillLogSet(li, `${name}: could not reach the lookup service`, 'fail');
       backfill.stats.failed++;
     } else if (!r.ok) {
-      if (r.error === 'not_found') {
+      const canFall = !String(it.url_poshmark || '').trim() && BACKFILL_NO_PHOTO_ERRORS.includes(r.error);
+      if (canFall) {
+        fallThrough(it, li, name);
+      } else if (r.error === 'not_found') {
         backfillLogSet(li, `${name}: listing not found, it may have been removed`, 'skip');
         backfill.stats.skipped++;
       } else {
@@ -2367,8 +2381,12 @@ async function backfillLinked(items) {
     } else {
       const urls = (r.item.photos || []).slice(0, BACKFILL_MAX_PHOTOS);
       if (!urls.length) {
-        backfillLogSet(li, `${name}: ${r.item.ended ? 'the listing ended and kept no photos' : 'the listing has no photos'}`, 'skip');
-        backfill.stats.skipped++;
+        if (!String(it.url_poshmark || '').trim()) {
+          fallThrough(it, li, name);
+        } else {
+          backfillLogSet(li, `${name}: ${r.item.ended ? 'the listing ended and kept no photos' : 'the listing has no photos'}`, 'skip');
+          backfill.stats.skipped++;
+        }
       } else {
         const added = await backfillAttachPhotos(it.id, urls);
         if (added) {
@@ -2382,6 +2400,7 @@ async function backfillLinked(items) {
     }
     await sleep(BACKFILL_DELAY_MS);
   }
+  return fell;
 }
 
 // Shows one review row and resolves 'accept', 'skip', or 'skipall'.
@@ -2436,7 +2455,7 @@ async function backfillUnlinked(items) {
   if (!items.length || backfill.cancelled) return;
   const handle = (state.settings.poshmarkCloset || '').trim().replace(/^@/, '');
   if (!handle) {
-    backfillLog(`${items.length} item${items.length === 1 ? '' : 's'} with no listing link: no Poshmark closet username is set. Add it in Settings, under Photos, and run this again.`, 'skip');
+    backfillLog(`${items.length} item${items.length === 1 ? '' : 's'} with no usable listing link: no Poshmark closet username is set. Add your Poshmark closet username in Settings, Photos, and run this again.`, 'skip');
     backfill.stats.skipped += items.length;
     return;
   }
@@ -2534,10 +2553,11 @@ async function runBackfill() {
     // Scan again: a re-run only sees items that still have no photos.
     const { linked, unlinked } = scanMissingPhotos();
     setBackfillStep('linked');
-    await backfillLinked(linked);
+    const fell = await backfillLinked(linked);
     if (!backfill.cancelled) {
       setBackfillStep('unlinked');
-      await backfillUnlinked(unlinked);
+      if (fell.length) backfillLog(`${fell.length} item${fell.length === 1 ? '' : 's'} fell through to closet matching`, 'note');
+      await backfillUnlinked([...unlinked, ...fell]);
     }
     render();
     if (!backfill.cancelled) {
@@ -2587,7 +2607,7 @@ function openSettings() {
     findBtn.disabled = state.demoMode;
     findNote.hidden = !state.demoMode;
     findNote.textContent = state.demoMode
-      ? 'Switched off in demo mode: the sample items already have photos and nothing is saved. Exit the demo to use it on your own items.'
+      ? 'Exit demo and sign in to use this.'
       : '';
   }
   document.getElementById('settingsModal').classList.add('open');

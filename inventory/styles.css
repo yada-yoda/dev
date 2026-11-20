@@ -2030,3 +2030,8 @@ select.needs-choice {
     padding-top: 0.2rem;
   }
 }
+
+/* Phones: modal footer buttons are a true 44px (border-box, no line-height drift). */
+@media (max-width: 700px) {
+  .modal-footer .btn { box-sizing: border-box; min-height: 44px; height: 44px; line-height: 1.2; padding-top: 0; padding-bottom: 0; justify-content: center; }
+}
