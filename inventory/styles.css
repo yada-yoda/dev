@@ -111,8 +111,8 @@ body::before {
   flex-wrap: wrap;
   color: var(--text-0);
 }
-.demo-banner-icon { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
-.demo-banner-text { color: var(--text-1); }
+.demo-banner-icon { width: 16px; height: 16px; color: var(--accent); display: inline-block; vertical-align: -3px; margin-right: 0.45rem; }
+.demo-banner-text { color: var(--text-1); min-width: 0; }
 .demo-banner-text strong { color: var(--text-0); margin-right: 0.2rem; }
 .demo-banner .btn-link {
   font-size: 0.78rem;
@@ -1831,5 +1831,202 @@ body.demo-mode .footer-demo-link { display: none; }
   }
   .info-tip:hover::after, .info-tip:focus::after {
     max-width: min(260px, calc(100vw - 32px));
+  }
+}
+
+/* ============ MARK SOLD ============ */
+.btn-sold {
+  align-self: flex-start;
+  margin-top: 0.7rem;
+  padding: 0.45rem 0.8rem;
+  font-size: 0.78rem;
+}
+.item-table td .btn-sold { display: flex; margin-top: 0.4rem; }
+.sold-item {
+  font-family: var(--font-mono);
+  font-size: 0.78rem !important;
+  color: var(--text-1) !important;
+  margin: 0 0 1rem !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sold-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.95rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.sold-fees { align-items: flex-start; }
+.sold-fees input[type="checkbox"] { margin-top: 0.15rem; }
+.sold-error {
+  color: var(--coral) !important;
+  font-size: 0.82rem !important;
+  margin: 0.5rem 0 0 !important;
+}
+.sold-error[hidden] { display: none; }
+/* Unset decision dropdown: amber glow until a choice is made. */
+select.needs-choice {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-dim), 0 0 12px rgba(245, 158, 11, 0.25);
+}
+@media (max-width: 600px) {
+  .sold-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ============ SETTINGS: PHOTOS + BACKFILL ============ */
+.settings-field { margin-bottom: 0.75rem; }
+.mini-modal .backfill-card { max-width: 520px; }
+.stepper {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  counter-reset: step;
+}
+.stepper li {
+  counter-increment: step;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-2);
+  padding: 0.3rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+}
+.stepper li::before { content: counter(step) ". "; }
+.stepper li.done { color: var(--text-1); }
+.stepper li.active {
+  color: var(--accent);
+  border-color: var(--accent-line);
+  background: var(--accent-dim);
+}
+.backfill-scan, .backfill-summary { overflow-wrap: anywhere; }
+.backfill-summary {
+  color: var(--text-0) !important;
+  font-weight: 500;
+  margin: 1rem 0 0 !important;
+}
+.backfill-summary[hidden], .backfill-review[hidden] { display: none; }
+.backfill-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: var(--text-1);
+}
+.backfill-log:empty { display: none; }
+.backfill-log li {
+  padding: 0.4rem 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.backfill-log .log-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-right: 0.25rem;
+  color: var(--text-2);
+}
+.backfill-log .ok .log-tag { color: var(--green); }
+.backfill-log .skip .log-tag { color: var(--amber); }
+.backfill-log .fail .log-tag { color: var(--coral); }
+.backfill-review {
+  margin: 0 0 0.75rem;
+  padding: 0.75rem;
+  background: var(--bg-2);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius);
+}
+.review-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: start;
+}
+.review-thumb {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  display: block;
+}
+.review-text { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; font-size: 0.82rem; color: var(--text-1); }
+.review-text strong { color: var(--text-0); overflow-wrap: anywhere; }
+.review-text span { overflow-wrap: anywhere; }
+.review-score { font-family: var(--font-mono); font-size: 0.72rem; color: var(--amber); }
+.review-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
+
+/* Disabled buttons (Mark sold flow, photo backfill, import fetch). */
+.btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+
+/* ============ TABLE: CARD STACK ON PHONES ============ */
+/* The thumbnail cell only exists for the stacked layout. */
+.item-table td.col-thumb { display: none; }
+@media (max-width: 640px) {
+  .item-table { overflow-x: hidden; }
+  .item-table table, .item-table tbody { display: block; width: 100%; }
+  .item-table thead { display: none; }
+  .item-table tr {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    column-gap: 0.75rem;
+    row-gap: 0.15rem;
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .item-table tr:last-child { border-bottom: none; }
+  .item-table td {
+    display: block;
+    padding: 0;
+    border: none;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .item-table td:empty { display: none; }
+  .item-table td.col-thumb {
+    display: block;
+    grid-column: 1;
+    grid-row: 1 / span 2;
+    width: 56px;
+    height: 56px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-2);
+    border: 1px solid var(--border);
+    overflow: hidden;
+  }
+  .item-table td.col-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .item-table td.col-name { grid-column: 2; grid-row: 1; font-size: 0.95rem; align-self: start; }
+  .item-table td.col-price { grid-column: 3; grid-row: 1; font-size: 1.05rem; text-align: right; align-self: start; }
+  .item-table td.col-status { grid-column: 2 / -1; grid-row: 2; padding-top: 0.2rem; }
+  .item-table td.col-status .btn-sold { margin-top: 0.5rem; }
+  .item-table td[data-label]:not(.col-name):not(.col-price):not(.col-status) {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    padding-top: 0.2rem;
+  }
+  .item-table td[data-label]:not(.col-name):not(.col-price):not(.col-status):empty { display: none; }
+  .item-table td[data-label]:not(.col-name):not(.col-price):not(.col-status)::before {
+    content: attr(data-label);
+    flex: 0 0 5.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-2);
+    padding-top: 0.2rem;
   }
 }

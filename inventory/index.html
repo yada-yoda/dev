@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>The Ledger v1.2.1 · Collectibles Inventory</title>
+<title>The Ledger v1.3.0 · Collectibles Inventory</title>
 <meta name="description" content="The Ledger is a self-hosted inventory manager for Beanie Babies and resale collectibles. Listing-ready capture for Poshmark and eBay, multi-device sync, full import/export.">
 <link rel="canonical" href="https://dev.rizzo.cc/inventory/" />
 <meta name="theme-color" content="#0a0d11" />
@@ -46,15 +46,14 @@
 <link rel="stylesheet" media="print" onload="this.media='all'"
       href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"></noscript>
-<link rel="stylesheet" href="styles.css?v=1.2.1" />
+<link rel="stylesheet" href="styles.css?v=1.3.0" />
 </head>
 <body>
 
 <!-- ============ DEMO BANNER ============ -->
 <div class="demo-banner" id="demoBanner" hidden>
   <div class="demo-banner-inner">
-    <svg class="demo-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg>
-    <span class="demo-banner-text"><strong>Demo mode</strong> &middot; sample data only, nothing is being saved</span>
+    <span class="demo-banner-text"><svg class="demo-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m10 9 5 3-5 3z"/></svg><strong>Demo mode</strong> &middot; sample data only, nothing is being saved</span>
     <button type="button" class="btn-link" id="exitDemoBtn">Exit demo</button>
   </div>
 </div>
@@ -271,12 +270,12 @@
           <div class="lookup-header">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
             <div>
-              <h4>Import from an eBay listing</h4>
-              <p>Already listed it but never catalogued it? Paste the listing link or item number to pull in the title, price, condition, item specifics, and photos.</p>
+              <h4>Import from an eBay or Poshmark listing</h4>
+              <p>Already listed it? Paste the link to pull in the title, price, condition, specifics, and photos.</p>
             </div>
           </div>
           <div class="lookup-row">
-            <input type="text" id="ebayImportInput" placeholder="Listing link or item number" autocomplete="off" inputmode="url" />
+            <input type="text" id="ebayImportInput" placeholder="eBay or Poshmark link, or eBay item number" autocomplete="off" inputmode="url" aria-label="eBay or Poshmark listing link, or eBay item number" />
             <button type="button" class="btn btn-accent" id="ebayImportBtn">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg>
               Fetch
@@ -809,6 +808,10 @@
             <input type="number" step="0.01" name="postage_paid" placeholder="0.00" />
             <small>Poshmark sales: 0.00 (prepaid label, buyer pays Poshmark directly)</small>
           </div>
+          <div class="field">
+            <label>Tracking Number <span class="info-tip" data-tip="The carrier tracking number, pasted from the shipping label. Handy when a buyer asks where the package is or opens a dispute.">?</span></label>
+            <input type="text" name="tracking_number" placeholder="e.g. 9400 1000 0000 0000 0000 00" autocomplete="off" />
+          </div>
           <div class="field field-span-2">
             <label>Shipping Notes</label>
             <textarea name="ship_notes" rows="2" placeholder="Fragile, tag protector in place, etc."></textarea>
@@ -1015,10 +1018,24 @@
     <section class="settings-section">
       <h4>About</h4>
       <dl class="settings-dl">
-        <div><dt>Version</dt><dd id="settingsVersion">v1.2.1</dd></div>
+        <div><dt>Version</dt><dd id="settingsVersion">v1.3.0</dd></div>
         <div><dt>Items</dt><dd id="settingsItemCount">0</dd></div>
         <div><dt>Sync</dt><dd id="settingsSyncStatus">Guest, local only</dd></div>
       </dl>
+    </section>
+
+    <section class="settings-section">
+      <h4>Photos</h4>
+      <div class="field settings-field">
+        <label for="poshmarkClosetInput">Poshmark closet username <span class="info-tip" data-tip="Used to match your items to your Poshmark closet when they have no listing link, so their photos can be pulled in. Only the public username, never a password.">?</span></label>
+        <input type="text" id="poshmarkClosetInput" placeholder="your closet handle" autocomplete="off" autocapitalize="off" spellcheck="false" />
+      </div>
+      <p class="settings-muted">Items with no photos can be filled from their eBay or Poshmark listing. Items with no listing link are matched by title against your closet.</p>
+      <button type="button" class="btn btn-ghost" id="findPhotosBtn">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-8 8"/></svg>
+        Find missing photos
+      </button>
+      <p class="settings-muted" id="findPhotosNote" hidden></p>
     </section>
 
     <section class="settings-section">
@@ -1035,6 +1052,84 @@
       <p class="settings-muted" id="wipeNote">Clears items, settings, and demo flag from this device's localStorage. Your cloud data (if signed in) is <strong>not</strong> touched, so your items come back when you sign in again.</p>
       <button type="button" class="btn btn-danger" id="wipeLocalBtn">Wipe local data</button>
     </section>
+  </div>
+</div>
+
+<!-- ============ MARK SOLD MODAL ============ -->
+<div class="modal mini-modal" id="soldModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card" role="dialog" aria-modal="true" aria-labelledby="soldTitle">
+    <header class="settings-header">
+      <h3 id="soldTitle">Mark as sold</h3>
+      <button type="button" class="icon-btn" id="soldClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <p class="sold-item" id="soldItemLine"></p>
+    <form id="soldForm" novalidate>
+      <div class="sold-grid">
+        <div class="field">
+          <label for="soldPlatform">Platform Sold On <span class="req">*</span></label>
+          <select id="soldPlatform">
+            <option value="">Choose a platform</option>
+            <option>Poshmark</option>
+            <option>eBay</option>
+            <option>Mercari</option>
+            <option>Facebook Marketplace</option>
+            <option>Local / Cash</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="soldPrice">Sold Price <span class="req">*</span></label>
+          <input type="number" step="0.01" min="0" id="soldPrice" placeholder="0.00" inputmode="decimal" />
+        </div>
+        <div class="field">
+          <label for="soldDate">Date Sold</label>
+          <input type="date" id="soldDate" />
+        </div>
+        <div class="field">
+          <label for="soldBuyer">Buyer <span class="info-tip" data-tip="Who bought it, for disputes and for spotting repeat customers. Private: never included in the Poshmark or eBay listing exports. Optional.">?</span></label>
+          <input type="text" id="soldBuyer" placeholder="@username or buyer name" autocomplete="off" />
+        </div>
+      </div>
+      <label class="checkbox-label sold-fees">
+        <input type="checkbox" id="soldAutoFees" checked />
+        <span>Auto-fill standard fees for this platform <span class="info-tip" data-tip="Fills the platform's usual selling fee so profit is not overstated: Poshmark 20% (or $2.95 under $15) with postage at 0.00 for the prepaid label, eBay 13.25% plus $0.30. Check it against your seller statement later.">?</span></span>
+      </label>
+      <p class="sold-error" id="soldError" role="alert" hidden></p>
+      <footer class="modal-footer">
+        <button type="button" class="btn btn-ghost" id="soldCancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="soldSave">Save</button>
+      </footer>
+    </form>
+  </div>
+</div>
+
+<!-- ============ PHOTO BACKFILL MODAL ============ -->
+<div class="modal mini-modal" id="photoBackfillModal">
+  <div class="modal-backdrop"></div>
+  <div class="modal-card mini-card backfill-card" role="dialog" aria-modal="true" aria-labelledby="backfillTitle">
+    <header class="settings-header">
+      <h3 id="backfillTitle">Find missing photos</h3>
+      <button type="button" class="icon-btn" id="backfillClose" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <ol class="stepper" id="backfillStepper" aria-label="Progress">
+      <li data-step="scan">Scan</li>
+      <li data-step="linked">Linked</li>
+      <li data-step="unlinked">Unlinked</li>
+      <li data-step="summary">Summary</li>
+    </ol>
+    <p class="backfill-scan" id="backfillScan"></p>
+    <div class="backfill-review" id="backfillReview" hidden></div>
+    <ul class="backfill-log" id="backfillLog" aria-live="polite"></ul>
+    <p class="backfill-summary" id="backfillSummary" hidden></p>
+    <footer class="modal-footer">
+      <button type="button" class="btn btn-ghost" id="backfillCancel">Cancel</button>
+      <button type="button" class="btn btn-primary" id="backfillStart">Start</button>
+    </footer>
   </div>
 </div>
 
@@ -1058,16 +1153,16 @@
 <div id="toast" class="toast"></div>
 
 <footer class="site-footer">
-  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.2.1</span></p>
+  <p>The Ledger · Client-side inventory · Optional Google sign-in for sync · Export often · <a href="guides.html" class="footer-link">Listing guides</a><span class="footer-demo-link"> · <a href="?demo=1" id="demoFooterLink" class="footer-link">Try the demo</a></span> · <span id="appVersion">v1.3.0</span></p>
 </footer>
 
 <!-- Cache-bust query string. Bump these (along with the styles.css link
      above) whenever a release ships new JS or CSS, so users on a stale
      browser cache get the new file. The value should match APP_VERSION
      in app.js. -->
-<script type="module" src="firebase-config.js?v=1.2.1"></script>
-<script defer src="beanie-db.js?v=1.2.1"></script>
-<script defer src="demo-data.js?v=1.2.1"></script>
-<script defer src="app.js?v=1.2.1"></script>
+<script type="module" src="firebase-config.js?v=1.3.0"></script>
+<script defer src="beanie-db.js?v=1.3.0"></script>
+<script defer src="demo-data.js?v=1.3.0"></script>
+<script defer src="app.js?v=1.3.0"></script>
 </body>
 </html>

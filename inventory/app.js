@@ -5,7 +5,7 @@
              Multi-format import/export
    ============================================================ */
 
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.3.0';
 
 // What the UI prints where a value is missing (P&L rows, card SKU, days,
 // suggested price). An en dash reads as "nothing here" without looking
@@ -20,15 +20,22 @@ const SETTINGS_KEY = 'theLedger.settings.v1';
 // so visitors keep seeing the populated app even on repeat visits.
 const DEMO_DISMISSED_KEY = 'theLedger.demoDismissed.v1';
 
-// Backend for "Import from an eBay listing" (the inven-worker repo). A static
-// page can't reach eBay itself: listing pages 403 anything that isn't a real
-// browser, and the Browse API needs an app secret. The Worker does the lookup
-// and proxies the photos; until its eBay keys are configured it answers
-// not_configured and the card says so instead of failing.
-const EBAY_WORKER_URL = 'https://inven-worker.sevendwarfs.workers.dev';
-// eBay allows up to 24 photos per listing; the form keeps the first few so a
+// Backend for "Import from an eBay or Poshmark listing" (the inven-worker
+// repo). A static page can't reach either site itself: listing pages 403
+// anything that isn't a real browser, and eBay's Browse API needs an app
+// secret. The Worker does the lookup and proxies the photos with CORS; until
+// its eBay keys are configured it answers not_configured for eBay links and
+// the card says so instead of failing.
+const LISTING_WORKER_URL = 'https://inven-worker.sevendwarfs.workers.dev';
+// Listings can carry two dozen photos; the form keeps the first few so a
 // single import doesn't push a dozen 900px images into local storage.
 const EBAY_IMPORT_MAX_PHOTOS = 8;
+// Photo backfill attaches fewer per item: it can run over hundreds of items.
+const BACKFILL_MAX_PHOTOS = 6;
+const BACKFILL_DELAY_MS = 300;
+// Title match score (shared tokens / tokens in the shorter title) at or above
+// which a closet match is accepted without asking.
+const BACKFILL_AUTO_SCORE = 0.75;
 
 const DEFAULT_FIELDS = {
   id: '', name: '', category: 'Beanie Baby', sku: '', upc: '',
@@ -72,6 +79,7 @@ const DEFAULT_FIELDS = {
   carrier: 'USPS Ground Advantage',
   ship_cost: '',     // Postage charged to buyer (kept name for back-compat)
   postage_paid: '',  // Actual label cost we paid
+  tracking_number: '', // Carrier tracking number from the label
   ship_notes: '',
   // Platform fees (filled when sold; Auto-fill button computes standard rates)
   fee_ebay_insertion: '',
@@ -259,6 +267,12 @@ function render() {
       }
     });
   });
+  // Mark sold lives inside the clickable card/row: swallow its click and key
+  // events so they never reach the open-editor handlers above.
+  document.querySelectorAll('[data-sold-id]').forEach(btn => {
+    btn.addEventListener('click', e => { e.stopPropagation(); openSoldModal(btn.dataset.soldId); });
+    btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); });
+  });
   populateCategoryFilter();
 }
 
@@ -343,6 +357,15 @@ function renderStats() {
   });
 }
 
+// Statuses that can still be marked sold from the grid/table: anything not
+// already sold, shipped, or archived.
+const MARK_SOLD_STATUSES = ['Draft', 'Ready to List', 'Listed - Poshmark', 'Listed - eBay', 'Listed - Both'];
+
+function markSoldButton(item) {
+  if (!MARK_SOLD_STATUSES.includes(item.status || 'Draft')) return '';
+  return `<button type="button" class="btn btn-ghost btn-sold" data-sold-id="${escapeHtml(item.id)}" aria-label="Mark ${escapeHtml(item.name || 'Untitled')} as sold">Mark sold</button>`;
+}
+
 function renderCard(item) {
   const img = (item.photos && item.photos[0])
     ? `<img src="${item.photos[0]}" alt="${escapeHtml(item.name)}" />`
@@ -377,24 +400,27 @@ function renderCard(item) {
           ${price}
           <span class="status-badge ${statusClass}">${escapeHtml(item.status || 'Draft')}</span>
         </div>
+        ${markSoldButton(item)}
       </div>
     </div>`;
 }
 
 function renderTable(items) {
+  const L = escapeHtml;
   return `<table><thead><tr>
     <th>SKU</th><th>Name</th><th>Category</th><th>Year</th>
     <th>Condition</th><th>Status</th><th>Price</th><th>Location</th>
   </tr></thead><tbody>${items.map(i => `
-    <tr data-edit-id="${i.id}" tabindex="0" aria-label="Edit ${escapeHtml(i.name || 'Untitled')}">
-      <td class="col-sku">${escapeHtml(i.sku || NO_VALUE)}</td>
-      <td class="col-name">${escapeHtml(i.name || 'Untitled')}</td>
-      <td>${escapeHtml(i.category || '')}</td>
-      <td>${escapeHtml(i.bb_year || '')}</td>
-      <td>${escapeHtml(i.condition || '')}</td>
-      <td><span class="status-badge status-${slug(i.status || 'draft')}">${escapeHtml(i.status || 'Draft')}</span>${shipByHtml(i)}</td>
-      <td class="col-price">${formatMoney(i.status === 'Sold' || i.status === 'Shipped' ? i.sold_price : i.price) || NO_VALUE}</td>
-      <td>${escapeHtml(i.location || '')}</td>
+    <tr data-edit-id="${i.id}" tabindex="0" aria-label="Edit ${L(i.name || 'Untitled')}">
+      <td class="col-thumb" aria-hidden="true">${(i.photos && i.photos[0]) ? `<img src="${i.photos[0]}" alt="" />` : ''}</td>
+      <td class="col-sku" data-label="SKU">${L(i.sku || NO_VALUE)}</td>
+      <td class="col-name" data-label="Name">${L(i.name || 'Untitled')}</td>
+      <td data-label="Category">${L(i.category || '')}</td>
+      <td data-label="Year">${L(i.bb_year || '')}</td>
+      <td data-label="Condition">${L(i.condition || '')}</td>
+      <td class="col-status" data-label="Status"><span class="status-badge status-${slug(i.status || 'draft')}">${L(i.status || 'Draft')}</span>${shipByHtml(i)}${markSoldButton(i)}</td>
+      <td class="col-price" data-label="Price">${formatMoney(i.status === 'Sold' || i.status === 'Shipped' ? i.sold_price : i.price) || NO_VALUE}</td>
+      <td data-label="Location">${L(i.location || '')}</td>
     </tr>`).join('')}</tbody></table>`;
 }
 
@@ -421,7 +447,7 @@ function applyFilters(items) {
     if (status && i.status !== status) return false;
     if (search) {
       const q = search.toLowerCase();
-      const blob = [i.name, i.sku, i.upc, i.brand, i.tags, i.location, i.listing_title, i.bb_year, i.category, i.buyer]
+      const blob = [i.name, i.sku, i.upc, i.brand, i.tags, i.location, i.listing_title, i.bb_year, i.category, i.buyer, i.tracking_number]
         .join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
@@ -552,7 +578,7 @@ function openEditor(id = null) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.dataset.panel === 'basics'));
   document.getElementById('upcStatus').textContent = '';
   document.getElementById('upcStatus').className = 'lookup-status';
-  setEbayImportStatus('');
+  setListingImportStatus('');
   document.getElementById('beanieLookupResults').classList.remove('open');
 
   let item;
@@ -654,28 +680,38 @@ async function saveItem(e) {
   render();
   toast('Saved', 'success');
 
-  if (savedItem && isSignedIn()) {
-    try {
-      const hasBase64 = (savedItem.photos || []).some(p => typeof p === 'string' && p.startsWith('data:'));
-      if (hasBase64 && window.firebaseStorageApi) {
-        const urls = await Promise.all((savedItem.photos || []).map(async (p) => {
-          if (typeof p === 'string' && p.startsWith('data:')) {
-            return await window.firebaseStorageApi.uploadPhoto(cloudUid, savedItem.id, p);
-          }
-          return p;
-        }));
-        savedItem.photos = urls;
-        const idx = state.items.findIndex(i => i.id === savedItem.id);
-        if (idx >= 0) state.items[idx].photos = urls;
-        saveState();
-        render();
-      }
-      cloudSaveItemSafe(savedItem);
-    } catch (err) {
-      console.error('Photo upload failed:', err);
-      toast('Photo upload failed. The item saved to the cloud without its new photos; they stay on this device.', 'error');
-      cloudSaveItemSafe(savedItem);
+  await persistItemPhotos(savedItem);
+}
+
+// Cloud half of a save: when signed in, upload any base64 photos to Storage,
+// swap them for their URLs, then write the item to Firestore. Resolves true
+// when every photo made it, false when the upload failed (the item still
+// reaches the cloud, without the new photos; they stay on this device). Does
+// nothing when signed out. Shared by the editor's save and the photo backfill.
+async function persistItemPhotos(savedItem) {
+  if (!savedItem || !isSignedIn()) return true;
+  try {
+    const hasBase64 = (savedItem.photos || []).some(p => typeof p === 'string' && p.startsWith('data:'));
+    if (hasBase64 && window.firebaseStorageApi) {
+      const urls = await Promise.all((savedItem.photos || []).map(async (p) => {
+        if (typeof p === 'string' && p.startsWith('data:')) {
+          return await window.firebaseStorageApi.uploadPhoto(cloudUid, savedItem.id, p);
+        }
+        return p;
+      }));
+      savedItem.photos = urls;
+      const idx = state.items.findIndex(i => i.id === savedItem.id);
+      if (idx >= 0) state.items[idx].photos = urls;
+      saveState();
+      render();
     }
+    cloudSaveItemSafe(savedItem);
+    return true;
+  } catch (err) {
+    console.error('Photo upload failed:', err);
+    toast('Photo upload failed. The item saved to the cloud without its new photos; they stay on this device.', 'error');
+    cloudSaveItemSafe(savedItem);
+    return false;
   }
 }
 
@@ -805,9 +841,19 @@ function applyProductData(data) {
 // Resolves true once the photo is in state.currentPhotos (false on any
 // failure, never throws) so callers can add several in a known order.
 async function addPhotoFromUrl(url) {
+  const data = await fetchPhotoDataUrl(url);
+  if (!data) return false;
+  state.currentPhotos.push(data);
+  renderPhotoPreview();
+  return true;
+}
+
+// Downloads an image and returns it downscaled to 900px as a data URL, or
+// null on any failure (CORS, network, non-image). Never throws.
+async function fetchPhotoDataUrl(url) {
   try {
     const res = await fetch(url);
-    if (!res.ok) return false;
+    if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -815,11 +861,8 @@ async function addPhotoFromUrl(url) {
       reader.onerror = () => reject(reader.error);
       reader.readAsDataURL(blob);
     });
-    const data = await downscaleImage(dataUrl, 900);
-    state.currentPhotos.push(data);
-    renderPhotoPreview();
-    return true;
-  } catch (e) { return false; /* CORS or network issue; caller decides */ }
+    return await downscaleImage(dataUrl, 900);
+  } catch (e) { return null; /* CORS or network issue; caller decides */ }
 }
 
 // Sequential on purpose: the gallery order on eBay is the order the seller
@@ -832,62 +875,86 @@ async function addPhotosFromUrls(urls) {
   return added;
 }
 
-// ============ EBAY LISTING IMPORT ============
+// ============ LISTING IMPORT (eBay + Poshmark) ============
 
-function setEbayImportStatus(html, cls = '') {
+function setListingImportStatus(html, cls = '') {
   const el = document.getElementById('ebayImportStatus');
   if (!el) return;
   el.innerHTML = html;
   el.className = 'lookup-status' + (cls ? ' ' + cls : '');
 }
 
-async function importFromEbay(raw) {
+// One lookup against the Worker. Resolves { ok:true, item } or
+// { ok:false, error, message, httpStatus }; only a network failure throws.
+// Shared by the Add Item card and the photo backfill.
+async function fetchListing(raw) {
+  const res = await fetch(`${LISTING_WORKER_URL}/listing?url=${encodeURIComponent(raw)}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok || !data.item) {
+    return { ok: false, error: data.error || '', message: data.message || '', httpStatus: res.status };
+  }
+  return { ok: true, item: { ...data.item, source: data.item.source || data.source || '' } };
+}
+
+function listingSource(item) {
+  if (item.source === 'ebay' || item.source === 'poshmark') return item.source;
+  if (item.url_poshmark && !item.url_ebay && !item.ebay_item_number) return 'poshmark';
+  return 'ebay';
+}
+
+async function importFromListing(raw) {
   const input = String(raw || '').trim();
   const btn = document.getElementById('ebayImportBtn');
   if (!input) {
-    setEbayImportStatus('Paste an eBay listing link or item number first', 'error');
+    setListingImportStatus('Paste an eBay or Poshmark listing link, or an eBay item number, first', 'error');
     return;
   }
   btn.disabled = true;
-  setEbayImportStatus('Fetching the listing from eBay…', 'loading');
+  setListingImportStatus('Fetching the listing…', 'loading');
   try {
-    const res = await fetch(`${EBAY_WORKER_URL}/ebay/item?id=${encodeURIComponent(input)}`);
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) {
-      const msg = data.error === 'not_configured'
+    const r = await fetchListing(input);
+    if (!r.ok) {
+      const msg = r.error === 'not_configured'
         ? 'eBay import is not switched on yet: the lookup service is still waiting for its eBay API keys. Add the item by hand for now.'
-        : (data.message || `eBay lookup failed (${res.status})`);
-      setEbayImportStatus(escapeHtml(msg), 'error');
+        : (r.message || (r.error === 'not_found'
+          ? 'The lookup service did not find that listing. Check the link, or it may not support this kind of link yet.'
+          : `Listing lookup failed (${r.httpStatus}). Check the link and try again.`));
+      setListingImportStatus(escapeHtml(msg), 'error');
       return;
     }
-    const item = data.item;
-    const filled = applyEbayListing(item);
+    const item = r.item;
+    const source = listingSource(item);
+    const { filled, statusNote, conditionFromDescription: condFromDesc } = applyListing(item);
     const title = `<strong>${escapeHtml(item.title)}</strong>`;
-    const endedNote = item.ended ? ' Note: this listing has already ended on eBay.' : '';
+    let note = statusNote ? ' ' + escapeHtml(statusNote) : '';
+    if (!item.ended && source === 'poshmark' && ['not_for_sale', 'reserved'].includes(item.status)) {
+      note += ` Note: Poshmark shows this listing as ${item.status === 'reserved' ? 'reserved' : 'not for sale'}.`;
+    }
+    if (condFromDesc) note += ' Condition read from the description.';
 
     let photoNote = '';
     const wanted = (item.photos || []).slice(0, EBAY_IMPORT_MAX_PHOTOS);
     if (wanted.length && state.currentPhotos.length === 0) {
-      setEbayImportStatus(`Imported ${title}. Pulling ${wanted.length} photo${wanted.length === 1 ? '' : 's'}…`, 'loading');
+      setListingImportStatus(`Imported ${title}. Pulling ${wanted.length} photo${wanted.length === 1 ? '' : 's'}…`, 'loading');
       const added = await addPhotosFromUrls(wanted);
       photoNote = added
         ? `, ${added} photo${added === 1 ? '' : 's'}`
         : ' (photos could not be downloaded)';
     }
-    setEbayImportStatus(`Imported ${title}: ${filled} field${filled === 1 ? '' : 's'}${photoNote} filled. Review before saving.${endedNote}`, 'success');
+    setListingImportStatus(`Imported ${title}: ${filled} field${filled === 1 ? '' : 's'}${photoNote} filled. Review before saving.${note}`, 'success');
   } catch (err) {
-    console.error('eBay import failed:', err);
-    setEbayImportStatus('Could not reach the eBay lookup service. Check your connection and try again.', 'error');
+    console.error('Listing import failed:', err);
+    setListingImportStatus('Could not reach the listing lookup service. Check your connection and try again.', 'error');
   } finally {
     btn.disabled = false;
   }
 }
 
-// eBay condition names -> the form's 8-level scale. Order matters: the
+// Listing condition text -> the form's 8-level scale. Order matters: the
 // specific phrases sit above the generic ones they contain.
-const EBAY_CONDITION_MAP = [
+const LISTING_CONDITION_MAP = [
   [/new with tags|\bnwt\b/i, 'New With Tags (NWT)'],
-  [/new without tags|\bnwot\b|new without box|new \(other\)|new other|open box/i, 'New Without Tags (NWOT)'],
+  [/new without tags|new w\/o|\bnwot\b|new without box|new \(other\)|new other|open box/i, 'New Without Tags (NWOT)'],
   [/with defects|with imperfections|refurbished/i, 'New With Defects'],
   [/^new$|brand new|new in box|new with box/i, 'New With Tags (NWT)'],
   [/like new|excellent|\bmint\b/i, 'Like New / Excellent Used'],
@@ -897,29 +964,62 @@ const EBAY_CONDITION_MAP = [
   [/parts|not working|\bpoor\b/i, 'Poor / For Parts'],
   [/used|pre-owned/i, 'Good'],
 ];
+// "Used" tells a reseller nothing: Poshmark has only NWT and Used, and sellers
+// often write the real condition in the first lines of the description.
+const GENERIC_CONDITION_RE = /^(used|pre-?owned)$/i;
 
-function mapEbayCondition(text) {
-  const t = String(text || '').trim();
-  if (!t) return '';
-  for (const [re, value] of EBAY_CONDITION_MAP) {
-    if (re.test(t)) return value;
-  }
+function conditionFromDescription(description, allowTags) {
+  const d = String(description || '').slice(0, 300).toLowerCase();
+  if (!d) return '';
+  if (/\bnwot\b|new without tags|new w\/o/.test(d)) return 'New Without Tags (NWOT)';
+  if (allowTags && /\bnwt\b|new with tags/.test(d)) return 'New With Tags (NWT)';
+  if (/brand new|never worn/.test(d)) return 'New Without Tags (NWOT)';
   return '';
 }
 
-// eBay category path (e.g. "Toys & Hobbies|Beanbag Plush|Ty|Beanie Babies-Original")
-// plus the title -> one of the form's categories. Empty string = no opinion.
-function mapEbayCategory(item) {
+// Returns { value, fromDescription }. value '' = no opinion. The description
+// only decides when the raw condition is empty or generic.
+function mapListingCondition(text, description) {
+  const t = String(text || '').trim();
+  if (!t || GENERIC_CONDITION_RE.test(t)) {
+    const fromDesc = conditionFromDescription(description, !t);
+    if (fromDesc) return { value: fromDesc, fromDescription: true };
+  }
+  if (!t) return { value: '', fromDescription: false };
+  for (const [re, value] of LISTING_CONDITION_MAP) {
+    if (re.test(t)) return { value, fromDescription: false };
+  }
+  return { value: '', fromDescription: false };
+}
+
+// Category path (eBay "Toys & Hobbies|Beanbag Plush|Ty|Beanie Babies-Original",
+// Poshmark "Men|Shirts|Tees - Short Sleeve") plus the title -> one of the
+// form's categories. Empty string = no opinion.
+function mapListingCategory(item) {
   const text = `${item.title || ''} ${item.category_path || ''}`.toLowerCase();
   const segs = String(item.category_path || '').toLowerCase().split('|').map(s => s.trim()).filter(Boolean);
   const top = segs[0] || '';
+  const second = segs[1] || '';
   const sub = segs.slice(1).join(' | ');
   const all = segs.join(' | ');
   if (/beanie bab|ty beanie|beanie buddies|teenie beanie/.test(text)) return 'Beanie Baby';
   if (/plush|stuffed animal|beanbag/.test(text)) return 'Plush / Stuffed Animal';
   if (/trading card|sports cards|ccg|non-sport/.test(all)) return 'Trading Cards';
-  // Shoes / accessories only exist as sub-categories of the clothing umbrella;
-  // tested anywhere else, "Action Figures & Accessories" would match too.
+  // Poshmark: Women / Men / Kids, then a department.
+  if (top === 'women' || top === 'men' || top === 'kids') {
+    if (top === 'kids' && /^toys/.test(second)) return 'Toys & Collectibles';
+    if (/^shoes/.test(second)) return 'Shoes';
+    if (/^(bags|accessories|hats|belts|sunglasses|wallets)/.test(second)) return 'Accessories';
+    if (/^(jewelry|watches)/.test(second)) return 'Jewelry';
+    return 'Clothing';
+  }
+  if (top === 'home') {
+    return /games|toys/.test(second) ? 'Toys & Collectibles' : 'Home & Decor';
+  }
+  if (top === 'electronics') return 'Electronics';
+  if (top === 'pets') return 'Other';
+  // eBay: shoes / accessories only exist as sub-categories of the clothing
+  // umbrella; tested anywhere else, "Action Figures & Accessories" would match too.
   if (/clothing, shoes & accessories/.test(top)) {
     if (/\bshoes\b|footwear|sneakers|boots/.test(sub)) return 'Shoes';
     if (/jewelry|watches/.test(sub)) return 'Jewelry';
@@ -936,14 +1036,17 @@ function mapEbayCategory(item) {
 }
 
 // Fills the open editor from a normalized listing. Empty fields are filled;
-// anything the user already typed is left alone, except the eBay identifiers
-// (always overwritten — they ARE the listing) and status, which steps up to
-// "Listed" because the item is demonstrably live on eBay. Selects with a
+// anything the user already typed is left alone, except the source's
+// identifiers (always overwritten, they ARE the listing) and status, which
+// steps up to "Listed" because the item is demonstrably live. Selects with a
 // default value (condition, category) are only overridden on a NEW entry;
-// on an existing item the user chose those on purpose. Returns the count.
-function applyEbayListing(item) {
+// on an existing item the user chose those on purpose.
+// Returns { filled, statusNote, conditionFromDescription }.
+function applyListing(item) {
   const form = document.getElementById('itemForm');
   const isNew = !state.currentEditId;
+  const source = listingSource(item);
+  const platformName = source === 'poshmark' ? 'Poshmark' : 'eBay';
   let filled = 0;
 
   const set = (name, value, overwrite = false) => {
@@ -958,7 +1061,7 @@ function applyEbayListing(item) {
 
   // Category first: it drives the SKU prefix and the Beanie tab, and the
   // default "Beanie Baby" only wins when the listing actually looks like one.
-  const cat = mapEbayCategory(item);
+  const cat = mapListingCategory(item);
   if (isNew && cat && cat !== form.elements.category.value) {
     form.elements.category.value = cat;
     filled++;
@@ -968,7 +1071,8 @@ function applyEbayListing(item) {
 
   set('name', item.title);
   set('listing_title', item.title);
-  set('price', item.price);
+  const price = Number(item.price);
+  if (isFinite(price) && price > 0) set('price', price.toFixed(2));
   set('brand', item.brand);
   set('model', item.model);
   set('size', item.size);
@@ -976,29 +1080,56 @@ function applyEbayListing(item) {
   set('material', item.material);
   set('country', item.country);
   set('upc', item.upc);
-  set('listing_desc_ebay', item.description);
+  set(source === 'poshmark' ? 'listing_desc_poshmark' : 'listing_desc_ebay', item.description);
   set('date_listed', item.date_listed);
   if (isNew && Number(item.quantity) > 1) set('quantity', String(item.quantity), true);
 
-  const cond = mapEbayCondition(item.condition);
+  const mapped = mapListingCondition(item.condition, item.description);
+  const cond = mapped.value;
   if (cond) set('condition', cond, isNew);
   const condNote = [item.condition, item.condition_description].filter(Boolean).join(': ');
-  if (condNote && (!cond || item.condition_description)) set('condition_notes', 'eBay: ' + condNote);
+  if (condNote && (!cond || item.condition_description)) set('condition_notes', platformName + ': ' + condNote);
 
-  set('ebay_item_number', item.ebay_item_number, true);
-  set('url_ebay', item.url_ebay, true);
+  if (source === 'ebay') {
+    set('ebay_item_number', item.ebay_item_number, true);
+    set('url_ebay', item.url_ebay, true);
+  } else {
+    let url = item.url_poshmark;
+    if (!url && item.listing_id) url = `https://poshmark.com/listing/${item.listing_id}`;
+    set('url_poshmark', url, true);
+  }
 
+  // Status follows whether the listing is live. A sold-out Poshmark listing
+  // means the item sold; any other ended listing leaves the status alone.
   const status = form.elements.status;
-  const next = status.value === 'Listed - Poshmark' ? 'Listed - Both'
-    : (status.value === 'Draft' || status.value === 'Ready to List') ? 'Listed - eBay'
-    : '';
-  if (next) { status.value = next; filled++; }
+  let statusNote = '';
+  if (item.ended && item.status === 'sold_out') {
+    if (['Sold', 'Shipped'].includes(status.value)) {
+      statusNote = `This listing is sold out on ${platformName}; status left as ${status.value}.`;
+    } else {
+      status.value = 'Sold';
+      filled++;
+      set('sold_platform', platformName);
+      const sp = Number(item.price);
+      if (isFinite(sp) && sp > 0) set('sold_price', sp.toFixed(2));
+      statusNote = `This listing is sold out on ${platformName}: status set to Sold. Add the sale date and fees (or use Mark sold on the card).`;
+    }
+  } else if (item.ended) {
+    statusNote = `This listing is no longer active on ${platformName}; status left as ${status.value}.`;
+  } else {
+    const own = source === 'poshmark' ? 'Listed - Poshmark' : 'Listed - eBay';
+    const other = source === 'poshmark' ? 'Listed - eBay' : 'Listed - Poshmark';
+    const next = status.value === other ? 'Listed - Both'
+      : (status.value === 'Draft' || status.value === 'Ready to List') ? own
+      : '';
+    if (next) { status.value = next; filled++; }
+  }
 
   updateTitleCount();
   updatePnl();
   updateResearchSummary();
   syncVariationFieldVisibility();
-  return filled;
+  return { filled, statusNote, conditionFromDescription: mapped.fromDescription && !!cond };
 }
 
 // ============ BARCODE SCANNER ============
@@ -1800,26 +1931,37 @@ function computeStandardFees(soldPlatform, soldPrice, postageCharged) {
   return fees;
 }
 
+// The field values "Auto-fill standard fees" would write for a sale: the
+// platform's fee fields, plus (Poshmark only) postage charged and postage
+// paid set to 0.00 when blank. Poshmark sales ship on a prepaid label: the
+// buyer pays Poshmark for postage, so the seller neither charges nor pays any.
+// Only blanks are filled, so a value the user typed (e.g. an upgraded label)
+// survives. Shared by the editor's Auto-fill button and the Mark sold modal.
+function standardFeeUpdates(platform, soldPrice, shipCost, postagePaid) {
+  const updates = {};
+  Object.entries(computeStandardFees(platform, soldPrice, shipCost)).forEach(([k, v]) => {
+    if (v !== '') updates[k] = v;
+  });
+  const isPosh = /posh/i.test(platform || '');
+  if (isPosh) {
+    const blank = v => v == null || v === '';
+    if (blank(postagePaid)) updates.postage_paid = '0.00';
+    if (blank(shipCost)) updates.ship_cost = '0.00';
+  }
+  return { updates, isPosh };
+}
+
 function autoFillFees() {
   const form = document.getElementById('itemForm');
-  const fees = computeStandardFees(
+  const { updates, isPosh } = standardFeeUpdates(
     form.elements.sold_platform.value,
     form.elements.sold_price.value,
-    form.elements.ship_cost.value
+    form.elements.ship_cost.value,
+    form.elements.postage_paid.value
   );
-  Object.entries(fees).forEach(([k, v]) => {
-    if (v !== '' && form.elements[k]) form.elements[k].value = v;
+  Object.entries(updates).forEach(([k, v]) => {
+    if (form.elements[k]) form.elements[k].value = v;
   });
-  // Poshmark sales ship on a prepaid label: the buyer pays Poshmark for
-  // postage, so the seller neither charges nor pays any. Only blanks are
-  // filled, so a value the user typed (e.g. an upgraded label) survives.
-  const isPosh = /posh/i.test(form.elements.sold_platform.value || '');
-  if (isPosh) {
-    ['postage_paid', 'ship_cost'].forEach(name => {
-      const el = form.elements[name];
-      if (el && el.value === '') el.value = '0.00';
-    });
-  }
   updatePnl();
   toast(isPosh
     ? 'Poshmark fee filled. Postage is 0.00: prepaid label, the buyer pays Poshmark directly.'
@@ -1966,6 +2108,456 @@ function updateDaysPanel() {
   }
 }
 
+// ============ MARK SOLD ============
+// A one-step version of "open editor, set Sold, fill four fields, press
+// Auto-fill": the sale details in a small modal, applied straight to the item.
+let soldItemId = null;
+
+function platformFromStatus(status) {
+  if (status === 'Listed - Poshmark') return 'Poshmark';
+  if (status === 'Listed - eBay') return 'eBay';
+  return ''; // Draft, Ready to List, and Listed - Both are ambiguous
+}
+
+function syncSoldPlatformGlow() {
+  const sel = document.getElementById('soldPlatform');
+  sel.classList.toggle('needs-choice', !sel.value);
+}
+
+function showSoldError(message, focusEl) {
+  const err = document.getElementById('soldError');
+  err.textContent = message;
+  err.hidden = false;
+  if (focusEl) focusEl.focus();
+}
+
+function openSoldModal(id) {
+  const item = state.items.find(i => i.id === id);
+  if (!item) return;
+  soldItemId = id;
+  const name = item.name || 'Untitled';
+  const line = document.getElementById('soldItemLine');
+  line.textContent = `${name} · ${item.sku || NO_VALUE}`;
+  line.title = line.textContent;
+  const platform = document.getElementById('soldPlatform');
+  platform.value = platformFromStatus(item.status) || item.sold_platform || '';
+  syncSoldPlatformGlow();
+  const price = Number(item.price);
+  document.getElementById('soldPrice').value = isFinite(price) && price > 0 ? price.toFixed(2) : '';
+  document.getElementById('soldDate').value = localDateStr();
+  document.getElementById('soldBuyer').value = item.buyer || '';
+  document.getElementById('soldAutoFees').checked = true;
+  document.getElementById('soldError').hidden = true;
+  document.getElementById('soldModal').classList.add('open');
+  setTimeout(() => (platform.value ? document.getElementById('soldPrice') : platform).focus(), 100);
+}
+
+function closeSoldModal() {
+  soldItemId = null;
+  document.getElementById('soldModal').classList.remove('open');
+}
+
+function submitSold(e) {
+  e.preventDefault();
+  const item = state.items.find(i => i.id === soldItemId);
+  if (!item) { closeSoldModal(); return; }
+  const platformEl = document.getElementById('soldPlatform');
+  const priceEl = document.getElementById('soldPrice');
+  const platform = platformEl.value;
+  const priceRaw = priceEl.value.trim();
+  const price = Number(priceRaw);
+  if (!platform) {
+    showSoldError('Choose the platform it sold on. Fees and the ship-by reminder depend on it.', platformEl);
+    return;
+  }
+  if (priceRaw === '' || !isFinite(price) || price < 0) {
+    showSoldError('Enter what the buyer paid as a number, 0 or more (for example 24.00).', priceEl);
+    return;
+  }
+  const buyer = document.getElementById('soldBuyer').value.trim();
+  item.status = 'Sold';
+  item.sold_platform = platform;
+  item.sold_price = price.toFixed(2);
+  item.date_sold = document.getElementById('soldDate').value || localDateStr();
+  if (buyer) item.buyer = buyer;
+  if (document.getElementById('soldAutoFees').checked) {
+    const { updates } = standardFeeUpdates(platform, item.sold_price, item.ship_cost, item.postage_paid);
+    Object.assign(item, updates);
+  }
+  item.updated_at = nowISO();
+  saveState();
+  cloudSaveItemSafe(item);
+  const name = item.name || 'Untitled';
+  closeSoldModal();
+  render();
+  toast(`Marked sold: ${name}`, 'success');
+}
+
+// ============ PHOTO BACKFILL ============
+// Items catalogued without photos (the sheet migration) get theirs from the
+// eBay or Poshmark listing. Linked items are looked up directly; unlinked
+// ones are matched by title against the owner's Poshmark closet. One request
+// is ever in flight, and the run is safe to repeat: it only looks at items
+// that still have zero photos.
+const backfill = { running: false, cancelled: false, done: false, resolveReview: null, stats: null };
+
+const BACKFILL_STOP_WORDS = new Set(['the', 'a', 'an', 'and', 'of', 'for', 'with', 'size', 'mens', 'womens', 'large', 'medium', 'small', 'l', 'm', 's', 'xl']);
+// Below this a closet title is too far off to be worth asking about.
+const BACKFILL_REVIEW_MIN_SCORE = 0.4;
+
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+function itemHasPhotos(it) { return Array.isArray(it.photos) && it.photos.some(Boolean); }
+
+// Poshmark first when both exist: its listings are the ones that hold photos
+// for items migrated from the sheet.
+function itemListingLink(it) {
+  return String(it.url_poshmark || '').trim() || String(it.url_ebay || '').trim() || String(it.ebay_item_number || '').trim();
+}
+
+function scanMissingPhotos() {
+  const missing = state.items.filter(it => !itemHasPhotos(it));
+  return {
+    missing,
+    linked: missing.filter(it => itemListingLink(it)),
+    unlinked: missing.filter(it => !itemListingLink(it))
+  };
+}
+
+function titleTokens(title) {
+  const t = String(title || '').toLowerCase()
+    .replace(/\([^)]*\d{1,2}\/\d{2}[^)]*\)/g, ' ')   // "(Loot Crate 3/19)" tails
+    .replace(/['’]/g, '')                        // men's -> mens
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(' ')
+    .filter(w => w && !BACKFILL_STOP_WORDS.has(w));
+  return new Set(t);
+}
+
+// shared tokens / tokens in the shorter title
+function titleMatch(a, b) {
+  const small = Math.min(a.size, b.size);
+  if (!small) return { score: 0, shared: 0 };
+  let shared = 0;
+  a.forEach(w => { if (b.has(w)) shared++; });
+  return { score: shared / small, shared };
+}
+
+function setBackfillStep(step) {
+  const order = ['scan', 'linked', 'unlinked', 'summary'];
+  const at = order.indexOf(step);
+  document.querySelectorAll('#backfillStepper li').forEach(li => {
+    const i = order.indexOf(li.dataset.step);
+    li.classList.toggle('active', i === at);
+    li.classList.toggle('done', i < at);
+    if (i === at) li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+  });
+}
+
+const BACKFILL_LABEL = { ok: 'Added', skip: 'Skipped', fail: 'Failed', busy: 'Working' };
+
+function backfillLog(text, cls) {
+  const list = document.getElementById('backfillLog');
+  const li = document.createElement('li');
+  backfillLogSet(li, text, cls);
+  list.appendChild(li);
+  list.scrollTop = list.scrollHeight;
+  return li;
+}
+
+function backfillLogSet(li, text, cls) {
+  li.className = cls || '';
+  li.textContent = '';
+  const tag = document.createElement('span');
+  tag.className = 'log-tag';
+  tag.textContent = BACKFILL_LABEL[cls] || 'Note';
+  li.appendChild(tag);
+  li.appendChild(document.createTextNode(' ' + text));
+}
+
+function openPhotoBackfill() {
+  if (backfill.running) { toast('Still stopping the last run. Try again in a moment.', 'error'); return; }
+  closeSettings();
+  backfill.cancelled = false;
+  backfill.done = false;
+  backfill.stats = { photos: 0, linked: 0, skipped: 0, failed: 0 };
+  const { missing, linked, unlinked } = scanMissingPhotos();
+  const handle = (state.settings.poshmarkCloset || '').trim().replace(/^@/, '');
+  setBackfillStep('scan');
+  document.getElementById('backfillLog').textContent = '';
+  document.getElementById('backfillReview').hidden = true;
+  document.getElementById('backfillSummary').hidden = true;
+  const start = document.getElementById('backfillStart');
+  start.textContent = 'Start';
+  start.disabled = missing.length === 0;
+  const cancel = document.getElementById('backfillCancel');
+  cancel.hidden = false;
+  cancel.textContent = 'Cancel';
+
+  const scan = document.getElementById('backfillScan');
+  if (!missing.length) {
+    scan.textContent = 'Every item already has at least one photo. Nothing to do.';
+  } else {
+    let text = `${missing.length} item${missing.length === 1 ? ' has' : 's have'} no photos: ${linked.length} with a listing link, ${unlinked.length} without.`;
+    if (unlinked.length && !handle) {
+      text += ` The ${unlinked.length} without a link can only be matched by title against your Poshmark closet. Add your closet username in Settings, under Photos, and run this again; until then they are skipped.`;
+    } else if (unlinked.length) {
+      text += ` The ${unlinked.length} without a link will be matched by title against the closet "${handle}". Close calls ask you first.`;
+    }
+    scan.textContent = text;
+  }
+  document.getElementById('photoBackfillModal').classList.add('open');
+  setTimeout(() => (start.disabled ? document.getElementById('backfillCancel') : start).focus(), 100);
+}
+
+function closeBackfill() {
+  backfill.cancelled = true;
+  if (backfill.resolveReview) {
+    const resolve = backfill.resolveReview;
+    backfill.resolveReview = null;
+    resolve('skipall');
+  }
+  document.getElementById('photoBackfillModal').classList.remove('open');
+}
+
+// Downloads the listing photos and writes them into the item's own photos
+// array (never the open editor), then persists exactly as the editor does.
+// Resolves the number of photos added.
+async function backfillAttachPhotos(itemId, urls, extra) {
+  const got = [];
+  for (const u of urls) {
+    if (backfill.cancelled) break;
+    const data = await fetchPhotoDataUrl(u);
+    if (data) got.push(data);
+  }
+  if (!got.length) return 0;
+  const live = state.items.find(i => i.id === itemId);
+  if (!live) return 0;
+  live.photos = [...(Array.isArray(live.photos) ? live.photos.filter(Boolean) : []), ...got];
+  if (extra) Object.assign(live, extra);
+  live.updated_at = nowISO();
+  saveState();
+  await persistItemPhotos(live);
+  return got.length;
+}
+
+function backfillFailureText(r) {
+  if (r.error === 'not_configured') return 'the eBay lookup is not switched on yet';
+  return r.message || `lookup failed (${r.httpStatus})`;
+}
+
+async function backfillLinked(items) {
+  for (const it of items) {
+    if (backfill.cancelled) return;
+    const name = it.name || 'Untitled';
+    const li = backfillLog(`${name}: looking up the listing`, 'busy');
+    let r = null;
+    try { r = await fetchListing(itemListingLink(it)); } catch (err) { r = null; }
+    if (!r) {
+      backfillLogSet(li, `${name}: could not reach the lookup service`, 'fail');
+      backfill.stats.failed++;
+    } else if (!r.ok) {
+      if (r.error === 'not_found') {
+        backfillLogSet(li, `${name}: listing not found, it may have been removed`, 'skip');
+        backfill.stats.skipped++;
+      } else {
+        backfillLogSet(li, `${name}: ${backfillFailureText(r)}`, 'fail');
+        backfill.stats.failed++;
+      }
+    } else {
+      const urls = (r.item.photos || []).slice(0, BACKFILL_MAX_PHOTOS);
+      if (!urls.length) {
+        backfillLogSet(li, `${name}: ${r.item.ended ? 'the listing ended and kept no photos' : 'the listing has no photos'}`, 'skip');
+        backfill.stats.skipped++;
+      } else {
+        const added = await backfillAttachPhotos(it.id, urls);
+        if (added) {
+          backfillLogSet(li, `${name}: ${added} photo${added === 1 ? '' : 's'}`, 'ok');
+          backfill.stats.photos += added;
+        } else {
+          backfillLogSet(li, `${name}: the photos could not be downloaded`, 'fail');
+          backfill.stats.failed++;
+        }
+      }
+    }
+    await sleep(BACKFILL_DELAY_MS);
+  }
+}
+
+// Shows one review row and resolves 'accept', 'skip', or 'skipall'.
+function backfillAsk(item, best) {
+  return new Promise(resolve => {
+    const box = document.getElementById('backfillReview');
+    box.textContent = '';
+    const row = document.createElement('div');
+    row.className = 'review-row';
+    if (best.c.cover) {
+      const img = document.createElement('img');
+      img.className = 'review-thumb';
+      img.alt = '';
+      img.src = best.c.cover;
+      row.appendChild(img);
+    } else {
+      const ph = document.createElement('span');
+      ph.className = 'review-thumb';
+      row.appendChild(ph);
+    }
+    const text = document.createElement('div');
+    text.className = 'review-text';
+    const mine = document.createElement('strong');
+    mine.textContent = item.name || 'Untitled';
+    const theirs = document.createElement('span');
+    theirs.textContent = `Closet title: ${best.c.title || 'Untitled'}`;
+    const score = document.createElement('span');
+    score.className = 'review-score';
+    score.textContent = `Match ${Math.round(best.score * 100)}%`;
+    text.append(mine, theirs, score);
+    row.appendChild(text);
+    const actions = document.createElement('div');
+    actions.className = 'review-actions';
+    const mk = (label, cls, value) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn ' + cls;
+      b.textContent = label;
+      b.onclick = () => { backfill.resolveReview = null; box.hidden = true; resolve(value); };
+      return b;
+    };
+    const accept = mk('Accept', 'btn-primary', 'accept');
+    actions.append(accept, mk('Skip', 'btn-ghost', 'skip'), mk('Skip all remaining', 'btn-ghost', 'skipall'));
+    box.append(row, actions);
+    box.hidden = false;
+    backfill.resolveReview = resolve;
+    accept.focus();
+  });
+}
+
+async function backfillUnlinked(items) {
+  if (!items.length || backfill.cancelled) return;
+  const handle = (state.settings.poshmarkCloset || '').trim().replace(/^@/, '');
+  if (!handle) {
+    backfillLog(`${items.length} item${items.length === 1 ? '' : 's'} with no listing link: no Poshmark closet username is set. Add it in Settings, under Photos, and run this again.`, 'skip');
+    backfill.stats.skipped += items.length;
+    return;
+  }
+  const li = backfillLog(`Loading the closet "${handle}"`, 'busy');
+  let closet = null;
+  try {
+    const res = await fetch(`${LISTING_WORKER_URL}/poshmark/closet?user=${encodeURIComponent(handle)}&availability=all`);
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) closet = data;
+    else backfillLogSet(li, `could not load the closet: ${data.message || 'lookup failed (' + res.status + ')'}. Check the username in Settings and try again.`, 'fail');
+  } catch (err) {
+    backfillLogSet(li, 'could not reach the lookup service to load the closet. Check your connection and try again.', 'fail');
+  }
+  if (!closet) { backfill.stats.failed += items.length; return; }
+  const note = closet.truncated ? ' The list was cut short, so a few items may not match.' : '';
+  backfillLogSet(li, `closet loaded, ${closet.count != null ? closet.count : (closet.listings || []).length} listings.${note}`, 'note');
+
+  // A closet listing already linked to another item is not a candidate.
+  const linkedText = state.items.map(i => i.url_poshmark || '').join(' ');
+  let cands = (closet.listings || [])
+    .filter(c => c && c.title && !(c.id && linkedText.includes(c.id)))
+    .map(c => ({ c, tokens: titleTokens(c.title) }));
+
+  let skipAll = false;
+  let skippedQuiet = 0;
+  for (const it of items) {
+    if (backfill.cancelled) return;
+    if (skipAll) { backfill.stats.skipped++; skippedQuiet++; continue; }
+    const name = it.name || 'Untitled';
+    const mine = titleTokens(it.name || it.listing_title);
+    const ranked = cands
+      .map(x => ({ c: x.c, ...titleMatch(mine, x.tokens) }))
+      .sort((a, b) => b.score - a.score);
+    const best = ranked[0];
+    const second = ranked[1];
+    if (!best || best.score < BACKFILL_REVIEW_MIN_SCORE) {
+      backfillLog(`${name}: no closet title is close enough`, 'skip');
+      backfill.stats.skipped++;
+      continue;
+    }
+    let accepted = best.score >= BACKFILL_AUTO_SCORE && best.shared >= 2 && (!second || best.score > second.score);
+    if (!accepted) {
+      const choice = await backfillAsk(it, best);
+      if (choice === 'skipall') {
+        skipAll = true;
+        backfill.stats.skipped++;
+        skippedQuiet++;
+        continue;
+      }
+      accepted = choice === 'accept';
+    }
+    if (!accepted) {
+      backfillLog(`${name}: skipped, no match chosen`, 'skip');
+      backfill.stats.skipped++;
+      continue;
+    }
+
+    cands = cands.filter(x => x.c !== best.c);
+    const row = backfillLog(`${name}: linked to "${best.c.title}", fetching photos`, 'busy');
+    const live = state.items.find(i => i.id === it.id);
+    if (!live) continue;
+    live.url_poshmark = best.c.url;
+    live.updated_at = nowISO();
+    saveState();
+    backfill.stats.linked++;
+    await sleep(BACKFILL_DELAY_MS);
+    let urls = [];
+    try {
+      const r = await fetchListing(best.c.url);
+      if (r.ok) urls = (r.item.photos || []).slice(0, BACKFILL_MAX_PHOTOS);
+    } catch (err) { /* fall back to the closet cover below */ }
+    if (!urls.length && best.c.cover) urls = [best.c.cover];
+    const added = urls.length ? await backfillAttachPhotos(it.id, urls) : 0;
+    if (added) {
+      backfillLogSet(row, `${name}: linked, ${added} photo${added === 1 ? '' : 's'}`, 'ok');
+      backfill.stats.photos += added;
+    } else {
+      cloudSaveItemSafe(live); // the link itself still needs to reach the cloud
+      backfillLogSet(row, `${name}: linked, but the photos could not be downloaded`, 'fail');
+      backfill.stats.failed++;
+    }
+    await sleep(BACKFILL_DELAY_MS);
+  }
+  if (skippedQuiet) backfillLog(`${skippedQuiet} remaining item${skippedQuiet === 1 ? '' : 's'} skipped at your request`, 'skip');
+}
+
+async function runBackfill() {
+  if (backfill.running) return;
+  backfill.running = true;
+  backfill.cancelled = false;
+  const start = document.getElementById('backfillStart');
+  start.disabled = true;
+  document.getElementById('backfillLog').textContent = '';
+  try {
+    // Scan again: a re-run only sees items that still have no photos.
+    const { linked, unlinked } = scanMissingPhotos();
+    setBackfillStep('linked');
+    await backfillLinked(linked);
+    if (!backfill.cancelled) {
+      setBackfillStep('unlinked');
+      await backfillUnlinked(unlinked);
+    }
+    render();
+    if (!backfill.cancelled) {
+      setBackfillStep('summary');
+      const s = backfill.stats;
+      const sum = document.getElementById('backfillSummary');
+      sum.textContent = `Photos added: ${s.photos}. Items linked: ${s.linked}. Skipped: ${s.skipped}. Failed: ${s.failed}.` +
+        (s.skipped || s.failed ? ' Run it again any time: items that now have photos are left alone.' : '');
+      sum.hidden = false;
+      backfill.done = true;
+      start.textContent = 'Done';
+      start.disabled = false;
+      document.getElementById('backfillCancel').hidden = true;
+      start.focus();
+    }
+  } finally {
+    backfill.running = false;
+  }
+}
+
 // ============ SETTINGS ============
 function openSettings() {
   // Refresh the dynamic fields each open
@@ -1986,6 +2578,17 @@ function openSettings() {
     wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. Your cloud data is <strong>not</strong> touched, so your items come back when you sign in again.';
   } else {
     wipeNote.innerHTML = 'Clears items, settings, and demo flag from this device\'s localStorage. <strong>Cannot be undone</strong> for guest data. Export a JSON backup first if you want to keep it.';
+  }
+  const closetInput = document.getElementById('poshmarkClosetInput');
+  if (closetInput) closetInput.value = state.settings.poshmarkCloset || '';
+  const findBtn = document.getElementById('findPhotosBtn');
+  const findNote = document.getElementById('findPhotosNote');
+  if (findBtn && findNote) {
+    findBtn.disabled = state.demoMode;
+    findNote.hidden = !state.demoMode;
+    findNote.textContent = state.demoMode
+      ? 'Switched off in demo mode: the sample items already have photos and nothing is saved. Exit the demo to use it on your own items.'
+      : '';
   }
   document.getElementById('settingsModal').classList.add('open');
 }
@@ -2365,6 +2968,27 @@ function init() {
   if (reenableDemoBtn) reenableDemoBtn.onclick = reenableDemoOnNextVisit;
   const wipeLocalBtn = document.getElementById('wipeLocalBtn');
   if (wipeLocalBtn) wipeLocalBtn.onclick = wipeLocalData;
+  const closetInput = document.getElementById('poshmarkClosetInput');
+  if (closetInput) closetInput.addEventListener('input', () => {
+    state.settings.poshmarkCloset = closetInput.value.trim().replace(/^@/, '');
+    saveState();
+  });
+  const findPhotosBtn = document.getElementById('findPhotosBtn');
+  if (findPhotosBtn) findPhotosBtn.onclick = openPhotoBackfill;
+
+  // Mark sold and photo backfill modals: like the editor, no backdrop close.
+  // X, Cancel, Save/Done, or Escape.
+  document.getElementById('soldClose').onclick = closeSoldModal;
+  document.getElementById('soldCancel').onclick = closeSoldModal;
+  document.getElementById('soldForm').onsubmit = submitSold;
+  document.getElementById('soldPlatform').addEventListener('change', () => {
+    syncSoldPlatformGlow();
+    document.getElementById('soldError').hidden = true;
+  });
+  document.getElementById('soldPrice').addEventListener('input', () => { document.getElementById('soldError').hidden = true; });
+  document.getElementById('backfillClose').onclick = closeBackfill;
+  document.getElementById('backfillCancel').onclick = closeBackfill;
+  document.getElementById('backfillStart').onclick = () => { if (backfill.done) closeBackfill(); else runBackfill(); };
 
   // Demo mode buttons + ?demo=1 URL param + auto-demo on first visit
   const tryDemoBtn = document.getElementById('tryDemoBtn');
@@ -2595,7 +3219,7 @@ function init() {
     setTimeout(() => document.getElementById('ebayImportInput').focus(), 150);
   };
   document.getElementById('ebayImportBtn').onclick = () => {
-    importFromEbay(document.getElementById('ebayImportInput').value);
+    importFromListing(document.getElementById('ebayImportInput').value);
   };
   document.getElementById('ebayImportInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('ebayImportBtn').click(); }
@@ -2615,6 +3239,7 @@ function init() {
     if (e.key === 'Escape') {
       closeScanner();
       if (document.getElementById('itemModal').classList.contains('open')) closeEditor();
+      if (document.getElementById('photoBackfillModal').classList.contains('open')) closeBackfill();
       document.querySelectorAll('.modal.open').forEach(m => m.classList.remove('open'));
     }
     if ((e.metaKey || e.ctrlKey) && e.key === 'n' && !document.querySelector('.modal.open')) {
