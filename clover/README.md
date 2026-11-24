@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.165 — Entries are filed by their own date, not the year you are viewing
+
+A bug: adding income while looking at the 2025 list saved it into 2025 even when
+you dated it 2026. The entry kept its real date but lived in the wrong year, so
+it showed up under the wrong tab and counted toward the wrong year totals.
+
+Income, expenses and paychecks now go to the year of their own date. If that is
+not the year on screen, the confirmation says where it went, so nothing appears
+to vanish. Changing an entry date to a different year now moves it properly
+instead of leaving a copy behind, and converting a bill to a one-off expense
+files it under today, not the year you happened to be viewing.
+
+**To fix an entry already filed wrong:** open it, change nothing, and press
+Save. It moves itself to the correct year and clears out of the old one.
+
+## Changelog
+
 ### v1.0.164 — What each bill has actually cost you
 
 Bills & Subscriptions has two new columns: **Spent YTD** and **Spent lifetime**.

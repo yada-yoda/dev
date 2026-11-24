@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.164';
+const VERSION = '1.0.165';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -935,9 +935,10 @@ function recurringToExpense(rec) {
     categoryId: rec.categoryId || '', subId: rec.subId || '', amount: Number(rec.amount) || 0,
     accountId: rec.accountId || '', personId: rec.personId, notes: rec.notes || '', checkNo: rec.checkNo || ''
   };
-  store.saveExpense(activeYear, exp);
+  // Dated today, so it belongs to today's year even if an older year is on screen.
+  const y = saveIntoDateYear({ date: exp.date, save: yr => store.saveExpense(yr, exp) });
   store.removeRecurring(rec.id);
-  toast('Converted to a one-off expense');
+  toast(y !== activeYear ? 'Converted to a one-off expense in ' + y : 'Converted to a one-off expense');
 }
 // kind: 'expense' (an expensePayment) or 'recurring' (a bill or placeholder).
 function convertModal(kind, item) {
@@ -3188,8 +3189,16 @@ function incomeModal(existing) {
         distType: fRetType.value.trim(), payer: fPayer.value.trim(), fromAccountId: fFromAcct.value || '',
         fedWithheld: fFedWh.value === '' ? null : parseFloat(fFedWh.value), stateWithheld: fStateWh.value === '' ? null : parseFloat(fStateWh.value)
       });
-      store.saveIncome(activeYear, entry);
-      toast(incIsEdit ? 'Income updated' : 'Income added');
+      const y = saveIntoDateYear({
+        date: entry.date, id: entry.id, livesIn: incIsEdit ? activeYear : 0,
+        save: yr => store.saveIncome(yr, entry),
+        remove: yr => store.removeIncome(yr, entry.id)
+      });
+      // Say where it went when that is not the year on screen, so an entry
+      // does not just vanish from the list you are looking at.
+      toast(y !== activeYear
+        ? (incIsEdit ? 'Income updated and moved to ' : 'Income added to ') + y
+        : (incIsEdit ? 'Income updated' : 'Income added'));
     }
   });
 }
@@ -4904,8 +4913,14 @@ function expenseModal(existing) {
         gallons: fuelOn ? (parseFloat(fGallons.value) || '') : '',
         pricePerGallon: fuelOn ? (parseFloat(fPpg.value) || '') : ''
       });
-      store.saveExpense(activeYear, entry);
-      toast(isEdit ? 'Expense updated' : 'Expense added');
+      const y = saveIntoDateYear({
+        date: entry.date, id: entry.id, livesIn: isEdit ? activeYear : 0,
+        save: yr => store.saveExpense(yr, entry),
+        remove: yr => store.removeExpense(yr, entry.id)
+      });
+      toast(y !== activeYear
+        ? (isEdit ? 'Expense updated and moved to ' : 'Expense added to ') + y
+        : (isEdit ? 'Expense updated' : 'Expense added'));
     }
   });
 }
@@ -5144,6 +5159,20 @@ function buildPaycheckCol(store, key) {
 function paycheckColumnsModal() { tableColumnsModal('paychecks', PAYCHECK_ALL_COLS, PAYCHECK_DEFAULT_COLS, PAYCHECK_COL_LABELS, 'Paycheck columns'); }
 
 function isPaycheckPaid(p) { return !!p.receivedDate && p.status !== 'Bounced/Returned' && p.status !== 'Missing'; }
+// An entry belongs to the year of its own date, never the year being viewed.
+// Saving to the viewed year filed a 2026-dated entry into the 2025 document.
+// `livesIn` is where the record is TODAY (the year document it was loaded
+// from), which for anything filed before this fix is not always its date's
+// year, so that is what gets cleaned up when the date moves it.
+function saveIntoDateYear(opts) {
+  const store = window.cloverStore;
+  const newYear = +String(opts.date || todayISO()).slice(0, 4);
+  if (!newYear) { opts.save(activeYear); return activeYear; }
+  if (opts.livesIn && opts.id && newYear !== opts.livesIn) opts.remove(opts.livesIn);
+  const doSave = () => opts.save(newYear);
+  if (store.isYearLoaded(newYear)) doSave(); else store.loadYear(newYear).then(doSave);
+  return newYear;
+}
 function yearOfPaycheck(p) { const m = /^(\d{4})/.exec((p && p.payDate) || ''); return m ? +m[1] : activeYear; }
 function paycheckDaysLate(p) {
   if (!p.payDate || !p.receivedDate) return null;
@@ -5474,12 +5503,15 @@ function paycheckModal(existing) {
         periodStart: fPeriodStart.value || '', periodEnd: fPeriodEnd.value || '',
         status: fStatus.value, method: fMethod.value, checkNo: fCheckNo.value.trim(), checkType: fKind.value, notes: fNotes.value.trim()
       });
-      // A paycheck belongs to the year of its pay date, not whatever year is
-      // being viewed — this keeps All-view edits and cross-year adds correct.
-      const y = yearOfPaycheck(entry);
-      const doSave = () => store.savePaycheck(y, entry);
-      if (store.isYearLoaded(y)) doSave(); else store.loadYear(y).then(doSave);
-      toast(isEdit ? 'Paycheck updated' : 'Paycheck added');
+      const y = saveIntoDateYear({
+        date: entry.payDate, id: entry.id,
+        livesIn: isEdit ? yearOfPaycheck(existing) : 0,
+        save: yr => store.savePaycheck(yr, entry),
+        remove: yr => store.removePaycheck(yr, entry.id)
+      });
+      toast(y !== activeYear
+        ? (isEdit ? 'Paycheck updated and moved to ' : 'Paycheck added to ') + y
+        : (isEdit ? 'Paycheck updated' : 'Paycheck added'));
     }
   });
 }
