@@ -302,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.91.1';
+const APP_VERSION = 'v0.91.2';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3883,7 +3883,9 @@ function promptAddDog(){
 }
 function setLogSubtab(t){ logSubtab = t; render(); }
 function setCareSubtab(t){ careSubtab = t; render(); }
-function setSuppliesCat(c, enc){ suppliesCat = enc ? decodeURIComponent(c) : c; render(); }
+// Switching category starts fresh: a leftover status or brand/store filter could otherwise hide
+// every item in the new tab (e.g. "In use" + Clothing, where clothing is usually one-time).
+function setSuppliesCat(c, enc){ suppliesCat = enc ? decodeURIComponent(c) : c; suppliesStatus = 'all'; suppliesFilter = null; render(); }
 function setSuppliesStatus(s){ suppliesStatus = s; render(); }
 // Supplies column sort — text sorts ascending first, cost/date descending first; same column toggles direction.
 const SUP_SORTS = [{k:'name',l:'Item',t:'text'},{k:'brand',l:'Brand',t:'text'},{k:'store',l:'Store',t:'text'},{k:'category',l:'Category',t:'text'},{k:'cost',l:'Cost',t:'num'},{k:'purchaseDate',l:'Purchased',t:'date'},{k:'status',l:'Status',t:'status'}];
