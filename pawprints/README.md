@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.91.2**
+**Current Version: v0.92.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -45,7 +45,8 @@ covers both.
   info card" vCard for handing off to a sitter
 - **Emergency card** — a link + QR code (Profile → 🆘 Emergency card) to a no-sign-in page with
   the dog's photo, who-he-is facts, feeding worked out from the logs and routine, meds, medical
-  notes and vet / emergency-vet numbers. It's a snapshot stored by `pawprints-worker`
+  notes, the people to call if you can't be reached (Contacts typed "Emergency Contact", up to
+  4) and vet / emergency-vet numbers. It's a snapshot stored by `pawprints-worker`
   (`POST`/`DELETE /emergency`, served at `/e/<token>`); Update re-uploads to the same link,
   Turn off kills it
 - **Calendar** — a month view of every dated item (vet, follow-ups, grooming + next-due, med
@@ -97,6 +98,7 @@ covers both.
 
 ## Version History
 
+- **v0.92.0** — The emergency card now lists the people to call when you can't be reached. Anyone saved in Contacts as an "Emergency Contact" (up to 4, with their note, like "neighbor, has a spare key") rides along on the next Update, each with a Call button on the card page. The card modal shows who's included, or a hint on how to add someone.
 - **v0.91.2** — Switching to a category tab in Supplies now clears any status or brand/store filter that was still on, so a Clothing item marked one-time can't look missing from its own tab.
 - **v0.91.1** — The Clothing size box in the supply form now takes half the width instead of stretching all the way across, since it only ever holds short sizes like "M" or "20 in chest".
 - **v0.91.0** — **See when things were bought, and hide the columns you don't use.** The Supplies list now has its own Purchased column, so you can see at a glance when each item was bought and sort by it from the header. A new Columns button next to the sort controls lets you switch off any column you don't care about (Brand, Store, Category, Cost, Purchased or Status); your choice is remembered and follows you to your other devices, and Reset brings everything back. If you hide Purchased, the date moves back under the item name so it never disappears. The "Where" column is now called "Store", which says what it actually holds (the spreadsheet export uses the same name). Supply items also get two optional fields, Manufacturer and Model / part #, for when the maker differs from the brand or you need the exact replacement part, filter or accessory. Both are searchable and included in the spreadsheet export, and the model number shows quietly under the item name. The "Paid by" box on supplies, vet visits and grooming now remembers who has paid before: pick a past person from the list in one tap, or just type a new name and it's offered next time. People viewing a shared dog can hide columns too; it just isn't saved for them.

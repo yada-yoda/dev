@@ -302,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.91.2';
+const APP_VERSION = 'v0.92.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3345,6 +3345,15 @@ function emergencyFeeding(){
   if(treats) lines.push(treats);
   return { food, perMeal, mealsPerDay, treats, lines };
 }
+// People to call when the owner can't be reached: every Contacts entry typed
+// "Emergency Contact", in stored order (newest first), capped at 4 so the card stays short.
+function emergencyPeople(){
+  return (data.contacts||[])
+    .filter(c => c && /^emergency contact$/i.test(String(c.role||'').trim()))
+    .map(c => ({ name:String(c.name||'').trim(), phone:String(c.phone||'').trim(), note:String(c.notes||'').trim() }))
+    .filter(x => x.name || x.phone)
+    .slice(0, 4);
+}
 function buildEmergencyCard(){
   const p = activePet(); if(!p) return null;
   const w = latestWeight();
@@ -3364,7 +3373,7 @@ function buildEmergencyCard(){
       return m.name+(m.kind?' ('+m.kind+')':'')+(parts.length?' — '+parts.join(', '):'');
     }),
     medical: { notes: p.notes||'', ongoing: '' },
-    contacts: { owner: String((data.settings||{}).emergencyOwnerLine||'').trim(), vet: null, emergencyVet: null }
+    contacts: { owner: String((data.settings||{}).emergencyOwnerLine||'').trim(), vet: null, emergencyVet: null, people: emergencyPeople() }
   };
   const ill = petArr('illnesses').filter(e => !e.recovery).sort((a,b)=>String(b.start||'').localeCompare(String(a.start||'')))[0];
   if(ill) card.medical.ongoing = 'Ongoing: '+(ill.diagnosis || (ill.symptoms||[]).join(', ') || 'illness')+(ill.start?' (since '+fmtDate(ill.start)+')':'');
@@ -3376,6 +3385,15 @@ function buildEmergencyCard(){
   if(typeof p.photo === 'string' && p.photo.startsWith('data:image/') && p.photo.length < EMERGENCY_PHOTO_MAX) card.photo = p.photo;
   return card;
 }
+// Shows who rides along on the card, so the owner knows whether a backup person is listed.
+function emergencyPeopleNote(){
+  const people = emergencyPeople();
+  if(!people.length) return '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px">No emergency contacts yet — add people under Profile → Contacts with the type “Emergency Contact”, then tap Update here.</p>';
+  return '<div class="label">People to call if you can’t be reached'+tip('Taken from Profile → Contacts entries typed “Emergency Contact” (up to 4). The card is a snapshot, so tap Update after changing them.')+'</div>'
+    + '<ul style="font-size:13px;margin:0 0 14px;padding-left:18px">'
+    + people.map(x => '<li>'+esc(x.name||'(no name)')+(x.phone?' · '+esc(x.phone):'')+'</li>').join('')
+    + '</ul>';
+}
 function emergencyModal(){
   if(denyEmergencyShared()) return;
   if(denyManage()) return;
@@ -3383,7 +3401,8 @@ function emergencyModal(){
   const st = emergencyState(p.id);
   const ownerLine = (data.settings||{}).emergencyOwnerLine || '';
   const ownerField = '<label class="label" for="er-owner">Your contact line'+tip('Shown at the top of Contacts so whoever has '+(p.name||'your dog')+' can reach you. Leave it blank to show only the vets.')+'</label>'
-    + '<input class="input" id="er-owner" maxlength="160" value="'+esc(ownerLine)+'" placeholder="e.g. Sam · 555-123-4567">';
+    + '<input class="input" id="er-owner" maxlength="160" value="'+esc(ownerLine)+'" placeholder="e.g. Sam · 555-123-4567">'
+    + emergencyPeopleNote();
   let html = '<h3>🆘 Emergency card</h3>';
   if(!st){
     html += '<p style="font-size:14px;color:var(--text-secondary);margin:0 0 14px">Makes a link and QR code to a page with '+esc(p.name)+'’s photo, food, meds, medical notes and vet numbers. Anyone with the link can see it, no sign-in needed. You can turn it off anytime.</p>'
@@ -5825,6 +5844,7 @@ function enterDemo(){
     contacts: [
       { id:'c1', role:'Vet', name:'Dr. Patel', org:'Riverside Animal Hospital', phone:'(555) 012-3456', email:'care@riversideah.example', address:'420 River Rd, Springfield, IL 62704', website:'https://riversideah.example', notes:'Ask for the established-patient line' },
       { id:'c2', role:'Emergency Vet', name:'', org:'Springfield Animal ER (24/7)', phone:'(555) 911-7387', email:'', address:'9 Hospital Dr, Springfield, IL 62701', website:'', notes:'Open nights & weekends' },
+      { id:'c4', role:'Emergency Contact', name:'Alex R.', org:'', phone:'(555) 234-8890', email:'', address:'', website:'', notes:'Neighbor — has a spare key' },
       { id:'c3', role:'Groomer', name:'', org:'Soapy Paws', phone:'(555) 778-2200', email:'hello@soapypaws.example', address:'88 Maple Ave, Springfield, IL 62704', website:'', notes:'Biscuit likes the blueberry shampoo' },
     ],
     gcalEvents: {}, settings: { feedGoal:'3', feedGoalUnit:'cups' }
