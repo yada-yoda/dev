@@ -5,7 +5,7 @@
 // sections render navigable placeholders until their phase.
 // ============================================================
 
-const VERSION = '1.0.165';
+const VERSION = '1.0.166';
 
 // Owner allowlist (client-side convenience gate). The REAL security
 // boundary is firestore.rules — this only improves UX by showing a
@@ -2561,9 +2561,36 @@ function attnWhenEmpty(sel) {
 // Account <option>s for modals — always alphabetical, however accounts were added.
 // Account dropdown grouped by type: an <optgroup> per account type (in the
 // ACCOUNT_TYPES order), alphabetical within each group.
+// Cash spending had nowhere to go: every picker lists accounts, and notes in
+// your pocket are not one. Rather than special-case a fake id through the ~50
+// places that read accountId, picking Cash creates a real "Cash" account the
+// first time it is used, so filters, badges and totals treat it like any other.
+const CASH_OPT = '__cash';
+function cashAccount(s) {
+  return (s.accounts || []).find(a => /^cash$/i.test((a.name || '').trim()));
+}
+function resolveAccountId(id) {
+  if (id !== CASH_OPT) return id;
+  const store = window.cloverStore;
+  const found = cashAccount(store.state);
+  if (found) return found.id;
+  const acc = store.saveAccount({
+    name: 'Cash', type: 'Cash / Sweep', active: true, usedForExpenses: true,
+    notes: 'Cash on hand. Added automatically the first time something was paid in cash.'
+  });
+  toast('Added a Cash account to track cash spending');
+  return (acc && acc.id) || '';
+}
 function accountSelect(s, value, noneLabel) {
   const sel = document.createElement('select');
   const o0 = el('option'); o0.value = ''; o0.textContent = noneLabel || '—'; sel.appendChild(o0);
+  // Only when there is no Cash account yet, otherwise the real one is already
+  // listed below and two identical entries would be confusing.
+  if (!cashAccount(s)) {
+    const oc = el('option'); oc.value = CASH_OPT; oc.textContent = 'Cash';
+    if (value === CASH_OPT) oc.selected = true;
+    sel.appendChild(oc);
+  }
   const groups = new Map();
   s.accounts.slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''))
     .forEach(a => { const t = a.type || 'Other'; if (!groups.has(t)) groups.set(t, []); groups.get(t).push(a); });
@@ -3178,7 +3205,7 @@ function incomeModal(existing) {
       const net = fNet.value !== '' ? parseFloat(fNet.value) : (/reward/i.test(catName) ? gross : null);
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), categoryId: fCat.value, subId: fSub.value || '',
-        accountId: fAcct.value || '', personId: fPerson.value, gross,
+        accountId: resolveAccountId(fAcct.value) || '', personId: fPerson.value, gross,
         net, status: fStatus.value,
         expectedDate: fExpected.value || '', receivedVia: fVia.value.trim(), taxable: fTax.value,
         reinvested: cReinv.__input.checked, paidOut: cPaid.__input.checked, notes: fNotes.value.trim(),
@@ -3186,7 +3213,7 @@ function incomeModal(existing) {
         qty: fQty.value === '' ? null : parseFloat(fQty.value), price: fPrice.value === '' ? null : parseFloat(fPrice.value),
         rewardSource: (fRwSel.value === '__other' ? fRwOther.value : fRwSel.value).trim(), rewardType: rwTypeVal(), orderConf: fOrderConf.value.trim(),
         otherType: fOtType.value.trim(), description: fDesc.value.trim(),
-        distType: fRetType.value.trim(), payer: fPayer.value.trim(), fromAccountId: fFromAcct.value || '',
+        distType: fRetType.value.trim(), payer: fPayer.value.trim(), fromAccountId: resolveAccountId(fFromAcct.value) || '',
         fedWithheld: fFedWh.value === '' ? null : parseFloat(fFedWh.value), stateWithheld: fStateWh.value === '' ? null : parseFloat(fStateWh.value)
       });
       const y = saveIntoDateYear({
@@ -4106,6 +4133,7 @@ const HELP_SECTIONS = [
       'Annual grid totals spending by category — with your recurring bills rolled in — and List shows each logged expense.',
       'The grid’s “Year total” column adds up every month in the row, and with bills rolled in the months that haven’t happened yet are estimates — so it’s a full-year forecast, not a year-to-date figure. The dashboard’s “Expenses by category (YTD)” donut is the year-to-date view, which is why the two differ.',
       'Stat cards show income, what you’ve spent, your monthly bills, and what’s left after everything.',
+      'Paid with cash? Pick Cash in Paid from. The first time you do, Clover adds a Cash account for you, so cash spending sorts and totals like everything else instead of sitting outside your accounts.',
       'Each expense can carry a description, vendor, and (for parking/tolls) the day it applied to. Convert an expense into a recurring bill or budget placeholder from its row.',
       'In List view, search by vendor, description, notes, category, account, person, or amount — e.g. type “Supercuts” to see every visit and when the last one was. Searching spans the whole selected year (the month selector is ignored while a search is active), and the top-right search box does the same thing. Look in another year up top if the purchase was earlier.',
       'Picking Auto → Fuel adds Gallons and Price / gallon fields. Fill both and the Amount works itself out; the pump price keeps its third decimal (3.499, not 3.50) so it ties out to the receipt. Both are available as optional columns in List view.',
@@ -4373,7 +4401,7 @@ function subscriptionModal(existing) {
       const item = Object.assign(r, {
         name, vendor: fVendor.value.trim(), categoryId: fCat.value, subId: fSub.value || '',
         amount, frequency: fFreq.value, interval: isN ? (parseInt(fInterval.value, 10) || 1) : null,
-        renewalDate: fRenew.value || '', notPaidYear: cPaidYr.__input.checked ? null : new Date().getFullYear(), accountId: fAcct.value || '', backupAccountId: fBackup.value || '',
+        renewalDate: fRenew.value || '', notPaidYear: cPaidYr.__input.checked ? null : new Date().getFullYear(), accountId: resolveAccountId(fAcct.value) || '', backupAccountId: resolveAccountId(fBackup.value) || '',
         personId: fPerson.value, priority: fPriority.value, status: fStatus.value, autoPay: cAuto.__input.checked, budgetEst: cBudget.__input.checked,
         url: fUrl.value.trim(), payUrl: fPayUrl.value.trim(), customerNo: fCust.value.trim(), checkNo: fSubCheckNo.value.trim(),
         apr: fApr.value === '' ? null : parseFloat(fApr.value), notes: fNotes.value.trim(), priceHistory: hist
@@ -4796,7 +4824,7 @@ function expenseModal(existing) {
     forField.style.display = (park || toll || e.forDate) ? '' : 'none';
     forLbl.nodeValue = toll && !park ? 'Toll issued day' : park ? 'Parking day' : 'Applies to (day)';
   };
-  const ACCT_HINT = 'The account or card the money came OUT of — e.g. Chase Checking, or Amex ••1234 if you put it on a card.';
+  const ACCT_HINT = 'The account or card the money came OUT of — e.g. Chase Checking, or Amex ••1234 if you put it on a card. Paid in notes or coins? Pick Cash and Clover keeps a Cash account for you.';
   const ACCT_HINT_TRANSFER = 'The account the money came OUT of — e.g. the checking account your paycheck was deposited into.';
   const acctField = field('Paid from', fAcct, ACCT_HINT);
   body.appendChild(acctField);
@@ -4868,7 +4896,10 @@ function expenseModal(existing) {
   // the account's type, and the description writes itself.
   const SUB_BY_ACCT_TYPE = { 'Brokerage': 'Brokerage', 'Retirement': 'Retirement / IRA', 'Savings': 'Other savings', 'Money Market': 'Other savings', 'CD': 'Other savings', 'Cash / Sweep': 'Other savings' };
   fToAcct.addEventListener('change', () => {
-    const acct = store.account(fToAcct.value);
+    // Cash is not a saved account until it is used, so stand in for it here
+    // rather than skipping the auto-fill and leaving the fields blank.
+    const acct = store.account(fToAcct.value)
+      || (fToAcct.value === CASH_OPT ? { name: 'Cash', type: 'Cash / Sweep' } : null);
     if (!acct || !isTransferCat()) return;
     if (!fSub.value) {
       const want = SUB_BY_ACCT_TYPE[acct.type];
@@ -4907,7 +4938,7 @@ function expenseModal(existing) {
       const entry = Object.assign(e, {
         date: fDate.value || todayISO(), title: fTitle.value.trim(), vendor: fVendor.value.trim(),
         forDate: fForDate.value || '', categoryId: fCat.value, subId: fSub.value || '',
-        accountId: fAcct.value || '', toAccountId: isTransferCat() ? (fToAcct.value || '') : '',
+        accountId: resolveAccountId(fAcct.value) || '', toAccountId: isTransferCat() ? (resolveAccountId(fToAcct.value) || '') : '',
         personId: fPerson.value, amount, checkNo: fExpCheckNo.value.trim(), notes: fNotes.value.trim(),
         recurringId: fBill.value || '',
         gallons: fuelOn ? (parseFloat(fGallons.value) || '') : '',
@@ -8892,7 +8923,7 @@ function dividendReviewCard(store) {
 
   const optRow = el('div', 'io-actions');
   const acctSel = attnWhenEmpty(accountSelect(s, st.accountId, '— no account —'));
-  acctSel.addEventListener('change', () => { st.accountId = acctSel.value; renderView(currentRoute); });
+  acctSel.addEventListener('change', () => { st.accountId = resolveAccountId(acctSel.value); renderView(currentRoute); });
   optRow.appendChild(labelWrap('Record dividends under', acctSel));
   card.appendChild(optRow);
   card.appendChild(el('p', 'muted', 'This tags every imported dividend as belonging to one of YOUR Clover accounts (e.g. your brokerage account on the Accounts page). The broker’s file doesn’t say which internal account paid — if you keep more than one account at this broker, either import the whole file under one Clover account, or run the import twice with separate per-account exports if the broker offers them.'));
@@ -8966,7 +8997,7 @@ function dividendReviewCard(store) {
     card.appendChild(el('p', 'muted', 'Interest paid by the broker’s cash / sweep account (e.g. the insured money market). These import as Interest income.' + (skippedInt ? ' ' + skippedInt + ' already recorded for the account picked below will be skipped automatically.' : '')));
     const iAcctRow = el('div', 'io-actions');
     const iAcctSel = attnWhenEmpty(accountSelect(s, st.intAccountId || '', '— no account —'));
-    iAcctSel.addEventListener('change', () => { st.intAccountId = iAcctSel.value; renderView(currentRoute); });
+    iAcctSel.addEventListener('change', () => { st.intAccountId = resolveAccountId(iAcctSel.value); renderView(currentRoute); });
     iAcctRow.appendChild(labelWrap('Record interest under', iAcctSel));
     card.appendChild(iAcctRow);
     card.appendChild(el('p', 'muted', 'Which of YOUR Clover accounts this interest belongs to — often the money market / cash-sweep account itself, which may be a different account than the brokerage the dividends go under.'));

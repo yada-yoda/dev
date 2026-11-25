@@ -45,6 +45,23 @@ computed client-side; nothing derived is stored.
 
 ## Changelog
 
+### v1.0.166 — Pay with cash
+
+Every account picker now offers **Cash**, so money out of your pocket has
+somewhere to go. It shows up in Paid from on an expense, on income, on a bill,
+and in the CSV import.
+
+The first time you pick it, Clover quietly adds a real Cash account (type
+Cash / Sweep) and tells you it did. That matters: because it is a real account
+rather than a special case, cash spending filters, sorts, colours and totals
+exactly like every other account. After that, the Cash option disappears from
+the list because the real account is already there, so you never see two.
+
+If you already keep an account called Cash, that one is used and nothing new is
+created.
+
+## Changelog
+
 ### v1.0.165 — Entries are filed by their own date, not the year you are viewing
 
 A bug: adding income while looking at the 2025 list saved it into 2025 even when
