@@ -119,7 +119,10 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 .sup-table tbody tr:hover{background:var(--bg-tertiary)}
 .sup-table td.sup-mono{font-family:'JetBrains Mono',monospace;color:var(--success);white-space:nowrap}
 .sup-table td.sup-act{white-space:nowrap;text-align:right}
-.sup-sortbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sup-toolbar{display:flex;align-items:flex-start;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.sup-sortbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1 1 auto;min-width:0}
+.sup-sortbar .range-seg{flex-shrink:1;min-width:0}
+.sup-colbtn{margin-left:auto;white-space:nowrap}
 @media(min-width:721px){.sup-sortbar{display:none}}
 @media(max-width:720px){
   .sup-table thead{display:none}
@@ -299,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.90.0';
+const APP_VERSION = 'v0.91.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -408,6 +411,26 @@ function stoolOptions(){ const c = (data.settings && data.settings.customStoolTy
 // "Where purchased" suggestions: every store used on a past supply purchase joins automatically
 // (minus any the user hid in Settings), plus custom additions from the Settings list.
 function usedStores(){ return [...new Set((data.inventory||[]).map(i=>(i.store||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b)); }
+// Everyone who has paid for anything (supplies, vet visits, grooming), deduped case-insensitively
+// keeping the first-seen spelling, sorted A-Z.
+function paidByOptions(){
+  const seen = new Map();
+  [data.inventory, data.vetVisits, data.grooming].forEach(arr => (arr||[]).forEach(r => {
+    const v = (r && typeof r.paidBy === 'string') ? r.paidBy.trim() : '';
+    if(v && !seen.has(v.toLowerCase())) seen.set(v.toLowerCase(), v);
+  }));
+  return [...seen.values()].sort((a,b)=>a.localeCompare(b, undefined, {sensitivity:'base'}));
+}
+// "Paid by" field for any payment block: free typing adds a new person; past people come from a
+// datalist plus a one-tap picker (same pattern as the store field). Plain input when nobody's saved yet.
+function paidByField(inputId, value){
+  const opts = paidByOptions();
+  if(!opts.length) return '<label class="label">Paid by</label><input class="input" id="'+inputId+'" value="'+esc(value||'')+'" placeholder="You / partner / etc.">';
+  return '<label class="label">Paid by'+tip('Type a name or pick someone you\'ve used before — anyone you enter once shows up here next time.')+'</label>'
+    + '<input class="input" id="'+inputId+'" list="'+inputId+'-list" autocomplete="off" value="'+esc(value||'')+'" placeholder="You / partner / etc.">'
+    + '<datalist id="'+inputId+'-list">'+opts.map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'
+    + savedPick(inputId, opts, 'Pick a past person');
+}
 function storeOptions(){ const c = (data.settings && data.settings.customStores) || []; return [...new Set([...notHidden('store', usedStores()), ...c])]; }
 const GROOM_SERVICES = ['Bath','Full groom','Haircut','Nail trim','Ear cleaning','Teeth brushing','De-shedding','Anal glands','Flea bath'];
 function groomServiceOptions(){ const c = (data.settings && data.settings.customGroomServices) || []; return [...new Set([...notHidden('groomservice', GROOM_SERVICES), ...c])]; }
@@ -1819,7 +1842,7 @@ async function exportXLSX(){
   add('Meds', ['Dog','Name','Type','Dose','Given by','Every (days)','Last given','Time','Next due','Record #','Notes'], data.meds.map(m => [nm(m.petId),m.name,m.kind,(m.dose||''),(m.givenBy||''),m.intervalDays,m.lastGiven,(m.time?fmtClock(m.time):''),medNextDue(m),(m.recordNo||''),m.notes].map(clean)));
   add('Records', ['Dog','Type','Vaccine type','Tested for','Result','Name','Record #','Date','Time','Vet','Clinic','Address','Phone','Cost','Next due','Notes'], data.records.map(r => [nm(r.petId),r.type,(r.vaccineType||''),(r.testedFor||''),(r.result||''),r.name,(r.recordNo||''),r.date,(r.time?fmtClock(r.time):''),(r.vet||''),(r.clinic||r.provider||''),fullAddr(r),(r.phone||''),r.cost,r.nextDue,r.notes].map(clean)));
   add('Illnesses', ['Dog','Started','Recovered','Symptoms','Severity','Diagnosis','Treatment','Notes'], data.illnesses.map(e => [nm(e.petId),e.start,e.recovery,(e.symptoms||[]).join(', '),e.severity,e.diagnosis,e.treatment,e.notes].map(clean)));
-  add('Supplies', ['Dog','Category','Brand','Item','Qty','Unit','Size','Cost','Purchased','Where','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,i.name,i.qty,i.unit,[i.size,i.clothingSize].filter(Boolean).join(' · '),i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
+  add('Supplies', ['Dog','Category','Brand','Manufacturer','Model/part #','Item','Qty','Unit','Size','Cost','Purchased','Store','Paid by','Payment','Card','Started','Finished','Status','Days','UPC','Reorder URL','ASIN','Running low','Notes'], data.inventory.map(i => [nm(i.petId),i.category,i.brand,(i.maker||''),(i.model||''),i.name,i.qty,i.unit,[i.size,i.clothingSize].filter(Boolean).join(' · '),i.cost,i.purchaseDate,i.store,(i.paidBy||''),(i.payMethod||''),(((i.payMethod==='Credit card'||i.payMethod==='Debit card')&&i.ccLast4)?((i.ccBrand?i.ccBrand+' ':'')+'••'+i.ccLast4):''),i.startDate,i.endDate,invStatus(i),(i.startDate?(i.endDate?daysBetween(i.startDate,i.endDate):daysBetween(i.startDate,todayISO())):''),i.upc,(i.reorderUrl||''),(i.asin||''),i.runningLow?'Yes':'',i.notes].map(clean)));
   add('Contacts', ['Type','Name','Business','Phone','Email','Address','Website','Notes'], (data.contacts||[]).map(c => [c.role,c.name,c.org,c.phone,c.email,fullAddr(c),c.website,c.notes].map(clean)));
   add('Journal', ['Dog','When','Type','Title','Entry'], (data.journal||[]).map(n => [nm(n.petId),(n.dateTime?fmtDateTime(n.dateTime):''),JOURNAL_KINDS[journalKind(n)].label,(n.title||''),n.text].map(clean)));
   add('History', ['Time','Action','Entity','Detail','By'], (data.auditLog||[]).map(e => [fmtDateTime(e.ts),cap(e.action),e.entity,e.detail,e.by].map(clean)));
@@ -2811,7 +2834,7 @@ function vetModal(id){
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
     +'<div id="vt-lines"></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="lineAddRow(\'vt\')">+ Add line item</button><span id="vt-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
-    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="vt-paidby" value="'+(v?esc(v.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div class="grid-2"><div>'+paidByField('vt-paidby', v?(v.paidBy||''):'')+'</div>'
     +'<div><label class="label">Payment method</label><select class="select" id="vt-paymethod" onchange="payToggle(\'vt\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((v&&v.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="vt-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="vt-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((v&&v.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="vt-cclast4" inputmode="numeric" maxlength="4" value="'+(v?esc(v.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
@@ -2929,7 +2952,7 @@ function groomModal(id){
     +'<label class="label">Itemized charges (optional)'+tip('Break the bill into line items — their total fills in the Cost above automatically.')+'</label>'
     +'<div id="gr-lines"></div>'
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><button type="button" class="btn btn-sm" onclick="lineAddRow(\'gr\')">+ Add line item</button><span id="gr-total" style="font-family:JetBrains Mono,monospace;font-size:13px;color:var(--text-secondary)"></span></div>'
-    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="gr-paidby" value="'+(g?esc(g.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div class="grid-2"><div>'+paidByField('gr-paidby', g?(g.paidBy||''):'')+'</div>'
     +'<div><label class="label">Payment method</label><select class="select" id="gr-paymethod" onchange="payToggle(\'gr\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((g&&g.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="gr-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="gr-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((g&&g.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="gr-cclast4" inputmode="numeric" maxlength="4" value="'+(g?esc(g.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
@@ -3117,9 +3140,11 @@ function invModal(id, pre){
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased'+(storeOptions().length?tip('Type a store or pick a past one — every store you\'ve used on a purchase shows up here automatically. Manage the list in Settings → Lists &amp; preferences → Stores.'):'')+'</label><input class="input" id="iv-store" list="iv-store-list" autocomplete="off" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"><datalist id="iv-store-list">'+storeOptions().map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+savedPick('iv-store', storeOptions(), 'Pick a past store')+'</div>'
     +'<div><label class="label">UPC / barcode'+tip('The product barcode number — handy for re-ordering the exact item.')+'</label><input class="input" id="iv-upc" inputmode="numeric" value="'+(it?esc(it.upc||''):'')+'" placeholder="012345678905"></div></div>'
+    +'<div class="grid-2"><div><label class="label">Manufacturer'+tip('The company that makes it — useful when it differs from the brand, and for warranty or support lookups.')+'</label><input class="input" id="iv-maker" value="'+(it?esc(it.maker||''):'')+'" placeholder="e.g. J.M. Smucker Co."></div>'
+    +'<div><label class="label">Model / part #'+tip('The maker\'s model, part, or SKU number — so you can re-buy the exact replacement part, filter, or accessory.')+'</label><input class="input" id="iv-model" value="'+(it?esc(it.model||''):'')+'" placeholder="e.g. FLT-4, B-450"></div></div>'
     +'<div class="grid-2"><div><label class="label">Reorder link'+tip('Paste the product page URL (Chewy, Amazon, the store site). A "Reorder" link then shows on the item and — most usefully — next to it in the Restock list when it\'s running low, so you can re-buy the exact item in one tap.')+'</label><input class="input" type="url" id="iv-url" value="'+(it?esc(it.reorderUrl||''):'')+'" placeholder="https://…"></div>'
     +'<div><label class="label">Amazon ASIN'+tip('Amazon\'s 10-character product ID — it\'s in the product page URL right after "/dp/" (e.g. B01LP0U5X0), and under "Product information" on the listing. When set, an "Amazon" button appears next to Reorder linking straight to the product. Pasting the full Amazon URL here works too — the ASIN is pulled out automatically when you save.')+'</label><input class="input" id="iv-asin" autocapitalize="characters" autocomplete="off" value="'+(it?esc(it.asin||''):'')+'" placeholder="B01LP0U5X0"></div></div>'
-    +'<div class="grid-2"><div><label class="label">Paid by</label><input class="input" id="iv-paidby" value="'+(it?esc(it.paidBy||''):'')+'" placeholder="You / partner / etc."></div>'
+    +'<div class="grid-2"><div>'+paidByField('iv-paidby', it?(it.paidBy||''):'')+'</div>'
     +'<div><label class="label">Payment method</label><select class="select" id="iv-paymethod" onchange="payToggle(\'iv\')"><option value="">—</option>'+PAY_METHODS.map(m=>'<option'+((it&&it.payMethod===m)?' selected':'')+'>'+m+'</option>').join('')+'</select></div></div>'
     +'<div id="iv-cc-wrap" style="display:none"><div class="grid-2"><div><label class="label">Card brand</label><select class="select" id="iv-ccbrand"><option value="">—</option>'+CC_BRANDS.map(b=>'<option'+((it&&it.ccBrand===b)?' selected':'')+'>'+b+'</option>').join('')+'</select></div>'
     +'<div><label class="label">Last 4</label><input class="input" id="iv-cclast4" inputmode="numeric" maxlength="4" value="'+(it?esc(it.ccLast4||''):'')+'" placeholder="1234"></div></div></div>'
@@ -3164,7 +3189,7 @@ function saveInv(id){
   const payMethod = fv('iv-paymethod'), isCard = payMethod==='Credit card' || payMethod==='Debit card';
   const noLifecycle = document.getElementById('iv-nolife').checked;
   const f = { category:fv('iv-cat'), brand:fv('iv-brand'), name:fv('iv-name'), qty:fv('iv-qty'), unit:fv('iv-unit'), size:fv('iv-size'), clothingSize:fv('iv-clothsize'),
-    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), reorderUrl:fv('iv-url'), asin:normalizeAsin(fv('iv-asin')), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
+    cost:fv('iv-cost'), purchaseDate:fv('iv-date'), store:fv('iv-store'), upc:fv('iv-upc'), maker:fv('iv-maker'), model:fv('iv-model'), reorderUrl:fv('iv-url'), asin:normalizeAsin(fv('iv-asin')), paidBy:fv('iv-paidby'), payMethod:payMethod, ccBrand:isCard?fv('iv-ccbrand'):'', ccLast4:isCard?fv('iv-cclast4'):'', noLifecycle:noLifecycle, startDate:noLifecycle?'':fv('iv-start'), endDate:noLifecycle?'':fv('iv-end'), runningLow:document.getElementById('iv-low').checked, trackCost:document.getElementById('iv-track').checked, notes:fv('iv-notes') };
   if(!f.name){ showToast('⚠️ Enter an item name'); return; }
   if(id) data.inventory = data.inventory.map(x => x.id===id ? {...x, ...f} : x);
   else data.inventory.unshift({ id:genId(), petId:data.activePetId, ...f });
@@ -3861,7 +3886,7 @@ function setCareSubtab(t){ careSubtab = t; render(); }
 function setSuppliesCat(c, enc){ suppliesCat = enc ? decodeURIComponent(c) : c; render(); }
 function setSuppliesStatus(s){ suppliesStatus = s; render(); }
 // Supplies column sort — text sorts ascending first, cost/date descending first; same column toggles direction.
-const SUP_SORTS = [{k:'name',l:'Item',t:'text'},{k:'brand',l:'Brand',t:'text'},{k:'store',l:'Where',t:'text'},{k:'category',l:'Category',t:'text'},{k:'cost',l:'Cost',t:'num'},{k:'purchaseDate',l:'Purchased',t:'date'},{k:'status',l:'Status',t:'status'}];
+const SUP_SORTS = [{k:'name',l:'Item',t:'text'},{k:'brand',l:'Brand',t:'text'},{k:'store',l:'Store',t:'text'},{k:'category',l:'Category',t:'text'},{k:'cost',l:'Cost',t:'num'},{k:'purchaseDate',l:'Purchased',t:'date'},{k:'status',l:'Status',t:'status'}];
 function setSuppliesSort(key){
   if(suppliesSort.key===key){ suppliesSort.dir = suppliesSort.dir==='asc'?'desc':'asc'; }
   else { const s = SUP_SORTS.find(x=>x.k===key); suppliesSort = { key, dir:(s && (s.t==='num'||s.t==='date'))?'desc':'asc' }; }
@@ -3884,12 +3909,47 @@ function filterSupplies(field, encVal){
   render();
 }
 function clearSuppliesFilter(){ suppliesFilter = null; render(); }
-function supFieldLabel(f){ return f==='store' ? 'Where' : (f==='brand' ? 'Brand' : f.charAt(0).toUpperCase()+f.slice(1)); }
-// Mobile-only sort control (the table headers handle sorting on wider screens, where this is hidden).
+function supFieldLabel(f){ return f==='store' ? 'Store' : (f==='brand' ? 'Brand' : f.charAt(0).toUpperCase()+f.slice(1)); }
+// Supplies table columns. Item and the trailing actions column always show; the rest can be
+// hidden from the Columns panel. Header and row cells are both built from suppliesVisibleCols()
+// so they can never disagree.
+const SUP_COLS = [['name','Item'],['brand','Brand'],['store','Store'],['category','Category'],['cost','Cost'],['purchaseDate','Purchased'],['status','Status']];
+const SUP_HIDEABLE = ['brand','store','category','cost','purchaseDate','status'];
+let suppliesColsOpen = false;      // Columns panel open/closed (transient, not saved)
+let suppliesHiddenSession = null;  // shared-profile viewers can't write settings, so their choice lives here for the session
+function suppliesHiddenCols(){
+  if(!canManage() && suppliesHiddenSession) return suppliesHiddenSession;
+  const h = data.settings && data.settings.suppliesHiddenCols;
+  return Array.isArray(h) ? h : [];
+}
+function suppliesVisibleCols(){ const h = suppliesHiddenCols(); return SUP_COLS.filter(([k]) => !SUP_HIDEABLE.includes(k) || !h.includes(k)); }
+function setSuppliesHiddenCols(arr){
+  if(canManage()){ data.settings = data.settings || {}; data.settings.suppliesHiddenCols = arr; save(); }
+  else { suppliesHiddenSession = arr; render(); }
+}
+function toggleSupCol(k){
+  if(!SUP_HIDEABLE.includes(k)) return;
+  const h = suppliesHiddenCols();
+  setSuppliesHiddenCols(h.includes(k) ? h.filter(x=>x!==k) : [...h, k]);
+}
+function resetSupCols(){ setSuppliesHiddenCols([]); }
+function toggleSupColsPanel(){ suppliesColsOpen = !suppliesColsOpen; render(); }
+// Sort pills are mobile-only (the table headers handle sorting on wider screens, where they're hidden);
+// the Columns button sits at the right end of the same row on every screen size.
 function suppliesSortBar(){
-  return '<div class="sup-sortbar"><span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Sort</span><div class="range-seg">'
+  const h = suppliesHiddenCols();
+  const colIco = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><rect x="1.5" y="2.5" width="13" height="11" rx="1.5"/><path d="M6 2.5v11M10 2.5v11"/></svg>';
+  let out = '<div class="sup-toolbar"><div class="sup-sortbar"><span style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em">Sort</span><div class="range-seg">'
     + SUP_SORTS.map(s=>{ const on=suppliesSort.key===s.k; return '<button class="'+(on?'active':'')+'" onclick="setSuppliesSort(\''+s.k+'\')">'+s.l+(on?(suppliesSort.dir==='asc'?' ↑':' ↓'):'')+'</button>'; }).join('')
-    + '</div></div>';
+    + '</div></div>'
+    + '<button class="btn btn-sm sup-colbtn" type="button" onclick="toggleSupColsPanel()" aria-expanded="'+(suppliesColsOpen?'true':'false')+'" title="Choose which columns to show. Your choice is saved.">'+colIco+'Columns'+(h.length?' · '+h.length+' hidden':'')+'</button></div>';
+  if(suppliesColsOpen){
+    out += '<div class="tag-grid" style="margin-bottom:10px">'
+      + SUP_COLS.filter(([k])=>SUP_HIDEABLE.includes(k)).map(([k,l])=>{ const vis=!h.includes(k); return '<button class="tag'+(vis?' active':'')+'" type="button" aria-pressed="'+(vis?'true':'false')+'" onclick="toggleSupCol(\''+k+'\')" title="'+(vis?'Hide':'Show')+' the '+l+' column">'+l+'</button>'; }).join('')
+      + (h.length ? '<button class="tag" type="button" onclick="resetSupCols()" title="Show every column again">Reset</button>' : '')
+      + '</div>';
+  }
+  return out;
 }
 
 function updateHeader(){
@@ -4315,7 +4375,7 @@ function runSearch(){
   petArr('records').forEach(r => { if(hit(r.name, r.type, r.vaccineType, r.result, r.vet, r.clinic, r.notes)) care.push(row('records', (r.name||r.type||'Record'), fmtDate(r.date), "recordModal('"+r.id+"')")); });
   petArr('illnesses').forEach(e => { if(hit(e.diagnosis, (e.symptoms||[]).join(' '), e.treatment, e.notes)) care.push(row('illness', e.diagnosis||(e.symptoms||[]).slice(0,3).join(', ')||'Illness', fmtDate(e.start), "illnessModal('"+e.id+"')")); });
   add('Care', care);
-  add('Supplies', petArr('inventory').filter(i => hit(i.name, i.brand, i.category, i.clothingSize, i.store, i.upc, i.asin, i.notes))
+  add('Supplies', petArr('inventory').filter(i => hit(i.name, i.brand, i.maker, i.model, i.category, i.clothingSize, i.store, i.upc, i.asin, i.notes))
     .map(i => row('supplies', ((i.brand?i.brand+' ':'')+(i.name||'')).trim(), [i.category, i.purchaseDate?fmtDate(i.purchaseDate):''].filter(Boolean).join(' · '), "invModal('"+i.id+"')")));
   add('Journal', petArr('journal').filter(n => hit(n.title, n.text))
     .map(n => row('log', (JOURNAL_KINDS[journalKind(n)].e+' '+(n.title||String(n.text||'').split('\n')[0].slice(0,50))), n.dateTime?fmtDate(n.dateTime):'', "noteModal('"+n.id+"')")));
@@ -5139,7 +5199,8 @@ function renderSupplies(){
   if(!shown.length) return html + '<div class="card empty"><div class="ico">'+svgIcon('supplies',46)+'</div><p style="color:var(--text-secondary)">'+((suppliesFilter||suppliesStatus!=='all')?'No items match this filter.':('No purchases logged'+(suppliesCat==='all'?'':' in '+suppliesCat)+' yet.'))+'</p></div>';
   html += suppliesSortBar();
   const fActive = (f,v)=> (suppliesFilter && suppliesFilter.field===f && suppliesFilter.value===v) ? ' active' : '';
-  const cols = [['name','Item'],['brand','Brand'],['store','Where'],['category','Category'],['cost','Cost'],['status','Status']];
+  const cols = suppliesVisibleCols();
+  const dateInSub = !cols.some(([k])=>k==='purchaseDate'); // date goes in the Item sub-line only when its own column is hidden
   const thead = '<thead><tr>'+cols.map(([k,l])=>{ const on=suppliesSort.key===k; const car=on?(suppliesSort.dir==='asc'?'↑':'↓'):'↕'; return '<th class="'+(on?'sorted':'')+'" onclick="setSuppliesSort(\''+k+'\')" title="Sort by '+l+'">'+l+'<span class="car">'+car+'</span></th>'; }).join('')+'<th></th></tr></thead>';
   const dash = '<span style="color:var(--text-secondary)">—</span>';
   const rows = shown.map(i=>{
@@ -5157,14 +5218,18 @@ function renderSupplies(){
       + (bd && bd.perUnit!=null ? '<div style="font-size:10px;color:var(--text-secondary);font-weight:400">'+moneyRate(bd.perUnit)+esc(bd.perUnitLabel)+'</div>' : '')+'</div>';
     const statusCell = '<span class="sup-tag'+(suppliesStatus===st?' active':'')+'" onclick="event.stopPropagation();setSuppliesStatus(\''+st+'\')" title="Show only '+st+' items">'+invStatusChip(i)+'</span>'
       +(i.runningLow?' <span class="chip" style="background:rgba(210,153,34,.15);color:var(--warning);font-size:10px">low</span>':'');
-    const sub = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
+    const sub = [ (i.qty?esc(i.qty)+' '+esc(i.unit||''):''), (i.size?esc(i.size):''), (i.model?'model '+esc(i.model):''), (dateInSub&&i.purchaseDate?fmtDate(i.purchaseDate):''), (i.startDate?'opened '+fmtDate(i.startDate):''), (i.endDate?'finished '+fmtDate(i.endDate):''), invDurationText(i) ].filter(Boolean).join(' · ');
+    const cell = {
+      name: '<td class="sup-item" data-label="Item">'+esc(i.name)+(i.clothingSize?' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+esc(i.clothingSize)+'</span>':'')+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>',
+      brand: '<td data-label="Brand">'+brandCell+'</td>',
+      store: '<td data-label="Store">'+whereCell+'</td>',
+      category: '<td data-label="Category">'+catCell+'</td>',
+      cost: '<td class="sup-mono" data-label="Cost">'+costCell+'</td>',
+      purchaseDate: '<td data-label="Purchased" style="white-space:nowrap">'+(i.purchaseDate?fmtDate(i.purchaseDate):dash)+'</td>',
+      status: '<td data-label="Status">'+statusCell+'</td>'
+    };
     return '<tr onclick="invModal(\''+i.id+'\')">'
-      + '<td class="sup-item" data-label="Item">'+esc(i.name)+(i.clothingSize?' <span style="font-size:11px;color:var(--text-secondary);font-weight:400">· '+esc(i.clothingSize)+'</span>':'')+(sub?'<div style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-top:2px">'+sub+'</div>':'')+'</td>'
-      + '<td data-label="Brand">'+brandCell+'</td>'
-      + '<td data-label="Where">'+whereCell+'</td>'
-      + '<td data-label="Category">'+catCell+'</td>'
-      + '<td class="sup-mono" data-label="Cost">'+costCell+'</td>'
-      + '<td data-label="Status">'+statusCell+'</td>'
+      + cols.map(([k])=>cell[k]).join('')
       + '<td class="sup-act" data-label="">'+reorder+(reorder&&action?' ':'')+action+'</td>'
       + '</tr>';
   }).join('');
