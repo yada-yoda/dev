@@ -302,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.91.0';
+const APP_VERSION = 'v0.91.1';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -3135,7 +3135,7 @@ function invModal(id, pre){
     +'<div class="grid-2"><div><label class="label">Qty'+tip('How many you bought — usually 1 (one bag, one box), with the amount inside in Package size below. Tracking by piece works too (65 treats = Qty 65, Unit count, no package size); cost breakdown then shows per piece.')+'</label><input class="input" type="number" step="0.1" id="iv-qty" value="'+(it?esc(it.qty||''):'1')+'"></div>'
     +'<div><label class="label">Unit'+tip('The container or measure. Add your own units in Settings → Lists &amp; preferences.')+'</label><select class="select" id="iv-unit"><option value="">—</option>'+sel(unitList, it?(it.unit||''):'')+'</select></div></div>'
     +'<label class="label">Package size (optional)'+tip('The amount inside the package — e.g. "5 lb", "30 ct", "12 oz". It\'s separate from Unit (the container), so a 5-lb bag of food is Qty 1, Unit bag, Size 5 lb.')+'</label><input class="input" id="iv-size" value="'+(it?esc(it.size||''):'')+'" placeholder="e.g. 5 lb, 30 ct">'
-    +'<div id="iv-clothing-wrap"><label class="label">Clothing size'+tip('The size on the tag or the measurements that fit — M, XL, 20 in chest, 15 in neck. Saved with the item so you can re-buy the right size without measuring again.')+'</label><input class="input" id="iv-clothsize" value="'+(it?esc(it.clothingSize||''):'')+'" placeholder="e.g. M, 20 in chest"></div>'
+    +'<div id="iv-clothing-wrap" class="grid-2"><div><label class="label">Clothing size'+tip('The size on the tag or the measurements that fit — M, XL, 20 in chest, 15 in neck. Saved with the item so you can re-buy the right size without measuring again.')+'</label><input class="input" id="iv-clothsize" value="'+(it?esc(it.clothingSize||''):'')+'" placeholder="e.g. M, 20 in chest"></div></div>'
     +'<div class="grid-2"><div><label class="label">Cost (pre-tax)'+tip('Enter the item price before sales tax, so spending totals stay consistent.')+'</label><input class="input" type="number" step="0.01" id="iv-cost" value="'+(it?esc(it.cost||''):'')+'" placeholder="0.00"></div>'
     +'<div><label class="label">Purchased</label><input class="input" type="date" id="iv-date" value="'+(it?esc(it.purchaseDate||''):todayISO())+'"></div></div>'
     +'<div class="grid-2"><div><label class="label">Where purchased'+(storeOptions().length?tip('Type a store or pick a past one — every store you\'ve used on a purchase shows up here automatically. Manage the list in Settings → Lists &amp; preferences → Stores.'):'')+'</label><input class="input" id="iv-store" list="iv-store-list" autocomplete="off" value="'+(it?esc(it.store||''):'')+'" placeholder="Chewy / PetSmart / Amazon"><datalist id="iv-store-list">'+storeOptions().map(x=>'<option value="'+esc(x)+'"></option>').join('')+'</datalist>'+savedPick('iv-store', storeOptions(), 'Pick a past store')+'</div>'
