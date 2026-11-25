@@ -302,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.92.0';
+const APP_VERSION = 'v0.93.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -380,6 +380,7 @@ let gcalAccessToken = null;
 let sharedOwnerUid = null;   // when set, the app is viewing/editing another owner's dogs (shared access)
 let sharedOwnerName = '';
 let sharedAccess = '';       // the current viewer's access level in shared mode: 'full' | 'logger' | 'read'
+let pendingShareCode = '';   // ?share=<owner uid> seen before sign-in; applied once the auth state arrives
 function activeUid(){ return sharedOwnerUid || (currentUser ? currentUser.uid : null); }
 // Permission predicates — always true on your own dogs; restricted only when viewing a shared profile.
 function canLog(){ return !sharedOwnerUid || sharedAccess === 'full' || sharedAccess === 'logger'; }
@@ -879,10 +880,16 @@ function initFirebase(){
     firebase.auth().onAuthStateChanged(user => {
       currentUser = user; updateAuthUI();
       if(user){
+        // An invite link opened before sign-in: switch to that owner's dogs for this first load.
+        const ps = takePendingShare(user);
+        if(ps){ sharedOwnerUid = ps; sharedOwnerName = ''; try { localStorage.setItem('pawprints_shared_uid', ps); } catch(e){} }
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
         ensureFirestore().then(() => loadFromFirestore()).then(() => { if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); if(typeof syncRecapPrefs==='function') syncRecapPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
-      else { gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; }
+      else {
+        gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = '';
+        if(pendingShareCode) showToast('👋 Sign in with Google, using the email the invite went to, to open the shared dog');
+      }
     });
   } catch(e){ console.warn('Firebase init failed:', e); }
 }
@@ -1144,6 +1151,34 @@ function openSharedProfile(code){
   closeModal();
   loadFromFirestore();
 }
+// ?share=<owner uid> is the one-tap invite in an SOS email. Signed in: open that owner's dogs
+// now. Not signed in yet (the usual case, since Firebase reports the user asynchronously):
+// remember the code and let the auth callback apply it. The param is stripped either way so a
+// reload doesn't re-trigger it.
+function readShareParam(){
+  let code = '';
+  try { code = (new URLSearchParams(location.search).get('share') || '').trim(); } catch(e){ code = ''; }
+  if(!code) return;
+  try {
+    if(history.replaceState){
+      const q = new URLSearchParams(location.search); q.delete('share');
+      const qs = q.toString();
+      history.replaceState(null, '', location.pathname + (qs ? '?'+qs : '') + location.hash);
+    }
+  } catch(e){}
+  if(!/^[A-Za-z0-9]{6,128}$/.test(code)) return; // Firebase uids are alphanumeric
+  if(currentUser){ if(code !== currentUser.uid) openSharedProfile(code); return; }
+  pendingShareCode = code;
+  try { localStorage.setItem('pawprints_pending_share', code); } catch(e){}
+}
+// Returns the stashed invite code (once) when it belongs to someone else, and clears the stash.
+function takePendingShare(user){
+  let code = pendingShareCode;
+  if(!code){ try { code = localStorage.getItem('pawprints_pending_share') || ''; } catch(e){ code = ''; } }
+  pendingShareCode = '';
+  try { localStorage.removeItem('pawprints_pending_share'); } catch(e){}
+  return (code && user && code !== user.uid) ? code : '';
+}
 function exitSharedProfile(silent){
   if(!sharedOwnerUid) return;
   sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = '';
@@ -1264,7 +1299,7 @@ function logChange(action, entity, detail){
   data.auditLog.unshift({ id:genId(), ts:new Date().toISOString(), action, entity, detail:detail||'', by:actor(), uid: currentUser ? currentUser.uid : null });
   if(data.auditLog.length > 500) data.auditLog = data.auditLog.slice(0, 500);
 }
-const AUDIT_ICON = { added:'➕', edited:'✏️', deleted:'🗑️', logged:'📝', restored:'♻️', cleared:'🧹', marked:'✅' };
+const AUDIT_ICON = { added:'➕', edited:'✏️', deleted:'🗑️', logged:'📝', restored:'♻️', cleared:'🧹', marked:'✅', sent:'📧' };
 let historyReturnView = 'today';
 function openHistory(){ historyReturnView = (currentView && currentView !== 'history') ? currentView : 'today'; switchView('history'); }
 let activityReturnView = 'today';
@@ -3402,7 +3437,8 @@ function emergencyModal(){
   const ownerLine = (data.settings||{}).emergencyOwnerLine || '';
   const ownerField = '<label class="label" for="er-owner">Your contact line'+tip('Shown at the top of Contacts so whoever has '+(p.name||'your dog')+' can reach you. Leave it blank to show only the vets.')+'</label>'
     + '<input class="input" id="er-owner" maxlength="160" value="'+esc(ownerLine)+'" placeholder="e.g. Sam · 555-123-4567">'
-    + emergencyPeopleNote();
+    + emergencyPeopleNote()
+    + '<div id="er-sos">'+sosBlockHTML('')+'</div>';
   let html = '<h3>🆘 Emergency card</h3>';
   if(!st){
     html += '<p style="font-size:14px;color:var(--text-secondary);margin:0 0 14px">Makes a link and QR code to a page with '+esc(p.name)+'’s photo, food, meds, medical notes and vet numbers. Anyone with the link can see it, no sign-in needed. You can turn it off anytime.</p>'
@@ -3430,14 +3466,17 @@ function renderEmergencyQR(url){
     new QRCode(el, { text:url, width:180, height:180, colorDark:'#000000', colorLight:'#ffffff', correctLevel:QRCode.CorrectLevel.M });
   }).catch(()=>{ const el = document.getElementById('er-qr'); if(el) el.innerHTML = '<span style="font-size:13px;color:#333;line-height:1.4">QR code couldn’t load — the link below still works.</span>'; });
 }
-async function saveEmergencyCard(){
-  if(denyEmergencyShared()) return;
-  if(denyManage()) return;
-  if(demoMode){ showToast('🐾 Emergency cards aren’t available in the demo'); return; }
-  const p = activePet(); if(!p) return;
+// opts.sos: called from sendSOS() as a step. Then it stays quiet (no toast, no modal re-render)
+// and returns { ok, error } so the SOS flow can stop and show the error in the modal.
+async function saveEmergencyCard(opts){
+  const sos = !!(opts && opts.sos);
+  if(denyEmergencyShared()) return sos ? { ok:false, error:'Only the dog’s owner can do this' } : undefined;
+  if(denyManage()) return sos ? { ok:false, error:'Only the dog’s owner can do this' } : undefined;
+  if(demoMode){ showToast('🐾 Emergency cards aren’t available in the demo'); return sos ? { ok:false, error:'Not available in the demo' } : undefined; }
+  const p = activePet(); if(!p) return sos ? { ok:false, error:'No dog selected' } : undefined;
   const ownerEl = document.getElementById('er-owner');
   if(ownerEl){ data.settings.emergencyOwnerLine = ownerEl.value.trim(); save(false); }
-  if(!currentUser){ signIn(false, saveEmergencyCard); return; }
+  if(!currentUser){ if(sos) return { ok:false, error:'Sign in first' }; signIn(false, saveEmergencyCard); return; }
   const btn = document.getElementById('er-go'), label = btn ? btn.textContent : '';
   if(btn){ btn.disabled = true; btn.textContent = 'Saving…'; }
   try {
@@ -3448,11 +3487,126 @@ async function saveEmergencyCard(){
     data.settings[emergencyKey(p.id)] = { token:j.token, url:j.url, updated:new Date().toISOString() };
     logChange(wasNew?'added':'edited','emergency card', p.name);
     save(false);
+    if(sos){ if(btn){ btn.disabled = false; btn.textContent = label; } return { ok:true }; }
     showToast(wasNew ? '🆘 Emergency card created' : '🆘 Emergency card updated');
     emergencyModal();
   } catch(e){
     if(btn){ btn.disabled = false; btn.textContent = label; }
-    showToast(e && e.message==='too-large' ? '⚠️ Card too large — try a smaller profile photo' : '⚠️ Couldn’t save the card — check your connection and try again');
+    const msg = e && e.message==='too-large' ? 'Card too large — try a smaller profile photo' : 'Couldn’t save the card — check your connection and try again';
+    if(sos) return { ok:false, error:msg };
+    showToast('⚠️ '+msg);
+  }
+}
+
+// ── SOS handoff ──
+// One tap emails each Emergency Contact who has an email the care-card link plus an invite
+// into the app (?share=<owner uid>). The worker sends the mail and caps it at 3 sends an hour.
+const SOS_MAX = 4;
+const SOS_EMAIL_RE = /^[^\s@<>"',;:()\[\]\\]+@[^\s@<>"',;:()\[\]\\]+\.[^\s@<>"',;:()\[\]\\]+$/;
+let sosNotice = null; // { ok, text } shown once in the SOS block after a send, then cleared
+// Emergency Contacts split by whether they can be emailed. Duplicate emails count once.
+function sosRecipients(){
+  const withEmail = [], noEmail = [], seen = new Set();
+  (data.contacts||[]).filter(c => c && /^emergency contact$/i.test(String(c.role||'').trim())).forEach(c => {
+    const name = String(c.name||'').trim(), email = String(c.email||'').trim().toLowerCase();
+    if(email && email.length <= 254 && SOS_EMAIL_RE.test(email)){
+      if(!seen.has(email)){ seen.add(email); withEmail.push({ name:name.slice(0,120), email }); }
+    } else if(name || String(c.phone||'').trim()){
+      noEmail.push({ name: name || String(c.phone||'').trim() });
+    }
+  });
+  return { withEmail: withEmail.slice(0, SOS_MAX), extra: Math.max(0, withEmail.length - SOS_MAX), noEmail };
+}
+function sosPeopleLabel(n){ return n+' '+(n===1?'person':'people'); }
+// stage: '' = normal view, 'confirm' = in-modal confirmation, 'sending' = waiting on the worker.
+function sosBlockHTML(stage){
+  const p = activePet(); if(!p) return '';
+  const dog = p.name || 'your dog';
+  const { withEmail, extra, noEmail } = sosRecipients();
+  const notice = sosNotice; sosNotice = null;
+  const noticeHTML = notice ? '<p role="status" style="font-size:13px;margin:0 0 10px;color:'+(notice.ok?'var(--accent)':'var(--danger)')+'">'+esc(notice.text)+'</p>' : '';
+  let html = '<div class="label">If you can’t care for '+esc(dog)+' yourself'+tip('For a hospital stay or any emergency: your Emergency Contacts get the care card link and an invite into the app, so they can see food, meds and vets and log what they do.')+'</div>';
+  if(!withEmail.length){
+    return html + noticeHTML + '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 14px">Add an email to an Emergency Contact under Profile → Contacts and you can email them '+esc(dog)+'’s care info from here in one tap.</p>';
+  }
+  if(stage === 'confirm' || stage === 'sending'){
+    const list = withEmail.map(r => (r.name ? r.name+' ('+r.email+')' : r.email)).join(', ');
+    const busy = stage === 'sending';
+    return html + '<div style="border:1px solid var(--danger);border-radius:10px;padding:12px;margin:0 0 14px">'
+      + '<p style="font-size:13px;margin:0 0 10px;line-height:1.5">This emails '+sosPeopleLabel(withEmail.length)+' ('+esc(list)+') a link to '+esc(dog)+'’s care card and an invite to help in the app. Each will also be added to your Sharing list with full helper access (existing entries are upgraded).</p>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn btn-danger" type="button" id="er-sos-send" onclick="sendSOS()"'+(busy?' disabled':'')+'>'+(busy?'Sending…':'Send now')+'</button>'
+      + '<button class="btn" type="button" onclick="sosShow(\'\')"'+(busy?' disabled':'')+'>Cancel</button></div></div>';
+  }
+  html += noticeHTML
+    + '<ul style="font-size:13px;margin:0 0 8px;padding-left:18px">'
+    + withEmail.map(r => '<li>'+esc(r.name||'(no name)')+' · '+esc(r.email)+'</li>').join('')
+    + '</ul>'
+    + (extra ? '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 8px">Only the first '+SOS_MAX+' are emailed; '+extra+' more not included.</p>' : '')
+    + noEmail.map(x => '<p style="font-size:12px;color:var(--text-secondary);margin:0 0 6px">'+esc(x.name)+': no email saved — add one in Contacts to include them</p>').join('')
+    + '<button class="btn btn-danger" type="button" style="margin:4px 0 14px" onclick="sosStart()" title="Sends each person the care card and an invite to help in the app. Use it when you can’t care for '+esc(dog)+' yourself.">Email my emergency contacts</button>';
+  return html;
+}
+function sosShow(stage){ const el = document.getElementById('er-sos'); if(el) el.innerHTML = sosBlockHTML(stage); }
+function sosStart(){
+  if(denyEmergencyShared()) return;
+  if(denyManage()) return;
+  if(demoMode){ showToast('🐾 Emergency emails aren’t available in the demo'); return; }
+  sosShow('confirm');
+}
+// Shows the result in the SOS block. A full re-render picks up a card created along the way.
+function sosFinish(ok, text){
+  sosNotice = { ok, text };
+  if(document.getElementById('er-sos')) emergencyModal();
+  else { sosNotice = null; showToast((ok?'':'⚠️ ')+text); }
+}
+async function sendSOS(){
+  if(denyEmergencyShared()) return;
+  if(denyManage()) return;
+  if(demoMode){ showToast('🐾 Emergency emails aren’t available in the demo'); return; }
+  const p = activePet(); if(!p) return;
+  if(!currentUser){ signIn(false, sendSOS); return; }
+  const { withEmail } = sosRecipients();
+  if(!withEmail.length){ sosShow(''); return; }
+  // Keep an edited contact line: the re-render at the end reads it back from settings.
+  const ownerEl = document.getElementById('er-owner');
+  if(ownerEl){ data.settings.emergencyOwnerLine = ownerEl.value.trim(); save(false); }
+  sosShow('sending');
+  // 1. Always re-push the card (create or update) so the emailed link never shows a stale snapshot.
+  const res = await saveEmergencyCard({ sos:true });
+  if(!res || !res.ok){ sosFinish(false, (res && res.error) || 'Couldn’t save the card'); return; }
+  // 2. Recipients join the Sharing list so the invite's sign-in actually opens the dog. Someone
+  // already listed as view-only or past their end date is upgraded; nobody is ever downgraded.
+  data.collaborators = data.collaborators || [];
+  const today = todayISO();
+  let changed = 0;
+  withEmail.forEach(r => {
+    const c = data.collaborators.find(x => String(x.email||'').toLowerCase() === r.email);
+    if(!c){
+      data.collaborators.push({ email:r.email, role:'Helper', access:'full', until:'' });
+      logChange('added','shared access', r.email+' · Helper · '+SHARE_ACCESS_LABEL.full);
+      changed++;
+      return;
+    }
+    const viewOnly = c.access === 'read', expired = !!(c.until && c.until < today);
+    if(!viewOnly && !expired) return;
+    if(viewOnly) c.access = 'full';
+    if(expired) c.until = '';
+    logChange('edited','shared access', r.email+' · upgraded for SOS');
+    changed++;
+  });
+  if(changed){ syncShareLists(); save(false); }
+  // 3. Ask the worker to send.
+  try {
+    const r = await workerFetch('/emergency/sos', { method:'POST', body: JSON.stringify({ petId:p.id, recipients:withEmail }) });
+    const j = await r.json().catch(()=>({}));
+    if(!r.ok || !j.ok) throw new Error(j.error || 'Couldn’t send the emails — check your connection and try again');
+    const sent = num(j.sent), failed = num(j.failed);
+    if(sent) logChange('sent','emergency SOS', sent+' recipient'+(sent===1?'':'s')+(failed?' · '+failed+' failed':''));
+    save(false);
+    if(!sent) throw new Error('None of the emails went out — check the addresses and try again');
+    sosFinish(true, '✅ Emailed '+sosPeopleLabel(sent)+(failed?' — '+failed+' couldn’t be sent, check their addresses':''));
+  } catch(e){
+    sosFinish(false, (e && e.message && e.message !== 'not-signed-in') ? e.message : 'Couldn’t send the emails — check your connection and try again');
   }
 }
 async function turnOffEmergencyCard(){
@@ -5880,7 +6034,8 @@ if(data.pets.length && !data.activePetId) data.activePetId = data.pets[0].id;
 seedWalkBadges();
 try { diagMode = new URLSearchParams(location.search).has('diag'); } catch(e){ diagMode = false; }
 if(new URLSearchParams(location.search).has('demo')) enterDemo();
-else { backfillVetContacts(); if(migrateFeedItems() + migrateMedDoses() + migrateMedDosesFromAudit() + migrateMeasurements()) saveLocal(); render(); }
+else readShareParam();
+if(!demoMode){ backfillVetContacts(); if(migrateFeedItems() + migrateMedDoses() + migrateMedDosesFromAudit() + migrateMeasurements()) saveLocal(); render(); }
 initAnalytics();
 if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather();
 setInterval(() => { if(data.settings && (data.settings.homeZip||'').trim()) fetchHeaderWeather(); }, 1800000);

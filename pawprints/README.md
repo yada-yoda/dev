@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.92.0**
+**Current Version: v0.93.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -49,6 +49,15 @@ covers both.
   4) and vet / emergency-vet numbers. It's a snapshot stored by `pawprints-worker`
   (`POST`/`DELETE /emergency`, served at `/e/<token>`); Update re-uploads to the same link,
   Turn off kills it
+- **SOS handoff** — in the Emergency card modal, "Email my emergency contacts" (after an
+  in-modal confirm) emails each Emergency Contact that has an email (up to 4) the care-card link
+  plus an invite into the app, and adds them to your Sharing list as Helper / Full access so the
+  invite works (anyone already listed as view-only or past their end date is upgraded, never
+  downgraded). Re-uploads the card first every time, so the emailed link is never stale. Sent by `pawprints-worker`
+  (`POST /emergency/sos`, at most 3 sends an hour)
+- **Invite links** — `?share=<owner code>` opens that owner's dogs in one tap. Signed out, the
+  code is remembered until Google sign-in finishes, then applied; the param is stripped from the
+  URL so a reload doesn't repeat it
 - **Calendar** — a month view of every dated item (vet, follow-ups, grooming + next-due, med
   due-dates); **two-way Google Calendar sync** writes the schedule to a calendar you pick (re-sync
   updates the same events, no duplicates), plus a no-account `.ics` download
@@ -98,6 +107,7 @@ covers both.
 
 ## Version History
 
+- **v0.93.0** — An SOS button for when you can't look after your dog, like a hospital stay. In the Emergency card modal, "Email my emergency contacts" sends each Emergency Contact with an email the care-card link and an invite into the app, after you confirm right there in the modal. They're added to your Sharing list first (or upgraded to full access if they were view-only or their access had run out), so when they open the invite and sign in with that email, your dog is already there. The card is re-uploaded right before sending, so what they see is current. The invite link (`?share=`) also works for anyone you share with by hand, even if they aren't signed in yet. Contacts with no email are flagged so you know who won't get it.
 - **v0.92.0** — The emergency card now lists the people to call when you can't be reached. Anyone saved in Contacts as an "Emergency Contact" (up to 4, with their note, like "neighbor, has a spare key") rides along on the next Update, each with a Call button on the card page. The card modal shows who's included, or a hint on how to add someone.
 - **v0.91.2** — Switching to a category tab in Supplies now clears any status or brand/store filter that was still on, so a Clothing item marked one-time can't look missing from its own tab.
 - **v0.91.1** — The Clothing size box in the supply form now takes half the width instead of stretching all the way across, since it only ever holds short sizes like "M" or "20 in chest".
