@@ -28,12 +28,14 @@ Single file: `index.html`, plain HTML/CSS/JS, no build step. No analytics. Marke
 
 ## Screenshot import
 
-In Add snapshot, drop Robinhood option screenshots or press Choose screenshots (on a phone this opens the photo library). Several at once is fine; they are read one after another and shown one form at a time.
+In Add snapshot, drop Robinhood option screenshots, paste one with Ctrl+V (Cmd+V on a Mac), or press Choose screenshots (on a phone this opens the photo library). Several at once is fine; they are read one after another and shown one form at a time. Pasting works while the drop zone is showing or an import is running; pasting text into a field is not affected. The drop zone can be reached with Tab, and Enter on it opens the file picker.
+
+Both the phone app and the desktop site (robinhood.com) are read.
 
 - OCR is tesseract.js 7.0.0, loaded from cdnjs only when the first image is chosen. Its worker, engine and English data come from jsdelivr (about 7 MB on first use, then cached by the browser). Everything runs in the browser; the image is never uploaded.
-- Each image is upscaled 2x on a canvas and read with automatic page segmentation. If the stock price bar is missed, the bottom quarter is read again on its own. Dark screenshots with few values read get a second, inverted pass.
-- `parseRobinhoodText(text)` turns the text into fields by matching Robinhood's label rows (Bid/Ask, Mark/Last trade/IV, Greeks, and the Your position screen). Anything it cannot read stays empty. It never fills in a guess.
-- The form opens prefilled. Read values are highlighted; editing one removes the highlight. The time comes from the status-bar clock with AM/PM guessed from market hours. The date is left empty and confidence stays Inferred until you change it. If the image has an EXIF/XMP creation date, it is offered as a suggestion only. The file's modified time is never used.
+- Each image is upscaled 2x on a canvas. Phone (portrait) shots are read with automatic page segmentation; if the stock price bar is missed, the bottom quarter is read again on its own. Desktop (landscape) shots have their long edge capped at 4000 px and are read as one column of lines (page segmentation mode 4), because automatic segmentation split the five-column stats grid and dropped the Ask row. Dark screenshots with few values read get a second, inverted pass.
+- `parseRobinhoodText(text, { wide })` turns the text into fields. Phone text is matched by Robinhood's label rows (Bid/Ask, Mark/Last trade/IV, Greeks, and the Your position screen). Desktop text is recognised by its full label names ("Implied volatility", "Previous close") or "$0.27 x 34" bid/ask lines and goes to `parseRobinhoodDesktop`, which reads the five-column rows, the position cards, Today's return and Total return (with percent), and takes the stock price from "Current NVDA price". Anything it cannot read stays empty. It never fills in a guess.
+- The form opens prefilled. Read values are highlighted; editing one removes the highlight. On phone shots the time comes from the status-bar clock with AM/PM guessed from market hours. Desktop shots have no clock, so the time is left empty too. The date is left empty and confidence stays Inferred until you change it. If the image has an EXIF/XMP creation date, it is offered as a suggestion only. The file's modified time is never used.
 - Nothing is saved until you press Save and confirm. Warnings show when the screenshot's ticker, strike, type, contracts, average cost or expiration differ from the selected position, when the same image was imported before, and when a snapshot with the same date and time exists.
 - Images over 15 MB or not images are left out.
 
@@ -44,6 +46,12 @@ Later option: store the screenshot itself (for example in Firebase Storage) so a
 Points from the latest snapshot: premium lost (60%+ = 3, 40%+ = 2, 20%+ = 1), days to expiry (7 or less = 3, 21 or less = 2, 45 or less = 1), absolute delta (under 0.10 = 2, under 0.25 = 1), and percent out of the money when the stock price was recorded (20%+ = 2, 10%+ = 1). Total: 0-1 Low, 2-3 Moderate, 4-5 High, 6+ Very High. The same rules are shown in the app.
 
 ## Changelog
+
+### v0.3.1 (2026-11-25)
+
+Screenshots from the Robinhood desktop site came out mostly blank, because that page lays the numbers out differently from the phone app: five stats per row, bid and ask sizes on the same line as the price, and no clock. Desktop screenshots are now read on their own terms, including Today's return and Total return. Phone screenshots are read exactly as before.
+
+Taking a screenshot on a computer and then saving it as a file was an extra step. You can now paste it straight into Add snapshot with Ctrl+V (Cmd+V on a Mac).
 
 ### v0.3.0 (2026-11-13)
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>OptionsPulse v0.3.0</title>
+<title>OptionsPulse v0.3.1</title>
 <meta name="robots" content="noindex">
 <meta name="description" content="Private options-position tracker: snapshots, P/L, Greeks and rule-based holding risk.">
 <meta name="color-scheme" content="dark light">
@@ -119,6 +119,7 @@ table.hist th.sorted{color:var(--text)}
 .drop p{margin:0 0 8px}
 .drop .legend{margin:8px 0 0}
 .drop.on{border-color:var(--blue);color:var(--text);background:var(--hl)}
+.drop:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-color:var(--blue)}
 .ocrbox{display:grid;grid-template-columns:minmax(0,120px) minmax(0,1fr);gap:12px;align-items:start;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}
 .ocrbox.big{grid-template-columns:minmax(0,1fr)}
 .ocrbox p{margin:0 0 6px;font-size:13px;overflow-wrap:anywhere}
@@ -189,7 +190,7 @@ input.ocr{border-color:var(--blue);box-shadow:inset 3px 0 0 var(--blue)}
 
 <script>
 'use strict';
-const APP_VERSION = '0.3.0';
+const APP_VERSION = '0.3.1';
 const TZ_DEFAULT = 'America/Chicago';
 
 // ---------- Firebase (same project as Illness Tracker / PawPrints, so the same Google login works) ----------
@@ -525,7 +526,8 @@ function snapshotForm(s, ocr){
   const isNew = !s || !!ocr; s = s || Object.assign(blankSnap(), { date: todayCT() });
   const F = (k, l, tip, mode) => numField('f-' + k, l, s[k], tip, mode);
   const M = (k, l, tip) => moneyField('f-' + k, l, s[k], tip);
-  const top = ocr ? ocrPanel(ocr) : isNew ? '<div class="drop" id="drop-zone"><p><b>Fill from screenshots.</b> Drop Robinhood option screenshots here, or</p>' +
+  const top = ocr ? ocrPanel(ocr) : isNew ? '<div class="drop" id="drop-zone" tabindex="0" aria-label="Screenshot drop zone. Paste an image with ' + PASTE_KEYS + ', or press Enter to choose screenshots." title="Drop or paste a screenshot here. Enter opens the file picker.">' +
+    '<p><b>Fill from screenshots.</b> Drop Robinhood option screenshots (phone app or desktop site) here, or paste with ' + PASTE_KEYS + ', or</p>' +
     '<button type="button" data-act="pick-shots" title="Pick one or more screenshots (up to 15 MB each). On a phone this opens your photo library.">Choose screenshots</button>' +
     '<p class="legend">Text is read in this browser with free OCR. The image never leaves your device and is not saved. You check every value before anything is stored. Or type the values below; leave anything not shown blank.</p></div>' : '';
   openModal('<div class="modal-head"><h2>' + (ocr ? 'Add snapshot from screenshot' : isNew ? 'Add snapshot' : 'Edit snapshot') + '</h2><button type="button" class="x" data-act="close" aria-label="Close">&times;</button></div>' + top +
@@ -551,6 +553,7 @@ function snapshotForm(s, ocr){
   dtWarn();
 }
 const OCR_TIP = 'Read from screenshot, please verify';
+const PASTE_KEYS = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '') ? 'Cmd+V' : 'Ctrl+V';
 // Live warning when another snapshot of this position already has the chosen date and time.
 function dtWarn(){
   const w = $('dt-warn'), p = activePos(); if(!w || !p) return;
@@ -594,7 +597,9 @@ function findHash(h){
 // Robinhood lays stats out as a row of labels followed by a row of values. A label row is matched when any one
 // of its labels appears (OCR often garbles one, e.g. "IV" -> "\Y"), and values are read by position from the
 // next line (within 2) that has enough numbers. Anything not read stays null; nothing is guessed.
-function parseRobinhoodText(text){
+// The desktop web page is read by parseRobinhoodDesktop() instead (see below); the phone path is unchanged.
+// opts.wide = the image is landscape, which lets the weaker desktop-only clues (return rows) pick the desktop reader.
+function parseRobinhoodText(text, opts){
   const ROWS = [
     { labels: ['bid', 'ask'], keys: ['bid', 'ask'], sizes: true },
     { labels: ['mark', 'last trade', 'iv'], keys: ['mark', 'last', 'iv'] },
@@ -608,7 +613,8 @@ function parseRobinhoodText(text){
     { labels: ['breakeven', 'current [a-z]{1,5} price', 'current'], keys: ['breakeven', 'currentUnderlying'] }
   ];
   const FIELDS = ['stock','mark','bid','bidSize','ask','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho','clock',
-    'contracts','avgCost','marketValue','currentPrice','dateBought','expiration','breakeven','currentUnderlying','ticker','titleTicker','titleStrike','titleType'];
+    'contracts','avgCost','marketValue','currentPrice','dateBought','expiration','breakeven','currentUnderlying','ticker','titleTicker','titleStrike','titleType',
+    'todaysReturn','todaysReturnPct','totalReturn','totalReturnPct','layout'];
   const out = {}; FIELDS.forEach(k => out[k] = null);
   if(typeof text !== 'string' || !text) return out;
   // Dash variants (figure/en/em dash, minus, and their UTF-8-read-as-Latin-1 forms) become "-".
@@ -617,6 +623,12 @@ function parseRobinhoodText(text){
   const toNum = t => { const v = parseFloat(String(t).replace(/[^\d.]/g, '')); return isFinite(v) ? (/-/.test(t) ? -v : v) : null; };
   const all = norm(text);
   const lines = all.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  // Desktop web: full label names, or "$0.27 x 34" (price and size on one line). Phone shots use "IV" / "Prev close" and put sizes on their own line.
+  const desktop = /implied[ \t]+volatil|previous[ \t]+close|\$\d[\d,]*\.\d+[ \t]*[xX×][ \t]*\d/i.test(all) ||
+    !!(opts && opts.wide && /today.{0,2}s[ \t]+return|total[ \t]+return|breakeven[ \t]+price/i.test(all));
+  out.layout = desktop ? 'desktop' : 'phone';
+  if(desktop) parseRobinhoodDesktop(lines, out, toNum);
+  else {
   const clock = lines[0] && lines[0].match(/^(\d{1,2}:\d{2})/);
   if(clock) out.clock = clock[1];
   const used = new Set();
@@ -648,6 +660,7 @@ function parseRobinhoodText(text){
       if(sz.length === 2 && px.length === 2){ out.bid = toNum(px[0]); out.ask = toNum(px[1]); out.bidSize = sz[0]; out.askSize = sz[1]; break; }
     }
   }
+  }
   // Title such as "NVDA $215 Call".
   const title = all.match(/\b([A-Z]{1,5})\s+\$(\d[\d,]*(?:\.\d+)?)\s+(Call|Put)\b/i);
   if(title){ out.titleTicker = title[1].toUpperCase(); out.titleStrike = toNum(title[2]); out.titleType = title[3].toLowerCase(); }
@@ -656,12 +669,58 @@ function parseRobinhoodText(text){
   if(bars.length){ const b = bars[bars.length - 1]; out.ticker = b[1]; out.stock = toNum(b[2]); }
   return out;
 }
+// Desktop web page (robinhood.com): five-column stat rows ("Bid Mark Implied volatility High Volume" over its values) and
+// position cards where the value sits on the label's own line ("Current price $0.30 Average cost $2.22") or, for the two
+// headline values, on the next line ("Market value Expiration date" over "$30.00 12/18"). Each label claims the text up
+// to the next label. A label row takes the next line's values only when the counts and kinds match exactly; otherwise
+// those fields stay null. There is no clock and no "NVDA - $price" bar here; the stock price is "Current NVDA price".
+function parseRobinhoodDesktop(lines, out, toNum){
+  const L = [
+    ['bid', 'bidask', /\bbid\b/], ['ask', 'bidask', /\bask\b/], ['mark', 'num', /\bmark\b/], ['last', 'num', /\blast\s+trade\b/],
+    ['iv', 'num', /\bimplied\s+volatility\b|\biv\b/], ['prevClose', 'num', /\bprev(?:ious)?\s+close\b/], ['high', 'num', /\bhigh\b/], ['low', 'num', /\blow\b/],
+    ['volume', 'num', /\bvolume\b/], ['oi', 'num', /\bopen\s+interest\b/],
+    ['delta', 'num', /\bdelta\b/], ['gamma', 'num', /\bgamma\b/], ['theta', 'num', /\btheta\b/], ['vega', 'num', /\bvega\b/], ['rho', 'num', /\brho\b/],
+    ['marketValue', 'num', /\bmarket\s+value\b/], ['currentUnderlying', 'num', /\bcurrent\s+[a-z]{1,5}\s+price\b/], ['currentPrice', 'num', /\bcurrent\s+price\b/],
+    ['todaysReturn', 'ret', /\btoday.{0,2}s\s+return\b/], ['totalReturn', 'ret', /\btotal\s+return\b/],
+    ['expiration', 'date', /\bexpiration\s+date\b/], ['avgCost', 'num', /\baverage\s+cost\b/], ['breakeven', 'num', /\bbreakeven(?:\s+price)?\b/],
+    ['contracts', 'num', /\bcontracts\b/], ['dateBought', 'date', /\bdate\s+bought\b/]
+  ];
+  // Value tokens: "$0.27 x 34" (price and size), "-$12.00 (-28.57%)" (amount and percent), "12/18" (date), or a plain number.
+  const TOK = /([+-]?\$?[+-]?\d[\d,]*(?:\.\d+)?)\s*[xX×]\s*(\d[\d,]*)(?![\d.])|([+-]?\$?[+-]?\d[\d,]*(?:\.\d+)?)\s*\(\s*([+-]?\d[\d,]*(?:\.\d+)?)\s*%\s*\)|(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)(?![\d.])|([+-]?\$?[+-]?\d[\d,]*(?:\.\d+)?%?)/g;
+  const tokens = s => Array.from(s.matchAll(TOK), m => m[1] != null ? { kind: 'ps', v: m[1], n: m[2] } : m[3] != null ? { kind: 'ret', v: m[3], n: m[4] } : m[5] != null ? { kind: 'date', v: m[5] } : { kind: 'num', v: m[6] });
+  const fits = (want, t) => want === 'date' ? t.kind === 'date' : want === 'bidask' ? t.kind === 'ps' || t.kind === 'num' : want === 'ret' ? t.kind === 'ret' || t.kind === 'num' : t.kind === 'num';
+  const labelsIn = line => {
+    const low = line.toLowerCase(), hits = [];
+    L.forEach(([key, want, re]) => { const m = re.exec(low); if(m) hits.push({ key, want, at: m.index, end: m.index + m[0].length }); });
+    hits.sort((a, b) => a.at - b.at || b.end - a.end);
+    return hits.filter((h, i) => !hits.slice(0, i).some(o => h.at < o.end)); // drop a label inside a longer one
+  };
+  const put = (h, t) => {
+    if(out[h.key] != null || !fits(h.want, t)) return;
+    if(h.want === 'date'){ out[h.key] = t.v; return; }
+    out[h.key] = toNum(t.v);
+    if(t.kind === 'ps') out[h.key + 'Size'] = toNum(t.n);
+    if(t.kind === 'ret') out[h.key + 'Pct'] = /-/.test(t.v) && !/-/.test(t.n) ? -toNum(t.n) : toNum(t.n);
+  };
+  for(let i = 0; i < lines.length; i++){
+    const hits = labelsIn(lines[i]); if(!hits.length) continue;
+    const segs = hits.map((h, n) => tokens(lines[i].slice(h.end, n + 1 < hits.length ? hits[n + 1].at : undefined)));
+    hits.forEach((h, n) => { if(segs[n].length === 1) put(h, segs[n][0]); });
+    if(!segs.every(s => !s.length)) continue; // mixed line: labels without an inline value stay null
+    const next = lines[i + 1];
+    if(!next || labelsIn(next).length) continue;
+    const vals = tokens(next);
+    if(vals.length === hits.length && hits.every((h, n) => fits(h.want, vals[n]))) hits.forEach((h, n) => put(h, vals[n]));
+  }
+  const tk = lines.join('\n').match(/\bCurrent\s+([A-Z]{1,5})\s+price\b/);
+  if(tk) out.ticker = tk[1];
+}
 // ---------- end OCR parser ----------
 
 // ---------- Screenshot import: OCR runs in this browser; images never leave the device and are not stored ----------
 const SHOT_MAX = 15 * 1024 * 1024;
 const TESS_SRC = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/7.0.0/tesseract.min.js';
-const OCR_NUM_KEYS = ['stock','mark','bid','bidSize','ask','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho','contracts','avgCost','marketValue','currentPrice','breakeven','currentUnderlying'];
+const OCR_NUM_KEYS = ['stock','mark','bid','bidSize','ask','askSize','last','prevClose','high','low','iv','volume','oi','delta','gamma','theta','vega','rho','contracts','avgCost','marketValue','currentPrice','breakeven','currentUnderlying','todaysReturn','totalReturn'];
 let ocrQueue = [], ocrCur = null, ocrBusy = false, ocrGen = 0, ocrWaiting = false, ocrLog = null;
 let tessLoading = null, tessWorker = null;
 function loadTesseract(){
@@ -736,8 +795,9 @@ async function decodeImage(file){
 }
 function imgSize(img){ return { w: img.naturalWidth || img.width, h: img.naturalHeight || img.height }; }
 // 2x upscale (OCR reads small phone text much better), capped under the ~16.7M pixel canvas limit of iOS Safari.
+// Landscape (desktop) shots also cap the long edge at 4000 px: a 4K screenshot gains nothing from 7680 px and reads slower.
 function shotCanvas(img, invert){
-  const { w, h } = imgSize(img), k = Math.min(2, Math.sqrt(16e6 / (w * h)));
+  const { w, h } = imgSize(img), k = Math.min(2, Math.sqrt(16e6 / (w * h)), w > h ? 4000 / w : 2);
   const c = document.createElement('canvas'); c.width = Math.round(w * k); c.height = Math.round(h * k);
   const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(img, 0, 0, c.width, c.height);
   if(invert){
@@ -801,14 +861,19 @@ async function ocrPump(){
     else {
       const img = await decodeImage(it.file);
       const worker = await getWorker(), canvas = shotCanvas(img, false);
-      let best = parseRobinhoodText((await worker.recognize(canvas)).data.text);
+      // Desktop (landscape) pages read as one column of variable-size lines (PSM 4): automatic segmentation (3) splits the
+      // five-column stat grid and the position cards into separate blocks and drops rows. Phone shots keep PSM 3.
+      const sz = imgSize(img), wide = sz.w > sz.h;
+      await worker.setParameters({ tessedit_pageseg_mode: wide ? '4' : '3' });
+      let best = parseRobinhoodText((await worker.recognize(canvas)).data.text, { wide });
       if(ocrCount(best) < 6 && meanLuma(img) < 128){
         pass = 2;
-        const r2 = parseRobinhoodText((await worker.recognize(shotCanvas(img, true))).data.text);
+        const r2 = parseRobinhoodText((await worker.recognize(shotCanvas(img, true))).data.text, { wide });
         if(ocrCount(r2) > ocrCount(best)) best = r2;
       }
-      // Full-page segmentation in the browser often drops the "NVDA - $price" bar; reading the bottom quarter alone finds it.
-      if(best.stock == null){
+      // Full-page segmentation in the browser often drops the phone's "NVDA - $price" bar; reading the bottom quarter alone finds it.
+      // The desktop page has no such bar.
+      if(best.stock == null && !wide){
         pass = 3;
         const top = Math.round(canvas.height * 0.75);
         const rb = parseRobinhoodText((await worker.recognize(canvas, { rectangle: { left: 0, top, width: canvas.width, height: canvas.height - top } })).data.text);
@@ -874,7 +939,7 @@ function ocrOpenForm(it){
   put('stock', r.stock != null ? r.stock : r.currentUnderlying);
   const t = clockTo24(r.clock);
   if(t){ s.time = t; filled.push('time'); }
-  s.evidence = 'Robinhood screenshot, read by OCR' + (r.clock ? '; status-bar clock ' + r.clock + (+r.clock.split(':')[0] <= 12 ? ' (AM/PM guessed)' : '') : '');
+  s.evidence = (r.layout === 'desktop' ? 'Robinhood desktop screenshot (no clock on the page), read by OCR' : 'Robinhood screenshot, read by OCR') + (r.clock ? '; status-bar clock ' + r.clock + (+r.clock.split(':')[0] <= 12 ? ' (AM/PM guessed)' : '') : '');
   snapshotForm(s, { item: it, filled, warn: ocrWarnings(p, r, it) });
 }
 function ocrWarnings(p, r, it){
@@ -895,18 +960,21 @@ function ocrPanel(o){
   const it = o.item, r = it.parsed, p = activePos();
   let h = '<div class="ocrbox"><button type="button" class="thumbbtn" data-act="ocr-zoom" title="Show the screenshot larger or smaller" aria-label="Enlarge or shrink the screenshot"><img src="' + esc(it.url) + '" alt="Screenshot ' + it.n + '"></button><div>';
   h += '<p><b>Screenshot ' + it.n + ' of ' + ocrQueue.length + '</b>: ' + esc(it.name) + '</p>';
-  h += r ? '<p>' + o.filled.length + ' field(s) were read and are highlighted. Check each one against the screenshot. Blank fields could not be read; type them if you can see them. Set the date yourself.</p>'
+  h += r ? '<p>' + o.filled.length + ' field(s) were read and are highlighted. Check each one against the screenshot. Blank fields could not be read; type them if you can see them. ' +
+      (r.layout === 'desktop' ? 'The desktop page shows no clock or date, so set both yourself.' : 'Set the date yourself.') + '</p>'
     : '<p class="warn">The text could not be read (' + esc(it.msg) + '). Type the values from the screenshot, or skip it.</p>';
   h += '<p class="legend">Saving to <b>' + esc(posLabel(p)) + '</b>. Read in this browser; the image is not uploaded or saved. Nothing is stored until you press Save.</p>';
   o.warn.forEach(x => h += '<p class="warn">' + esc(x) + '</p>');
   if(r){
-    const ex = [['contracts', 'Contracts', v => String(v)], ['avgCost', 'Avg cost', money], ['marketValue', 'Market value', money], ['dateBought', 'Bought', v => v], ['expiration', 'Expires', v => v], ['breakeven', 'Breakeven', money]].filter(x => r[x[0]] != null);
+    const ex = [['contracts', 'Contracts', v => String(v)], ['avgCost', 'Avg cost', money], ['marketValue', 'Market value', money], ['dateBought', 'Bought', v => v], ['expiration', 'Expires', v => v], ['breakeven', 'Breakeven', money],
+      ['todaysReturn', "Today's return", v => money(v) + pctPart(r.todaysReturnPct)], ['totalReturn', 'Total return', v => money(v) + pctPart(r.totalReturnPct)]].filter(x => r[x[0]] != null);
     if(ex.length) h += '<p class="legend">Position screen: ' + ex.map(x => x[1] + ' ' + esc(x[2](r[x[0]]))).join(' · ') + '. Shown for checking; not saved with the snapshot.</p>';
   }
   if(it.exif) h += '<p class="legend">Image metadata suggests <b>' + esc(longDate(it.exif.date) + ' ' + to12(it.exif.time)) + '</b>. Only a suggestion: it can be when the file was saved or edited, not when the screenshot was taken. <button type="button" data-act="ocr-exif" title="Copy the suggested date into the Date field (and the time, if Time is empty)">Use this date</button></p>';
   if(ocrQueue.length > 1) h += '<div id="ocr-list">' + ocrListHtml() + '</div>';
   return h + '</div></div>';
 }
+function pctPart(v){ return v == null ? '' : ' (' + (v < 0 ? '−' : '') + fmt(Math.abs(v), 2) + '%)'; }
 function ocrAdvance(status){
   if(!ocrCur) return;
   ocrCur.status = status; ocrCur = null;
@@ -935,6 +1003,21 @@ document.addEventListener('drop', e => {
   e.preventDefault();
   const z = e.target.closest && e.target.closest('#drop-zone');
   if(z){ z.classList.remove('on'); shotFilesChosen(e.dataTransfer.files); }
+});
+// Paste (Ctrl+V / Cmd+V) an image from the clipboard into the same queue as a dropped file. Works while the Add snapshot
+// form shows the drop zone or an import is under way. Pastes without an image (text into a field) are left alone.
+document.addEventListener('paste', e => {
+  const cd = e.clipboardData; if(!cd) return;
+  const files = Array.from(cd.items || []).filter(i => i.kind === 'file' && /^image\//.test(i.type)).map(i => i.getAsFile()).filter(Boolean);
+  if(!files.length) return;
+  if(!$('drop-zone') && !ocrQueue.length) return;
+  e.preventDefault();
+  const stamp = new Date().toTimeString().slice(0, 8);
+  shotFilesChosen(files.map(f => { try { return new File([f], 'Pasted image ' + stamp + '.' + ((f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')), { type: f.type }); } catch(err){ return f; } }));
+});
+// The drop zone takes focus so a keyboard user can see where a paste lands; Enter or Space on it opens the picker.
+document.addEventListener('keydown', e => {
+  if(e.target && e.target.id === 'drop-zone' && (e.key === 'Enter' || e.key === ' ')){ e.preventDefault(); $('shot-file').value = ''; $('shot-file').click(); }
 });
 
 // ---------- Rendering ----------
