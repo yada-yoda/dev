@@ -302,7 +302,7 @@ input[type="date"]::-webkit-date-and-time-value,input[type="time"]::-webkit-date
 // ═══════════════════════════════════════════════
 // VERSION
 // ═══════════════════════════════════════════════
-const APP_VERSION = 'v0.93.0';
+const APP_VERSION = 'v0.94.0';
 // Google Analytics 4 measurement ID for PawPrints. Paste the dedicated property's
 // "G-XXXXXXXXXX" id here to turn analytics on; empty = analytics fully off. Tracking is
 // anonymous (anonymize_ip, no personal data) and is skipped entirely in demo mode.
@@ -884,10 +884,10 @@ function initFirebase(){
         const ps = takePendingShare(user);
         if(ps){ sharedOwnerUid = ps; sharedOwnerName = ''; try { localStorage.setItem('pawprints_shared_uid', ps); } catch(e){} }
         try { const sc = localStorage.getItem('pawprints_shared_uid'); if(sc && sc !== user.uid){ sharedOwnerUid = sc; } } catch(e){}
-        ensureFirestore().then(() => loadFromFirestore()).then(() => { if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); if(typeof syncRecapPrefs==='function') syncRecapPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
+        ensureFirestore().then(() => loadFromFirestore()).then(() => { markStandaloneUse(); if(cloudDirty) saveToFirestore(); if(typeof syncReorderPrefs==='function') syncReorderPrefs(true); if(typeof syncRecapPrefs==='function') syncRecapPrefs(true); }).catch(e => console.warn('firestore load failed:', e)); checkGcalConnection();
       }
       else {
-        gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = '';
+        gcalAccessToken = null; gcalPersistent = false; sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; sharedLoadedUid = null;
         if(pendingShareCode) showToast('👋 Sign in with Google, using the email the invite went to, to open the shared dog');
       }
     });
@@ -965,6 +965,7 @@ function mergeTombstones(remoteDel){
   return tomb;
 }
 let lastCloudPull = 0; // last time this device saw the cloud doc (load or pre-save check)
+let sharedLoadedUid = null; // whose shared doc `data` currently holds; null = own data (or nothing shared loaded)
 async function loadFromFirestore(quiet){
   if(demoMode || !firebaseReady || !currentUser) return;
   const shared = !!sharedOwnerUid, uid = activeUid();
@@ -982,8 +983,25 @@ async function loadFromFirestore(quiet){
         if(myEntry) sharedAccess = myEntry.access || 'full';
         else if((d.sharedRead||[]).includes(me) && !(d.sharedWrite||[]).includes(me)) sharedAccess = 'read';
         else sharedAccess = 'full';
-        // Viewing someone else's dogs — replace the in-memory view entirely; never touch own localStorage.
+        // Viewing someone else's dogs: never touch own localStorage. On a re-pull of the SAME
+        // owner's doc, keep in-memory records the pull lacks (logged just before it, write still
+        // queued) so the follow-up save carries them; this device keeps no other copy in shared
+        // mode. Remote wins per id and tombstones from either side drop records, as in the owner
+        // merge below. A first load (memory holds own or another owner's data) replaces outright.
+        const prev = sharedLoadedUid === uid ? data : null;
         data = Object.assign(JSON.parse(JSON.stringify(DATA_DEFAULTS)), d);
+        if(prev){
+          const tomb = Object.assign({}, d.deleted||{}, prev.deleted||{});
+          data.deleted = tomb;
+          SYNC_COLLECTIONS.forEach(k => {
+            const remote = (data[k]||[]).filter(r => r && !tomb[r.id]);
+            const remoteIds = new Set(remote.map(r=>r.id));
+            const localOnly = (prev[k]||[]).filter(x => x && x.id && !remoteIds.has(x.id) && !tomb[x.id]);
+            data[k] = [...remote, ...localOnly];
+          });
+          if(prev.activePetId && data.pets.some(p=>p.id===prev.activePetId)) data.activePetId = prev.activePetId;
+        }
+        sharedLoadedUid = uid;
         sharedOwnerName = d.ownerName || '';
         if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
         seedWalkBadges();
@@ -1008,7 +1026,8 @@ async function loadFromFirestore(quiet){
       data.settings = Object.assign({}, d.settings||{}, data.settings||{});
       if(d.sharedWith) data.sharedWith = d.sharedWith;
       if(data.settings.theme){ try { localStorage.setItem('pawprints_theme', data.settings.theme); } catch(e){} applyTheme(data.settings.theme); }
-      if(d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
+      // The selected dog is per-device: a resume pull must not silently switch the dog the next entry is logged for.
+      if(!(data.activePetId && data.pets.some(p=>p.id===data.activePetId)) && d.activePetId && data.pets.some(p=>p.id===d.activePetId)) data.activePetId = d.activePetId;
       if(!data.activePetId && data.pets[0]) data.activePetId = data.pets[0].id;
       backfillVetContacts(); migrateFeedItems(); migrateMedDoses(); migrateMedDosesFromAudit(); migrateMeasurements(); seedWalkBadges(); saveLocal(); render();
       if(!quiet) showToast('✅ Synced from cloud');
@@ -1029,7 +1048,10 @@ let saveInFlight = false, savePending = false, saveInFlightSince = 0; // coalesc
 // killed by backgrounding (or that got force-closed) pushes them on its next open/foreground.
 // Set on every persist, cleared ONLY after a set() actually succeeds.
 let cloudDirty = false; try { cloudDirty = !!localStorage.getItem('pawprints_dirty'); } catch(e){}
-function setCloudDirty(v){ cloudDirty = v; try { if(v) localStorage.setItem('pawprints_dirty','1'); else localStorage.removeItem('pawprints_dirty'); } catch(e){} }
+// Bumped on every setCloudDirty(true). A write may clear the flag only if no change landed
+// after its payload was built; otherwise entries added while it was in flight lose replay.
+let dirtyGen = 0, saveRunId = 0;
+function setCloudDirty(v){ if(v) dirtyGen++; cloudDirty = v; try { if(v) localStorage.setItem('pawprints_dirty','1'); else localStorage.removeItem('pawprints_dirty'); } catch(e){} }
 async function saveToFirestore(){
   if(demoMode || !firebaseReady || !currentUser) return;
   const uid = activeUid(); if(!uid) return;
@@ -1039,6 +1061,7 @@ async function saveToFirestore(){
   // stuck past 45s, a new save takes over instead of queueing behind a corpse.
   if(saveInFlight && Date.now() - saveInFlightSince < 45000){ savePending = true; return; }
   saveInFlight = true; saveInFlightSince = Date.now();
+  const runId = ++saveRunId; // a superseded (taken-over) run must not reset the in-flight state of its successor
   const timeout = ms => new Promise((_,rej)=>setTimeout(()=>rej(new Error('cloud-timeout')), ms));
   try {
     await ensureFirestore();
@@ -1070,10 +1093,11 @@ async function saveToFirestore(){
         }
       } catch(e){ /* pre-read failed (offline?) — still save what we have */ }
     }
+    const genAtBuild = dirtyGen;
     const payload = { ...data, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
     if(!sharedOwnerUid) payload.ownerName = currentUser.displayName || currentUser.email || '';
     await Promise.race([ref.set(payload), timeout(25000)]);
-    setCloudDirty(false); // confirmed in the cloud
+    if(dirtyGen === genAtBuild) setCloudDirty(false); // confirmed, and nothing changed after this payload was built
     if(rescued){ saveLocal(); render(); }
     if(cloudSaveOk !== true){ cloudSaveOk = true; if(currentView==='today') render(); }
   } catch(e){
@@ -1086,8 +1110,10 @@ async function saveToFirestore(){
     }
     if(currentView==='today') render();
   } finally {
-    saveInFlight = false;
-    if(savePending){ savePending = false; saveToFirestore(); }
+    if(runId === saveRunId){
+      saveInFlight = false;
+      if(savePending){ savePending = false; saveToFirestore(); }
+    }
   }
 }
 
@@ -1181,7 +1207,7 @@ function takePendingShare(user){
 }
 function exitSharedProfile(silent){
   if(!sharedOwnerUid) return;
-  sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = '';
+  sharedOwnerUid = null; sharedOwnerName = ''; sharedAccess = ''; sharedLoadedUid = null;
   try { localStorage.removeItem('pawprints_shared_uid'); } catch(e){}
   data = JSON.parse(JSON.stringify(DATA_DEFAULTS));
   loadLocal();
@@ -1223,22 +1249,27 @@ function mergeFromLocalStorage(){
   }
   adopted += reconcileJournal();
   // A stale resumed page must re-adopt the pending-upload duty the newer page left behind.
-  try { if(localStorage.getItem('pawprints_dirty') && !cloudDirty) setCloudDirty(true); } catch(e){}
+  // Adopted records may never have reached the cloud (journal-only ones certainly didn't), so
+  // adoption alone marks dirty too, matching loadLocal; the resume push then uploads them.
+  // Always called on adoption (even if already dirty) so an in-flight write that predates it can't clear the flag.
+  if(adopted) setCloudDirty(true);
+  else { try { if(localStorage.getItem('pawprints_dirty') && !cloudDirty) setCloudDirty(true); } catch(e){} }
   return adopted;
 }
 // Safety-net journal: every new activity entry also goes to a small separate key (newest
-// first, capped at 50). A small write can succeed when the big blob hits the storage
+// first, capped at JOURNAL_MAX). A small write can succeed when the big blob hits the storage
 // quota. Reconcile re-inserts entries missing from data.logs unless tombstoned; only
 // entries from the last 90 days, so a deleted log whose 120-day tombstone has been
 // pruned can't come back. The journal is never cleared except by the cap.
 const JOURNAL_KEY = 'pawprints_journal';
+const JOURNAL_MAX = 120; // about a week of heavy logging; photo-sized fields are already dropped, so this stays small
 function journalLog(rec){
   if(demoMode || sharedOwnerUid || !rec) return;
   try {
     const c = {}; Object.keys(rec).forEach(f => { const v = rec[f]; if(!(typeof v === 'string' && v.length > 4000)) c[f] = v; }); // drop photo-sized strings
     let j = []; try { j = JSON.parse(localStorage.getItem(JOURNAL_KEY) || '[]'); } catch(e){ j = []; }
     if(!Array.isArray(j)) j = [];
-    j = [c].concat(j.filter(x => x && x.id !== c.id)).slice(0, 50);
+    j = [c].concat(j.filter(x => x && x.id !== c.id)).slice(0, JOURNAL_MAX);
     localStorage.setItem(JOURNAL_KEY, JSON.stringify(j));
   } catch(e){}
 }
@@ -1486,6 +1517,30 @@ const A2HS_DISMISS_KEY = 'pawprints_a2hs_dismissed';
 let a2hsDismissedMem = false; // keeps the dismiss for this session when storage is blocked
 function a2hsDismissed(){ if(a2hsDismissedMem) return true; try { return !!localStorage.getItem(A2HS_DISMISS_KEY); } catch(e){ return false; } }
 function dismissA2hs(){ a2hsDismissedMem = true; try { localStorage.setItem(A2HS_DISMISS_KEY, '1'); } catch(e){} render(); }
+// The iOS home-screen app and a Safari tab keep separate localStorage, so an entry stranded in
+// one is invisible to the other, and Safari may purge a tab's storage after ~7 days unused.
+// Neither context can read the other's storage, so "this person uses the installed app" rides
+// the synced settings doc; a Safari tab that sees it nudges toward the installed app.
+let standaloneMarked = false; // once per session
+function markStandaloneUse(){
+  if(standaloneMarked || demoMode || sharedOwnerUid || !currentUser || !isStandalone()) return;
+  standaloneMarked = true;
+  data.settings = data.settings || {};
+  if(data.settings.usesStandalonePWA === true) return;
+  data.settings.usesStandalonePWA = true;
+  save(false);
+}
+const TAB_NOTICE_KEY = 'pawprints_tab_notice_dismissed', TAB_NOTICE_DAYS = 14;
+let tabNoticeDismissedMem = false; // keeps the dismiss for this session when storage is blocked
+function tabNoticeDismissed(){
+  if(tabNoticeDismissedMem) return true;
+  try { const t = Number(localStorage.getItem(TAB_NOTICE_KEY)); return t > 0 && Date.now() - t < TAB_NOTICE_DAYS*86400000; } catch(e){ return false; }
+}
+function dismissTabNotice(){ tabNoticeDismissedMem = true; try { localStorage.setItem(TAB_NOTICE_KEY, String(Date.now())); } catch(e){} render(); }
+function showTabNotice(){
+  return isIOS() && !isStandalone() && !demoMode && !sharedOwnerUid && !!currentUser
+    && !!(data.settings && data.settings.usesStandalonePWA === true) && !tabNoticeDismissed();
+}
 function a2hsModal(){
   const shareIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--blue)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-5px" aria-label="Share icon: a square with an arrow pointing up out of it" role="img"><path d="M16 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2h2"/><path d="M12 15V3"/><path d="m8.5 6 3.5-3.5L15.5 6"/></svg>';
   const addIcon = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-5px" aria-label="Add to Home Screen icon: a square with a plus inside" role="img"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 9v6M9 12h6"/></svg>';
@@ -2296,7 +2351,7 @@ function quickWater(){
 }
 function saveWater(){
   if(!futureLogOk(fv('q-dt'))) return;
-  addLog({ type:'water', dateTime:fv('q-dt'), refilled:true, place:fv('q-place'), notes:fv('q-note') });
+  if(!addLog({ type:'water', dateTime:fv('q-dt'), refilled:true, place:fv('q-place'), notes:fv('q-note') })) return; // deny / no-dog paths already showed why
   closeModal(); showToast('💧 Fresh water given');
 }
 // Food choices for the feed form = your Food/Treats from inventory (specific brands first) + the generic types.
@@ -2378,7 +2433,7 @@ function quickFeed(){
     +'<div><label class="label">Unit</label><select class="select" id="q-unit">'+sel(AMOUNT_UNITS, initFed?(initFed.unit||'cups'):'cups')+'</select></div></div>'
     +'<div id="q-place-wrap"'+(/treat|chew/i.test(initType)?' style="display:none"':'')+'><label class="label">Where'+tip('Where you fed them. Add your own spots in Settings → Lists.')+'</label><select class="select" id="q-place"><option value="">—</option>'+sel(foodPlaceOptions(), last?last.foodPlace:'')+'</select></div>'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')});closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;if(!addLog({type:\'feed\',dateTime:fv(\'q-dt\'),foodType:fv(\'q-food\'),foodItem:fv(\'q-fooditem\')||\'\',amount:fv(\'q-amt\'),unit:fv(\'q-unit\'),foodPlace:fv(\'q-place\'),notes:fv(\'q-note\')}))return;closeModal();showToast(\'🍖 Feeding logged\')">Save</button>');
   populateFoodItems('q', initItem);
 }
 function quickPotty(){
@@ -2427,8 +2482,9 @@ function savePotty(){
   if(!result){ showToast('⚠️ Pick pee, poop, or nothing'); return; }
   const atHome = (fv('q-loc') || 'home') !== 'other';
   const id = addLog({ type:'potty', dateTime:fv('q-dt'), result, place:fv('q-place'), stool:fv('q-stool'), location:atHome?'home':'other', notes:fv('q-note') });
+  if(!id) return; // deny / no-dog paths already showed why; closing here would also close the add-dog prompt
   closeModal(); showToast('🚪 Potty logged');
-  if(id && data.settings) fetchWalkWeather(id); // zipForLog decides: home ZIP at home, custom location ZIP elsewhere
+  if(data.settings) fetchWalkWeather(id); // zipForLog decides: home ZIP at home, custom location ZIP elsewhere
 }
 function quickWalk(){
   if(denyLog()) return;
@@ -2459,9 +2515,10 @@ function saveWalk(){
   const saveFav = document.getElementById('q-fav') && document.getElementById('q-fav').checked && (entry.from || entry.to);
   if(saveFav) addWalkFavorite(entry.from, entry.to);
   const id = addLog(entry);
+  if(!id) return; // deny / no-dog paths already showed why
   closeModal();
   showToast('🦮 Walk logged'+(saveFav?' · ★ route saved':''));
-  if(id && data.settings) fetchWalkWeather(id); // zipForLog decides: custom From/To location ZIP beats home ZIP
+  if(data.settings) fetchWalkWeather(id); // zipForLog decides: custom From/To location ZIP beats home ZIP
 }
 // ── Weather for walks (zip → Open-Meteo, no API key) ──
 function weatherFromCode(code){
@@ -2775,7 +2832,7 @@ function quickWeight(){
     +'<label class="label">When</label><input class="input" type="datetime-local" id="q-dt" value="'+nowLocalISO()+'">'
     +'<label class="label">Weight ('+unit+')</label><input class="input" type="number" step="0.1" id="q-w" placeholder="42.5">'
     +'<label class="label">Note</label><input class="input" id="q-note" placeholder="Optional">'
-    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;addLog({type:\'weight\',dateTime:fv(\'q-dt\'),value:fv(\'q-w\'),unit:\''+unit+'\',source:\'manual\',notes:fv(\'q-note\')});closeModal();showToast(\'⚖️ Weight logged\')">Save</button>');
+    +'<button class="btn-primary" onclick="if(!futureLogOk(fv(\'q-dt\')))return;if(!addLog({type:\'weight\',dateTime:fv(\'q-dt\'),value:fv(\'q-w\'),unit:\''+unit+'\',source:\'manual\',notes:fv(\'q-note\')}))return;closeModal();showToast(\'⚖️ Weight logged\')">Save</button>');
 }
 
 // ═══════════════════════════════════════════════
@@ -4376,7 +4433,7 @@ function diagReport(){
   section('Safety journal (this device)', () => {
     if(!journal){ out.push('Journal unreadable - ' + journalErr); return; }
     out.push(journal.length + ' entr' + (journal.length === 1 ? 'y' : 'ies') + ', newest first (id | type | logged for | saved at)');
-    journal.slice(0, 50).forEach(x => { if(!x || typeof x !== 'object'){ out.push('(bad entry)'); return; } out.push(sid(x.id) + ' | ' + (x.type || '-') + ' | ' + (x.dateTime || '-') + ' | ' + when(x.createdAt)); });
+    journal.slice(0, JOURNAL_MAX).forEach(x => { if(!x || typeof x !== 'object'){ out.push('(bad entry)'); return; } out.push(sid(x.id) + ' | ' + (x.type || '-') + ' | ' + (x.dateTime || '-') + ' | ' + when(x.createdAt)); });
   });
   section('Change history (last 20, newest first)', () => {
     const a = arr(D.auditLog).slice(0, 20);
@@ -4451,8 +4508,15 @@ function renderToday(){
   if(localSaveFailed && !demoMode && !sharedOwnerUid){
     html += '<div class="card" style="border-color:var(--danger);background:rgba(248,81,73,.07)"><div style="font-size:13px"><strong>⚠️ This device couldn’t save locally.</strong> Your entries still sync to the cloud when you’re online, but this device’s offline copy isn’t updating — usually the browser’s storage is full. Freeing space or reinstalling the home-screen app fixes it.</div></div>';
   }
+  // iOS Safari tab of someone who also uses the installed app: steer them back to it (replaces the generic nudge)
+  const tabNotice = showTabNotice();
+  if(tabNotice){
+    html += '<div class="card a2hs-nudge"><span aria-hidden="true" style="font-size:18px">📲</span>'
+      + '<div style="flex:1 1 180px;min-width:0;font-size:13px"><strong>You’re in the browser tab</strong><br>You usually use the PawPrints home-screen app. Entries are safest logged there — Safari can clear this tab’s offline safety copies after a week of disuse. Switch to the PawPrints icon on your home screen.</div>'
+      + '<div style="display:flex;gap:6px;margin-left:auto"><button class="btn btn-sm" onclick="dismissTabNotice()" aria-label="Dismiss browser-tab notice" title="Hide for 14 days">×</button></div></div>';
+  }
   // first-visit home-screen nudge (phones only, until dismissed on this device)
-  if((isIOS() || isAndroid()) && !isStandalone() && !demoMode && !a2hsDismissed()){
+  if(!tabNotice && (isIOS() || isAndroid()) && !isStandalone() && !demoMode && !a2hsDismissed()){
     html += '<div class="card a2hs-nudge"><span aria-hidden="true" style="font-size:18px">📲</span>'
       + '<div style="flex:1 1 180px;min-width:0;font-size:13px">Add PawPrints to your home screen — it opens full-screen like a real app.</div>'
       + '<div style="display:flex;gap:6px;margin-left:auto"><button class="btn btn-sm" onclick="installApp()">Show me</button>'
@@ -4579,6 +4643,7 @@ function dupLog(id){
   const src = data.logs.find(x=>x.id===id); if(!src) return;
   const copy = { ...src, id: genId(), createdAt: new Date().toISOString() };
   data.logs.unshift(copy);
+  journalLog(copy);
   logChange('logged', LOG_ENTITY[copy.type]||'activity', 'duplicated: '+(logSummary(copy)||'').replace(/<[^>]+>/g,''));
   save(); queueActivitySync();
   editLogModal(copy.id);

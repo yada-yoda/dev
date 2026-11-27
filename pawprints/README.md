@@ -1,6 +1,6 @@
 # PawPrints
 
-**Current Version: v0.93.0**
+**Current Version: v0.94.0**
 
 Live: [dev.rizzo.cc/pawprints](https://dev.rizzo.cc/pawprints/)
 
@@ -71,7 +71,9 @@ covers both.
   spend breakdown
 - **Photos stored inline** — uploads are canvas-downscaled to a small thumbnail, so they sync
   with everything else (no separate storage bucket)
-- **Cloud sync** — Google Sign-In + Firestore, with graceful offline fallback to localStorage
+- **Cloud sync** — Google Sign-In + Firestore, with graceful offline fallback to localStorage.
+  Every activity entry also lands in a small on-device safety journal (the latest 120), which
+  puts back anything the main copy lost. Unconfirmed uploads are retried on the next open.
 - **Demo mode** at `?demo=1` (meet Biscuit), JSON export/import, installable PWA
 
 ## Setup
@@ -106,6 +108,8 @@ covers both.
 4. `dev.rizzo.cc` is already an authorized Firebase domain, so sign-in works as-is.
 
 ## Version History
+
+- **v0.94.0** — **Still chasing the vanished entries.** A close audit of what happens when you log several things in a row turned up three real ways entries could miss the cloud or vanish, and all three are now closed. (1) When two or three entries were saved back to back, the first upload finishing could mark everything as "synced" even though the later entries hadn't gone up yet. If the phone then went to sleep, nothing would ever retry them, so the other devices never saw them. Now an upload only counts as complete if nothing new was added while it was on its way. (2) A helper viewing a shared dog could lose an entry logged a moment before the app refreshed from the cloud, because the refresh replaced everything on screen. The refresh now keeps those fresh entries so they still upload. (3) Entries the safety journal brings back when the app wakes up are now queued for upload too, not just shown on this device. Smaller fixes: the "logged" message only appears when something was actually saved, a duplicated entry gets its safety-journal copy, waking the app no longer switches which dog is selected, and the safety journal now holds the latest 120 entries instead of 50, roughly a week of busy logging. And because the iPhone home-screen app and a Safari tab each keep their own separate offline copy, opening PawPrints in a Safari tab when you normally use the home-screen app now shows a note pointing you back to the app. Safari can clear a tab's offline copy after about a week without use. You can hide the note for 14 days.
 
 - **v0.93.0** — An SOS button for when you can't look after your dog, like a hospital stay. In the Emergency card modal, "Email my emergency contacts" sends each Emergency Contact with an email the care-card link and an invite into the app, after you confirm right there in the modal. They're added to your Sharing list first (or upgraded to full access if they were view-only or their access had run out), so when they open the invite and sign in with that email, your dog is already there. The card is re-uploaded right before sending, so what they see is current. The invite link (`?share=`) also works for anyone you share with by hand, even if they aren't signed in yet. Contacts with no email are flagged so you know who won't get it.
 - **v0.92.0** — The emergency card now lists the people to call when you can't be reached. Anyone saved in Contacts as an "Emergency Contact" (up to 4, with their note, like "neighbor, has a spare key") rides along on the next Update, each with a Call button on the card page. The card modal shows who's included, or a hint on how to add someone.
